@@ -11679,56 +11679,47 @@ async function fetchFinanceTab(pubKey, gid) {
 function num(v) { const n = parseFloat(v); return isNaN(n) ? 0 : n; }
 
 function parseAgingCSV(rows) {
-  // Columns: [row#, Study Name, current, 30-60, 61-90, 91-120, 121-150, >150]
-  // Header row 0 has tier labels, row 1 has column names — both come as CSV rows
-  // The Apps Script copies raw data, so row 0 = tier header, row 1 = column header, row 2+ = data
-  // parseCSV already uses row 0 as headers, so we skip the first data row (column header row)
-  const dataRows = rows.filter(r => {
-    const s = (r['Study Name'] || Object.values(r)[1] || '').trim();
-    return s && s.toLowerCase() !== 'grand total' && s.toLowerCase() !== 'study name';
-  });
-  return dataRows.map(r => {
-    const vals = Object.values(r);
-    return {
-      study: (r['Study Name'] || vals[1] || '').trim(),
-      current: num(vals[2]),
-      d30_60: num(vals[3]),
-      d61_90: num(vals[4]),
-      d91_120: num(vals[5]),
-      d121_150: num(vals[6]),
-      d150plus: num(vals[7])
-    };
-  }).filter(r => r.study);
+  // CSV has duplicate empty-string header keys, so use r['Age Tier'] for study name
+  // Filter: skip "Study Name" subheader row, skip Grand Total (study name is purely numeric)
+  return rows.filter(r => {
+    const s = (r['Age Tier'] || '').trim();
+    return s && s.toLowerCase() !== 'study name' && s.toLowerCase() !== 'grand total' && !/^\d[\d,.]*$/.test(s);
+  }).map(r => ({
+    study: (r['Age Tier'] || '').trim(),
+    current: num(r['1. Current']),
+    d30_60: num(r['2. 30-60']),
+    d61_90: num(r['3. 61-90']),
+    d91_120: num(r['4. 91-120']),
+    d121_150: num(r['5. 121-150']),
+    d150plus: num(r['6. >150'])
+  })).filter(r => r.study);
 }
 
 function parseUnpaidInvCSV(rows) {
+  // Headers: [empty, Study Name, Invoice Number, Due Date, Sent Date, Days Overdue, Amount, Amount Paid, Amount Unpaid]
   return rows.filter(r => {
-    const s = (r['Study Name'] || Object.values(r)[1] || '').trim();
+    const s = (r['Study Name'] || '').trim();
     return s && s.toLowerCase() !== 'study name';
-  }).map(r => {
-    const vals = Object.values(r);
-    const due = (r['Due Date'] || vals[3] || '').trim();
-    return {
-      study: (r['Study Name'] || vals[1] || '').trim(),
-      invoice: (r['Invoice Number'] || vals[2] || '').trim(),
-      due: due || null,
-      days: parseInt(r['Days Overdue'] || vals[5] || 0) || 0,
-      amount: num(r['Amount'] || vals[6]),
-      unpaid: num(r['Amount Unpaid'] || vals[8])
-    };
-  }).filter(r => r.study);
+  }).map(r => ({
+    study: (r['Study Name'] || '').trim(),
+    invoice: (r['Invoice Number'] || '').trim(),
+    due: (r['Due Date'] || '').trim() || null,
+    days: parseInt(r['Days Overdue'] || 0) || 0,
+    amount: num(r['Amount']),
+    unpaid: num(r['Amount Unpaid'])
+  })).filter(r => r.study);
 }
 
 function parseUnpaidApCSV(rows) {
+  // Headers: [empty, Study Name, Visit Number and Name, Subject ID, Visit Date, Revenue Type, Amount Upfront, Days Unpaid]
   const studies = {};
   rows.filter(r => {
-    const s = (r['Study Name'] || Object.values(r)[1] || '').trim();
+    const s = (r['Study Name'] || '').trim();
     return s && s.toLowerCase() !== 'study name';
   }).forEach(r => {
-    const vals = Object.values(r);
-    const study = (r['Study Name'] || vals[1] || '').trim();
-    const revType = (r['Revenue Payment Type'] || vals[5] || '').toLowerCase();
-    const amount = num(r['Amount'] || vals[6]);
+    const study = (r['Study Name'] || '').trim();
+    const revType = (r['Revenue Type'] || '').toLowerCase();
+    const amount = num(r['Amount Upfront']);
     if (!studies[study]) studies[study] = { study, total: 0, visits: 0, procs: 0 };
     studies[study].total += amount;
     if (revType.includes('visit')) studies[study].visits += amount;
@@ -11741,14 +11732,14 @@ function parseUnpaidApCSV(rows) {
 }
 
 function parseUninvoicedCSV(rows) {
+  // Headers: [empty, Study Name, Name, Frequency Type, Amount Remaining]
   const studies = {};
   rows.filter(r => {
-    const s = (r['Study Name'] || Object.values(r)[1] || '').trim();
+    const s = (r['Study Name'] || '').trim();
     return s && s.toLowerCase() !== 'study name';
   }).forEach(r => {
-    const vals = Object.values(r);
-    const study = (r['Study Name'] || vals[1] || '').trim();
-    const amount = num(vals[4]);
+    const study = (r['Study Name'] || '').trim();
+    const amount = num(r['Amount Remaining']);
     studies[study] = (studies[study] || 0) + amount;
   });
   return Object.entries(studies).filter(([, a]) => a > 0)
@@ -11757,19 +11748,19 @@ function parseUninvoicedCSV(rows) {
 }
 
 function parseRevenueCSV(rows) {
+  // Headers: [empty, Revenue Group ID, Site Name, Study Name, Subject Patient ID, Subject Status, Revenue Payment Type, Revenue Type, Item, Service Date, Invoice Sent Date, Invoice Number, Type, Amount, ...]
   const months = {};
   rows.filter(r => {
-    const s = (r['Study Name'] || Object.values(r)[1] || '').trim();
+    const s = (r['Study Name'] || '').trim();
     return s && s.toLowerCase() !== 'study name';
   }).forEach(r => {
-    const vals = Object.values(r);
-    const dateStr = r['Service Date'] || vals[9] || '';
+    const dateStr = r['Service Date'] || '';
     if (!dateStr) return;
     const d = new Date(dateStr);
     if (isNaN(d)) return;
     const mk = d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }).replace(' ', " '");
-    const payType = (r['Revenue Payment Type'] || vals[6] || '').toLowerCase();
-    const amount = num(r['Amount'] || vals[13]);
+    const payType = (r['Revenue Payment Type'] || '').toLowerCase();
+    const amount = num(r['Amount']);
     if (!months[mk]) months[mk] = { autopay: 0, procedures: 0, invoicables: 0, sort: d };
     if (payType.includes('autopay') || payType.includes('auto')) months[mk].autopay += amount;
     else if (payType.includes('invoice')) months[mk].invoicables += amount;
@@ -11783,14 +11774,13 @@ function parseRevenueCSV(rows) {
 function parseStudyRevenue12mCSV(rows) {
   const studies = {};
   rows.filter(r => {
-    const s = (r['Study Name'] || Object.values(r)[1] || '').trim();
+    const s = (r['Study Name'] || '').trim();
     return s && s.toLowerCase() !== 'study name';
   }).forEach(r => {
-    const vals = Object.values(r);
-    const full = (vals[3] || '').trim();
+    const full = (r['Study Name'] || '').trim();
     const parts = full.split(' - ');
     const code = parts.length > 1 ? parts[parts.length - 1] : full;
-    const amount = num(r['Amount'] || vals[13]);
+    const amount = num(r['Amount']);
     studies[code] = (studies[code] || 0) + amount;
   });
   const result = {};
@@ -11799,19 +11789,19 @@ function parseStudyRevenue12mCSV(rows) {
 }
 
 function parsePaymentsCSV(rows) {
+  // Headers: [empty, Study Name, Payment Type, Payment Number, Received Date, Amount, ...]
   const months = {};
   const monthOrder = [];
   rows.filter(r => {
-    const s = (r['Study Name'] || Object.values(r)[1] || '').trim();
+    const s = (r['Study Name'] || '').trim();
     return s && s.toLowerCase() !== 'study name';
   }).forEach(r => {
-    const vals = Object.values(r);
-    const dateStr = vals[4] || '';
+    const dateStr = r['Received Date'] || '';
     if (!dateStr) return;
     const d = new Date(dateStr);
     if (isNaN(d)) return;
     const mk = d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }).replace(' ', " '");
-    const amount = num(vals[5]);
+    const amount = num(r['Amount']);
     if (!months[mk]) { months[mk] = 0; monthOrder.push({ month: mk, sort: d }); }
     months[mk] += amount;
   });
@@ -11878,9 +11868,9 @@ async function fetchFinanceLive() {
     const newRevenue12m = parseStudyRevenue12mCSV(revenueRows);
     const newPayments = parsePaymentsCSV(paymentsRows);
     const newTopAR = buildTopAR(newAgingInv, newAgingAp, paymentsRows.filter(r => {
-      const s = (r['Study Name'] || Object.values(r)[1] || '').trim();
+      const s = (r['Study Name'] || '').trim();
       return s && s.toLowerCase() !== 'study name';
-    }).map(r => { const v = Object.values(r); return { study: (v[1]||'').trim(), amount: num(v[5]) }; }));
+    }).map(r => ({ study: (r['Study Name']||'').trim(), amount: num(r['Amount']) })));
     const newMerged = buildMergedStudies(newAgingInv, newAgingAp, newUninvoiced);
 
     // Calculate totals
