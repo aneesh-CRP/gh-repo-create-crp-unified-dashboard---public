@@ -2800,7 +2800,7 @@ function renderInsights() {
   });
   if (typeof DATA !== 'undefined') {
     (DATA.cancelByStudy || []).forEach(c => {
-      const code = c.code || c.name;
+      const code = c.code || c.name || c.study || c.full || '';
       Object.keys(crossMap).forEach(k => { if (code && (k===code || crossMap[k].name.includes(code) || code.includes(k))) crossMap[k].cancels = (crossMap[k].cancels||0) + c.count; });
     });
     (DATA.upcomingByStudyFull || DATA.upcomingByStudy || []).forEach(u => {
@@ -2956,7 +2956,7 @@ function renderInsights() {
       else {
         let h='<table class="tbl"><thead><tr><th>Study</th><th class="r">Cancellations</th></tr></thead><tbody>';
         (DATA.cancelByStudy||[]).sort((a,b)=>b.count-a.count).forEach(s=>{
-          h+='<tr><td>'+slink(s.name||s.code)+'</td><td class="r">'+s.count+'</td></tr>';
+          h+='<tr><td>'+slink(s.name||s.study||s.code||s.full)+'</td><td class="r">'+s.count+'</td></tr>';
         });
         h+='</tbody></table>';
         showFinModal('Cancellations by Study',h);
@@ -12316,13 +12316,14 @@ function buildActionSteps() {
   // ── Dormant ──
   if(dormEl){
     const dormant=(DATA.cancelByStudy||[]).filter(c=>{
-      const up=((DATA.upcomingByStudyFull||DATA.upcomingByStudy||[]).find(u=>u.full===c.full||u.name===c.name)||{}).count||0;
+      const cName=c.name||c.study||c.full||'Unknown';
+      const up=((DATA.upcomingByStudyFull||DATA.upcomingByStudy||[]).find(u=>u.full===c.full||u.name===cName||u.study===c.study)||{}).count||0;
       return c.count>=5&&up<5;
     });
     dormEl.innerHTML=dormant.length>0
-      ?dormant.map(c=>c.study_url
-        ?`<div style="padding:8px 12px;border-left:3px solid #dc2626;margin-bottom:6px;background:#fef2f2;border-radius:0 6px 6px 0;font-size:12px;"><a href="${c.study_url}" target="_blank" rel="noopener" style="color:#dc2626;font-weight:600;text-decoration:underline;text-decoration-style:dotted;">${c.name}</a> — ${c.count} cancels, low upcoming pipeline</div>`
-        :`<div style="padding:8px 12px;border-left:3px solid #dc2626;margin-bottom:6px;background:#fef2f2;border-radius:0 6px 6px 0;font-size:12px;"><span style="color:#dc2626;font-weight:600;">${c.name}</span> — ${c.count} cancels, low upcoming pipeline</div>`
+      ?dormant.map(c=>{const label=c.name||c.study||c.full||'Unknown';return c.study_url
+        ?`<div style="padding:8px 12px;border-left:3px solid #dc2626;margin-bottom:6px;background:#fef2f2;border-radius:0 6px 6px 0;font-size:12px;"><a href="${c.study_url}" target="_blank" rel="noopener" style="color:#dc2626;font-weight:600;text-decoration:underline;text-decoration-style:dotted;">${label}</a> — ${c.count} cancels, low upcoming pipeline</div>`
+        :`<div style="padding:8px 12px;border-left:3px solid #dc2626;margin-bottom:6px;background:#fef2f2;border-radius:0 6px 6px 0;font-size:12px;"><span style="color:#dc2626;font-weight:600;">${label}</span> — ${c.count} cancels, low upcoming pipeline</div>`}
       ).join('')
       :'<div style="padding:12px;color:#94a3b8;font-size:12px;">No dormant studies detected</div>';
   }
