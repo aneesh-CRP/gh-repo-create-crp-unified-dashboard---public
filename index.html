@@ -2160,19 +2160,19 @@ const CRP_CONFIG = {
   DATA_FEEDS: {
     UPCOMING: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRUXJxTDsr5IRByMfuLF0P3hVq_QuEw6M1MPNDwd1CaV2UZ9tnFflUwsmUKAd3xeX3_esn0c4YlrV0q/pub?gid=0&single=true&output=csv',
     CANCELLATIONS: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRUXJxTDsr5IRByMfuLF0P3hVq_QuEw6M1MPNDwd1CaV2UZ9tnFflUwsmUKAd3xeX3_esn0c4YlrV0q/pub?gid=1487298034&single=true&output=csv',
-    // Finance Master Sheet (consolidated daily by Apps Script)
-    FINANCE_MASTER_ID: '1UNnuWHIkoiB0Xl4qJ7T0Ynmf2L6Mce-IOAOB032wCME',
+    // Finance Master Sheet — published key + tab GIDs for CSV access
+    FINANCE_PUB_KEY: '2PACX-1vQXxreb6lrZHej3luMOSI07ditFm6mmGHIHrxWu9BkTfsvk0OLk_gx7o_JIY34UIgroGIKgEYbVdC_V',
   },
 
-  // Finance tab names in the Master Sheet → used to build per-tab CSV URLs
+  // Finance tab GIDs in the published Master Sheet
   FINANCE_TABS: {
-    AGING_INV:     'Aging_Invoices',
-    AGING_AP:      'Aging_Autopay',
-    UNPAID_INV:    'Unpaid_Invoices',
-    UNPAID_AP:     'Unpaid_Autopay',
-    UNINVOICED:    'Uninvoiced',
-    REVENUE:       'Revenue',
-    PAYMENTS:      'Payments',
+    AGING_INV:     '1436743094',
+    AGING_AP:      '1893853669',
+    UNPAID_INV:    '970419989',
+    UNPAID_AP:     '162958154',
+    UNINVOICED:    '1408187165',
+    REVENUE:       '1739434495',
+    PAYMENTS:      '454961282',
   },
 
   // Master Sheet (for Apps Script consolidation)
@@ -11668,10 +11668,10 @@ function parseCSV(text) {
 // ═══════════════════════════════════════════════════
 // LIVE FINANCE DATA — Auto-fetch from CRP Finance Master Sheet
 // ═══════════════════════════════════════════════════
-async function fetchFinanceTab(sheetId, tabName) {
-  const url = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(tabName)}`;
+async function fetchFinanceTab(pubKey, gid) {
+  const url = `https://docs.google.com/spreadsheets/d/e/${pubKey}/pub?gid=${gid}&single=true&output=csv`;
   const resp = await fetch(url);
-  if (!resp.ok) throw new Error('Failed to fetch tab: ' + tabName);
+  if (!resp.ok) throw new Error('Failed to fetch finance tab gid=' + gid);
   const text = await resp.text();
   return parseCSV(text);
 }
@@ -11846,21 +11846,21 @@ function buildMergedStudies(agingInv, agingAp, uninvoiced) {
 }
 
 async function fetchFinanceLive() {
-  const sid = CRP_CONFIG.DATA_FEEDS.FINANCE_MASTER_ID;
-  if (!sid) { console.log('CRP Finance: No master sheet ID configured'); return false; }
+  const pk = CRP_CONFIG.DATA_FEEDS.FINANCE_PUB_KEY;
+  if (!pk) { console.log('CRP Finance: No published key configured'); return false; }
   const tabs = CRP_CONFIG.FINANCE_TABS;
 
   console.log('CRP Finance: Fetching live data from Master Sheet...');
   try {
     // Fetch all tabs in parallel
     const [agingInvRows, agingApRows, unpaidInvRows, unpaidApRows, uninvoicedRows, revenueRows, paymentsRows] = await Promise.all([
-      fetchFinanceTab(sid, tabs.AGING_INV),
-      fetchFinanceTab(sid, tabs.AGING_AP),
-      fetchFinanceTab(sid, tabs.UNPAID_INV),
-      fetchFinanceTab(sid, tabs.UNPAID_AP),
-      fetchFinanceTab(sid, tabs.UNINVOICED),
-      fetchFinanceTab(sid, tabs.REVENUE),
-      fetchFinanceTab(sid, tabs.PAYMENTS),
+      fetchFinanceTab(pk, tabs.AGING_INV),
+      fetchFinanceTab(pk, tabs.AGING_AP),
+      fetchFinanceTab(pk, tabs.UNPAID_INV),
+      fetchFinanceTab(pk, tabs.UNPAID_AP),
+      fetchFinanceTab(pk, tabs.UNINVOICED),
+      fetchFinanceTab(pk, tabs.REVENUE),
+      fetchFinanceTab(pk, tabs.PAYMENTS),
     ]);
 
     // Parse into dashboard data structures
