@@ -11616,8 +11616,8 @@ function showHorizonDetail(type, weekLabel) {
   mon.setDate(parsed.getDate() - (day === 0 ? 6 : day - 1));
   const sun = new Date(mon);
   sun.setDate(mon.getDate() + 6);
-  const monISO = mon.toISOString().split('T')[0];
-  const sunISO = sun.toISOString().split('T')[0];
+  const monISO = localISO(mon);
+  const sunISO = localISO(sun);
   const monFmt = mon.toLocaleDateString('en-US',{month:'short',day:'numeric'});
   const sunFmt = sun.toLocaleDateString('en-US',{month:'short',day:'numeric'});
 
@@ -11627,7 +11627,7 @@ function showHorizonDetail(type, weekLabel) {
     rows = (DATA.allCancels || []).filter(r => {
       const d = new Date(r.cancel_date + ', ' + year);
       if (isNaN(d)) return false;
-      const iso = d.toISOString().split('T')[0];
+      const iso = localISO(d);
       return iso >= monISO && iso <= sunISO;
     });
   } else {
@@ -11743,6 +11743,11 @@ function buildCoordList() {
 }
 
 // ══════════ COORDINATOR DAILY GOALS ══════════
+/** Convert a Date to local YYYY-MM-DD (avoids UTC shift from toISOString) */
+function localISO(d) {
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
 function computeCoordGoals() {
   // Compute from allVisitDetail if coordGoals not pre-computed
   // Only counts weekday (Mon-Fri) visits toward goals
@@ -11784,7 +11789,7 @@ function renderCoordinatorGoals() {
   if (!grid) return;
 
   const now = new Date();
-  const todayISO = now.toISOString().split('T')[0];
+  const todayISO = localISO(now);
   // Get this week Mon-Fri
   const dayOfWeek = now.getDay(); // 0=Sun, 1=Mon...
   const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
@@ -11792,7 +11797,7 @@ function renderCoordinatorGoals() {
   const weekDays = [];
   for (let i = 0; i < 5; i++) {
     const d = new Date(monday); d.setDate(monday.getDate() + i);
-    weekDays.push(d.toISOString().split('T')[0]);
+    weekDays.push(localISO(d));
   }
   const dayLabels = ['Mon','Tue','Wed','Thu','Fri'];
 
