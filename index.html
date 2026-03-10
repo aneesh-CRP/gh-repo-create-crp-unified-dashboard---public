@@ -2199,7 +2199,7 @@ const CRP_CONFIG = {
   },
 
   // Version
-  VERSION: '2.2.0',
+  VERSION: '2.3.0',
   BUILD_DATE: '2026-03-09T21:15:00Z',
 };
 
@@ -2397,6 +2397,16 @@ let totalInvAR=507728.26;
 let totalApAR=555240.24;
 const BUCKET_COLLECT_RATES={current:0.88,d30_60:0.78,d61_90:0.62,d91_120:0.45,d121_150:0.28,d150plus:0.12};
 
+// ══════════ ENHANCED DATA (populated by live fetch) ══════════
+let REVENUE_BY_TYPE = [];      // [{type:'Visit',amount:2981151},{type:'Procedure',amount:381081},...]
+let REVENUE_BY_PAY_TYPE = [];  // [{type:'Autopay',amount:2942664},{type:'Invoice',amount:818898}]
+let UNINVOICED_DETAIL = [];    // [{study,name,amount},...] — line-level uninvoiced items
+let UNINVOICED_BY_CATEGORY = [];// [{category:'Start-Up',amount:46750,count:5},...]
+let UNPAID_AP_DETAIL = [];     // [{study,visit,revType,amount,daysUnpaid},...]
+let UNPAID_AP_BY_TYPE = [];    // [{type:'Visit',amount:423073},{type:'Procedure',amount:35008},...]
+let UNPAID_AP_AGING = [];      // [{bucket:'0-30',amount:X,count:N},...]
+let REVENUE_ITEMS_TOP = [];    // [{item:'Visit 3 - Week 1...',amount:X,count:N},...]
+
 // ══════════ HELPERS ══════════
 const fmt=v=>'$'+Math.abs(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
 const fmtK=v=>'$'+(v/1000).toFixed(0)+'K';
@@ -2493,7 +2503,7 @@ function showStudyModal(s){
 // ══════════ CHARTS ══════════
 function drawRevChart(){
   const sv=document.getElementById('revChart');if(!sv)return;sv.innerHTML='';
-  const d=MONTHLY_REVENUE.slice(0,12);const mx=Math.max(...d.map(m=>m.autopay+m.procedures+Math.max(0,m.invoicables)))*1.1;
+  const d=MONTHLY_REVENUE.slice(-12);const mx=Math.max(...d.map(m=>m.autopay+m.procedures+Math.max(0,m.invoicables)))*1.1;
   const bw=58,pad=50;
   d.forEach((m,i)=>{const x=pad+i*((950-pad)/d.length);const a=m.autopay,p=m.procedures,inv=Math.max(0,m.invoicables);const tot=a+p+inv;const sc=230/mx;
     const ha=a*sc,hp=p*sc,hi=inv*sc;
@@ -2544,10 +2554,218 @@ function renderRevByStudy(){
   tb.innerHTML+='<tr class="total-row"><td>TOTAL</td><td class="r">'+fmt(tot)+'</td></tr>';
 }
 function renderUninvoiced(){
-  const tb=document.getElementById('uninvBody');let tot=0;
+  const tb=document.getElementById('uninvBody');if(!tb)return;let tot=0;
   tb.innerHTML=UNINVOICED.map(r=>{tot+=r.amount;return'<tr><td>'+slink(r.study)+'</td><td class="r">'+fmt(r.amount)+'</td></tr>';}).join('');
-  tb.innerHTML+='<tr class="total-row"><td>TOTAL (30 studies)</td><td class="r">'+fmt(tot)+'</td></tr>';
+  tb.innerHTML+='<tr class="total-row"><td>TOTAL ('+UNINVOICED.length+' studies)</td><td class="r">'+fmt(tot)+'</td></tr>';
 }
+
+// ══════════ ENHANCED REVENUE TAB ══════════
+function renderRevenueTab() {
+  // KPIs
+  const total12m = Object.values(STUDY_REVENUE_12M).reduce((s,v) => s+v, 0);
+  const monthCount = MONTHLY_REVENUE.length || 1;
+  const avgMonthly = total12m / Math.min(monthCount, 12);
+  const studyCount = Object.keys(STUDY_REVENUE_12M).length || 1;
+  const revPerStudy = total12m / studyCount;
+  const topType = REVENUE_BY_TYPE.length ? REVENUE_BY_TYPE[0] : null;
+
+  const el = id => document.getElementById(id);
+  if (el('rev-total')) { el('rev-total').textContent = '$' + (total12m/1000000).toFixed(2) + 'M'; }
+  if (el('rev-total-sub')) { el('rev-total-sub').textContent = (REVENUE_BY_PAY_TYPE.length >= 2 ? 'Autopay ' + fmtK(REVENUE_BY_PAY_TYPE.find(t=>t.type==='Autopay')?.amount||0) + ' + Invoice ' + fmtK(REVENUE_BY_PAY_TYPE.find(t=>t.type==='Invoice')?.amount||0) : studyCount + ' studies'); }
+  if (el('rev-avg')) { el('rev-avg').textContent = fmtK(avgMonthly); }
+  if (el('rev-avg-sub')) {
+    const last3 = MONTHLY_REVENUE.slice(-3);
+    const avg3 = last3.length ? last3.reduce((s,m)=>s+m.autopay+m.procedures+m.invoicables,0)/last3.length : 0;
+    const trend = avg3 > avgMonthly ? '↑' : avg3 < avgMonthly ? '↓' : '→';
+    el('rev-avg-sub').textContent = 'Last 3mo avg: ' + fmtK(avg3) + ' ' + trend;
+  }
+  if (el('rev-per-study')) { el('rev-per-study').textContent = fmtK(revPerStudy); }
+  if (el('rev-per-study-sub')) { el('rev-per-study-sub').textContent = studyCount + ' active studies'; }
+  if (el('rev-top-type') && topType) { el('rev-top-type').textContent = topType.type; }
+  if (el('rev-top-type-sub') && topType) { el('rev-top-type-sub').textContent = '$' + (topType.amount/1000000).toFixed(2) + 'M (' + Math.round(topType.amount/total12m*100) + '%)'; }
+
+  // Revenue Trend chart (duplicate of overview revChart but on Revenue tab)
+  drawRevChartOn('revChartDetail');
+
+  // Revenue by Type donut
+  drawDonutChart('revTypeDonut', 'revTypeLegend', REVENUE_BY_TYPE, ['#8B5CF6','#14B8A6','#F59E0B','#EF4444','#6B7280']);
+
+  // Revenue by Payment Type horizontal bars
+  renderPayTypeChart();
+
+  // Top Items table
+  renderRevenueItems();
+
+  // Study revenue table (existing)
+  renderRevByStudy();
+}
+
+function drawRevChartOn(svgId) {
+  const sv = document.getElementById(svgId); if (!sv) return; sv.innerHTML = '';
+  const d = MONTHLY_REVENUE.slice(-12);
+  if (!d.length) return;
+  const mx = Math.max(...d.map(m => m.autopay + m.procedures + Math.max(0, m.invoicables))) * 1.1 || 1;
+  const bw = 58, pad = 50;
+  d.forEach((m, i) => {
+    const x = pad + i * ((950 - pad) / d.length);
+    const a = m.autopay, p = m.procedures, inv = Math.max(0, m.invoicables), tot = a + p + inv, sc = 230 / mx;
+    const ha = a * sc, hp = p * sc, hi = inv * sc;
+    [['#60A5FA', ha, 230 - ha], ['#34D399', hp, 230 - (ha + hp)], ['#FBBF24', hi, 230 - (ha + hp + hi)]].forEach(([c, h, y]) => {
+      if (h > 0) { const r = document.createElementNS('http://www.w3.org/2000/svg', 'rect'); r.setAttribute('x', x); r.setAttribute('y', y); r.setAttribute('width', bw); r.setAttribute('height', h); r.setAttribute('fill', c); r.setAttribute('rx', '2'); sv.appendChild(r); }
+    });
+    const t = document.createElementNS('http://www.w3.org/2000/svg', 'text'); t.setAttribute('x', x + bw / 2); t.setAttribute('y', 258); t.setAttribute('text-anchor', 'middle'); t.setAttribute('font-size', '12'); t.setAttribute('fill', '#4A5568'); t.textContent = m.month; sv.appendChild(t);
+    const v = document.createElementNS('http://www.w3.org/2000/svg', 'text'); v.setAttribute('x', x + bw / 2); v.setAttribute('y', 230 - tot * sc - 6); v.setAttribute('text-anchor', 'middle'); v.setAttribute('font-size', '14'); v.setAttribute('font-weight', '700'); v.setAttribute('fill', '#1a202c'); v.textContent = '$' + (tot / 1000).toFixed(0) + 'K'; sv.appendChild(v);
+  });
+}
+
+function drawDonutChart(svgId, legendId, data, colors) {
+  const svg = document.getElementById(svgId); if (!svg) return; svg.innerHTML = '';
+  const legend = document.getElementById(legendId); if (legend) legend.innerHTML = '';
+  if (!data.length) return;
+  const total = data.reduce((s, d) => s + Math.abs(d.amount), 0);
+  if (total === 0) return;
+  const cx = 100, cy = 100, r = 80, ir = 50;
+  let startAngle = -Math.PI / 2;
+  data.forEach((d, i) => {
+    const pct = Math.abs(d.amount) / total;
+    if (pct < 0.005) return;
+    const endAngle = startAngle + pct * 2 * Math.PI;
+    const largeArc = pct > 0.5 ? 1 : 0;
+    const x1 = cx + r * Math.cos(startAngle), y1 = cy + r * Math.sin(startAngle);
+    const x2 = cx + r * Math.cos(endAngle), y2 = cy + r * Math.sin(endAngle);
+    const ix1 = cx + ir * Math.cos(endAngle), iy1 = cy + ir * Math.sin(endAngle);
+    const ix2 = cx + ir * Math.cos(startAngle), iy2 = cy + ir * Math.sin(startAngle);
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', `M${x1},${y1} A${r},${r} 0 ${largeArc},1 ${x2},${y2} L${ix1},${iy1} A${ir},${ir} 0 ${largeArc},0 ${ix2},${iy2} Z`);
+    path.setAttribute('fill', colors[i % colors.length]);
+    svg.appendChild(path);
+    startAngle = endAngle;
+    // Legend
+    if (legend) {
+      legend.innerHTML += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><span style="display:inline-block;width:10px;height:10px;background:' + colors[i % colors.length] + ';border-radius:2px;flex-shrink:0"></span><span style="color:#4A5568">' + d.type + '</span><span style="font-weight:700;color:#1a202c;margin-left:auto">' + fmtK(d.amount) + '</span><span style="color:#9CA3AF;font-size:11px">(' + Math.round(pct * 100) + '%)</span></div>';
+    }
+  });
+  // Center text
+  const ct = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  ct.setAttribute('x', cx); ct.setAttribute('y', cy - 5); ct.setAttribute('text-anchor', 'middle'); ct.setAttribute('font-size', '14'); ct.setAttribute('font-weight', '700'); ct.setAttribute('fill', '#1a202c');
+  ct.textContent = '$' + (total / 1000000).toFixed(1) + 'M';
+  svg.appendChild(ct);
+  const cs = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+  cs.setAttribute('x', cx); cs.setAttribute('y', cy + 12); cs.setAttribute('text-anchor', 'middle'); cs.setAttribute('font-size', '11'); cs.setAttribute('fill', '#718096');
+  cs.textContent = 'Total';
+  svg.appendChild(cs);
+}
+
+function renderPayTypeChart() {
+  const container = document.getElementById('revPayTypeChart'); if (!container) return;
+  if (!REVENUE_BY_PAY_TYPE.length) { container.innerHTML = '<div style="color:#9CA3AF;text-align:center">No data</div>'; return; }
+  const maxAmt = Math.max(...REVENUE_BY_PAY_TYPE.map(d => d.amount));
+  const colors = { 'Autopay': '#60A5FA', 'Invoice': '#FBBF24' };
+  container.innerHTML = REVENUE_BY_PAY_TYPE.map(d => {
+    const pct = (d.amount / maxAmt * 100).toFixed(0);
+    const c = colors[d.type] || '#8B5CF6';
+    return '<div style="margin-bottom:16px"><div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:13px"><span style="font-weight:600;color:#1a202c">' + d.type + '</span><span style="color:#4A5568;font-weight:700">' + fmt(d.amount) + '</span></div><div style="background:#F3F4F6;border-radius:6px;height:28px;overflow:hidden"><div style="background:' + c + ';height:100%;width:' + pct + '%;border-radius:6px;transition:width 0.5s"></div></div></div>';
+  }).join('');
+}
+
+function renderRevenueItems() {
+  const tb = document.getElementById('revItemsBody'); if (!tb) return;
+  if (!REVENUE_ITEMS_TOP.length) return;
+  let total = 0;
+  tb.innerHTML = REVENUE_ITEMS_TOP.map(r => {
+    total += r.amount;
+    const avg = r.count > 0 ? r.amount / r.count : 0;
+    return '<tr><td style="max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + r.item + '</td><td class="r">' + fmt(r.amount) + '</td><td class="r">' + r.count.toLocaleString() + '</td><td class="r">' + fmt(avg) + '</td></tr>';
+  }).join('');
+  tb.innerHTML += '<tr class="total-row"><td>TOP 20 TOTAL</td><td class="r">' + fmt(total) + '</td><td></td><td></td></tr>';
+}
+// ══════════ ENHANCED ACCRUALS TAB ══════════
+function renderAccruals() {
+  const el = id => document.getElementById(id);
+
+  // KPI values
+  const uninvTotal = UNINVOICED.reduce((s, r) => s + r.amount, 0);
+  const unpaidApTotal = UNPAID_AP.reduce((s, r) => s + r.total, 0);
+  const unpaidInvTotal = UNPAID_INVOICES.reduce((s, r) => s + r.unpaid, 0);
+  const grandTotal = uninvTotal + unpaidApTotal + unpaidInvTotal;
+
+  if (el('acc-total')) el('acc-total').textContent = fmtK(grandTotal);
+  if (el('acc-total-sub')) el('acc-total-sub').textContent = 'Across all categories';
+  if (el('acc-uninv')) el('acc-uninv').textContent = fmt(uninvTotal);
+  if (el('acc-uninv-sub')) el('acc-uninv-sub').textContent = UNINVOICED.length + ' studies';
+  if (el('acc-unpaid-ap')) el('acc-unpaid-ap').textContent = fmt(unpaidApTotal);
+  if (el('acc-unpaid-ap-sub')) el('acc-unpaid-ap-sub').textContent = new Set(UNPAID_AP.map(r=>r.study)).size + ' studies';
+  if (el('acc-unpaid-inv')) el('acc-unpaid-inv').textContent = fmt(unpaidInvTotal);
+  if (el('acc-unpaid-inv-sub')) el('acc-unpaid-inv-sub').textContent = UNPAID_INVOICES.length + ' invoices';
+
+  // Uninvoiced by Category donut
+  if (UNINVOICED_BY_CATEGORY.length) {
+    const catData = UNINVOICED_BY_CATEGORY.map(c => ({ type: c.category, amount: c.amount }));
+    drawDonutChart('uninvCatDonut', 'uninvCatLegend', catData, ['#8B5CF6','#EC4899','#F59E0B','#14B8A6','#EF4444','#60A5FA','#6B7280']);
+  }
+
+  // Unpaid AP by Revenue Type bars
+  renderUnpaidApTypeChart();
+
+  // Unpaid AP Aging distribution
+  renderUnpaidApAging();
+
+  // Uninvoiced detail table
+  renderUninvoicedDetail();
+
+  // Uninvoiced summary (existing)
+  renderUninvoiced();
+}
+
+function renderUnpaidApTypeChart() {
+  const container = document.getElementById('unpaidApTypeChart'); if (!container) return;
+  if (!UNPAID_AP_BY_TYPE.length) { container.innerHTML = '<div style="color:#9CA3AF;text-align:center">No data</div>'; return; }
+  const total = UNPAID_AP_BY_TYPE.reduce((s,d) => s + d.amount, 0);
+  const maxAmt = Math.max(...UNPAID_AP_BY_TYPE.map(d => d.amount));
+  const colors = { 'Visit': '#F59E0B', 'Procedure': '#14B8A6', 'Unscheduled Visit': '#8B5CF6' };
+  container.innerHTML = UNPAID_AP_BY_TYPE.map(d => {
+    const pct = total > 0 ? Math.round(d.amount / total * 100) : 0;
+    const barPct = (d.amount / maxAmt * 100).toFixed(0);
+    const c = colors[d.type] || '#6B7280';
+    return '<div style="margin-bottom:16px"><div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:13px"><span style="font-weight:600;color:#1a202c">' + d.type + ' <span style="color:#9CA3AF;font-weight:400">(' + d.count + ' items · ' + pct + '%)</span></span><span style="color:#4A5568;font-weight:700">' + fmt(d.amount) + '</span></div><div style="background:#F3F4F6;border-radius:6px;height:24px;overflow:hidden"><div style="background:' + c + ';height:100%;width:' + barPct + '%;border-radius:6px;transition:width 0.5s"></div></div></div>';
+  }).join('');
+}
+
+function renderUnpaidApAging() {
+  const container = document.getElementById('unpaidApAgingChart'); if (!container) return;
+  if (!UNPAID_AP_AGING.length) { container.innerHTML = '<div style="color:#9CA3AF;text-align:center">No data</div>'; return; }
+  const total = UNPAID_AP_AGING.reduce((s,d) => s + d.amount, 0);
+  const maxAmt = Math.max(...UNPAID_AP_AGING.map(d => d.amount));
+  const agingColors = { '0-30': '#10B981', '31-60': '#F59E0B', '61-90': '#F97316', '91-120': '#EF4444', '121+': '#7F1D1D' };
+  container.innerHTML = '<div style="display:flex;gap:12px;flex-wrap:wrap">' + UNPAID_AP_AGING.map(d => {
+    const pct = total > 0 ? Math.round(d.amount / total * 100) : 0;
+    const c = agingColors[d.bucket] || '#6B7280';
+    return '<div style="flex:1;min-width:140px;background:#F9FAFB;border-radius:10px;padding:16px;text-align:center;border:2px solid ' + c + '20">' +
+      '<div style="font-size:11px;color:#6B7280;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">' + d.bucket + ' Days</div>' +
+      '<div style="font-size:22px;font-weight:700;color:' + c + ';margin:4px 0">' + fmt(d.amount) + '</div>' +
+      '<div style="font-size:12px;color:#9CA3AF">' + d.count + ' visits · ' + pct + '%</div>' +
+    '</div>';
+  }).join('') + '</div>';
+}
+
+function renderUninvoicedDetail() {
+  const tb = document.getElementById('uninvDetailBody'); if (!tb) return;
+  const label = document.getElementById('uninvDetailLabel');
+  const data = UNINVOICED_DETAIL.length ? UNINVOICED_DETAIL : UNINVOICED.map(r => ({ study: r.study, name: '—', category: '—', amount: r.amount }));
+  if (label) label.textContent = 'Uninvoiced Revenue Detail (' + data.length + ' items)';
+  let total = 0;
+  tb.innerHTML = data.map(r => {
+    total += r.amount;
+    return '<tr><td>' + slink(r.study) + '</td><td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (r.name || '—') + '</td><td><span class="pill" style="background:' + getCategoryColor(r.category) + '20;color:' + getCategoryColor(r.category) + ';font-size:11px">' + (r.category || '—') + '</span></td><td class="r">' + fmt(r.amount) + '</td></tr>';
+  }).join('');
+  tb.innerHTML += '<tr class="total-row"><td colspan="3">TOTAL</td><td class="r">' + fmt(total) + '</td></tr>';
+}
+
+function getCategoryColor(cat) {
+  const map = { 'Start-Up Fees': '#8B5CF6', 'Close-Out Fees': '#EF4444', 'Archiving / Storage': '#F59E0B', 'Ethics / IRB Fees': '#14B8A6', 'SAE Reports': '#EC4899', 'Pharmacy Fees': '#60A5FA', 'Other Fees': '#6B7280' };
+  return map[cat] || '#6B7280';
+}
+
 function renderStudies(){
   const tb=document.getElementById('studiesBody');
   tb.innerHTML=FIN_MERGED_STUDIES.map(r=>{const rev=STUDY_REVENUE_12M[r.study]||0;const ar=TOP_AR_STUDIES.find(x=>x.study.includes(r.study));const arv=ar?ar.total:0;
@@ -2704,10 +2922,10 @@ function initFinanceDashboard() {
   // Aging
   try { renderAgingKPIs(); } catch(e) { console.warn('renderAgingKPIs:', e); }
   try { renderAgingTables(); } catch(e) { console.warn('renderAgingTables:', e); }
-  // Revenue
-  try { renderRevByStudy(); } catch(e) { console.warn('renderRevByStudy:', e); }
-  // Accruals
-  try { renderUninvoiced(); } catch(e) { console.warn('renderUninvoiced:', e); }
+  // Revenue (enhanced)
+  try { renderRevenueTab(); } catch(e) { console.warn('renderRevenueTab:', e); }
+  // Accruals (enhanced)
+  try { renderAccruals(); } catch(e) { console.warn('renderAccruals:', e); }
   // Studies
   try { renderStudies(); } catch(e) { console.warn('renderStudies:', e); }
   // Collections
@@ -11809,6 +12027,108 @@ function parsePaymentsCSV(rows) {
   return monthOrder.map(m => ({ month: m.month, amount: Math.round(months[m.month] * 100) / 100 }));
 }
 
+// ══════════ ENHANCED PARSERS ══════════
+
+function parseRevenueByTypeCSV(rows) {
+  const byType = {};
+  const byPayType = {};
+  const items = {};
+  rows.filter(r => {
+    const s = (r['Study Name'] || '').trim();
+    return s && s.toLowerCase() !== 'study name';
+  }).forEach(r => {
+    const revType = (r['Revenue Type'] || '').trim();
+    const payType = (r['Revenue Payment Type'] || '').trim();
+    const item = (r['Item'] || '').trim();
+    const amount = num(r['Amount']);
+    if (revType) { byType[revType] = (byType[revType] || 0) + amount; }
+    if (payType) { byPayType[payType] = (byPayType[payType] || 0) + amount; }
+    if (item) {
+      if (!items[item]) items[item] = { amount: 0, count: 0 };
+      items[item].amount += amount;
+      items[item].count++;
+    }
+  });
+  return {
+    byType: Object.entries(byType).filter(([,a]) => a > 0).sort((a, b) => b[1] - a[1]).map(([type, amount]) => ({ type, amount: Math.round(amount) })),
+    byPayType: Object.entries(byPayType).filter(([,a]) => a > 0).sort((a, b) => b[1] - a[1]).map(([type, amount]) => ({ type, amount: Math.round(amount) })),
+    topItems: Object.entries(items).sort((a, b) => b[1].amount - a[1].amount).slice(0, 20).map(([item, d]) => ({ item, amount: Math.round(d.amount), count: d.count })),
+  };
+}
+
+function parseUninvoicedDetailCSV(rows) {
+  const CATEGORY_MAP = {
+    'start-up': 'Start-Up Fees', 'start up': 'Start-Up Fees', 'site start': 'Start-Up Fees', 'accelerated': 'Start-Up Fees', 'site prep': 'Start-Up Fees',
+    'close-out': 'Close-Out Fees', 'close out': 'Close-Out Fees', 'closeout': 'Close-Out Fees',
+    'archiv': 'Archiving / Storage', 'document storage': 'Archiving / Storage', 'record retention': 'Archiving / Storage', 'storage': 'Archiving / Storage',
+    'ethics': 'Ethics / IRB Fees', 'irb': 'Ethics / IRB Fees',
+    'sae': 'SAE Reports', 'pharmacy': 'Pharmacy Fees',
+  };
+  function categorize(name) {
+    const lower = name.toLowerCase();
+    for (const [key, cat] of Object.entries(CATEGORY_MAP)) {
+      if (lower.includes(key)) return cat;
+    }
+    return 'Other Fees';
+  }
+
+  const detail = [];
+  const categories = {};
+  rows.filter(r => {
+    const s = (r['Study Name'] || '').trim();
+    return s && s.toLowerCase() !== 'study name';
+  }).forEach(r => {
+    const study = (r['Study Name'] || '').trim();
+    const name = (r['Name'] || '').trim();
+    const amount = num(r['Amount Remaining']);
+    if (amount <= 0) return;
+    const cat = categorize(name);
+    detail.push({ study, name, amount: Math.round(amount * 100) / 100, category: cat });
+    if (!categories[cat]) categories[cat] = { amount: 0, count: 0, studies: new Set() };
+    categories[cat].amount += amount;
+    categories[cat].count++;
+    categories[cat].studies.add(study);
+  });
+  return {
+    detail: detail.sort((a, b) => b.amount - a.amount),
+    byCategory: Object.entries(categories).sort((a, b) => b[1].amount - a[1].amount).map(([category, d]) => ({
+      category, amount: Math.round(d.amount), count: d.count, studies: d.studies.size
+    })),
+  };
+}
+
+function parseUnpaidApDetailCSV(rows) {
+  const detail = [];
+  const byType = {};
+  const agingBuckets = { '0-30': { amount: 0, count: 0 }, '31-60': { amount: 0, count: 0 }, '61-90': { amount: 0, count: 0 }, '91-120': { amount: 0, count: 0 }, '121+': { amount: 0, count: 0 } };
+  rows.filter(r => {
+    const s = (r['Study Name'] || '').trim();
+    return s && s.toLowerCase() !== 'study name';
+  }).forEach(r => {
+    const study = (r['Study Name'] || '').trim();
+    const visit = (r['Visit Number and Name'] || '').trim();
+    const revType = (r['Revenue Type'] || '').trim();
+    const amount = num(r['Amount Upfront']);
+    const days = parseInt(r['Days Unpaid'] || '0') || 0;
+    if (amount <= 0) return;
+    detail.push({ study, visit, revType, amount: Math.round(amount * 100) / 100, daysUnpaid: days });
+    if (revType) {
+      if (!byType[revType]) byType[revType] = { amount: 0, count: 0 };
+      byType[revType].amount += amount;
+      byType[revType].count++;
+    }
+    // Aging bucket
+    const bucket = days <= 30 ? '0-30' : days <= 60 ? '31-60' : days <= 90 ? '61-90' : days <= 120 ? '91-120' : '121+';
+    agingBuckets[bucket].amount += amount;
+    agingBuckets[bucket].count++;
+  });
+  return {
+    detail: detail.sort((a, b) => b.daysUnpaid - a.daysUnpaid),
+    byType: Object.entries(byType).sort((a, b) => b[1].amount - a[1].amount).map(([type, d]) => ({ type, amount: Math.round(d.amount), count: d.count })),
+    aging: Object.entries(agingBuckets).map(([bucket, d]) => ({ bucket, amount: Math.round(d.amount), count: d.count })),
+  };
+}
+
 function buildTopAR(agingInv, agingAp, paymentsData) {
   const collected = {};
   paymentsData.forEach(r => { collected[r.study] = (collected[r.study] || 0) + r.amount; });
@@ -11873,6 +12193,11 @@ async function fetchFinanceLive() {
     }).map(r => ({ study: (r['Study Name']||'').trim(), amount: num(r['Amount']) })));
     const newMerged = buildMergedStudies(newAgingInv, newAgingAp, newUninvoiced);
 
+    // Enhanced parsers
+    const revBreakdown = parseRevenueByTypeCSV(revenueRows);
+    const uninvDetail = parseUninvoicedDetailCSV(uninvoicedRows);
+    const unpaidApDetail = parseUnpaidApDetailCSV(unpaidApRows);
+
     // Calculate totals
     const sumB = r => r.current + r.d30_60 + r.d61_90 + r.d91_120 + r.d121_150 + r.d150plus;
     const newTotalInvAR = Math.round(newAgingInv.reduce((s, r) => s + sumB(r), 0) * 100) / 100;
@@ -11892,6 +12217,16 @@ async function fetchFinanceLive() {
     totalInvAR = newTotalInvAR;
     totalApAR = newTotalApAR;
 
+    // Enhanced data
+    REVENUE_BY_TYPE = revBreakdown.byType;
+    REVENUE_BY_PAY_TYPE = revBreakdown.byPayType;
+    REVENUE_ITEMS_TOP = revBreakdown.topItems;
+    UNINVOICED_DETAIL = uninvDetail.detail;
+    UNINVOICED_BY_CATEGORY = uninvDetail.byCategory;
+    UNPAID_AP_DETAIL = unpaidApDetail.detail;
+    UNPAID_AP_BY_TYPE = unpaidApDetail.byType;
+    UNPAID_AP_AGING = unpaidApDetail.aging;
+
     console.log('CRP Finance: Live data loaded — ' + newAgingInv.length + ' invoice studies, ' + newAgingAp.length + ' autopay studies, $' + (newTotalInvAR + newTotalApAR).toLocaleString() + ' total AR');
 
     // Update hero values in the Finance overview
@@ -11909,6 +12244,8 @@ async function fetchFinanceLive() {
     if (typeof renderForecast === 'function') try { renderForecast(); } catch(e) {}
     if (typeof drawPayChartOverview === 'function') try { drawPayChartOverview(); } catch(e) {}
     if (typeof drawRevChart === 'function') try { drawRevChart(); } catch(e) {}
+    if (typeof renderRevenueTab === 'function') try { renderRevenueTab(); } catch(e) {}
+    if (typeof renderAccruals === 'function') try { renderAccruals(); } catch(e) {}
 
     // Update the data source badge
     const badge = document.getElementById('data-source-badge');
@@ -13405,12 +13742,59 @@ document.addEventListener('DOMContentLoaded', () => {
 
 <!-- ═════ Finance Revenue View (Lines 2993-3063) ═════ -->
 <div id="view-fin-revenue" class="view">
+
+  <!-- Revenue KPIs -->
+  <div class="kpi-row" id="revKpiRow">
+    <div class="kpi"><div class="kpi-stripe" style="background:#8B5CF6"></div><div class="label">Total Revenue (12M)</div><div class="value" id="rev-total" style="color:#8B5CF6">--</div><div class="sub" id="rev-total-sub"></div></div>
+    <div class="kpi"><div class="kpi-stripe" style="background:#14B8A6"></div><div class="label">Avg Monthly Revenue</div><div class="value" id="rev-avg" style="color:#14B8A6">--</div><div class="sub" id="rev-avg-sub"></div></div>
+    <div class="kpi"><div class="kpi-stripe" style="background:#F59E0B"></div><div class="label">Revenue per Study</div><div class="value" id="rev-per-study" style="color:#F59E0B">--</div><div class="sub" id="rev-per-study-sub"></div></div>
+    <div class="kpi"><div class="kpi-stripe" style="background:#60A5FA"></div><div class="label">Top Revenue Source</div><div class="value" id="rev-top-type" style="color:#60A5FA;font-size:20px">--</div><div class="sub" id="rev-top-type-sub"></div></div>
+  </div>
+
+  <!-- Revenue Trend (Last 12 Months) -->
+  <div class="section-label">Revenue Trend &mdash; Last 12 Months</div>
+  <div class="panel">
+    <div class="chart-wrap"><svg id="revChartDetail" viewBox="0 0 1000 310" style="width:100%;height:280px"></svg></div>
+    <div style="display:flex;gap:16px;justify-content:center;padding:0 16px 14px;font-size:10px;color:#718096">
+      <span><span style="display:inline-block;width:8px;height:8px;background:#60A5FA;border-radius:2px;margin-right:3px"></span>Autopay</span>
+      <span><span style="display:inline-block;width:8px;height:8px;background:#FBBF24;border-radius:2px;margin-right:3px"></span>Invoicables</span>
+    </div>
+  </div>
+
+  <!-- Revenue Breakdown: Type + Payment Type side by side -->
+  <div class="charts-row">
+    <div class="panel">
+      <div class="panel-head">Revenue by Type</div>
+      <div style="display:flex;align-items:center;padding:16px">
+        <svg id="revTypeDonut" viewBox="0 0 200 200" style="width:180px;height:180px;flex-shrink:0"></svg>
+        <div id="revTypeLegend" style="margin-left:20px;font-size:13px;line-height:2"></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">Revenue by Payment Method</div>
+      <div id="revPayTypeChart" style="padding:20px"></div>
+    </div>
+  </div>
+
+  <!-- Monthly Payments Collected -->
   <div class="section-label">Monthly Payments Collected</div>
   <div class="panel">
     <div class="chart-wrap"><svg id="payChart" viewBox="0 0 1000 300" style="width:100%;height:280px"></svg></div>
   </div>
 
-  <div class="section-label">12-Month Revenue by Study</div>
+  <!-- Top Revenue Items -->
+  <div class="section-label">Top 20 Revenue Items by Dollar Amount</div>
+  <div class="panel">
+    <div class="panel-body" style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>Item</th><th class="r">Total Revenue</th><th class="r">Occurrences</th><th class="r">Avg per Item</th></tr></thead>
+        <tbody id="revItemsBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 12-Month Revenue by Study (enhanced) -->
+  <div class="section-label">Revenue by Study (Last 12 Months)</div>
   <div class="panel">
     <div class="panel-body" style="overflow-x:auto">
       <table class="tbl">
@@ -13423,29 +13807,70 @@ document.addEventListener('DOMContentLoaded', () => {
 
 <!-- ═══════════ ACCRUALS ═══════════ -->
 <div id="view-fin-accruals" class="view">
+
+  <!-- Accruals KPIs (dynamic) -->
   <div class="section-label">Open Accruals Summary</div>
-  <div class="kpi-row">
+  <div class="kpi-row" id="accrualKpiRow">
+    <div class="kpi click" onclick="showUninvoicedModal()">
+      <div class="kpi-stripe" style="background:#8B5CF6"></div>
+      <div class="label">Total Open Accruals</div>
+      <div class="value" id="acc-total" style="color:#8B5CF6">--</div>
+      <div class="sub" id="acc-total-sub"></div>
+    </div>
     <div class="kpi click" onclick="showUninvoicedModal()">
       <div class="kpi-stripe" style="background:#EC4899"></div>
       <div class="label">Uninvoiced Revenue</div>
-      <div class="value" style="color:#EC4899">$263,612</div>
-      <div class="sub">30 studies</div>
+      <div class="value" id="acc-uninv" style="color:#EC4899">--</div>
+      <div class="sub" id="acc-uninv-sub"></div>
     </div>
     <div class="kpi click" onclick="showUnpaidAPModal()">
       <div class="kpi-stripe" style="background:#F59E0B"></div>
       <div class="label">Unpaid Autopay</div>
-      <div class="value" style="color:#F59E0B">$461,629</div>
-      <div class="sub">13 studies</div>
+      <div class="value" id="acc-unpaid-ap" style="color:#F59E0B">--</div>
+      <div class="sub" id="acc-unpaid-ap-sub"></div>
     </div>
     <div class="kpi click" onclick="showUnpaidInvModal()">
       <div class="kpi-stripe" style="background:#EF4444"></div>
       <div class="label">Unpaid Invoices</div>
-      <div class="value" style="color:#EF4444">$189,244</div>
-      <div class="sub">42 invoices</div>
+      <div class="value" id="acc-unpaid-inv" style="color:#EF4444">--</div>
+      <div class="sub" id="acc-unpaid-inv-sub"></div>
     </div>
   </div>
 
-  <div class="section-label">Uninvoiced Revenue by Study (30 Studies)</div>
+  <!-- Uninvoiced by Category + Unpaid AP by Type side by side -->
+  <div class="charts-row">
+    <div class="panel">
+      <div class="panel-head">Uninvoiced Revenue by Category</div>
+      <div style="display:flex;align-items:center;padding:16px">
+        <svg id="uninvCatDonut" viewBox="0 0 200 200" style="width:180px;height:180px;flex-shrink:0"></svg>
+        <div id="uninvCatLegend" style="margin-left:20px;font-size:13px;line-height:2"></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">Unpaid Autopay by Revenue Type</div>
+      <div id="unpaidApTypeChart" style="padding:20px"></div>
+    </div>
+  </div>
+
+  <!-- Unpaid Autopay Aging Distribution -->
+  <div class="section-label">Unpaid Autopay &mdash; Aging Distribution</div>
+  <div class="panel">
+    <div id="unpaidApAgingChart" style="padding:20px"></div>
+  </div>
+
+  <!-- Uninvoiced Detail Table -->
+  <div class="section-label" id="uninvDetailLabel">Uninvoiced Revenue by Study</div>
+  <div class="panel">
+    <div class="panel-body" style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>Study</th><th>Item</th><th>Category</th><th class="r">Amount</th></tr></thead>
+        <tbody id="uninvDetailBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Simple Uninvoiced by Study (collapsed rollup) -->
+  <div class="section-label">Uninvoiced Summary by Study</div>
   <div class="panel">
     <div class="panel-body" style="overflow-x:auto">
       <table class="tbl">
