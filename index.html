@@ -2092,14 +2092,47 @@ body {
       </div>
     </div>
 
+    <!-- Medical Records & Patient's Path -->
+    <div class="card fade-in" style="margin-bottom:16px;">
+      <div class="card-header">
+        <span class="card-title">🏥 Medical Records &amp; Patient's Path</span>
+        <span class="badge badge-blue" id="ref-medrec-badge">Loading...</span>
+      </div>
+      <div style="padding:0;" id="ref-medrec-content">
+        <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Loading medical records data...</div>
+      </div>
+    </div>
+
+    <!-- Patient Tracker NJ (Pennington) -->
+    <div class="card fade-in" style="margin-bottom:16px;">
+      <div class="card-header">
+        <span class="card-title">📋 Patient Tracker — Pennington NJ</span>
+        <span class="badge badge-blue" id="ref-nj-badge">Loading...</span>
+      </div>
+      <div style="padding:0;" id="ref-nj-content">
+        <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Loading NJ patient tracker...</div>
+      </div>
+    </div>
+
     <!-- Facebook CRM -->
-    <div class="card fade-in">
+    <div class="card fade-in" style="margin-bottom:16px;">
       <div class="card-header">
         <span class="card-title">📘 Facebook / Meta Lead Referrals</span>
         <span class="badge badge-blue" id="ref-fb-badge">Loading...</span>
       </div>
       <div style="padding:0;" id="ref-fb-table">
         <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Fetching Facebook CRM sheet...</div>
+      </div>
+    </div>
+
+    <!-- CRP Marketing & Digital World -->
+    <div class="card fade-in" style="margin-bottom:16px;">
+      <div class="card-header">
+        <span class="card-title">📢 CRP Marketing &amp; Digital World</span>
+        <span class="badge badge-blue" id="ref-marketing-badge">Loading...</span>
+      </div>
+      <div style="padding:0;" id="ref-marketing-content">
+        <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Loading marketing data...</div>
       </div>
     </div>
 
@@ -2451,13 +2484,59 @@ const CRP_CONFIG = {
       'unable to reach':          'Lost',
       'screen fail':              'Screen Fail',
       'complete':                 'Enrolled',
-      // Future list statuses can be added here
+      // Medical Records statuses
+      'pending release':          'New Lead',
+      'under review':             'New Lead',
+      'not interested':           'Lost',
+      'ready to schedule':        'Contacted',
+      'no show':                  'Lost',
+      'in screening':             'Screening',
+      'enrolled':                 'Enrolled',
+      // Patient tracker NJ statuses
+      'scheduled':                'Screening',
     },
     // Pipeline stage order for funnel
     PIPELINE_ORDER: ['New Lead', 'Contacted', 'Pre-Screening', 'Screening', 'Screened', 'Enrolled'],
     // Closed/terminal stages (not in funnel)
     CLOSED_STAGES: ['DNQ', 'Screen Fail', 'Lost'],
     SOURCE_RENAME: { 'Practice': 'Princeton CardioMetabolic' },
+
+    // Medical Records & Patient's Path folder (per-study patient tracking)
+    MED_RECORDS_FOLDER: '90147290121',
+    MED_RECORDS_STATUS_MAP: {
+      'unable to reach': 'Unable to Reach',
+      'not interested':  'Not Interested',
+      'pending release':  'Pending Release',
+      'under review':     'Under Review',
+      'dnq':              'DNQ',
+      'ready to schedule':'Ready to Schedule',
+      'visit 0 scheduled':'Visit Scheduled',
+      'visit 1 scheduled':'Visit Scheduled',
+      'visit 2 scheduled':'Visit Scheduled',
+      'visit 3 scheduled':'Visit Scheduled',
+      'visit 4 scheduled':'Visit Scheduled',
+      'visit 5 scheduled':'Visit Scheduled',
+      'visit 6 scheduled':'Visit Scheduled',
+      'visit 7 scheduled':'Visit Scheduled',
+      'enrolled':         'Enrolled',
+      'in screening':     'In Screening',
+      'screen fail':      'Screen Fail',
+      'no show':          'No Show',
+      'complete':         'Complete',
+    },
+    MED_RECORDS_ACTIVE: ['Pending Release','Under Review','Ready to Schedule','Visit Scheduled','In Screening','Enrolled'],
+    MED_RECORDS_CLOSED: ['DNQ','Screen Fail','Not Interested','Unable to Reach','No Show','Complete'],
+
+    // Patient tracker NJ (Pennington site)
+    PATIENT_TRACKER_NJ: '901413875382',
+
+    // CRP Marketing & Digital World space
+    MARKETING_SPACE: '90144349799',
+    MARKETING_FOLDERS: {
+      CAMPAIGNS: '90147134843',
+      EVENTS: '90147290115',
+      CONTENT_CALENDAR: '90147290109',
+    },
   },
 
   // Master Sheet (for Apps Script consolidation)
@@ -2488,8 +2567,8 @@ const CRP_CONFIG = {
   },
 
   // Version
-  VERSION: '2.7.1',
-  BUILD_DATE: '2026-03-10T16:00:00Z',
+  VERSION: '2.8.0',
+  BUILD_DATE: '2026-03-10T18:00:00Z',
 };
 
 // ═══ EVENT BUS (for plugin extensibility) ═══
@@ -13642,6 +13721,9 @@ function showCoordDetail(coordName) {
 let REFERRAL_DATA = [];        // all referral tasks normalized
 let CAMPAIGN_DATA = [];        // central campaign aggregates
 let FB_CRM_DATA = [];          // Facebook CRM leads from Google Sheet
+let MED_RECORDS_DATA = [];     // Medical Records & Patient's Path (per-study patient tracking)
+let PATIENT_NJ_DATA = [];      // Patient tracker NJ (Pennington site)
+let MARKETING_DATA = [];       // CRP Marketing & Digital World tasks
 let _referralsLoaded = false;
 
 function getClickUpToken() { return localStorage.getItem('crp_clickup_token') || ''; }
@@ -13786,8 +13868,11 @@ async function refreshReferrals() {
 
     renderReferralDashboard();
 
-    // Also fetch Facebook CRM (non-blocking, separate from ClickUp)
+    // Also fetch additional ClickUp sources + Facebook CRM (non-blocking)
     fetchFacebookCRM().catch(e => console.warn('FB CRM fetch failed:', e));
+    fetchMedicalRecords().catch(e => console.warn('Medical Records fetch failed:', e));
+    fetchPatientTrackerNJ().catch(e => console.warn('Patient Tracker NJ fetch failed:', e));
+    fetchMarketingData().catch(e => console.warn('Marketing data fetch failed:', e));
   } catch(e) {
     console.error('CRP Referrals: Fetch failed', e);
     if (badge) badge.textContent = '❌ Fetch failed — check API token';
@@ -14339,6 +14424,507 @@ function showReferralDetailModal(filterFn, title, subtitle) {
   if (refs.length === 0) html = '<div style="text-align:center;padding:30px;color:#94a3b8;">No referrals match this filter</div>';
 
   openModal(title, subtitle || `${refs.length} referrals`, html);
+}
+
+
+// ══════════════════════════════════════════════════════════════
+// MEDICAL RECORDS & PATIENT'S PATH
+// ══════════════════════════════════════════════════════════════
+async function fetchMedicalRecords() {
+  const token = getClickUpToken();
+  if (!token) return;
+  const CU = CRP_CONFIG.CLICKUP;
+  const API = 'https://api.clickup.com/api/v2';
+  const H = { 'Authorization': token };
+
+  try {
+    // 1. Get all lists in the Medical Records folder
+    const folderResp = await fetch(`${API}/folder/${CU.MED_RECORDS_FOLDER}/list`, { headers: H });
+    if (!folderResp.ok) throw new Error('Failed to fetch Medical Records folder');
+    const folderData = await folderResp.json();
+    const lists = folderData.lists || [];
+
+    // 2. Fetch tasks from each list in parallel (each list = one study)
+    const taskPromises = lists.map(async (list) => {
+      const tasks = [];
+      let page = 0, hasMore = true;
+      while (hasMore) {
+        const resp = await fetch(`${API}/list/${list.id}/task?page=${page}&subtasks=false&include_closed=true&limit=100`, { headers: H });
+        if (!resp.ok) { hasMore = false; break; }
+        const data = await resp.json();
+        if (data.tasks && data.tasks.length > 0) {
+          tasks.push(...data.tasks);
+          page++;
+          if (data.tasks.length < 100) hasMore = false;
+        } else { hasMore = false; }
+      }
+      return { study: list.name, listId: list.id, tasks };
+    });
+
+    const listResults = await Promise.all(taskPromises);
+
+    // 3. Normalize
+    MED_RECORDS_DATA = [];
+    listResults.forEach(({ study, listId, tasks }) => {
+      tasks.forEach(t => {
+        const fields = {};
+        (t.custom_fields || []).forEach(f => {
+          if (f.value === null || f.value === undefined) return;
+          if (f.type === 'drop_down') {
+            const opt = (f.type_config?.options || []).find(o => o.orderindex === f.value);
+            fields[f.name] = opt ? opt.name : String(f.value);
+          } else if (f.type === 'date') {
+            fields[f.name] = f.value ? new Date(parseInt(f.value)).toISOString().split('T')[0] : null;
+          } else if (f.type === 'url') {
+            fields[f.name] = typeof f.value === 'object' ? (f.value.url || '') : String(f.value);
+          } else if (f.type === 'checkbox') {
+            fields[f.name] = f.value === true || f.value === 'true' ? 'Yes' : 'No';
+          } else {
+            fields[f.name] = String(f.value);
+          }
+        });
+
+        const rawStatus = (t.status?.status || '').toLowerCase();
+        const mappedStatus = CU.MED_RECORDS_STATUS_MAP[rawStatus] || rawStatus || 'Unknown';
+        const isActive = CU.MED_RECORDS_ACTIVE.includes(mappedStatus);
+
+        MED_RECORDS_DATA.push({
+          id: t.id,
+          name: t.name,
+          study,
+          listId,
+          status: mappedStatus,
+          status_raw: t.status?.status || '',
+          is_active: isActive,
+          is_closed: CU.MED_RECORDS_CLOSED.includes(mappedStatus),
+          next_visit: fields['Next Visit'] || fields['Next visit date'] || fields['Next Appointment Date'] || '',
+          screening_date: fields['Screening Visit Date'] || fields['Pre-Screening Visit Date'] || '',
+          randomization_date: fields['Randomization Visit Date'] || '',
+          crio_link: fields['CRIO Link'] || '',
+          med_release: fields['Medical release Jotform'] || '',
+          records_received: fields['Medical records received?'] || '',
+          records_portal: fields['Medical Records Portal'] || '',
+          investigator_approval: fields['Investigator Approval'] || '',
+          same_day_cancel: fields['Same day cancellation?'] || '',
+          notes: fields['Notes'] || fields['Operations Team Notes'] || '',
+          screen_fail_reason: fields['Reason - Screen Fail'] || '',
+          date_created: t.date_created ? new Date(parseInt(t.date_created)).toISOString().split('T')[0] : '',
+          date_updated: t.date_updated ? new Date(parseInt(t.date_updated)).toISOString().split('T')[0] : '',
+          url: t.url || 'https://app.clickup.com/t/' + t.id,
+        });
+      });
+    });
+
+    console.log('CRP: Medical Records loaded —', MED_RECORDS_DATA.length, 'patients across', lists.length, 'studies');
+    renderMedicalRecords();
+  } catch(e) {
+    console.error('CRP: Medical Records fetch failed:', e);
+    const el = document.getElementById('ref-medrec-badge');
+    if (el) el.textContent = '❌ Failed';
+  }
+}
+
+function renderMedicalRecords() {
+  const container = document.getElementById('ref-medrec-content');
+  const badge = document.getElementById('ref-medrec-badge');
+  if (!container) return;
+
+  if (MED_RECORDS_DATA.length === 0) {
+    container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">No medical records data</div>';
+    if (badge) badge.textContent = '—';
+    return;
+  }
+
+  const CU = CRP_CONFIG.CLICKUP;
+  const total = MED_RECORDS_DATA.length;
+  const activeCount = MED_RECORDS_DATA.filter(r => r.is_active).length;
+  const enrolled = MED_RECORDS_DATA.filter(r => r.status === 'Enrolled' || r.status === 'Complete').length;
+  const screening = MED_RECORDS_DATA.filter(r => r.status === 'In Screening').length;
+  const readySched = MED_RECORDS_DATA.filter(r => r.status === 'Ready to Schedule').length;
+  const visitSched = MED_RECORDS_DATA.filter(r => r.status === 'Visit Scheduled').length;
+  const dnq = MED_RECORDS_DATA.filter(r => r.status === 'DNQ' || r.status === 'Screen Fail').length;
+  const pending = MED_RECORDS_DATA.filter(r => r.status === 'Pending Release' || r.status === 'Under Review').length;
+
+  if (badge) badge.textContent = total + ' patients · ' + MED_RECORDS_DATA.reduce((acc, r) => { acc.add(r.study); return acc; }, new Set()).size + ' studies';
+
+  // KPI row
+  let html = '<div style="display:flex;gap:12px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid #f1f5f9;">';
+  const kpis = [
+    { label: 'Total Patients', val: total, color: '#1e293b' },
+    { label: 'Active', val: activeCount, color: '#3b82f6' },
+    { label: 'Enrolled/Complete', val: enrolled, color: '#059669' },
+    { label: 'In Screening', val: screening, color: '#8b5cf6' },
+    { label: 'Visit Scheduled', val: visitSched, color: '#06b6d4' },
+    { label: 'Ready to Schedule', val: readySched, color: '#f59e0b' },
+    { label: 'Pending Records', val: pending, color: '#94a3b8' },
+    { label: 'DNQ / Screen Fail', val: dnq, color: '#dc2626' },
+  ];
+  kpis.forEach(k => {
+    html += '<div style="text-align:center;min-width:70px;"><div style="font-size:18px;font-weight:800;color:' + k.color + ';">' + k.val + '</div><div style="font-size:10px;color:#94a3b8;">' + k.label + '</div></div>';
+  });
+  html += '</div>';
+
+  // Status breakdown bar
+  const statusOrder = ['Enrolled','Complete','In Screening','Visit Scheduled','Ready to Schedule','Pending Release','Under Review','Unable to Reach','Not Interested','DNQ','Screen Fail','No Show'];
+  const statusColors = {'Enrolled':'#059669','Complete':'#047857','In Screening':'#8b5cf6','Visit Scheduled':'#06b6d4','Ready to Schedule':'#f59e0b','Pending Release':'#94a3b8','Under Review':'#64748b','Unable to Reach':'#f97316','Not Interested':'#9ca3af','DNQ':'#dc2626','Screen Fail':'#ef4444','No Show':'#b91c1c'};
+  const statusCounts = {};
+  MED_RECORDS_DATA.forEach(r => { statusCounts[r.status] = (statusCounts[r.status] || 0) + 1; });
+
+  html += '<div style="padding:12px 16px;border-bottom:1px solid #f1f5f9;">';
+  html += '<div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:6px;">STATUS DISTRIBUTION</div>';
+  html += '<div style="display:flex;height:24px;border-radius:6px;overflow:hidden;background:#f1f5f9;">';
+  statusOrder.forEach(function(st) {
+    var c = statusCounts[st] || 0;
+    if (c > 0) {
+      var pct = (c / total * 100).toFixed(1);
+      html += '<div style="width:' + pct + '%;background:' + (statusColors[st]||'#94a3b8') + ';display:flex;align-items:center;justify-content:center;" title="' + st + ': ' + c + ' (' + pct + '%)"><span style="font-size:9px;font-weight:700;color:#fff;text-shadow:0 1px 1px rgba(0,0,0,.3);">' + (c >= 5 ? c : '') + '</span></div>';
+    }
+  });
+  html += '</div>';
+  html += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;">';
+  statusOrder.forEach(function(st) {
+    var c = statusCounts[st] || 0;
+    if (c > 0) html += '<span style="font-size:10px;color:#475569;"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + (statusColors[st]||'#94a3b8') + ';margin-right:3px;"></span>' + st + ' (' + c + ')</span>';
+  });
+  html += '</div></div>';
+
+  // By-study table
+  var studyMap = {};
+  MED_RECORDS_DATA.forEach(function(r) {
+    if (!studyMap[r.study]) studyMap[r.study] = { total: 0, active: 0, enrolled: 0, screening: 0, scheduled: 0, dnq: 0 };
+    studyMap[r.study].total++;
+    if (r.is_active) studyMap[r.study].active++;
+    if (r.status === 'Enrolled' || r.status === 'Complete') studyMap[r.study].enrolled++;
+    if (r.status === 'In Screening') studyMap[r.study].screening++;
+    if (r.status === 'Visit Scheduled' || r.status === 'Ready to Schedule') studyMap[r.study].scheduled++;
+    if (r.status === 'DNQ' || r.status === 'Screen Fail') studyMap[r.study].dnq++;
+  });
+  var studyRows = Object.entries(studyMap).sort(function(a,b){ return b[1].total - a[1].total; });
+
+  html += '<div style="overflow-x:auto;"><table class="fin-table" style="width:100%;font-size:11px;">';
+  html += '<thead><tr><th style="text-align:left;padding:8px 12px;">Study</th><th style="text-align:center;">Total</th><th style="text-align:center;">Active</th><th style="text-align:center;">Screening</th><th style="text-align:center;">Scheduled</th><th style="text-align:center;">Enrolled</th><th style="text-align:center;">DNQ/SF</th></tr></thead>';
+  html += '<tbody>';
+  studyRows.forEach(function(row) {
+    var name = row[0], d = row[1];
+    var safeName = name.replace(/'/g, "\\'");
+    html += '<tr style="cursor:pointer;" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'\'" onclick="showMedRecDetailModal(\'' + safeName + '\')">';
+    html += '<td style="padding:7px 12px;font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + name + '">' + name + '</td>';
+    html += '<td style="text-align:center;font-weight:700;">' + d.total + '</td>';
+    html += '<td style="text-align:center;color:#3b82f6;">' + d.active + '</td>';
+    html += '<td style="text-align:center;color:#8b5cf6;">' + d.screening + '</td>';
+    html += '<td style="text-align:center;color:#06b6d4;">' + d.scheduled + '</td>';
+    html += '<td style="text-align:center;color:#059669;font-weight:700;">' + d.enrolled + '</td>';
+    html += '<td style="text-align:center;color:#dc2626;">' + d.dnq + '</td>';
+    html += '</tr>';
+  });
+  html += '</tbody></table></div>';
+
+  container.innerHTML = html;
+}
+
+function showMedRecDetailModal(studyName) {
+  var patients = MED_RECORDS_DATA.filter(function(r) { return r.study === studyName; });
+  if (patients.length === 0) return;
+
+  var statusColors = {'Enrolled':'#059669','Complete':'#047857','In Screening':'#8b5cf6','Visit Scheduled':'#06b6d4','Ready to Schedule':'#f59e0b','Pending Release':'#94a3b8','Under Review':'#64748b','Unable to Reach':'#f97316','Not Interested':'#9ca3af','DNQ':'#dc2626','Screen Fail':'#ef4444','No Show':'#b91c1c'};
+
+  var body = '<table class="detail-table" style="width:100%;font-size:11px;"><thead><tr>';
+  body += '<th style="text-align:left;">Patient</th><th>Status</th><th>Next Visit</th><th>Med Records</th><th>Inv. Approval</th><th>Updated</th>';
+  body += '</tr></thead><tbody>';
+  patients.sort(function(a,b){ return (a.is_active === b.is_active) ? 0 : a.is_active ? -1 : 1; });
+  patients.forEach(function(p) {
+    var sc = statusColors[p.status] || '#94a3b8';
+    var recBadge = p.records_received === 'Yes' ? '<span style="color:#059669;font-weight:700;">✓</span>' : (p.records_received === 'No' || !p.records_received ? '<span style="color:#dc2626;">✗</span>' : '<span style="color:#f59e0b;">⏳</span>');
+    var appBadge = p.investigator_approval === 'Approved' ? '<span style="color:#059669;font-weight:700;">✓</span>' : (p.investigator_approval ? '<span style="color:#f59e0b;">' + p.investigator_approval + '</span>' : '—');
+    body += '<tr>';
+    body += '<td style="font-weight:600;"><a href="' + p.url + '" target="_blank" style="color:#1e293b;text-decoration:none;">' + p.name + '</a></td>';
+    body += '<td><span style="font-size:10px;padding:2px 8px;border-radius:4px;background:' + sc + '22;color:' + sc + ';font-weight:600;">' + p.status + '</span></td>';
+    body += '<td style="font-size:11px;color:#475569;">' + (p.next_visit || '—') + '</td>';
+    body += '<td style="text-align:center;">' + recBadge + '</td>';
+    body += '<td style="text-align:center;">' + appBadge + '</td>';
+    body += '<td style="font-size:10px;color:#94a3b8;">' + (p.date_updated || '—') + '</td>';
+    body += '</tr>';
+  });
+  body += '</tbody></table>';
+
+  openModal('🏥 ' + studyName + ' — Medical Records', patients.length + ' patients', body);
+}
+
+
+// ══════════════════════════════════════════════════════════════
+// PATIENT TRACKER NJ (PENNINGTON)
+// ══════════════════════════════════════════════════════════════
+async function fetchPatientTrackerNJ() {
+  var token = getClickUpToken();
+  if (!token) return;
+  var CU = CRP_CONFIG.CLICKUP;
+  var API = 'https://api.clickup.com/api/v2';
+  var H = { 'Authorization': token };
+
+  try {
+    var tasks = [];
+    var page = 0, hasMore = true;
+    while (hasMore) {
+      var resp = await fetch(API + '/list/' + CU.PATIENT_TRACKER_NJ + '/task?page=' + page + '&subtasks=false&include_closed=true&limit=100', { headers: H });
+      if (!resp.ok) { hasMore = false; break; }
+      var data = await resp.json();
+      if (data.tasks && data.tasks.length > 0) {
+        tasks.push.apply(tasks, data.tasks);
+        page++;
+        if (data.tasks.length < 100) hasMore = false;
+      } else { hasMore = false; }
+    }
+
+    PATIENT_NJ_DATA = tasks.map(function(t) {
+      var fields = {};
+      (t.custom_fields || []).forEach(function(f) {
+        if (f.value === null || f.value === undefined) return;
+        if (f.type === 'drop_down') {
+          var opt = (f.type_config?.options || []).find(function(o){ return o.orderindex === f.value; });
+          fields[f.name] = opt ? opt.name : String(f.value);
+        } else if (f.type === 'date') {
+          fields[f.name] = f.value ? new Date(parseInt(f.value)).toISOString().split('T')[0] : null;
+        } else {
+          fields[f.name] = String(f.value);
+        }
+      });
+
+      // Determine study from the task's list (group_id) or from the status group name
+      var study = '';
+      if (t.list && t.list.name) study = t.list.name;
+      // Tasks are grouped by study in the UI via status groups
+      var group = (t.status?.status || '').trim();
+
+      return {
+        id: t.id,
+        name: t.name,
+        study: fields['Study'] || study,
+        status: group || 'Unknown',
+        next_visit: fields['Next Visit'] || '',
+        screening_start: fields['Screening Start'] || fields['Status'] || '',
+        date_created: t.date_created ? new Date(parseInt(t.date_created)).toISOString().split('T')[0] : '',
+        date_updated: t.date_updated ? new Date(parseInt(t.date_updated)).toISOString().split('T')[0] : '',
+        url: t.url || 'https://app.clickup.com/t/' + t.id,
+      };
+    });
+
+    console.log('CRP: Patient Tracker NJ loaded —', PATIENT_NJ_DATA.length, 'patients');
+    renderPatientTrackerNJ();
+  } catch(e) {
+    console.error('CRP: Patient Tracker NJ fetch failed:', e);
+    var el = document.getElementById('ref-nj-badge');
+    if (el) el.textContent = '❌ Failed';
+  }
+}
+
+function renderPatientTrackerNJ() {
+  var container = document.getElementById('ref-nj-content');
+  var badge = document.getElementById('ref-nj-badge');
+  if (!container) return;
+
+  if (PATIENT_NJ_DATA.length === 0) {
+    container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">No NJ patient data</div>';
+    if (badge) badge.textContent = '—';
+    return;
+  }
+
+  if (badge) badge.textContent = PATIENT_NJ_DATA.length + ' patients';
+
+  var statusCounts = {};
+  PATIENT_NJ_DATA.forEach(function(r) {
+    var s = r.status || 'Unknown';
+    statusCounts[s] = (statusCounts[s] || 0) + 1;
+  });
+
+  // Status summary
+  var html = '<div style="display:flex;gap:12px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid #f1f5f9;">';
+  var statusColors2 = {'Scheduled':'#06b6d4','Screen Fail':'#dc2626','open':'#3b82f6','closed':'#94a3b8'};
+  Object.entries(statusCounts).sort(function(a,b){ return b[1]-a[1]; }).forEach(function(entry) {
+    var st = entry[0], ct = entry[1];
+    var clr = statusColors2[st] || '#475569';
+    html += '<div style="text-align:center;min-width:60px;"><div style="font-size:18px;font-weight:800;color:' + clr + ';">' + ct + '</div><div style="font-size:10px;color:#94a3b8;">' + st + '</div></div>';
+  });
+  html += '</div>';
+
+  // Patient table
+  html += '<div style="overflow-x:auto;"><table class="fin-table" style="width:100%;font-size:11px;">';
+  html += '<thead><tr><th style="text-align:left;padding:8px 12px;">Patient</th><th>Status</th><th>Next Visit</th><th>Updated</th></tr></thead>';
+  html += '<tbody>';
+  PATIENT_NJ_DATA.forEach(function(p) {
+    var sc = statusColors2[p.status] || '#475569';
+    html += '<tr>';
+    html += '<td style="padding:7px 12px;font-weight:600;"><a href="' + p.url + '" target="_blank" style="color:#1e293b;text-decoration:none;">' + p.name + '</a></td>';
+    html += '<td><span style="font-size:10px;padding:2px 8px;border-radius:4px;background:' + sc + '22;color:' + sc + ';font-weight:600;">' + p.status + '</span></td>';
+    html += '<td style="font-size:11px;color:#475569;">' + (p.next_visit || '—') + '</td>';
+    html += '<td style="font-size:10px;color:#94a3b8;">' + (p.date_updated || '—') + '</td>';
+    html += '</tr>';
+  });
+  html += '</tbody></table></div>';
+
+  container.innerHTML = html;
+}
+
+
+// ══════════════════════════════════════════════════════════════
+// CRP MARKETING & DIGITAL WORLD
+// ══════════════════════════════════════════════════════════════
+async function fetchMarketingData() {
+  var token = getClickUpToken();
+  if (!token) return;
+  var CU = CRP_CONFIG.CLICKUP;
+  var API = 'https://api.clickup.com/api/v2';
+  var H = { 'Authorization': token };
+
+  try {
+    // Fetch all folders in the Marketing space
+    var spaceResp = await fetch(API + '/space/' + CU.MARKETING_SPACE + '/folder', { headers: H });
+    if (!spaceResp.ok) throw new Error('Failed to fetch Marketing space folders');
+    var spaceData = await spaceResp.json();
+    var folders = spaceData.folders || [];
+
+    // Get lists from each folder
+    var allLists = [];
+    folders.forEach(function(folder) {
+      (folder.lists || []).forEach(function(list) {
+        allLists.push({ id: list.id, name: list.name, folder: folder.name, taskCount: list.task_count || 0 });
+      });
+    });
+
+    // Also fetch folderless lists in the space
+    var folderlessResp = await fetch(API + '/space/' + CU.MARKETING_SPACE + '/list', { headers: H });
+    if (folderlessResp.ok) {
+      var folderlessData = await folderlessResp.json();
+      (folderlessData.lists || []).forEach(function(list) {
+        allLists.push({ id: list.id, name: list.name, folder: 'General', taskCount: list.task_count || 0 });
+      });
+    }
+
+    // Fetch tasks from key folders: Campaigns, Events, Content Calendar
+    var keyFolders = ['Campaigns', 'Events', 'Content Calendar'];
+    var taskPromises = allLists.filter(function(l) {
+      return keyFolders.some(function(kf) { return l.folder.toLowerCase().includes(kf.toLowerCase()); });
+    }).map(async function(list) {
+      var resp = await fetch(API + '/list/' + list.id + '/task?page=0&subtasks=false&include_closed=false&limit=100', { headers: H });
+      if (!resp.ok) return { list: list, tasks: [] };
+      var data = await resp.json();
+      return { list: list, tasks: data.tasks || [] };
+    });
+
+    var results = await Promise.all(taskPromises);
+
+    MARKETING_DATA = [];
+    results.forEach(function(r) {
+      r.tasks.forEach(function(t) {
+        var fields = {};
+        (t.custom_fields || []).forEach(function(f) {
+          if (f.value === null || f.value === undefined) return;
+          if (f.type === 'date') {
+            fields[f.name] = f.value ? new Date(parseInt(f.value)).toISOString().split('T')[0] : null;
+          } else if (f.type === 'drop_down') {
+            var opt = (f.type_config?.options || []).find(function(o){ return o.orderindex === f.value; });
+            fields[f.name] = opt ? opt.name : String(f.value);
+          } else {
+            fields[f.name] = String(f.value);
+          }
+        });
+
+        MARKETING_DATA.push({
+          id: t.id,
+          name: t.name,
+          folder: r.list.folder,
+          list: r.list.name,
+          status: (t.status?.status || '').trim(),
+          priority: t.priority ? t.priority.priority : 'none',
+          due_date: t.due_date ? new Date(parseInt(t.due_date)).toISOString().split('T')[0] : '',
+          start_date: t.start_date ? new Date(parseInt(t.start_date)).toISOString().split('T')[0] : '',
+          assignees: (t.assignees || []).map(function(a){ return a.username || a.email || ''; }).join(', '),
+          url: t.url || 'https://app.clickup.com/t/' + t.id,
+          fields: fields,
+        });
+      });
+    });
+
+    // Also store folder overview
+    MARKETING_DATA._folders = allLists;
+
+    console.log('CRP: Marketing data loaded —', MARKETING_DATA.length, 'tasks from', allLists.length, 'lists');
+    renderMarketingData();
+  } catch(e) {
+    console.error('CRP: Marketing data fetch failed:', e);
+    var el = document.getElementById('ref-marketing-badge');
+    if (el) el.textContent = '❌ Failed';
+  }
+}
+
+function renderMarketingData() {
+  var container = document.getElementById('ref-marketing-content');
+  var badge = document.getElementById('ref-marketing-badge');
+  if (!container) return;
+
+  if (MARKETING_DATA.length === 0) {
+    container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">No marketing data</div>';
+    if (badge) badge.textContent = '—';
+    return;
+  }
+
+  var folders = MARKETING_DATA._folders || [];
+  if (badge) badge.textContent = MARKETING_DATA.length + ' tasks · ' + folders.length + ' lists';
+
+  // Group by folder
+  var folderMap = {};
+  MARKETING_DATA.forEach(function(t) {
+    if (!folderMap[t.folder]) folderMap[t.folder] = [];
+    folderMap[t.folder].push(t);
+  });
+
+  // Folder overview with task counts
+  var html = '<div style="display:flex;gap:12px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid #f1f5f9;">';
+  var folderColors = {'Campaigns':'#3b82f6','Events':'#f59e0b','Content Calendar':'#10b981','Advertising':'#8b5cf6','Website & SEO':'#06b6d4','Tech & IT management':'#64748b','Goals & Documentation':'#94a3b8','General':'#475569'};
+  Object.entries(folderMap).sort(function(a,b){ return b[1].length - a[1].length; }).forEach(function(entry) {
+    var fname = entry[0], tasks = entry[1];
+    var clr = folderColors[fname] || '#475569';
+    html += '<div style="text-align:center;min-width:70px;"><div style="font-size:18px;font-weight:800;color:' + clr + ';">' + tasks.length + '</div><div style="font-size:10px;color:#94a3b8;">' + fname + '</div></div>';
+  });
+  html += '</div>';
+
+  // Upcoming / active tasks grouped by folder
+  Object.entries(folderMap).sort(function(a,b){ return b[1].length - a[1].length; }).forEach(function(entry) {
+    var fname = entry[0], tasks = entry[1];
+    var clr = folderColors[fname] || '#475569';
+    // Sort by due date (upcoming first)
+    tasks.sort(function(a,b) {
+      if (a.due_date && b.due_date) return a.due_date.localeCompare(b.due_date);
+      if (a.due_date) return -1;
+      if (b.due_date) return 1;
+      return 0;
+    });
+
+    html += '<div style="padding:8px 16px;border-bottom:1px solid #f1f5f9;"><span style="font-size:11px;font-weight:700;color:' + clr + ';text-transform:uppercase;letter-spacing:.5px;">' + fname + '</span> <span style="font-size:10px;color:#94a3b8;">(' + tasks.length + ' tasks)</span></div>';
+    html += '<div style="overflow-x:auto;"><table class="fin-table" style="width:100%;font-size:11px;">';
+    html += '<thead><tr><th style="text-align:left;padding:6px 12px;">Task</th><th>List</th><th>Status</th><th>Due Date</th><th>Assignee</th></tr></thead>';
+    html += '<tbody>';
+    tasks.slice(0, 20).forEach(function(t) {
+      var priorityColors = {'urgent':'#dc2626','high':'#f97316','normal':'#3b82f6','low':'#94a3b8','none':'#cbd5e1'};
+      var pColor = priorityColors[t.priority] || '#cbd5e1';
+      var dueColor = '#475569';
+      if (t.due_date) {
+        var today = new Date().toISOString().split('T')[0];
+        if (t.due_date < today) dueColor = '#dc2626';
+        else if (t.due_date <= new Date(Date.now() + 7*86400000).toISOString().split('T')[0]) dueColor = '#f59e0b';
+      }
+      html += '<tr>';
+      html += '<td style="padding:6px 12px;font-weight:600;max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><span style="display:inline-block;width:4px;height:12px;border-radius:2px;background:' + pColor + ';margin-right:6px;"></span><a href="' + t.url + '" target="_blank" style="color:#1e293b;text-decoration:none;">' + t.name + '</a></td>';
+      html += '<td style="font-size:10px;color:#64748b;">' + t.list + '</td>';
+      html += '<td><span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#e8eeff;color:#1843ad;">' + t.status + '</span></td>';
+      html += '<td style="font-size:11px;color:' + dueColor + ';font-weight:' + (dueColor === '#dc2626' ? '700' : '400') + ';">' + (t.due_date || '—') + '</td>';
+      html += '<td style="font-size:10px;color:#64748b;">' + (t.assignees || '—') + '</td>';
+      html += '</tr>';
+    });
+    if (tasks.length > 20) html += '<tr><td colspan="5" style="text-align:center;padding:6px;font-size:10px;color:#94a3b8;">+' + (tasks.length - 20) + ' more tasks</td></tr>';
+    html += '</tbody></table></div>';
+  });
+
+  container.innerHTML = html;
 }
 
 
