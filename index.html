@@ -715,17 +715,14 @@ body {
     </g>
   </g>
 </svg></div>
-    <div>
-      <div class="nav-title" style="color:#072061;font-weight:800;font-size:16px;">Clinical Research <span style="color:#ff9933;">Philadelphia</span></div>
-      <div class="nav-sub" style="color:var(--blue);">Unified Intelligence Dashboard</div>
+    <div style="display:flex;flex-direction:column;justify-content:center;">
+      <div class="nav-title" style="color:#072061;font-weight:800;font-size:15px;white-space:nowrap;">Clinical Research <span style="color:#ff9933;">Philadelphia</span> <span style="font-weight:400;color:var(--blue);font-size:13px;">· Unified Intelligence Dashboard</span></div>
     </div>
   </div>
-  <div style="display:flex; align-items:center; gap:8px;">
-    <span class="nav-tab active" onclick="switchTab('overview', this)" role="tab" aria-selected="true">Overview</span>
-    <span class="nav-tab" onclick="switchTab('studies', this)" role="tab">Studies</span>
-    <span class="nav-tab" onclick="switchTab('schedule', this)" role="tab">Schedule</span>
-    <span class="nav-tab" onclick="switchTab('actions', this)" role="tab">Actions</span>
-    <span class="nav-tab" onclick="switchTab('referrals', this)" role="tab">Referrals</span>
+  <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+    <span class="nav-tab active" onclick="switchTab('patient-journey', this)" role="tab" aria-selected="true">Patient Journey</span>
+    <span class="nav-tab" onclick="switchTab('operations', this)" role="tab">Operations</span>
+    <span class="nav-tab" onclick="switchTab('referrals-marketing', this)" role="tab">Referrals</span>
     <span class="nav-tab" onclick="switchTab('admin', this)" role="tab">⚙ Admin</span>
     <span style="width:1px;background:#CBD5E0;margin:8px 4px"></span>
     <span class="nav-tab fin-tab" onclick="switchTab('fin-overview',this)" role="tab">🔒 Finance</span>
@@ -737,8 +734,8 @@ body {
     <span class="nav-tab fin-tab" onclick="switchTab('insights',this)" role="tab">🔒 Insights</span>
   </div>
   <div class="nav-right">
-    <span class="data-badge" id="data-source-badge">✅ Live Data · Mar 6, 2026</span>
-    <span class="data-badge" id="last-refresh-badge">Updated: Mar 6, 2026</span>
+    <span class="data-badge" id="data-source-badge" style="display:none;"></span>
+    <span class="data-badge" id="last-refresh-badge">Updated: Mar 10, 2026</span>
     <button class="refresh-btn" onclick="refreshData()">↻ Refresh</button>
   </div>
 </nav>
@@ -748,8 +745,299 @@ body {
 ════════════════════════════════════════ -->
 <div class="main">
 
-<!-- ══ VIEW: OVERVIEW ══════════════════════ -->
-<div id="view-overview" class="view active">
+<!-- ══ VIEW: PATIENT JOURNEY (new primary tab) ══════════════════════ -->
+<div id="view-patient-journey" class="view active">
+
+  <!-- KPI Banner -->
+  <div class="time-banner fade-in">
+    <div class="tb-section">
+      <div class="tb-label">Total in Journey</div>
+      <div class="tb-value blue" id="pj-kpi-total">—</div>
+      <div class="tb-sub">Active patients</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section">
+      <div class="tb-label">Avg Days to Enroll</div>
+      <div class="tb-value" style="color:#059669" id="pj-kpi-avg-days">—</div>
+      <div class="tb-sub">From referral to enrolled</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section">
+      <div class="tb-label">Conversion Rate</div>
+      <div class="tb-value" style="color:#7c3aed" id="pj-kpi-conv-rate">—</div>
+      <div class="tb-sub">Lead → Enrolled</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section">
+      <div class="tb-label">Patients w/ Blockers</div>
+      <div class="tb-value red" id="pj-kpi-blockers">—</div>
+      <div class="tb-sub">Requiring attention</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section">
+      <div class="tb-label">Stale (&gt;14 days)</div>
+      <div class="tb-value yellow" id="pj-kpi-stale">—</div>
+      <div class="tb-sub">No recent updates</div>
+    </div>
+  </div>
+
+  <!-- Per-Stage Counters -->
+  <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-bottom:16px;" id="pj-stage-grid">
+    <div style="padding:10px 12px;background:var(--surface);border-radius:8px;border:1px solid var(--border);text-align:center;">
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Referral Created</div>
+      <div style="font-size:20px;font-weight:700;color:#3b82f6;" id="pj-stage-0">0</div>
+    </div>
+    <div style="padding:10px 12px;background:var(--surface);border-radius:8px;border:1px solid var(--border);text-align:center;">
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Contacted</div>
+      <div style="font-size:20px;font-weight:700;color:#f59e0b;" id="pj-stage-1">0</div>
+    </div>
+    <div style="padding:10px 12px;background:var(--surface);border-radius:8px;border:1px solid var(--border);text-align:center;">
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Med Records</div>
+      <div style="font-size:20px;font-weight:700;color:#8b5cf6;" id="pj-stage-2">0</div>
+    </div>
+    <div style="padding:10px 12px;background:var(--surface);border-radius:8px;border:1px solid var(--border);text-align:center;">
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Records Recv'd</div>
+      <div style="font-size:20px;font-weight:700;color:#06b6d4;" id="pj-stage-3">0</div>
+    </div>
+    <div style="padding:10px 12px;background:var(--surface);border-radius:8px;border:1px solid var(--border);text-align:center;">
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Screening</div>
+      <div style="font-size:20px;font-weight:700;color:#d97706;" id="pj-stage-4">0</div>
+    </div>
+    <div style="padding:10px 12px;background:var(--surface);border-radius:8px;border:1px solid var(--border);text-align:center;">
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Visit Scheduled</div>
+      <div style="font-size:20px;font-weight:700;color:#0284c7;" id="pj-stage-5">0</div>
+    </div>
+    <div style="padding:10px 12px;background:var(--surface);border-radius:8px;border:1px solid var(--border);text-align:center;">
+      <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Enrolled</div>
+      <div style="font-size:20px;font-weight:700;color:#059669;" id="pj-stage-6">0</div>
+    </div>
+  </div>
+
+  <!-- Roadblock Alerts (Collapsible) -->
+  <div class="card fade-in" style="margin-bottom:16px;">
+    <div class="card-header" style="cursor:pointer;" onclick="togglePJRoadblocks()">
+      <span class="card-title">Roadblock Alerts</span>
+      <span class="badge badge-red" id="pj-roadblock-count">0</span>
+      <span style="margin-left:auto;font-size:14px;color:var(--muted);" id="pj-roadblock-toggle">&#9660;</span>
+    </div>
+    <div id="pj-roadblocks-content" style="padding:0;max-height:300px;overflow-y:auto;">
+      <div style="text-align:center;padding:20px;color:var(--muted);font-size:12px;">Loading roadblocks...</div>
+    </div>
+  </div>
+
+  <!-- Main Patient Journey Table -->
+  <div class="card fade-in">
+    <div class="card-header" style="flex-wrap:wrap;gap:8px;">
+      <span class="card-title">Patient Journey Timeline</span>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-left:auto;">
+        <input type="text" id="pj-search" placeholder="Search patient or study..." style="padding:5px 12px;border:1px solid var(--border);border-radius:6px;font-size:11px;width:200px;font-family:inherit;" onkeyup="filterPatientJourneyTable()">
+        <select id="pj-stage-filter" onchange="filterPatientJourneyTable()" style="padding:5px 10px;border:1px solid var(--border);border-radius:6px;font-size:11px;font-family:inherit;">
+          <option value="">All Stages</option>
+          <option value="Referral Created">Referral Created</option>
+          <option value="Contacted">Contacted</option>
+          <option value="Med Records Created">Med Records Created</option>
+          <option value="Records Received">Records Received</option>
+          <option value="Screening">Screening</option>
+          <option value="Scheduled Visit">Scheduled Visit</option>
+          <option value="Enrolled">Enrolled</option>
+        </select>
+        <select id="pj-blocker-filter" onchange="filterPatientJourneyTable()" style="padding:5px 10px;border:1px solid var(--border);border-radius:6px;font-size:11px;font-family:inherit;">
+          <option value="">All Patients</option>
+          <option value="with-blockers">With Blockers Only</option>
+          <option value="stale">Stale (&gt;14 days)</option>
+        </select>
+        <select id="pj-study-filter" onchange="filterPatientJourneyTable()" style="padding:5px 10px;border:1px solid var(--border);border-radius:6px;font-size:11px;font-family:inherit;">
+          <option value="">All Studies</option>
+        </select>
+      </div>
+    </div>
+    <div style="max-height:600px;overflow-y:auto;">
+      <table class="detail-table" id="pj-table" style="width:100%;font-size:11px;">
+        <thead>
+          <tr>
+            <th style="text-align:left;cursor:pointer;" onclick="sortPJTable(this,0)">Patient</th>
+            <th style="text-align:left;cursor:pointer;" onclick="sortPJTable(this,1)">Study</th>
+            <th style="cursor:pointer;" onclick="sortPJTable(this,2)">Stage</th>
+            <th style="cursor:pointer;" onclick="sortPJTable(this,3)">Days</th>
+            <th style="text-align:left;">Blocker</th>
+            <th style="cursor:pointer;" onclick="sortPJTable(this,5)">Source</th>
+            <th style="cursor:pointer;" onclick="sortPJTable(this,6)">Updated</th>
+          </tr>
+        </thead>
+        <tbody id="pj-tbody">
+          <tr><td colspan="7" style="text-align:center;padding:30px;color:var(--muted);">Loading patient data...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /view-patient-journey -->
+
+<!-- ══ VIEW: OPERATIONS (merged Studies + Schedule + Actions) ══════════════════════ -->
+<div id="view-operations" class="view">
+
+  <!-- Operations KPI Banner -->
+  <div class="time-banner fade-in">
+    <div class="tb-section">
+      <div class="tb-label">Past 2 Months</div>
+      <div class="tb-value red" id="ops-kpi-cancels">—</div>
+      <div class="tb-sub">Cancellations</div>
+    </div>
+    <div class="tb-divider">TODAY</div>
+    <div class="tb-section">
+      <div class="tb-label">Next 14 Days</div>
+      <div class="tb-value blue" id="ops-kpi-14days">—</div>
+      <div class="tb-sub">Confirmed visits</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section">
+      <div class="tb-label">Next 2 Months</div>
+      <div class="tb-value green" id="ops-kpi-upcoming">—</div>
+      <div class="tb-sub">Upcoming visits</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section">
+      <div class="tb-label">At-Risk Studies</div>
+      <div class="tb-value red" id="ops-kpi-risk">—</div>
+      <div class="tb-sub">Critical risk</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section">
+      <div class="tb-label">Active Studies</div>
+      <div class="tb-value" style="color:var(--navy);" id="ops-kpi-studies">—</div>
+      <div class="tb-sub">Across 2 sites</div>
+    </div>
+  </div>
+
+  <!-- Sub-Tab Navigation -->
+  <div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid var(--border);" id="ops-subtab-bar">
+    <button class="ops-subtab" onclick="switchOpsSubtab('studies', this)" style="flex:1;padding:10px;text-align:center;font-size:12px;font-weight:600;color:var(--navy);border:none;border-bottom:3px solid var(--navy);background:transparent;cursor:pointer;">Studies &amp; Risk</button>
+    <button class="ops-subtab" onclick="switchOpsSubtab('schedule', this)" style="flex:1;padding:10px;text-align:center;font-size:12px;font-weight:600;color:var(--muted);border:none;border-bottom:3px solid transparent;background:transparent;cursor:pointer;">Schedule &amp; Visits</button>
+    <button class="ops-subtab" onclick="switchOpsSubtab('alerts', this)" style="flex:1;padding:10px;text-align:center;font-size:12px;font-weight:600;color:var(--muted);border:none;border-bottom:3px solid transparent;background:transparent;cursor:pointer;">Alerts &amp; Actions</button>
+  </div>
+
+  <!-- Subtab content containers — populated by moving old view content via JS -->
+  <div id="ops-studies-view"></div>
+  <div id="ops-schedule-view" style="display:none;"></div>
+  <div id="ops-alerts-view" style="display:none;"></div>
+
+</div><!-- /view-operations -->
+
+<!-- ══ VIEW: REFERRALS & MARKETING (simplified) ══════════════════════ -->
+<div id="view-referrals-marketing" class="view">
+
+  <!-- ClickUp API Key Setup -->
+  <div id="referral-setup-rm" style="display:none;">
+    <div class="card fade-in" style="max-width:600px;margin:40px auto;">
+      <div class="card-header"><span class="card-title">Connect ClickUp</span></div>
+      <div style="padding:20px;">
+        <p style="font-size:13px;color:var(--muted);margin-bottom:16px;">Enter your ClickUp API token to load referral pipeline data.</p>
+        <div style="display:flex;gap:8px;">
+          <input type="password" id="clickup-token-input-rm" placeholder="pk_..." style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;">
+          <button onclick="document.getElementById('clickup-token-input').value=document.getElementById('clickup-token-input-rm').value;saveClickUpToken();" style="padding:8px 20px;background:#1843ad;color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:13px;">Connect</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Referral Dashboard (simplified) -->
+  <div id="referral-dashboard-rm" style="display:none;">
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <span class="card-title">Referral Pipeline</span>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span class="data-badge" id="ref-status-badge-rm" style="font-size:10px;">Loading...</span>
+        <button onclick="refreshReferrals()" style="padding:4px 12px;background:#e8eeff;color:#1843ad;border:1px solid #1843ad;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">↻ Refresh</button>
+        <button onclick="disconnectClickUp()" style="padding:4px 12px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">Disconnect</button>
+      </div>
+    </div>
+
+    <!-- Pipeline KPI Banner -->
+    <div class="time-banner fade-in" style="margin-bottom:16px;">
+      <div class="tb-section">
+        <div class="tb-label">New Leads</div>
+        <div class="tb-value blue" id="ref-kpi-leads-rm">—</div>
+      </div>
+      <div class="tb-divider"></div>
+      <div class="tb-section">
+        <div class="tb-label">In Contact</div>
+        <div class="tb-value yellow" id="ref-kpi-contact-rm">—</div>
+      </div>
+      <div class="tb-divider"></div>
+      <div class="tb-section">
+        <div class="tb-label">Screening</div>
+        <div class="tb-value green" id="ref-kpi-screening-rm">—</div>
+      </div>
+      <div class="tb-divider"></div>
+      <div class="tb-section">
+        <div class="tb-label">Enrolled</div>
+        <div class="tb-value" style="color:#059669" id="ref-kpi-enrolled-rm">—</div>
+      </div>
+      <div class="tb-divider"></div>
+      <div class="tb-section">
+        <div class="tb-label">Conversion</div>
+        <div class="tb-value" style="color:#7C3AED" id="ref-kpi-conversion-rm">—</div>
+      </div>
+    </div>
+
+    <!-- Pipeline Funnel + Source Breakdown -->
+    <div class="grid-2" style="margin-bottom:16px;">
+      <div class="card fade-in">
+        <div class="card-header">
+          <span class="card-title">Pipeline Funnel</span>
+          <span class="badge badge-blue" id="ref-total-badge-rm">—</span>
+        </div>
+        <div style="padding:12px 16px;" id="ref-funnel-chart-rm">
+          <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Loading pipeline...</div>
+        </div>
+      </div>
+      <div class="card fade-in">
+        <div class="card-header"><span class="card-title">Referral Source Breakdown</span></div>
+        <div style="padding:12px 16px;" id="ref-source-chart-rm">
+          <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Loading sources...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pipeline by Study -->
+    <div class="card fade-in" style="margin-bottom:16px;">
+      <div class="card-header"><span class="card-title">Pipeline by Study</span></div>
+      <div style="padding:0;" id="ref-study-table-rm">
+        <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Loading...</div>
+      </div>
+    </div>
+
+    <!-- Campaigns -->
+    <div class="card fade-in" style="margin-bottom:16px;">
+      <div class="card-header">
+        <span class="card-title">Campaigns &amp; Conversion Tracking</span>
+        <span class="badge badge-blue" id="ref-camp-badge-rm">Loading...</span>
+      </div>
+      <div style="padding:0;" id="ref-campaigns-table-rm">
+        <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Loading campaigns...</div>
+      </div>
+      <div style="padding:0;border-top:2px solid #e2e8f0;" id="ref-campaign-xref-rm">
+        <div style="padding:8px 16px;background:#f8fafc;"><span style="font-size:12px;font-weight:700;color:var(--navy);">Participant Status &amp; Appointments</span> <span class="badge badge-purple" id="ref-xref-badge-rm" style="margin-left:6px;">—</span></div>
+        <div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">Cross-referencing with patient database...</div>
+      </div>
+    </div>
+
+    <!-- Facebook / Meta Leads -->
+    <div class="card fade-in" style="margin-bottom:16px;">
+      <div class="card-header">
+        <span class="card-title">Facebook / Meta Leads</span>
+        <span class="badge badge-blue" id="ref-fb-badge-rm">Loading...</span>
+      </div>
+      <div style="padding:0;" id="ref-fb-table-rm">
+        <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Fetching Facebook CRM...</div>
+      </div>
+    </div>
+
+  </div><!-- /referral-dashboard-rm -->
+</div><!-- /view-referrals-marketing -->
+
+<!-- ══ VIEW: OVERVIEW (hidden — content moved to Operations) ══════════════════════ -->
+<div id="view-overview" class="view" style="display:none;">
 
   <!-- Time Banner -->
   <div class="time-banner fade-in">
@@ -905,8 +1193,8 @@ body {
 </div><!-- /view-overview -->
 
 
-<!-- ══ VIEW: STUDY RISK ══════════════════════ -->
-<div id="view-studies" class="view">
+<!-- ══ VIEW: STUDY RISK (hidden — content moved to Operations) ══════════ -->
+<div id="view-studies" class="view" style="display:none;">
 
   <!-- Header + filters -->
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
