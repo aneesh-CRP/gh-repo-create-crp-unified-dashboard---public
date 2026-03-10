@@ -1756,6 +1756,33 @@ id="view-schedule" class="view">
     </div>
   </div>
 
+  <!-- ── COORDINATOR DAILY GOALS ── -->
+  <div class="section-title" style="margin-top:24px">Coordinator Visit Goals</div>
+  <div class="card fade-in">
+    <div style="padding:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div style="font-size:14px;font-weight:700;color:var(--navy)">Daily Goal: <span style="color:#059669">2 visits</span> per coordinator</div>
+        <div style="font-size:11px;color:var(--muted)" id="coord-week-label">This Week</div>
+      </div>
+      <div id="coordGoalsGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px"></div>
+      <div style="margin-top:16px">
+        <div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">Monthly Summary — <span id="coord-month-label">March 2026</span></div>
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:12px" id="coordMonthTable">
+            <thead><tr style="background:var(--surface2);border-bottom:2px solid var(--border)">
+              <th style="padding:8px 12px;text-align:left;font-weight:700">Coordinator</th>
+              <th style="padding:8px 8px;text-align:center;font-weight:700">Visits</th>
+              <th style="padding:8px 8px;text-align:center;font-weight:700">Goal</th>
+              <th style="padding:8px 8px;text-align:center;font-weight:700">Progress</th>
+              <th style="padding:8px 8px;text-align:center;font-weight:700">Status</th>
+            </tr></thead>
+            <tbody id="coordMonthBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </div><!-- /view-schedule -->
 
 <!-- ══ VIEW: ACTIONS ══════════════════════ -->
@@ -2177,6 +2204,10 @@ const CRP_CONFIG = {
 
   // Master Sheet (for Apps Script consolidation)
   MASTER_SHEET_ID: '1LZWJeJE9EJqe1Th13sSazrWOI5k8I56mbZPieAHqoyo',
+
+  // Coordinator visit goals
+  COORDINATORS: ['Mario Castellanos','Stacey scott','Ruby Pereira','Cady Chilensky','Angelina McMullen'],
+  COORD_DAILY_GOAL: 2,
 
   // Auto-refresh interval (ms) — 0 to disable
   REFRESH_INTERVAL: 0,
@@ -11629,6 +11660,106 @@ function buildCoordList() {
     </div>`;
   }).join('');
 }
+
+// ══════════ COORDINATOR DAILY GOALS ══════════
+function renderCoordinatorGoals() {
+  const goals = DATA.coordGoals;
+  if (!goals) return;
+  const COORDS = CRP_CONFIG.COORDINATORS || [];
+  const DAILY_GOAL = CRP_CONFIG.COORD_DAILY_GOAL || 2;
+  const grid = document.getElementById('coordGoalsGrid');
+  const monthBody = document.getElementById('coordMonthBody');
+  if (!grid) return;
+
+  const now = new Date();
+  const todayISO = now.toISOString().split('T')[0];
+  // Get this week Mon-Fri
+  const dayOfWeek = now.getDay(); // 0=Sun, 1=Mon...
+  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  const monday = new Date(now); monday.setDate(now.getDate() + mondayOffset);
+  const weekDays = [];
+  for (let i = 0; i < 5; i++) {
+    const d = new Date(monday); d.setDate(monday.getDate() + i);
+    weekDays.push(d.toISOString().split('T')[0]);
+  }
+  const dayLabels = ['Mon','Tue','Wed','Thu','Fri'];
+
+  const weekLabel = document.getElementById('coord-week-label');
+  if (weekLabel) weekLabel.textContent = 'Week of ' + monday.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+
+  const monthLabel = document.getElementById('coord-month-label');
+  if (monthLabel) monthLabel.textContent = now.toLocaleDateString('en-US',{month:'long',year:'numeric'});
+
+  // Working days elapsed this month
+  let workDaysElapsed = 0, workDaysTotal = 0;
+  const mm = now.getMonth(), yy = now.getFullYear();
+  for (let d = 1; d <= 31; d++) {
+    const dt = new Date(yy, mm, d);
+    if (dt.getMonth() !== mm) break;
+    if (dt.getDay() > 0 && dt.getDay() < 6) {
+      workDaysTotal++;
+      if (dt <= now) workDaysElapsed++;
+    }
+  }
+
+  // Build coordinator cards
+  grid.innerHTML = COORDS.map(name => {
+    const byDay = goals.byDay[name] || {};
+    const weekTotal = weekDays.reduce((s,d) => s + (byDay[d]||0), 0);
+    const weekGoal = 5 * DAILY_GOAL;
+    const weekPct = Math.min(100, Math.round(weekTotal / weekGoal * 100));
+    const weekColor = weekPct >= 80 ? '#059669' : weekPct >= 50 ? '#D97706' : '#DC2626';
+
+    const dayBars = weekDays.map((d,i) => {
+      const visits = byDay[d] || 0;
+      const met = visits >= DAILY_GOAL;
+      const isToday = d === todayISO;
+      const isPast = d < todayISO;
+      const barColor = !isPast && !isToday ? '#E5E7EB' : met ? '#059669' : visits > 0 ? '#D97706' : '#EF4444';
+      const barH = Math.min(100, Math.round((visits / (DAILY_GOAL * 1.5)) * 100));
+      return `<div style="text-align:center;flex:1">
+        <div style="height:40px;display:flex;align-items:flex-end;justify-content:center">
+          <div style="width:18px;height:${isPast || isToday ? Math.max(4,barH) : 4}%;background:${barColor};border-radius:3px 3px 0 0;transition:height 0.3s"></div>
+        </div>
+        <div style="font-size:10px;font-weight:${isToday?'700':'500'};color:${isToday?'#1843AD':'#9CA3AF'};margin-top:2px">${dayLabels[i]}</div>
+        <div style="font-size:11px;font-weight:700;color:${isPast || isToday ? barColor : '#D1D5DB'}">${visits}</div>
+      </div>`;
+    }).join('');
+
+    const firstName = name.split(' ')[0];
+    return `<div style="background:#F9FAFB;border-radius:10px;padding:14px;border:1px solid #E5E7EB">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <span style="font-weight:700;font-size:13px;color:#1a202c">${firstName}</span>
+        <span style="font-size:12px;font-weight:700;color:${weekColor}">${weekTotal}/${weekGoal}</span>
+      </div>
+      <div style="display:flex;gap:4px;margin-bottom:8px">${dayBars}</div>
+      <div style="background:#E5E7EB;border-radius:6px;height:6px;overflow:hidden">
+        <div style="background:${weekColor};height:100%;width:${weekPct}%;border-radius:6px;transition:width 0.5s"></div>
+      </div>
+      <div style="font-size:10px;color:#9CA3AF;margin-top:4px;text-align:right">${weekPct}% of weekly goal</div>
+    </div>`;
+  }).join('');
+
+  // Monthly summary table
+  if (!monthBody) return;
+  const monthGoal = workDaysElapsed * DAILY_GOAL;
+  const monthGoalFull = workDaysTotal * DAILY_GOAL;
+  monthBody.innerHTML = COORDS.map(name => {
+    const monthVisits = goals.byMonth[name] || 0;
+    const pct = monthGoal > 0 ? Math.round(monthVisits / monthGoal * 100) : 0;
+    const statusColor = pct >= 80 ? '#059669' : pct >= 50 ? '#D97706' : '#DC2626';
+    const statusLabel = pct >= 80 ? 'On Track' : pct >= 50 ? 'Behind' : 'At Risk';
+    const barPct = Math.min(100, Math.round(monthVisits / monthGoalFull * 100));
+    return `<tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:8px 12px;font-weight:600">${name}</td>
+      <td style="padding:8px 8px;text-align:center;font-weight:700">${monthVisits}</td>
+      <td style="padding:8px 8px;text-align:center;color:#6B7280">${monthGoal} (of ${monthGoalFull})</td>
+      <td style="padding:8px 12px"><div style="background:#E5E7EB;border-radius:6px;height:8px;overflow:hidden"><div style="background:${statusColor};height:100%;width:${barPct}%;border-radius:6px"></div></div></td>
+      <td style="padding:8px 8px;text-align:center"><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:${statusColor}20;color:${statusColor}">${statusLabel}</span></td>
+    </tr>`;
+  }).join('');
+}
+
 function buildInsights() {
   const flags    = DATA.riskFlags || [];
   const cancels  = DATA.cancelByStudy || [];
@@ -12049,10 +12180,38 @@ function parseRevenueByTypeCSV(rows) {
       items[item].count++;
     }
   });
+  // Group items into collapsed categories
+  const ITEM_CAT_MAP = {
+    'screen': 'Screening Visits', 'scrn': 'Screening Visits', 'prescreening': 'Pre-Screening',
+    'treatment': 'Treatment Visits', 'infusion': 'Treatment Visits',
+    'unscheduled': 'Unscheduled Visits', 'early term': 'Early Termination',
+    'start-up': 'Start-Up / Site Fees', 'start up': 'Start-Up / Site Fees', 'site prep': 'Start-Up / Site Fees', 'initiation': 'Start-Up / Site Fees',
+    'close-out': 'Close-Out Fees', 'close out': 'Close-Out Fees', 'closeout': 'Close-Out Fees',
+    'follow-up': 'Follow-Up Visits', 'follow up': 'Follow-Up Visits',
+  };
+  function categorizeItem(name) {
+    const lower = name.toLowerCase();
+    // Treatment: any "V[N]-Treatment" or "Treatment" keyword
+    if (/v\d+.*treatment|treatment.*v\d+|treatment/i.test(lower)) return 'Treatment Visits';
+    for (const [key, cat] of Object.entries(ITEM_CAT_MAP)) {
+      if (lower.includes(key)) return cat;
+    }
+    // Numbered visits that aren't screening or treatment → classify by pattern
+    if (/^visit\s+\d/i.test(lower) && !lower.includes('screen') && !lower.includes('treatment')) return 'Other Study Visits';
+    return 'Other';
+  }
+  const grouped = {};
+  Object.entries(items).forEach(([item, d]) => {
+    const cat = categorizeItem(item);
+    if (!grouped[cat]) grouped[cat] = { amount: 0, count: 0 };
+    grouped[cat].amount += d.amount;
+    grouped[cat].count += d.count;
+  });
+
   return {
     byType: Object.entries(byType).filter(([,a]) => a > 0).sort((a, b) => b[1] - a[1]).map(([type, amount]) => ({ type, amount: Math.round(amount) })),
     byPayType: Object.entries(byPayType).filter(([,a]) => a > 0).sort((a, b) => b[1] - a[1]).map(([type, amount]) => ({ type, amount: Math.round(amount) })),
-    topItems: Object.entries(items).sort((a, b) => b[1].amount - a[1].amount).slice(0, 20).map(([item, d]) => ({ item, amount: Math.round(d.amount), count: d.count })),
+    topItems: Object.entries(grouped).sort((a, b) => b[1].amount - a[1].amount).map(([item, d]) => ({ item, amount: Math.round(d.amount), count: d.count })),
   };
 }
 
@@ -12524,6 +12683,24 @@ function processLiveData(upcoming, cancels) {
   });
   const coordinators = Object.values(coordMap2).sort((a,b) => b.upcoming - a.upcoming);
 
+  // ── coordinator daily goals ──
+  const COORD_NAMES = CRP_CONFIG.COORDINATORS || [];
+  const coordGoals = { byDay: {}, byMonth: {} };
+  const seenCoordVisits = new Set();
+  COORD_NAMES.forEach(c => { coordGoals.byDay[c] = {}; coordGoals.byMonth[c] = 0; });
+  activeUpcoming.forEach(r => {
+    const name = (r['Full Name']||'').trim();
+    const date = (r['Scheduled Date']||'').trim();
+    const subjectId = (r['Subject ID']||'').trim();
+    if (!COORD_NAMES.includes(name)) return;
+    const key = name + '|' + date + '|' + subjectId;
+    if (seenCoordVisits.has(key)) return;
+    seenCoordVisits.add(key);
+    coordGoals.byDay[name][date] = (coordGoals.byDay[name][date]||0) + 1;
+    const now = new Date(); const mm = String(now.getMonth()+1).padStart(2,'0'); const yy = now.getFullYear();
+    if (date >= `${yy}-${mm}-01` && date <= `${yy}-${mm}-31`) coordGoals.byMonth[name]++;
+  });
+
   // ── cancelReasons ──
   const rb = {};
   recentCancels.forEach(r => {
@@ -12636,6 +12813,7 @@ function processLiveData(upcoming, cancels) {
     riskMatrix,
     subjectStatus,
     coordinators,
+    coordGoals,
     next14Detail,
     riskFlags,
     sites: [
@@ -12964,6 +13142,7 @@ function renderAll() {
   safe(buildSiteChart,       'buildSiteChart');
   safe(buildCancelStudyBars, 'buildCancelStudyBars');
   safe(buildCoordList,       'buildCoordList');
+  safe(renderCoordinatorGoals, 'renderCoordinatorGoals');
   safe(buildActionSteps,     'buildActionSteps');
   safe(buildInsights,        'buildInsights');
   // Note: buildRiskTable/buildStudyCards removed — Studies tab now uses buildStudiesView (lazy-loaded on tab click)
@@ -13783,11 +13962,11 @@ document.addEventListener('DOMContentLoaded', () => {
   </div>
 
   <!-- Top Revenue Items -->
-  <div class="section-label">Top 20 Revenue Items by Dollar Amount</div>
+  <div class="section-label">Revenue by Category</div>
   <div class="panel">
     <div class="panel-body" style="overflow-x:auto">
       <table class="tbl">
-        <thead><tr><th>Item</th><th class="r">Total Revenue</th><th class="r">Occurrences</th><th class="r">Avg per Item</th></tr></thead>
+        <thead><tr><th>Category</th><th class="r">Total Revenue</th><th class="r">Items</th><th class="r">Avg per Item</th></tr></thead>
         <tbody id="revItemsBody"></tbody>
       </table>
     </div>
