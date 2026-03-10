@@ -903,6 +903,7 @@ body {
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;" onclick="sortMergedTable(this,6)">In Screen ↕</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;" onclick="sortMergedTable(this,7)">SF Rate ↕</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Site</th>
+            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Pipeline</th>
           </tr>
         </thead>
         <tbody id="merged-study-tbody"></tbody>
@@ -2080,9 +2081,21 @@ body {
     <div class="card fade-in" style="margin-bottom:16px;">
       <div class="card-header">
         <span class="card-title">📣 Central Campaign Metrics</span>
+        <span class="badge badge-blue" id="ref-camp-badge">Loading...</span>
       </div>
       <div style="padding:0;" id="ref-campaigns-table">
         <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Loading campaigns...</div>
+      </div>
+    </div>
+
+    <!-- Campaign ↔ Patient DB Cross-Reference -->
+    <div class="card fade-in" style="margin-bottom:16px;">
+      <div class="card-header">
+        <span class="card-title">🔗 Campaign Participant Status &amp; Appointments</span>
+        <span class="badge badge-purple" id="ref-xref-badge">—</span>
+      </div>
+      <div style="padding:0;" id="ref-campaign-xref">
+        <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Cross-referencing campaigns with patient database and upcoming visits...</div>
       </div>
     </div>
 
@@ -2481,7 +2494,7 @@ const CRP_CONFIG = {
   },
 
   // Version
-  VERSION: '2.5.0',
+  VERSION: '2.6.0',
   BUILD_DATE: '2026-03-10T16:00:00Z',
 };
 
@@ -13820,7 +13833,8 @@ function renderReferralDashboard() {
     const count = stageCounts[stage] || 0;
     const pct = maxCount ? Math.max(count / maxCount * 100, 4) : 4;
     const color = stageColors[stage] || '#94a3b8';
-    return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+    const safeStage = stage.replace(/'/g,"\\'");
+    return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;cursor:pointer;" onclick="showReferralDetailModal(r=>r.stage==='${safeStage}','${safeStage} Referrals','${count} referrals in this stage')">
       <div style="width:100px;font-size:11px;font-weight:600;color:#475569;text-align:right;">${stage}</div>
       <div style="flex:1;background:#f1f5f9;border-radius:4px;height:28px;position:relative;overflow:hidden;">
         <div style="width:${pct}%;background:${color};height:100%;border-radius:4px;transition:width 0.5s;display:flex;align-items:center;justify-content:center;">
@@ -13891,7 +13905,8 @@ function renderReferralDashboard() {
     <tbody>${studyRows.map(([name, d]) => {
       const conv = d.total ? Math.round(d.enrolled / d.total * 100) : 0;
       const convColor = conv >= 30 ? '#059669' : conv >= 15 ? '#d97706' : '#dc2626';
-      return `<tr>
+      const safeName = name.replace(/'/g,"\\'");
+      return `<tr style="cursor:pointer;transition:background .1s" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''" onclick="showStudyPipelineModal('${safeName}')">
         <td style="padding:8px 12px;font-weight:600;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${name}">${name}</td>
         <td style="text-align:center;font-weight:700;">${d.total}</td>
         <td style="text-align:center;color:#3b82f6;">${d.active}</td>
@@ -13966,6 +13981,8 @@ function renderReferralDashboard() {
   } else {
     const campaigns = CAMPAIGN_DATA.filter(c => c.first_contact > 0 || c.new_referrals > 0)
       .sort((a,b) => b.first_contact - a.first_contact);
+    const campBadge = el('ref-camp-badge');
+    if (campBadge) campBadge.textContent = campaigns.length + ' active campaigns';
     campEl.innerHTML = `<table class="fin-table" style="width:100%;font-size:12px;">
       <thead><tr>
         <th style="text-align:left;padding:10px 12px;">Campaign / Study</th>
@@ -13979,8 +13996,9 @@ function renderReferralDashboard() {
       <tbody>${campaigns.map(c => {
         const contactRate = c.first_contact ? Math.round(c.second_contact / c.first_contact * 100) : 0;
         const crColor = contactRate >= 20 ? '#059669' : contactRate >= 10 ? '#d97706' : '#dc2626';
-        return `<tr>
-          <td style="padding:8px 12px;font-weight:600;"><a href="${c.url}" target="_blank" style="color:#1e293b;text-decoration:none;">${c.study}</a></td>
+        const safeName = c.study.replace(/'/g,"\\'");
+        return `<tr style="cursor:pointer;transition:background .1s" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''" onclick="showCampaignDetailModal('${safeName}')">
+          <td style="padding:8px 12px;font-weight:600;"><a href="${c.url}" target="_blank" onclick="event.stopPropagation()" style="color:#1e293b;text-decoration:none;">${c.study}</a></td>
           <td style="text-align:center;"><span style="font-size:10px;padding:2px 8px;border-radius:4px;background:#e8eeff;color:#1843ad;font-weight:600;">${c.vendor}</span></td>
           <td style="text-align:center;font-weight:700;">${c.first_contact.toLocaleString()}</td>
           <td style="text-align:center;">${c.second_contact.toLocaleString()}</td>
@@ -13991,6 +14009,315 @@ function renderReferralDashboard() {
       }).join('')}</tbody>
     </table>`;
   }
+
+  // Render the cross-reference section
+  renderCampaignXRef();
+}
+
+
+// ── Study ↔ Referral Pipeline helper (for Studies tab) ──────────────
+function getStudyReferralPipeline(studyName) {
+  if (!REFERRAL_DATA || REFERRAL_DATA.length === 0) return null;
+  const sn = studyName.toLowerCase().trim();
+  const matches = REFERRAL_DATA.filter(r => {
+    const rs = (r.study||'').toLowerCase().trim();
+    return rs === sn || rs.includes(sn) || sn.includes(rs);
+  });
+  if (matches.length === 0) return null;
+  const stages = {};
+  let active = 0;
+  matches.forEach(r => {
+    stages[r.stage] = (stages[r.stage] || 0) + 1;
+    if (!r.is_closed) active++;
+  });
+  return { total: matches.length, active, stages, referrals: matches };
+}
+
+// ── Study Pipeline Modal (click from Studies tab) ───────────────────
+function showStudyPipelineModal(studyName) {
+  const ref = getStudyReferralPipeline(studyName);
+  if (!ref) { openModal(studyName + ' — Referral Pipeline', '', '<div style="text-align:center;padding:30px;color:#94a3b8;">No referral data found for this study</div>'); return; }
+
+  const CU = CRP_CONFIG.CLICKUP;
+  const stageColors = {'New Lead':'#3b82f6','Contacted':'#f59e0b','Pre-Screening':'#8b5cf6','Screening':'#06b6d4','Screened':'#10b981','Enrolled':'#059669','DNQ':'#ef4444','Screen Fail':'#f97316','Lost':'#94a3b8'};
+
+  // Funnel bars
+  let funnel = '<div style="margin-bottom:16px;">';
+  [...CU.PIPELINE_ORDER, ...CU.CLOSED_STAGES].forEach(stage => {
+    const count = ref.stages[stage] || 0;
+    if (count === 0) return;
+    const pct = Math.max(count / ref.total * 100, 5);
+    const color = stageColors[stage] || '#94a3b8';
+    funnel += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+      <div style="width:90px;font-size:11px;font-weight:600;color:#475569;text-align:right;">${stage}</div>
+      <div style="flex:1;background:#f1f5f9;border-radius:3px;height:22px;overflow:hidden;">
+        <div style="width:${pct}%;background:${color};height:100%;border-radius:3px;display:flex;align-items:center;padding-left:6px;">
+          <span style="font-size:11px;font-weight:700;color:#fff;">${count}</span>
+        </div>
+      </div>
+    </div>`;
+  });
+  funnel += '</div>';
+
+  // Detail table
+  const rows = ref.referrals.sort((a,b) => {
+    const order = [...CU.PIPELINE_ORDER, ...CU.CLOSED_STAGES];
+    return order.indexOf(a.stage) - order.indexOf(b.stage);
+  });
+  let table = `<table class="detail-table" style="width:100%;font-size:11px;"><thead><tr>
+    <th>Name</th><th>Stage</th><th>Source</th><th>Next Appt</th><th>Days Since Update</th><th>Patient DB</th>
+  </tr></thead><tbody>`;
+  rows.forEach(r => {
+    // Cross-reference with patient DB
+    const nameKey = r.name.toLowerCase().trim();
+    const dbMatch = PATIENT_DB.find(p => p.name_lower === nameKey);
+    const dbStatus = dbMatch ? `<span style="padding:2px 6px;border-radius:3px;font-size:10px;font-weight:600;background:${dbMatch.status==='Available'?'#dcfce7':'#fef2f2'};color:${dbMatch.status==='Available'?'#059669':'#dc2626'}">${dbMatch.status}</span>` : '<span style="color:#cbd5e1;font-size:10px;">Not found</span>';
+
+    // Check upcoming appointments
+    const upcoming = (DATA.allVisitDetail || []).filter(v => v.patient.toLowerCase().trim() === nameKey);
+    const nextApptDisplay = upcoming.length > 0
+      ? `<span style="color:#059669;font-weight:600;">${upcoming[0].date}</span> <span style="font-size:9px;color:#94a3b8;">${upcoming[0].visit}</span>`
+      : r.next_appt ? `<span style="color:#3b82f6;">${r.next_appt}</span>` : '<span style="color:#cbd5e1;">—</span>';
+
+    const staleColor = r.days_since_update >= 14 ? '#dc2626' : r.days_since_update >= 7 ? '#d97706' : '#059669';
+    table += `<tr>
+      <td style="padding:6px 8px;"><a href="${r.url}" target="_blank" style="font-weight:600;color:#1e293b;text-decoration:none;">${r.name}</a></td>
+      <td style="padding:6px 8px;text-align:center;"><span style="padding:2px 6px;border-radius:3px;font-size:10px;font-weight:600;background:${(stageColors[r.stage]||'#94a3b8')}22;color:${stageColors[r.stage]||'#94a3b8'}">${r.stage}</span></td>
+      <td style="padding:6px 8px;font-size:10px;color:#475569;">${r.source}</td>
+      <td style="padding:6px 8px;">${nextApptDisplay}</td>
+      <td style="padding:6px 8px;text-align:center;"><span style="font-weight:600;color:${staleColor};">${r.days_since_update}d</span></td>
+      <td style="padding:6px 8px;">${dbStatus}</td>
+    </tr>`;
+  });
+  table += '</tbody></table>';
+
+  openModal(studyName + ' — Referral Pipeline', `${ref.total} total referrals · ${ref.active} active`, funnel + table);
+}
+
+// ── Campaign Detail Modal (click from campaign row) ─────────────────
+function showCampaignDetailModal(studyName) {
+  // Cross-reference this campaign's study name against:
+  // 1. REFERRAL_DATA (individual referrals for this study)
+  // 2. PATIENT_DB (status of participants)
+  // 3. DATA.allVisitDetail (upcoming appointments)
+  const sn = studyName.toLowerCase().trim();
+
+  // Find referrals matching this campaign study
+  const referrals = REFERRAL_DATA.filter(r => {
+    const rs = (r.study||'').toLowerCase().trim();
+    return rs === sn || rs.includes(sn) || sn.includes(rs);
+  });
+
+  // Find upcoming visits for this study
+  const upcoming = (DATA.allVisitDetail || []).filter(v =>
+    v.study.toLowerCase().includes(sn) || sn.includes(v.study.toLowerCase())
+  );
+
+  // Campaign metadata
+  const campaign = CAMPAIGN_DATA.find(c => c.study === studyName);
+
+  let html = '';
+
+  // Campaign Summary KPIs
+  if (campaign) {
+    html += `<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;padding:12px;background:#f8fafc;border-radius:8px;">
+      <div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#3b82f6;">${campaign.first_contact.toLocaleString()}</div><div style="font-size:10px;color:#94a3b8;">1st Contact</div></div>
+      <div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#f59e0b;">${campaign.second_contact.toLocaleString()}</div><div style="font-size:10px;color:#94a3b8;">2nd Contact</div></div>
+      <div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#8b5cf6;">${campaign.third_contact.toLocaleString()}</div><div style="font-size:10px;color:#94a3b8;">3rd Contact</div></div>
+      <div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#059669;">${campaign.new_referrals}</div><div style="font-size:10px;color:#94a3b8;">New Referrals</div></div>
+      <div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#1843ad;">${referrals.length}</div><div style="font-size:10px;color:#94a3b8;">In Pipeline</div></div>
+      <div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#06b6d4;">${upcoming.length}</div><div style="font-size:10px;color:#94a3b8;">Upcoming Visits</div></div>
+    </div>`;
+  }
+
+  // Referral Pipeline Participants with cross-reference
+  if (referrals.length > 0) {
+    const stageColors = {'New Lead':'#3b82f6','Contacted':'#f59e0b','Pre-Screening':'#8b5cf6','Screening':'#06b6d4','Screened':'#10b981','Enrolled':'#059669','DNQ':'#ef4444','Screen Fail':'#f97316','Lost':'#94a3b8'};
+    html += `<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px;">📋 Referral Pipeline Participants</div>`;
+    html += `<table class="detail-table" style="width:100%;font-size:11px;margin-bottom:16px;"><thead><tr>
+      <th>Participant</th><th>Stage</th><th>Source</th><th>Appt Booked</th><th>Patient Status</th><th>Last Updated</th>
+    </tr></thead><tbody>`;
+    referrals.sort((a,b) => a.days_since_update - b.days_since_update).forEach(r => {
+      const nameKey = r.name.toLowerCase().trim();
+      const dbMatch = PATIENT_DB.find(p => p.name_lower === nameKey);
+      const pVisits = (DATA.allVisitDetail || []).filter(v => v.patient.toLowerCase().trim() === nameKey);
+      const apptBooked = pVisits.length > 0
+        ? `<span style="color:#059669;font-weight:700;">✓ ${pVisits[0].date}</span><div style="font-size:9px;color:#94a3b8;">${pVisits[0].visit}</div>`
+        : r.next_appt ? `<span style="color:#3b82f6;">${r.next_appt}</span>` : '<span style="color:#ef4444;font-size:10px;">No appt</span>';
+      const pStatus = dbMatch
+        ? `<span style="padding:2px 6px;border-radius:3px;font-size:10px;font-weight:600;background:${dbMatch.status==='Available'?'#dcfce7':dbMatch.status==='Do Not Solicit'||dbMatch.status==='Deceased'?'#fef2f2':'#fffbeb'};color:${dbMatch.status==='Available'?'#059669':dbMatch.status==='Do Not Solicit'||dbMatch.status==='Deceased'?'#dc2626':'#d97706'}">${dbMatch.status}</span>`
+        : '<span style="color:#94a3b8;font-size:10px;">Not in DB</span>';
+      const staleColor = r.days_since_update >= 14 ? '#dc2626' : r.days_since_update >= 7 ? '#d97706' : '#059669';
+      html += `<tr>
+        <td style="padding:6px 8px;"><a href="${r.url}" target="_blank" style="font-weight:600;color:#1e293b;text-decoration:none;">${r.name}</a></td>
+        <td style="padding:6px 8px;text-align:center;"><span style="padding:2px 6px;border-radius:3px;font-size:10px;font-weight:600;background:${(stageColors[r.stage]||'#94a3b8')}22;color:${stageColors[r.stage]||'#94a3b8'}">${r.stage}</span></td>
+        <td style="padding:6px 8px;font-size:10px;color:#475569;">${r.source}</td>
+        <td style="padding:6px 8px;">${apptBooked}</td>
+        <td style="padding:6px 8px;">${pStatus}</td>
+        <td style="padding:6px 8px;text-align:center;font-weight:600;color:${staleColor};">${r.days_since_update}d ago</td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+  } else {
+    html += `<div style="padding:16px;color:#94a3b8;text-align:center;font-size:12px;">No individual referrals tracked for this campaign in ClickUp</div>`;
+  }
+
+  // Upcoming visits for this study
+  if (upcoming.length > 0) {
+    html += `<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px;">📅 Upcoming Appointments (${upcoming.length})</div>`;
+    html += `<table class="detail-table" style="width:100%;font-size:11px;"><thead><tr>
+      <th>Date</th><th>Patient</th><th>Visit</th><th>Status</th><th>Coordinator</th>
+    </tr></thead><tbody>`;
+    upcoming.slice(0, 20).forEach(v => {
+      html += `<tr>
+        <td style="padding:5px 8px;font-weight:600;color:#1843ad;">${v.date}</td>
+        <td style="padding:5px 8px;"><a href="${v.patient_url}" target="_blank" style="color:#1e293b;text-decoration:none;font-weight:600;">${v.patient}</a></td>
+        <td style="padding:5px 8px;font-size:10px;color:#475569;">${v.visit}</td>
+        <td style="padding:5px 8px;font-size:10px;">${v.status}</td>
+        <td style="padding:5px 8px;font-size:10px;color:#475569;">${v.coord}</td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+    if (upcoming.length > 20) html += `<div style="text-align:center;padding:6px;font-size:10px;color:#94a3b8;">+${upcoming.length - 20} more visits</div>`;
+  }
+
+  if (!html) html = '<div style="text-align:center;padding:30px;color:#94a3b8;">No cross-reference data available for this campaign</div>';
+
+  openModal('📣 ' + studyName, campaign ? `Vendor: ${campaign.vendor} · ${campaign.first_contact} total contacts` : '', html);
+}
+
+// ── Campaign ↔ Patient DB Cross-Reference Renderer ──────────────────
+function renderCampaignXRef() {
+  const el = document.getElementById('ref-campaign-xref');
+  const badge = document.getElementById('ref-xref-badge');
+  if (!el) return;
+
+  // Cross-reference each campaign study against referral data, patient DB, upcoming visits
+  const results = [];
+  const studiesChecked = new Set();
+
+  // From campaigns
+  CAMPAIGN_DATA.forEach(c => {
+    const sn = c.study.toLowerCase().trim();
+    if (studiesChecked.has(sn)) return;
+    studiesChecked.add(sn);
+
+    const referrals = REFERRAL_DATA.filter(r => {
+      const rs = (r.study||'').toLowerCase().trim();
+      return rs === sn || rs.includes(sn) || sn.includes(rs);
+    });
+    const upcoming = (DATA.allVisitDetail || []).filter(v =>
+      v.study.toLowerCase().includes(sn) || sn.includes(v.study.toLowerCase())
+    );
+
+    // Patient DB cross-reference for referral participants
+    let inDB = 0, flagged = 0, withAppt = 0;
+    referrals.forEach(r => {
+      const nameKey = r.name.toLowerCase().trim();
+      const dbMatch = PATIENT_DB.find(p => p.name_lower === nameKey);
+      if (dbMatch) {
+        inDB++;
+        if (dbMatch.status !== 'Available') flagged++;
+      }
+      const hasAppt = (DATA.allVisitDetail || []).some(v => v.patient.toLowerCase().trim() === nameKey);
+      if (hasAppt || r.next_appt) withAppt++;
+    });
+
+    results.push({
+      study: c.study,
+      vendor: c.vendor,
+      first_contact: c.first_contact,
+      new_referrals: c.new_referrals,
+      referrals_in_pipeline: referrals.length,
+      active_referrals: referrals.filter(r => !r.is_closed).length,
+      upcoming_visits: upcoming.length,
+      in_patient_db: inDB,
+      flagged_patients: flagged,
+      with_appointment: withAppt,
+      url: c.url,
+    });
+  });
+
+  if (badge) badge.textContent = results.length + ' campaigns';
+
+  if (results.length === 0) {
+    el.innerHTML = '<div style="text-align:center;padding:20px;color:#94a3b8;font-size:13px;">No campaign cross-reference data available — ensure campaigns and patient DB are loaded</div>';
+    return;
+  }
+
+  // Summary KPIs
+  const totalPipeline = results.reduce((s,r) => s + r.referrals_in_pipeline, 0);
+  const totalUpcoming = results.reduce((s,r) => s + r.upcoming_visits, 0);
+  const totalFlagged = results.reduce((s,r) => s + r.flagged_patients, 0);
+  const totalWithAppt = results.reduce((s,r) => s + r.with_appointment, 0);
+
+  let html = `<div style="display:flex;gap:12px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid #f1f5f9;">
+    <div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#1843ad;">${totalPipeline}</div><div style="font-size:10px;color:#94a3b8;">In Pipeline</div></div>
+    <div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#059669;">${totalWithAppt}</div><div style="font-size:10px;color:#94a3b8;">Appts Booked</div></div>
+    <div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#06b6d4;">${totalUpcoming}</div><div style="font-size:10px;color:#94a3b8;">Upcoming Visits</div></div>
+    <div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:${totalFlagged>0?'#dc2626':'#059669'};">${totalFlagged}</div><div style="font-size:10px;color:#94a3b8;">⚠ Flagged</div></div>
+  </div>`;
+
+  // Table
+  html += `<div style="overflow-x:auto;"><table class="fin-table" style="width:100%;font-size:11px;">
+    <thead><tr>
+      <th style="text-align:left;padding:8px 12px;">Campaign / Study</th>
+      <th style="text-align:center;">Vendor</th>
+      <th style="text-align:center;">Pipeline</th>
+      <th style="text-align:center;">Active</th>
+      <th style="text-align:center;">Appt Booked</th>
+      <th style="text-align:center;">Upcoming</th>
+      <th style="text-align:center;">In Patient DB</th>
+      <th style="text-align:center;">⚠ Flagged</th>
+    </tr></thead>
+    <tbody>${results.filter(r => r.first_contact > 0 || r.referrals_in_pipeline > 0).sort((a,b) => b.referrals_in_pipeline - a.referrals_in_pipeline).map(r => {
+      const safeStudy = r.study.replace(/'/g,"\\'");
+      return `<tr style="cursor:pointer;transition:background .1s" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''" onclick="showCampaignDetailModal('${safeStudy}')">
+        <td style="padding:8px 12px;font-weight:600;">${r.study}</td>
+        <td style="text-align:center;"><span style="font-size:10px;padding:2px 8px;border-radius:4px;background:#e8eeff;color:#1843ad;font-weight:600;">${r.vendor}</span></td>
+        <td style="text-align:center;font-weight:700;color:#1843ad;">${r.referrals_in_pipeline}</td>
+        <td style="text-align:center;color:#3b82f6;">${r.active_referrals}</td>
+        <td style="text-align:center;font-weight:700;color:${r.with_appointment>0?'#059669':'#94a3b8'};">${r.with_appointment}</td>
+        <td style="text-align:center;color:#06b6d4;font-weight:600;">${r.upcoming_visits}</td>
+        <td style="text-align:center;">${r.in_patient_db}</td>
+        <td style="text-align:center;color:${r.flagged_patients>0?'#dc2626':'#059669'};font-weight:${r.flagged_patients>0?'700':'400'};">${r.flagged_patients > 0 ? '⚠ '+r.flagged_patients : '✓'}</td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table></div>`;
+
+  el.innerHTML = html;
+}
+
+// ── Referral detail modal (click from funnel, tracker rows, stale leads) ──
+function showReferralDetailModal(filterFn, title, subtitle) {
+  const refs = REFERRAL_DATA.filter(filterFn);
+  const stageColors = {'New Lead':'#3b82f6','Contacted':'#f59e0b','Pre-Screening':'#8b5cf6','Screening':'#06b6d4','Screened':'#10b981','Enrolled':'#059669','DNQ':'#ef4444','Screen Fail':'#f97316','Lost':'#94a3b8'};
+
+  let html = `<table class="detail-table" style="width:100%;font-size:11px;"><thead><tr>
+    <th>Name</th><th>Study</th><th>Stage</th><th>Source</th><th>Appt</th><th>Patient Status</th><th>Updated</th>
+  </tr></thead><tbody>`;
+  refs.slice(0, 50).forEach(r => {
+    const nameKey = r.name.toLowerCase().trim();
+    const dbMatch = PATIENT_DB.find(p => p.name_lower === nameKey);
+    const pVisits = (DATA.allVisitDetail || []).filter(v => v.patient.toLowerCase().trim() === nameKey);
+    const apptCell = pVisits.length > 0 ? `<span style="color:#059669;font-weight:600;">${pVisits[0].date}</span>` : r.next_appt || '<span style="color:#cbd5e1;">—</span>';
+    const dbCell = dbMatch ? `<span style="font-size:10px;font-weight:600;color:${dbMatch.status==='Available'?'#059669':'#dc2626'}">${dbMatch.status}</span>` : '<span style="color:#cbd5e1;font-size:10px;">—</span>';
+    const staleColor = r.days_since_update >= 14 ? '#dc2626' : r.days_since_update >= 7 ? '#d97706' : '#059669';
+    html += `<tr>
+      <td style="padding:5px 8px;"><a href="${r.url}" target="_blank" style="font-weight:600;color:#1e293b;text-decoration:none;">${r.name}</a></td>
+      <td style="padding:5px 8px;font-size:10px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.study||'—'}</td>
+      <td style="padding:5px 8px;text-align:center;"><span style="padding:2px 6px;border-radius:3px;font-size:10px;font-weight:600;background:${(stageColors[r.stage]||'#94a3b8')}22;color:${stageColors[r.stage]||'#94a3b8'}">${r.stage}</span></td>
+      <td style="padding:5px 8px;font-size:10px;color:#475569;">${r.source}</td>
+      <td style="padding:5px 8px;">${apptCell}</td>
+      <td style="padding:5px 8px;">${dbCell}</td>
+      <td style="padding:5px 8px;text-align:center;font-weight:600;color:${staleColor};">${r.days_since_update}d</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  if (refs.length > 50) html += `<div style="text-align:center;padding:8px;font-size:11px;color:#94a3b8;">Showing 50 of ${refs.length}</div>`;
+  if (refs.length === 0) html = '<div style="text-align:center;padding:30px;color:#94a3b8;">No referrals match this filter</div>';
+
+  openModal(title, subtitle || `${refs.length} referrals`, html);
 }
 
 
@@ -14293,6 +14620,18 @@ function sortMergedTable(th, col) {
   renderStudiesTable();
 }
 
+function buildPipelineCell(studyName, safeStudy) {
+  const refData = getStudyReferralPipeline(studyName);
+  if (!refData || refData.total === 0) return '<span style="font-size:10px;color:#cbd5e1;">\u2014</span>';
+  const stages = ['New Lead','Contacted','Pre-Screening','Screening','Screened','Enrolled'];
+  const colors = {'New Lead':'#3b82f6','Contacted':'#f59e0b','Pre-Screening':'#8b5cf6','Screening':'#06b6d4','Screened':'#10b981','Enrolled':'#059669'};
+  const miniBar = stages.map(function(st) {
+    const c = refData.stages[st] || 0;
+    return c > 0 ? '<div style="width:'+Math.max(c*6,4)+'px;height:10px;background:'+colors[st]+';border-radius:2px;" title="'+st+': '+c+'"></div>' : '';
+  }).filter(Boolean).join('');
+  return '<div style="cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;" onclick="showStudyPipelineModal(\''+safeStudy+'\')"><div style="display:flex;gap:1px;">'+miniBar+'</div><div style="font-size:9px;font-weight:600;color:#475569;">'+refData.active+'<span style="color:#94a3b8;font-weight:400">/'+refData.total+'</span></div></div>';
+}
+
 function renderStudiesTable() {
   const studies = (DATA.mergedStudies || []).filter(s => {
     if (_studyFilter === 'all') return true;
@@ -14386,6 +14725,7 @@ function renderStudiesTable() {
       <td style="padding:10px 8px;text-align:center;font-size:11px;color:${s.screening>0?'#7c3aed':'var(--muted)'};font-weight:${s.screening>0?'700':'400'}">${s.screening||0}</td>
       <td style="padding:10px 8px;text-align:center;font-size:11px;color:${sfColor};font-weight:600">${s.screen_fail_pct > 0 ? s.screen_fail_pct+'%' : '—'}</td>
       <td style="padding:10px 8px;text-align:center">${siteTags}</td>
+      <td style="padding:10px 8px;text-align:center">${buildPipelineCell(s.study, safeStudy)}</td>
     </tr>`;
   }).join('');
 }
