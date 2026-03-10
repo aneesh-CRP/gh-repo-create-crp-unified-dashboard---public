@@ -725,6 +725,7 @@ body {
     <span class="nav-tab" onclick="switchTab('studies', this)" role="tab">Studies</span>
     <span class="nav-tab" onclick="switchTab('schedule', this)" role="tab">Schedule</span>
     <span class="nav-tab" onclick="switchTab('actions', this)" role="tab">Actions</span>
+    <span class="nav-tab" onclick="switchTab('referrals', this)" role="tab">Referrals</span>
     <span class="nav-tab" onclick="switchTab('admin', this)" role="tab">⚙ Admin</span>
     <span style="width:1px;background:#CBD5E0;margin:8px 4px"></span>
     <span class="nav-tab fin-tab" onclick="switchTab('fin-overview',this)" role="tab">🔒 Finance</span>
@@ -1958,6 +1959,148 @@ body {
 </div><!-- /view-actions -->
 
 
+<!-- ══ VIEW: REFERRALS ══════════════════════ -->
+<div id="view-referrals" class="view">
+
+  <!-- ClickUp API Key Setup (shown if no key stored) -->
+  <div id="referral-setup" style="display:none;">
+    <div class="card fade-in" style="max-width:600px;margin:40px auto;">
+      <div class="card-header">
+        <span class="card-title">🔗 Connect ClickUp</span>
+      </div>
+      <div style="padding:20px;">
+        <p style="font-size:13px;color:var(--muted);margin-bottom:16px;">Enter your ClickUp API token to load referral pipeline data. The token is stored only in your browser — never in the source code.</p>
+        <div style="display:flex;gap:8px;">
+          <input type="password" id="clickup-token-input" placeholder="pk_..." style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;">
+          <button onclick="saveClickUpToken()" style="padding:8px 20px;background:#1843ad;color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:13px;">Connect</button>
+        </div>
+        <p style="font-size:11px;color:#94a3b8;margin-top:8px;">Find your token: ClickUp → Settings → Apps → API Token</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Referral Dashboard (shown when connected) -->
+  <div id="referral-dashboard" style="display:none;">
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <div style="font-size:13px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.5px;">📊 Referral Pipeline</div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span class="data-badge" id="ref-status-badge" style="font-size:10px;">Loading...</span>
+        <button onclick="refreshReferrals()" style="padding:4px 12px;background:#e8eeff;color:#1843ad;border:1px solid #1843ad;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">↻ Refresh</button>
+        <button onclick="disconnectClickUp()" style="padding:4px 12px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">Disconnect</button>
+      </div>
+    </div>
+
+    <!-- Pipeline KPI Banner -->
+    <div class="time-banner fade-in" style="margin-bottom:16px;">
+      <div class="tb-section">
+        <div class="tb-label">📥 New Leads</div>
+        <div class="tb-value blue" id="ref-kpi-leads">—</div>
+        <div class="tb-sub">Pending outreach + to contact</div>
+      </div>
+      <div class="tb-divider"></div>
+      <div class="tb-section">
+        <div class="tb-label">📞 In Contact</div>
+        <div class="tb-value yellow" id="ref-kpi-contact">—</div>
+        <div class="tb-sub">Interested + actively engaged</div>
+      </div>
+      <div class="tb-divider"></div>
+      <div class="tb-section">
+        <div class="tb-label">🩺 Screening</div>
+        <div class="tb-value green" id="ref-kpi-screening">—</div>
+        <div class="tb-sub">Pre-screening + screening</div>
+      </div>
+      <div class="tb-divider"></div>
+      <div class="tb-section">
+        <div class="tb-label">✅ Enrolled</div>
+        <div class="tb-value" style="color:#059669" id="ref-kpi-enrolled">—</div>
+        <div class="tb-sub">Randomized + completed</div>
+      </div>
+      <div class="tb-divider"></div>
+      <div class="tb-section">
+        <div class="tb-label">📊 Conversion</div>
+        <div class="tb-value" style="color:#7C3AED" id="ref-kpi-conversion">—</div>
+        <div class="tb-sub">Lead → Enrolled rate</div>
+      </div>
+    </div>
+
+    <!-- Pipeline Funnel + Source Breakdown -->
+    <div class="grid-2" style="margin-bottom:16px;">
+      <div class="card fade-in">
+        <div class="card-header">
+          <span class="card-title">Pipeline Funnel</span>
+          <span class="badge badge-blue" id="ref-total-badge">—</span>
+        </div>
+        <div style="padding:12px 16px;" id="ref-funnel-chart">
+          <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Loading pipeline...</div>
+        </div>
+      </div>
+      <div class="card fade-in">
+        <div class="card-header">
+          <span class="card-title">Referral Source Breakdown</span>
+        </div>
+        <div style="padding:12px 16px;" id="ref-source-chart">
+          <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Loading sources...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pipeline by Study + Stale Leads -->
+    <div class="grid-2" style="margin-bottom:16px;">
+      <div class="card fade-in">
+        <div class="card-header">
+          <span class="card-title">Pipeline by Study</span>
+        </div>
+        <div style="padding:0;" id="ref-study-table">
+          <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Loading...</div>
+        </div>
+      </div>
+      <div class="card fade-in">
+        <div class="card-header">
+          <span class="card-title">⚠️ Stale Leads</span>
+          <span class="badge badge-yellow" id="ref-stale-badge">—</span>
+        </div>
+        <div style="padding:12px 16px;" id="ref-stale-list">
+          <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Loading...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tracker Detail Cards -->
+    <div class="card fade-in" style="margin-bottom:16px;">
+      <div class="card-header">
+        <span class="card-title">📇 Physician Tracker Detail</span>
+      </div>
+      <div style="padding:0;" id="ref-tracker-detail">
+        <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Loading tracker data...</div>
+      </div>
+    </div>
+
+    <!-- Central Campaigns -->
+    <div class="card fade-in" style="margin-bottom:16px;">
+      <div class="card-header">
+        <span class="card-title">📣 Central Campaign Metrics</span>
+      </div>
+      <div style="padding:0;" id="ref-campaigns-table">
+        <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Loading campaigns...</div>
+      </div>
+    </div>
+
+    <!-- Facebook CRM -->
+    <div class="card fade-in">
+      <div class="card-header">
+        <span class="card-title">📘 Facebook / Meta Lead Referrals</span>
+        <span class="badge badge-blue" id="ref-fb-badge">Loading...</span>
+      </div>
+      <div style="padding:0;" id="ref-fb-table">
+        <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Fetching Facebook CRM sheet...</div>
+      </div>
+    </div>
+
+  </div><!-- /referral-dashboard -->
+</div><!-- /view-referrals -->
+
+
 <!-- ══ VIEW: CONNECT ══════════════════════ -->
 <div id="view-admin" class="view">
 
@@ -2270,6 +2413,46 @@ const CRP_CONFIG = {
   // Patient Database (CRIO daily export — published CSV)
   PATIENT_DB_URL: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSF6m57VM1I7VMG__gFSRGWGFUc05ZIymyMDCu4RiLcgNlBwgqccQmnT2A-bbfkm6f7mjb9f2Qe5lLf/pub?output=csv',
 
+  // ClickUp Integration — Referral Pipeline
+  CLICKUP: {
+    TEAM_ID: '36109289',
+    SPACE_ID: '90142526279',
+    // Physician Partnership Tracker lists (each task = patient referral)
+    REFERRAL_LISTS: [
+      { id: '901413202462', name: 'Dr. Modarressi', source_type: 'physician' },
+      { id: '901413613356', name: 'Connolly Dermatology', source_type: 'physician' },
+      { id: '901413613360', name: 'Dr. Savita Singh', source_type: 'physician' },
+      { id: '901414013590', name: 'Center Primary Care', source_type: 'physician' },
+    ],
+    // Central Campaigns list (each task = campaign/vendor with aggregate counts)
+    CAMPAIGN_LIST: '901407896291',
+    // Additional lists (add future tracker lists here)
+    EXTRA_LISTS: [],
+    // Facebook CRM Google Sheet (published CSV — recruitment team comments + Delfa AI pre-screener)
+    FACEBOOK_CRM_URL: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vR2y6TsaFLnVQcyskBntErNr5zl1WZRxZhWo-0cOIgMfEWvNm6NStcYatK9MF7U2tj4QDlnOCnopHri/pub?output=csv',
+    // Unified pipeline stage mapping (ClickUp status → dashboard stage)
+    PIPELINE_MAP: {
+      'pending provider outreach': 'New Lead',
+      'recruiter to contact':     'New Lead',
+      'schedule directly':        'Contacted',
+      'participant interested':   'Contacted',
+      'in contact':               'Contacted',
+      'scheduled pre-screening':  'Pre-Screening',
+      'scheduled screening':      'Screening',
+      'screening completed':      'Screened',
+      'randomization completed':  'Enrolled',
+      'dnq':                      'DNQ',
+      'unable to reach':          'Lost',
+      'screen fail':              'Screen Fail',
+      'complete':                 'Enrolled',
+      // Future list statuses can be added here
+    },
+    // Pipeline stage order for funnel
+    PIPELINE_ORDER: ['New Lead', 'Contacted', 'Pre-Screening', 'Screening', 'Screened', 'Enrolled'],
+    // Closed/terminal stages (not in funnel)
+    CLOSED_STAGES: ['DNQ', 'Screen Fail', 'Lost'],
+  },
+
   // Master Sheet (for Apps Script consolidation)
   MASTER_SHEET_ID: '1LZWJeJE9EJqe1Th13sSazrWOI5k8I56mbZPieAHqoyo',
 
@@ -2286,7 +2469,7 @@ const CRP_CONFIG = {
 
   // Tab registry — add new tabs here
   TABS: {
-    PERFORMANCE: ['overview', 'studies', 'schedule', 'actions', 'admin'],
+    PERFORMANCE: ['overview', 'studies', 'schedule', 'actions', 'referrals', 'admin'],
     FINANCE: ['fin-overview', 'fin-collections', 'fin-aging', 'fin-revenue', 'fin-accruals', 'insights'],
     CROSS: ['insights'],
   },
@@ -2298,8 +2481,8 @@ const CRP_CONFIG = {
   },
 
   // Version
-  VERSION: '2.4.0',
-  BUILD_DATE: '2026-03-10T14:00:00Z',
+  VERSION: '2.5.0',
+  BUILD_DATE: '2026-03-10T16:00:00Z',
 };
 
 // ═══ EVENT BUS (for plugin extensibility) ═══
@@ -3041,7 +3224,7 @@ function initFinanceDashboard() {
 // ═══ UNIFIED TAB SWITCHER (wraps perf switchView + finance gating) ═══
 function switchTab(name, el) {
   // Performance tabs → delegate to switchView (handles lazy building)
-  const PERF_TABS = ['overview','studies','schedule','actions','admin'];
+  const PERF_TABS = ['overview','studies','schedule','actions','referrals','admin'];
   if (PERF_TABS.includes(name)) {
     // Hide finance+insights views first
     document.querySelectorAll('[id^="view-fin-"], #view-insights').forEach(v => {
@@ -11666,6 +11849,9 @@ function switchView(name, el) {
   if (name === 'admin') {
     setTimeout(() => switchAdmin('trends', document.querySelector('#admin-filter-bar .sched-filter')), 50);
   }
+  if (name === 'referrals') {
+    setTimeout(() => initReferrals(), 50);
+  }
   if (name === 'trends' && typeof LONGITUDINAL !== 'undefined' && LONGITUDINAL) {
     setTimeout(() => renderTrendsCharts(), 50);
   }
@@ -13440,6 +13626,493 @@ function showCoordDetail(coordName) {
   }
   if(!body) body = '<p style="color:#94a3b8;padding:20px;text-align:center">No records found</p>';
   openModal(coordName, upcoming.length+' upcoming · '+allCancelRows.length+' cancellations', body);
+}
+
+
+// ═══════════════════════════════════════════════════
+// CLICKUP REFERRAL PIPELINE INTEGRATION
+// ═══════════════════════════════════════════════════
+let REFERRAL_DATA = [];        // all referral tasks normalized
+let CAMPAIGN_DATA = [];        // central campaign aggregates
+let FB_CRM_DATA = [];          // Facebook CRM leads from Google Sheet
+let _referralsLoaded = false;
+
+function getClickUpToken() { return localStorage.getItem('crp_clickup_token') || ''; }
+function saveClickUpToken() {
+  const token = document.getElementById('clickup-token-input').value.trim();
+  if (!token) return;
+  localStorage.setItem('crp_clickup_token', token);
+  initReferrals();
+}
+function disconnectClickUp() {
+  localStorage.removeItem('crp_clickup_token');
+  _referralsLoaded = false;
+  REFERRAL_DATA = [];
+  CAMPAIGN_DATA = [];
+  document.getElementById('referral-setup').style.display = 'block';
+  document.getElementById('referral-dashboard').style.display = 'none';
+}
+
+function initReferrals() {
+  const token = getClickUpToken();
+  if (!token) {
+    document.getElementById('referral-setup').style.display = 'block';
+    document.getElementById('referral-dashboard').style.display = 'none';
+    // Still load Facebook CRM even without ClickUp token
+    if (FB_CRM_DATA.length === 0) fetchFacebookCRM().catch(e => console.warn('FB CRM:', e));
+    return;
+  }
+  document.getElementById('referral-setup').style.display = 'none';
+  document.getElementById('referral-dashboard').style.display = 'block';
+  if (!_referralsLoaded) refreshReferrals();
+}
+
+async function refreshReferrals() {
+  const token = getClickUpToken();
+  if (!token) return;
+  const badge = document.getElementById('ref-status-badge');
+  if (badge) badge.textContent = '⏳ Fetching...';
+
+  const CU = CRP_CONFIG.CLICKUP;
+  const H = { 'Authorization': token };
+  const API = 'https://api.clickup.com/api/v2';
+
+  try {
+    // 1. Fetch all referral tracker lists in parallel
+    const allLists = [...CU.REFERRAL_LISTS, ...CU.EXTRA_LISTS];
+    const taskPromises = allLists.map(async (list) => {
+      const tasks = [];
+      let page = 0;
+      let hasMore = true;
+      while (hasMore) {
+        const resp = await fetch(`${API}/list/${list.id}/task?page=${page}&subtasks=false&include_closed=true&limit=100`, { headers: H });
+        if (!resp.ok) { hasMore = false; break; }
+        const data = await resp.json();
+        if (data.tasks && data.tasks.length > 0) {
+          tasks.push(...data.tasks);
+          page++;
+          if (data.tasks.length < 100) hasMore = false;
+        } else { hasMore = false; }
+      }
+      return { list, tasks };
+    });
+
+    // 2. Fetch Central Campaigns
+    const campaignPromise = (async () => {
+      const resp = await fetch(`${API}/list/${CU.CAMPAIGN_LIST}/task?page=0&subtasks=false&include_closed=true&limit=100`, { headers: H });
+      if (!resp.ok) return [];
+      const data = await resp.json();
+      return data.tasks || [];
+    })();
+
+    const [listResults, campaignTasks] = await Promise.all([
+      Promise.all(taskPromises),
+      campaignPromise
+    ]);
+
+    // 3. Normalize referral data
+    REFERRAL_DATA = [];
+    listResults.forEach(({ list, tasks }) => {
+      tasks.forEach(t => {
+        const fields = {};
+        (t.custom_fields || []).forEach(f => {
+          if (f.value === null || f.value === undefined) return;
+          if (f.type === 'drop_down') {
+            const opt = (f.type_config?.options || []).find(o => o.orderindex === f.value);
+            fields[f.name] = opt ? opt.name : String(f.value);
+          } else if (f.type === 'date') {
+            fields[f.name] = f.value ? new Date(parseInt(f.value)).toISOString().split('T')[0] : null;
+          } else if (f.type === 'phone') {
+            fields[f.name] = typeof f.value === 'object' ? f.value.phone_number || '' : String(f.value);
+          } else {
+            fields[f.name] = String(f.value);
+          }
+        });
+
+        const status = (t.status?.status || '').toLowerCase();
+        const stage = CU.PIPELINE_MAP[status] || 'Other';
+
+        REFERRAL_DATA.push({
+          id: t.id,
+          name: t.name,
+          tracker: list.name,
+          source_type: list.source_type,
+          source: fields['Source'] || list.name,
+          study: fields['Study'] || '',
+          status_raw: t.status?.status || '',
+          stage,
+          phone: fields['Phone #'] || '',
+          dob: fields['Patient DOB'] || '',
+          referring_physician: fields['Referring Physician'] || '',
+          next_appt: fields['Next Appointment Date'] || '',
+          date_created: t.date_created ? new Date(parseInt(t.date_created)).toISOString().split('T')[0] : '',
+          date_updated: t.date_updated ? new Date(parseInt(t.date_updated)).toISOString().split('T')[0] : '',
+          days_since_update: t.date_updated ? Math.floor((Date.now() - parseInt(t.date_updated)) / 86400000) : 999,
+          url: t.url || `https://app.clickup.com/t/${t.id}`,
+          is_closed: CU.CLOSED_STAGES.includes(stage) || t.status?.type === 'closed' || t.status?.type === 'done',
+        });
+      });
+    });
+
+    // 4. Normalize campaign data
+    CAMPAIGN_DATA = campaignTasks.map(t => {
+      const fields = {};
+      (t.custom_fields || []).forEach(f => {
+        if (f.value === null || f.value === undefined) return;
+        fields[f.name] = String(f.value);
+      });
+      return {
+        study: t.name,
+        vendor: (t.status?.status || '').trim(),
+        first_contact: parseInt(fields['FIRST CONTACT'] || '0') || 0,
+        second_contact: parseInt(fields['SECOND CONTACT'] || '0') || 0,
+        third_contact: parseInt(fields['THIRD CONTACT'] || '0') || 0,
+        new_referrals: parseInt(fields['New Referrals'] || '0') || 0,
+        url: t.url || `https://app.clickup.com/t/${t.id}`,
+      };
+    });
+
+    _referralsLoaded = true;
+    if (badge) badge.textContent = `✅ ${REFERRAL_DATA.length} referrals · ${new Date().toLocaleTimeString()}`;
+    console.log(`CRP Referrals: Loaded ${REFERRAL_DATA.length} referrals from ${allLists.length} lists, ${CAMPAIGN_DATA.length} campaigns`);
+
+    renderReferralDashboard();
+
+    // Also fetch Facebook CRM (non-blocking, separate from ClickUp)
+    fetchFacebookCRM().catch(e => console.warn('FB CRM fetch failed:', e));
+  } catch(e) {
+    console.error('CRP Referrals: Fetch failed', e);
+    if (badge) badge.textContent = '❌ Fetch failed — check API token';
+  }
+}
+
+function renderReferralDashboard() {
+  const CU = CRP_CONFIG.CLICKUP;
+  const active = REFERRAL_DATA.filter(r => !r.is_closed);
+  const all = REFERRAL_DATA;
+
+  // ── KPIs ──
+  const stageCounts = {};
+  CU.PIPELINE_ORDER.forEach(s => stageCounts[s] = 0);
+  CU.CLOSED_STAGES.forEach(s => stageCounts[s] = 0);
+  all.forEach(r => { stageCounts[r.stage] = (stageCounts[r.stage] || 0) + 1; });
+
+  const el = id => document.getElementById(id);
+  el('ref-kpi-leads').textContent = stageCounts['New Lead'] || 0;
+  el('ref-kpi-contact').textContent = stageCounts['Contacted'] || 0;
+  el('ref-kpi-screening').textContent = (stageCounts['Pre-Screening'] || 0) + (stageCounts['Screening'] || 0);
+  el('ref-kpi-enrolled').textContent = (stageCounts['Screened'] || 0) + (stageCounts['Enrolled'] || 0);
+  const totalIn = all.length;
+  const totalEnrolled = (stageCounts['Screened'] || 0) + (stageCounts['Enrolled'] || 0);
+  el('ref-kpi-conversion').textContent = totalIn ? Math.round(totalEnrolled / totalIn * 100) + '%' : '—';
+  el('ref-total-badge').textContent = all.length + ' total referrals';
+
+  // ── Pipeline Funnel ──
+  const funnelEl = el('ref-funnel-chart');
+  const maxCount = Math.max(...CU.PIPELINE_ORDER.map(s => stageCounts[s] || 0), 1);
+  const stageColors = {
+    'New Lead':'#3b82f6','Contacted':'#f59e0b','Pre-Screening':'#8b5cf6',
+    'Screening':'#06b6d4','Screened':'#10b981','Enrolled':'#059669'
+  };
+  const closedColors = {'DNQ':'#ef4444','Screen Fail':'#f97316','Lost':'#94a3b8'};
+
+  let funnelHtml = CU.PIPELINE_ORDER.map(stage => {
+    const count = stageCounts[stage] || 0;
+    const pct = maxCount ? Math.max(count / maxCount * 100, 4) : 4;
+    const color = stageColors[stage] || '#94a3b8';
+    return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+      <div style="width:100px;font-size:11px;font-weight:600;color:#475569;text-align:right;">${stage}</div>
+      <div style="flex:1;background:#f1f5f9;border-radius:4px;height:28px;position:relative;overflow:hidden;">
+        <div style="width:${pct}%;background:${color};height:100%;border-radius:4px;transition:width 0.5s;display:flex;align-items:center;justify-content:center;">
+          <span style="font-size:11px;font-weight:700;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,0.3);">${count}</span>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Add closed stages as smaller bars below
+  const closedHtml = CU.CLOSED_STAGES.filter(s => stageCounts[s] > 0).map(stage => {
+    const count = stageCounts[stage] || 0;
+    const pct = maxCount ? Math.max(count / maxCount * 100, 4) : 4;
+    const color = closedColors[stage] || '#94a3b8';
+    return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+      <div style="width:100px;font-size:10px;color:#94a3b8;text-align:right;">${stage}</div>
+      <div style="flex:1;background:#f8fafc;border-radius:3px;height:20px;position:relative;overflow:hidden;">
+        <div style="width:${pct}%;background:${color};height:100%;border-radius:3px;display:flex;align-items:center;justify-content:center;">
+          <span style="font-size:10px;font-weight:600;color:#fff;">${count}</span>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  funnelEl.innerHTML = funnelHtml + (closedHtml ? '<div style="margin-top:10px;padding-top:8px;border-top:1px solid #f1f5f9;"><div style="font-size:10px;color:#94a3b8;margin-bottom:4px;text-align:right;width:100px;display:inline-block;">Closed</div></div>' + closedHtml : '');
+
+  // ── Source Breakdown ──
+  const sourceEl = el('ref-source-chart');
+  const sourceCounts = {};
+  all.forEach(r => { const s = r.source || 'Unknown'; sourceCounts[s] = (sourceCounts[s] || 0) + 1; });
+  const sources = Object.entries(sourceCounts).sort((a,b) => b[1] - a[1]);
+  const srcColors = ['#3b82f6','#f59e0b','#10b981','#8b5cf6','#ef4444','#06b6d4','#f97316','#ec4899'];
+  sourceEl.innerHTML = sources.map(([name,count], i) => {
+    const pct = Math.round(count / all.length * 100);
+    const color = srcColors[i % srcColors.length];
+    return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+      <div style="width:8px;height:8px;border-radius:50%;background:${color};flex-shrink:0;"></div>
+      <div style="width:120px;font-size:12px;font-weight:600;color:#334155;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${name}">${name}</div>
+      <div style="flex:1;background:#f1f5f9;border-radius:3px;height:20px;overflow:hidden;">
+        <div style="width:${Math.max(pct,3)}%;background:${color};height:100%;border-radius:3px;"></div>
+      </div>
+      <div style="font-size:12px;font-weight:700;color:#1e293b;min-width:40px;text-align:right;">${count} <span style="font-size:10px;color:#94a3b8;">(${pct}%)</span></div>
+    </div>`;
+  }).join('') || '<div style="color:#94a3b8;text-align:center;padding:20px;">No source data</div>';
+
+  // ── Pipeline by Study ──
+  const studyEl = el('ref-study-table');
+  const studyMap = {};
+  all.forEach(r => {
+    const s = r.study || 'Unassigned';
+    if (!studyMap[s]) studyMap[s] = { total: 0, active: 0, enrolled: 0, dnq: 0, stages: {} };
+    studyMap[s].total++;
+    if (!r.is_closed) studyMap[s].active++;
+    if (r.stage === 'Enrolled' || r.stage === 'Screened') studyMap[s].enrolled++;
+    if (r.stage === 'DNQ' || r.stage === 'Screen Fail') studyMap[s].dnq++;
+    studyMap[s].stages[r.stage] = (studyMap[s].stages[r.stage] || 0) + 1;
+  });
+  const studyRows = Object.entries(studyMap).sort((a,b) => b[1].total - a[1].total);
+  studyEl.innerHTML = `<table class="fin-table" style="width:100%;font-size:12px;">
+    <thead><tr>
+      <th style="text-align:left;padding:10px 12px;">Study</th>
+      <th style="text-align:center;">Total</th>
+      <th style="text-align:center;">Active</th>
+      <th style="text-align:center;">Enrolled</th>
+      <th style="text-align:center;">DNQ/SF</th>
+      <th style="text-align:center;">Conv %</th>
+    </tr></thead>
+    <tbody>${studyRows.map(([name, d]) => {
+      const conv = d.total ? Math.round(d.enrolled / d.total * 100) : 0;
+      const convColor = conv >= 30 ? '#059669' : conv >= 15 ? '#d97706' : '#dc2626';
+      return `<tr>
+        <td style="padding:8px 12px;font-weight:600;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${name}">${name}</td>
+        <td style="text-align:center;font-weight:700;">${d.total}</td>
+        <td style="text-align:center;color:#3b82f6;">${d.active}</td>
+        <td style="text-align:center;color:#059669;font-weight:700;">${d.enrolled}</td>
+        <td style="text-align:center;color:#dc2626;">${d.dnq}</td>
+        <td style="text-align:center;font-weight:700;color:${convColor};">${conv}%</td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table>`;
+
+  // ── Stale Leads (active, not updated in 7+ days) ──
+  const staleEl = el('ref-stale-list');
+  const staleBadge = el('ref-stale-badge');
+  const staleLeads = active.filter(r => r.days_since_update >= 7)
+    .sort((a,b) => b.days_since_update - a.days_since_update);
+  if (staleBadge) staleBadge.textContent = staleLeads.length + ' stale';
+
+  if (staleLeads.length === 0) {
+    staleEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">🟢 No stale leads — all active referrals updated within 7 days</div>';
+  } else {
+    staleEl.innerHTML = staleLeads.slice(0, 15).map(r => {
+      const urgency = r.days_since_update >= 14 ? '#dc2626' : '#d97706';
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f1f5f9;">
+        <div>
+          <a href="${r.url}" target="_blank" style="font-size:12px;font-weight:600;color:#1e293b;text-decoration:none;">${r.name}</a>
+          <div style="font-size:10px;color:#94a3b8;">${r.study || 'No study'} · ${r.tracker} · ${r.stage}</div>
+        </div>
+        <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:${urgency}22;color:${urgency};">${r.days_since_update}d ago</span>
+      </div>`;
+    }).join('') + (staleLeads.length > 15 ? `<div style="text-align:center;padding:8px;font-size:11px;color:#94a3b8;">+${staleLeads.length - 15} more</div>` : '');
+  }
+
+  // ── Tracker Detail ──
+  const trackerEl = el('ref-tracker-detail');
+  const trackerMap = {};
+  all.forEach(r => {
+    if (!trackerMap[r.tracker]) trackerMap[r.tracker] = [];
+    trackerMap[r.tracker].push(r);
+  });
+  const trackerRows = Object.entries(trackerMap).sort((a,b) => b[1].length - a[1].length);
+  trackerEl.innerHTML = `<table class="fin-table" style="width:100%;font-size:12px;">
+    <thead><tr>
+      <th style="text-align:left;padding:10px 12px;">Tracker</th>
+      <th style="text-align:center;">Total</th>
+      <th style="text-align:center;">New Lead</th>
+      <th style="text-align:center;">Contacted</th>
+      <th style="text-align:center;">Pre-Screen</th>
+      <th style="text-align:center;">Screening</th>
+      <th style="text-align:center;">Enrolled</th>
+      <th style="text-align:center;">DNQ/Lost</th>
+    </tr></thead>
+    <tbody>${trackerRows.map(([name, tasks]) => {
+      const sc = {};
+      tasks.forEach(t => { sc[t.stage] = (sc[t.stage] || 0) + 1; });
+      return `<tr>
+        <td style="padding:8px 12px;font-weight:600;">${name}</td>
+        <td style="text-align:center;font-weight:700;">${tasks.length}</td>
+        <td style="text-align:center;">${sc['New Lead']||0}</td>
+        <td style="text-align:center;">${sc['Contacted']||0}</td>
+        <td style="text-align:center;">${sc['Pre-Screening']||0}</td>
+        <td style="text-align:center;">${sc['Screening']||0}</td>
+        <td style="text-align:center;color:#059669;font-weight:700;">${(sc['Screened']||0)+(sc['Enrolled']||0)}</td>
+        <td style="text-align:center;color:#dc2626;">${(sc['DNQ']||0)+(sc['Screen Fail']||0)+(sc['Lost']||0)}</td>
+      </tr>`;
+    }).join('')}</tbody>
+  </table>`;
+
+  // ── Central Campaigns ──
+  const campEl = el('ref-campaigns-table');
+  if (CAMPAIGN_DATA.length === 0) {
+    campEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">No campaign data available</div>';
+  } else {
+    const campaigns = CAMPAIGN_DATA.filter(c => c.first_contact > 0 || c.new_referrals > 0)
+      .sort((a,b) => b.first_contact - a.first_contact);
+    campEl.innerHTML = `<table class="fin-table" style="width:100%;font-size:12px;">
+      <thead><tr>
+        <th style="text-align:left;padding:10px 12px;">Campaign / Study</th>
+        <th style="text-align:center;">Vendor</th>
+        <th style="text-align:center;">1st Contact</th>
+        <th style="text-align:center;">2nd Contact</th>
+        <th style="text-align:center;">3rd Contact</th>
+        <th style="text-align:center;">New Referrals</th>
+        <th style="text-align:center;">Contact Rate</th>
+      </tr></thead>
+      <tbody>${campaigns.map(c => {
+        const contactRate = c.first_contact ? Math.round(c.second_contact / c.first_contact * 100) : 0;
+        const crColor = contactRate >= 20 ? '#059669' : contactRate >= 10 ? '#d97706' : '#dc2626';
+        return `<tr>
+          <td style="padding:8px 12px;font-weight:600;"><a href="${c.url}" target="_blank" style="color:#1e293b;text-decoration:none;">${c.study}</a></td>
+          <td style="text-align:center;"><span style="font-size:10px;padding:2px 8px;border-radius:4px;background:#e8eeff;color:#1843ad;font-weight:600;">${c.vendor}</span></td>
+          <td style="text-align:center;font-weight:700;">${c.first_contact.toLocaleString()}</td>
+          <td style="text-align:center;">${c.second_contact.toLocaleString()}</td>
+          <td style="text-align:center;">${c.third_contact.toLocaleString()}</td>
+          <td style="text-align:center;color:#059669;font-weight:700;">${c.new_referrals}</td>
+          <td style="text-align:center;font-weight:700;color:${crColor};">${contactRate}%</td>
+        </tr>`;
+      }).join('')}</tbody>
+    </table>`;
+  }
+}
+
+
+async function fetchFacebookCRM() {
+  const url = CRP_CONFIG.CLICKUP.FACEBOOK_CRM_URL;
+  if (!url) return;
+  try {
+    const rows = await fetchCSV(url);
+    FB_CRM_DATA = rows;
+    console.log(`CRP: Facebook CRM loaded — ${rows.length} rows`);
+    renderFacebookCRM();
+  } catch(e) {
+    console.warn('CRP: Facebook CRM fetch failed:', e.message);
+    const el = document.getElementById('ref-fb-table');
+    if (el) el.innerHTML = '<div style="text-align:center;padding:20px;color:#94a3b8;font-size:13px;">⚠️ Could not load Facebook CRM sheet</div>';
+  }
+}
+
+function renderFacebookCRM() {
+  const el = document.getElementById('ref-fb-table');
+  const badge = document.getElementById('ref-fb-badge');
+  if (!el || FB_CRM_DATA.length === 0) return;
+
+  // Detect columns dynamically
+  const cols = Object.keys(FB_CRM_DATA[0] || {});
+  if (badge) badge.textContent = `${FB_CRM_DATA.length} leads`;
+
+  // Try to identify key columns (name, phone, email, study, status, notes, etc.)
+  const findCol = (...patterns) => cols.find(c => patterns.some(p => c.toLowerCase().includes(p)));
+  const nameCol = findCol('name', 'full name', 'patient');
+  const phoneCol = findCol('phone', 'mobile', 'cell');
+  const emailCol = findCol('email');
+  const studyCol = findCol('study', 'campaign', 'indication', 'condition');
+  const statusCol = findCol('status', 'disposition', 'outcome');
+  const notesCol = findCol('notes', 'comment', 'recruiter', 'response');
+  const dateCol = findCol('date', 'created', 'submitted', 'timestamp');
+  const delfaCol = findCol('delfa', 'ai', 'pre-screen', 'prescreen');
+
+  // Calculate summary stats
+  const statusCounts = {};
+  const studyCounts = {};
+  let delfaCount = 0;
+  FB_CRM_DATA.forEach(r => {
+    const status = statusCol ? (r[statusCol] || '').trim() : '';
+    if (status) statusCounts[status] = (statusCounts[status] || 0) + 1;
+    const study = studyCol ? (r[studyCol] || '').trim() : '';
+    if (study) studyCounts[study] = (studyCounts[study] || 0) + 1;
+    // Check if Delfa (AI pre-screener) was involved
+    if (delfaCol && r[delfaCol]) delfaCount++;
+    // Also check notes for Delfa mention
+    if (notesCol && (r[notesCol] || '').toLowerCase().includes('delfa')) delfaCount++;
+  });
+
+  // Build summary bar
+  const topStatuses = Object.entries(statusCounts).sort((a,b) => b[1] - a[1]).slice(0, 6);
+  const topStudies = Object.entries(studyCounts).sort((a,b) => b[1] - a[1]).slice(0, 8);
+
+  let html = '';
+
+  // Summary stats row
+  html += `<div style="padding:12px 16px;display:flex;gap:16px;flex-wrap:wrap;border-bottom:1px solid #f1f5f9;">`;
+  if (topStatuses.length > 0) {
+    html += `<div style="flex:1;min-width:280px;">
+      <div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:8px;">Status Distribution</div>
+      ${topStatuses.map(([status, count]) => {
+        const pct = Math.round(count / FB_CRM_DATA.length * 100);
+        const colors = {'scheduled':'#059669','contacted':'#3b82f6','no answer':'#f59e0b','not interested':'#94a3b8','voicemail':'#d97706','dnq':'#ef4444'};
+        const matched = Object.keys(colors).find(k => status.toLowerCase().includes(k));
+        const color = matched ? colors[matched] : '#6366f1';
+        return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">
+          <div style="width:80px;font-size:11px;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${status}">${status}</div>
+          <div style="flex:1;background:#f1f5f9;border-radius:3px;height:16px;overflow:hidden;">
+            <div style="width:${Math.max(pct,3)}%;background:${color};height:100%;border-radius:3px;"></div>
+          </div>
+          <div style="font-size:10px;font-weight:600;color:#1e293b;min-width:35px;text-align:right;">${count}</div>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }
+  if (topStudies.length > 0) {
+    html += `<div style="flex:1;min-width:280px;">
+      <div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:8px;">By Campaign / Study</div>
+      ${topStudies.map(([study, count]) => {
+        const pct = Math.round(count / FB_CRM_DATA.length * 100);
+        return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">
+          <div style="width:100px;font-size:11px;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${study}">${study}</div>
+          <div style="flex:1;background:#f1f5f9;border-radius:3px;height:16px;overflow:hidden;">
+            <div style="width:${Math.max(pct,3)}%;background:#3b82f6;height:100%;border-radius:3px;"></div>
+          </div>
+          <div style="font-size:10px;font-weight:600;color:#1e293b;min-width:35px;text-align:right;">${count}</div>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }
+  if (delfaCount > 0) {
+    html += `<div style="min-width:120px;text-align:center;padding:8px;">
+      <div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:4px;">🤖 Delfa AI</div>
+      <div style="font-size:24px;font-weight:800;color:#7C3AED;">${delfaCount}</div>
+      <div style="font-size:10px;color:#94a3b8;">AI pre-screened</div>
+    </div>`;
+  }
+  html += `</div>`;
+
+  // Recent leads table (most recent 20)
+  const displayCols = [nameCol, phoneCol, studyCol, statusCol, notesCol, dateCol].filter(Boolean);
+  const recentRows = FB_CRM_DATA.slice(0, 30);
+  html += `<div style="overflow-x:auto;"><table class="fin-table" style="width:100%;font-size:11px;">
+    <thead><tr>${displayCols.map(c => `<th style="text-align:left;padding:8px 10px;white-space:nowrap;">${c}</th>`).join('')}</tr></thead>
+    <tbody>${recentRows.map(r => `<tr>${displayCols.map(c => {
+      let val = (r[c] || '').trim();
+      if (val.length > 60) val = val.substring(0, 57) + '...';
+      // Highlight Delfa mentions
+      if (val.toLowerCase().includes('delfa')) val = `<span style="background:#ede9fe;color:#7C3AED;padding:0 4px;border-radius:3px;font-weight:600;">${val}</span>`;
+      return `<td style="padding:6px 10px;border-bottom:1px solid #f8fafc;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${(r[c]||'').replace(/"/g,"'")}">${val || '<span style="color:#cbd5e1">—</span>'}</td>`;
+    }).join('')}</tr>`).join('')}</tbody>
+  </table></div>`;
+
+  if (FB_CRM_DATA.length > 30) {
+    html += `<div style="text-align:center;padding:8px;font-size:11px;color:#94a3b8;">Showing 30 of ${FB_CRM_DATA.length} leads</div>`;
+  }
+
+  el.innerHTML = html;
 }
 
 
