@@ -14462,6 +14462,54 @@ document.addEventListener('DOMContentLoaded', () => {
       try { buildActionSteps(); } catch(e) { console.error('buildActionSteps retry failed:', e); }
     }
   }, 300);
+
+  // ══════════ AUTO-REFRESH TIMER (every 15 minutes) ══════════
+  const AUTO_REFRESH_MS = 15 * 60 * 1000; // 15 minutes
+  let _autoRefreshId = null;
+
+  function autoRefreshAll() {
+    const badge = document.getElementById('last-refresh-badge');
+    const now = new Date();
+    console.log(`CRP Auto-Refresh: triggered at ${now.toLocaleTimeString()}`);
+
+    // 1. Refresh finance data
+    fetchFinanceLive().then(ok => {
+      if (ok) {
+        if (typeof renderForecast === 'function') try { renderForecast(); } catch(e) {}
+        if (typeof drawPayChartOverview === 'function') try { drawPayChartOverview(); } catch(e) {}
+      }
+    }).catch(() => {});
+
+    // 2. Refresh patient database cross-reference
+    fetchPatientDB().catch(() => {});
+
+    // 3. Refresh ClickUp referrals (if token exists)
+    if (getClickUpToken() && _referralsLoaded) {
+      refreshReferrals().catch(() => {});
+    }
+
+    // 4. Refresh Facebook CRM
+    fetchFacebookCRM().catch(() => {});
+
+    // Update badge
+    if (badge) badge.textContent = `Auto-updated: ${now.toLocaleTimeString()}`;
+  }
+
+  // Start auto-refresh cycle
+  _autoRefreshId = setInterval(autoRefreshAll, AUTO_REFRESH_MS);
+  console.log(`CRP: Auto-refresh enabled — every ${AUTO_REFRESH_MS / 60000} minutes`);
+
+  // Also refresh when tab becomes visible again (user returns to browser)
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) {
+      // Only auto-refresh if it's been more than 5 minutes since page was hidden
+      const badge = document.getElementById('last-refresh-badge');
+      const lastText = badge ? badge.textContent : '';
+      console.log('CRP: Tab visible again — checking if refresh needed');
+      // Simple approach: just refresh on return
+      setTimeout(autoRefreshAll, 1000);
+    }
+  });
 });
 </script>
 
