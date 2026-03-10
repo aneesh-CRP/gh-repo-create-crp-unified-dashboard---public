@@ -733,7 +733,7 @@ body {
     <span class="nav-tab fin-tab" onclick="switchTab('fin-revenue',this)">🔒 Revenue</span>
     <span class="nav-tab fin-tab" onclick="switchTab('fin-accruals',this)">🔒 Accruals</span>
     <span style="width:1px;background:#CBD5E0;margin:8px 4px"></span>
-    <span class="nav-tab" onclick="switchTab('insights',this)" role="tab">Insights</span>
+    <span class="nav-tab fin-tab" onclick="switchTab('insights',this)" role="tab">🔒 Insights</span>
   </div>
   <div class="nav-right">
     <span class="data-badge" id="data-source-badge">✅ Live Data · Mar 6, 2026</span>
@@ -2245,7 +2245,7 @@ const CRP_CONFIG = {
   // Tab registry — add new tabs here
   TABS: {
     PERFORMANCE: ['overview', 'studies', 'schedule', 'actions', 'admin'],
-    FINANCE: ['fin-overview', 'fin-collections', 'fin-aging', 'fin-revenue', 'fin-accruals'],
+    FINANCE: ['fin-overview', 'fin-collections', 'fin-aging', 'fin-revenue', 'fin-accruals', 'insights'],
     CROSS: ['insights'],
   },
 
