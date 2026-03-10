@@ -1163,6 +1163,33 @@ id="view-schedule" class="view">
     </div>
   </div>
 
+  <!-- ── COORDINATOR DAILY GOALS ── -->
+  <div class="section-title" style="margin-top:24px">Coordinator Visit Goals</div>
+  <div class="card fade-in">
+    <div style="padding:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div style="font-size:14px;font-weight:700;color:var(--navy)">Daily Goal: <span style="color:#059669">2 visits</span> per coordinator</div>
+        <div style="font-size:11px;color:var(--muted)" id="coord-week-label">This Week</div>
+      </div>
+      <div id="coordGoalsGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px"></div>
+      <div style="margin-top:16px">
+        <div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">Monthly Summary — <span id="coord-month-label">March 2026</span></div>
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:12px" id="coordMonthTable">
+            <thead><tr style="background:var(--surface2);border-bottom:2px solid var(--border)">
+              <th style="padding:8px 12px;text-align:left;font-weight:700">Coordinator</th>
+              <th style="padding:8px 8px;text-align:center;font-weight:700">Visits</th>
+              <th style="padding:8px 8px;text-align:center;font-weight:700">Goal</th>
+              <th style="padding:8px 8px;text-align:center;font-weight:700">Progress</th>
+              <th style="padding:8px 8px;text-align:center;font-weight:700">Status</th>
+            </tr></thead>
+            <tbody id="coordMonthBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Full visit table -->
   <div class="card fade-in">
     <div class="card-header" style="flex-wrap:wrap;gap:8px;">
@@ -1756,32 +1783,6 @@ id="view-schedule" class="view">
     </div>
   </div>
 
-  <!-- ── COORDINATOR DAILY GOALS ── -->
-  <div class="section-title" style="margin-top:24px">Coordinator Visit Goals</div>
-  <div class="card fade-in">
-    <div style="padding:16px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <div style="font-size:14px;font-weight:700;color:var(--navy)">Daily Goal: <span style="color:#059669">2 visits</span> per coordinator</div>
-        <div style="font-size:11px;color:var(--muted)" id="coord-week-label">This Week</div>
-      </div>
-      <div id="coordGoalsGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px"></div>
-      <div style="margin-top:16px">
-        <div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">Monthly Summary — <span id="coord-month-label">March 2026</span></div>
-        <div style="overflow-x:auto">
-          <table style="width:100%;border-collapse:collapse;font-size:12px" id="coordMonthTable">
-            <thead><tr style="background:var(--surface2);border-bottom:2px solid var(--border)">
-              <th style="padding:8px 12px;text-align:left;font-weight:700">Coordinator</th>
-              <th style="padding:8px 8px;text-align:center;font-weight:700">Visits</th>
-              <th style="padding:8px 8px;text-align:center;font-weight:700">Goal</th>
-              <th style="padding:8px 8px;text-align:center;font-weight:700">Progress</th>
-              <th style="padding:8px 8px;text-align:center;font-weight:700">Status</th>
-            </tr></thead>
-            <tbody id="coordMonthBody"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  </div>
 
 </div><!-- /view-schedule -->
 
@@ -2206,7 +2207,7 @@ const CRP_CONFIG = {
   MASTER_SHEET_ID: '1LZWJeJE9EJqe1Th13sSazrWOI5k8I56mbZPieAHqoyo',
 
   // Coordinator visit goals
-  COORDINATORS: ['Mario Castellanos','Stacey scott','Ruby Pereira','Cady Chilensky','Angelina McMullen'],
+  COORDINATORS: ['Mario Castellanos','Stacey Scott','Ruby Pereira','Cady Chilensky','Angelina Mcmullen'],
   COORD_DAILY_GOAL: 2,
 
   // Auto-refresh interval (ms) — 0 to disable
@@ -11579,21 +11580,22 @@ function buildHorizon() {
   let html = '';
 
   pastWeeks.forEach(w => {
-    html += `<div class="horizon-week hw-past" title="${w.count} cancellations week of ${w.week}">
+    html += `<div class="horizon-week hw-past" title="${w.count} cancellations week of ${w.week}" style="cursor:pointer" onclick="showHorizonDetail('cancel','${w.week}')">
       <div class="hw-date">${w.week}</div>
       <div class="hw-count">${w.count}</div>
       <div class="hw-type" style="color:var(--red)">canceled</div>
     </div>`;
   });
 
+  const todayStr = new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'});
   html += `<div class="horizon-week hw-today">
     <div class="hw-date" style="color:var(--green); font-weight:600">TODAY</div>
-    <div class="hw-count" style="font-size:11px; color:var(--green);">Mar 6</div>
-    <div class="hw-type" style="color:var(--green)">★</div>
+    <div class="hw-count" style="font-size:11px; color:var(--green);">${todayStr}</div>
+    <div class="hw-type" style="color:var(--green);">★</div>
   </div>`;
 
   futureWeeks.forEach(w => {
-    html += `<div class="horizon-week hw-future" title="${w.count} visits scheduled week of ${w.week}">
+    html += `<div class="horizon-week hw-future" title="${w.count} visits scheduled week of ${w.week}" style="cursor:pointer" onclick="showHorizonDetail('upcoming','${w.week}')">
       <div class="hw-date">${w.week}</div>
       <div class="hw-count">${w.count}</div>
       <div class="hw-type" style="color:#1843ad">visits</div>
@@ -11601,6 +11603,85 @@ function buildHorizon() {
   });
 
   grid.innerHTML = html;
+}
+
+function showHorizonDetail(type, weekLabel) {
+  // Parse the week label (e.g. "Feb 10") into a date range (Mon–Sun)
+  const year = new Date().getFullYear();
+  const parsed = new Date(weekLabel + ', ' + year);
+  if (isNaN(parsed)) return;
+  // Align to Monday of that week
+  const day = parsed.getDay();
+  const mon = new Date(parsed);
+  mon.setDate(parsed.getDate() - (day === 0 ? 6 : day - 1));
+  const sun = new Date(mon);
+  sun.setDate(mon.getDate() + 6);
+  const monISO = mon.toISOString().split('T')[0];
+  const sunISO = sun.toISOString().split('T')[0];
+  const monFmt = mon.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  const sunFmt = sun.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+
+  let rows = [], title = '';
+  if (type === 'cancel') {
+    title = `Cancellations: ${monFmt} – ${sunFmt}`;
+    rows = (DATA.allCancels || []).filter(r => {
+      const d = new Date(r.cancel_date + ', ' + year);
+      if (isNaN(d)) return false;
+      const iso = d.toISOString().split('T')[0];
+      return iso >= monISO && iso <= sunISO;
+    });
+  } else {
+    title = `Upcoming Visits: ${monFmt} – ${sunFmt}`;
+    rows = (DATA.allVisitDetail || []).filter(r => {
+      return r.date_iso >= monISO && r.date_iso <= sunISO;
+    });
+  }
+
+  const linkIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-left:2px;opacity:0.4;vertical-align:middle"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>';
+
+  let tableHTML = '';
+  if (type === 'cancel') {
+    tableHTML = `<table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0">
+        <th style="padding:8px;text-align:left">Patient</th><th style="padding:8px;text-align:left">Study</th>
+        <th style="padding:8px;text-align:left">Reason</th><th style="padding:8px;text-align:left">Date</th>
+      </tr></thead><tbody>${rows.map(r => `<tr style="border-bottom:1px solid #f1f5f9">
+        <td style="padding:6px 8px"><a href="${r.url}" target="_blank" style="text-decoration:none;color:var(--navy);font-weight:600">${r.name}${linkIcon}</a></td>
+        <td style="padding:6px 8px;font-size:11px">${r.study}</td>
+        <td style="padding:6px 8px;font-size:11px;color:var(--muted)">${(r.reason||'').substring(0,50)}</td>
+        <td style="padding:6px 8px;font-size:11px">${r.cancel_date}</td>
+      </tr>`).join('')}</tbody></table>`;
+  } else {
+    tableHTML = `<table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0">
+        <th style="padding:8px;text-align:left">Date</th><th style="padding:8px;text-align:left">Patient</th>
+        <th style="padding:8px;text-align:left">Study</th><th style="padding:8px;text-align:left">Visit</th>
+        <th style="padding:8px;text-align:left">Coordinator</th>
+      </tr></thead><tbody>${rows.map(r => `<tr style="border-bottom:1px solid #f1f5f9">
+        <td style="padding:6px 8px;font-weight:600;color:var(--blue)">${r.date}</td>
+        <td style="padding:6px 8px"><a href="${r.patient_url}" target="_blank" style="text-decoration:none;color:var(--navy);font-weight:600">${r.patient}${linkIcon}</a></td>
+        <td style="padding:6px 8px;font-size:11px">${r.study}</td>
+        <td style="padding:6px 8px;font-size:11px;color:var(--muted)">${r.visit}</td>
+        <td style="padding:6px 8px;font-size:11px">${r.coord}</td>
+      </tr>`).join('')}</tbody></table>`;
+  }
+
+  // Show in a modal/overlay
+  let overlay = document.getElementById('horizon-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'horizon-overlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px';
+    overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+    document.body.appendChild(overlay);
+  }
+  overlay.innerHTML = `<div style="background:#fff;border-radius:12px;max-width:800px;width:100%;max-height:80vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3)">
+    <div style="padding:16px 20px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center">
+      <div style="font-size:15px;font-weight:700;color:#1a202c">${title} <span style="font-weight:400;color:#64748b;font-size:13px">(${rows.length} records)</span></div>
+      <button onclick="document.getElementById('horizon-overlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#94a3b8;padding:4px 8px">✕</button>
+    </div>
+    <div style="padding:16px 20px">${rows.length ? tableHTML : '<div style="text-align:center;padding:24px;color:#94a3b8">No records for this week</div>'}</div>
+  </div>`;
 }
 
 function buildCancelStudyBars() {
@@ -12685,14 +12766,17 @@ function processLiveData(upcoming, cancels) {
 
   // ── coordinator daily goals ──
   const COORD_NAMES = CRP_CONFIG.COORDINATORS || [];
+  const COORD_LOWER = COORD_NAMES.map(c => c.toLowerCase());
   const coordGoals = { byDay: {}, byMonth: {} };
   const seenCoordVisits = new Set();
   COORD_NAMES.forEach(c => { coordGoals.byDay[c] = {}; coordGoals.byMonth[c] = 0; });
   activeUpcoming.forEach(r => {
-    const name = (r['Full Name']||'').trim();
+    const rawName = (r['Full Name']||'').trim();
     const date = (r['Scheduled Date']||'').trim();
     const subjectId = (r['Subject ID']||'').trim();
-    if (!COORD_NAMES.includes(name)) return;
+    const idx = COORD_LOWER.indexOf(rawName.toLowerCase());
+    if (idx === -1) return;
+    const name = COORD_NAMES[idx]; // use canonical name
     const key = name + '|' + date + '|' + subjectId;
     if (seenCoordVisits.has(key)) return;
     seenCoordVisits.add(key);
