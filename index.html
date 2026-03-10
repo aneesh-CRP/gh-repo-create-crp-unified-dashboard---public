@@ -3133,6 +3133,134 @@ function renderInsights() {
     cancelRevEl.innerHTML=html;
   }
 
+  // ═══ CANCELLATION ROOT CAUSE PLAYBOOK ═══
+  const playbookEl = el('ins-cancel-playbook');
+  if (playbookEl && typeof DATA !== 'undefined' && DATA.cancelReasons) {
+    const reasons = DATA.cancelReasons || [];
+    const totalCancels = reasons.reduce((s,r) => s + r.count, 0);
+
+    const PLAYBOOK = {
+      'No Show': {
+        icon: '🚫', color: '#DC2626', bg: '#FEF2F2', border: '#FECACA',
+        impact: 'Lost visit revenue, wasted coordinator time, disrupts study timelines',
+        nextSteps: [
+          'Call patient within 2 hours of missed appointment — document attempt in CRIO',
+          'If unreachable after 3 attempts across 48hrs, escalate to site director',
+          'For repeat no-shows (2+): schedule a retention call with coordinator before next visit',
+          'Implement 48hr + 24hr + same-day reminder texts for all upcoming visits',
+          'Flag chronic no-show patients in CRIO for proactive outreach'
+        ]
+      },
+      'Screen Fail / DNQ': {
+        icon: '🔍', color: '#C2410C', bg: '#FFF7ED', border: '#FED7AA',
+        impact: 'Wasted screening resources, indicates pre-screening gaps',
+        nextSteps: [
+          'Review the pre-screening checklist for each study with screen fails',
+          'Add specific eligibility questions to the initial phone screen (BMI, meds, conditions)',
+          'Track screen fail reasons by study to identify recurring protocol gaps',
+          'Update recruitment materials to better communicate eligibility requirements',
+          'Hold bi-weekly pre-screener review with recruitment team'
+        ]
+      },
+      'Screen Fail/DNQ': {
+        icon: '🔍', color: '#C2410C', bg: '#FFF7ED', border: '#FED7AA',
+        impact: 'Wasted screening resources, indicates pre-screening gaps',
+        nextSteps: [
+          'Review the pre-screening checklist for each study with screen fails',
+          'Add specific eligibility questions to the initial phone screen (BMI, meds, conditions)',
+          'Track screen fail reasons by study to identify recurring protocol gaps',
+          'Update recruitment materials to better communicate eligibility requirements',
+          'Hold bi-weekly pre-screener review with recruitment team'
+        ]
+      },
+      'Patient Withdrew': {
+        icon: '🚪', color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE',
+        impact: 'Permanent loss of enrolled patient, impacts enrollment targets',
+        nextSteps: [
+          'Conduct exit interview within 48hrs — understand root cause (comfort, travel, compensation)',
+          'For privacy concerns: review consent process, ensure clear communication of data protections',
+          'For compensation issues: escalate to sponsor if visit burden is disproportionate',
+          'Document withdrawal reason in CRIO for sponsor reporting',
+          'Review if retention support (travel reimbursement, flexible scheduling) could have helped'
+        ]
+      },
+      'Weather': {
+        icon: '🌧️', color: '#0369A1', bg: '#F0F9FF', border: '#BAE6FD',
+        impact: 'Temporary disruption, patients generally willing to reschedule',
+        nextSteps: [
+          'Proactively reschedule within 48hrs of weather event',
+          'Maintain a weather backup protocol: pre-identify flexible reschedule windows',
+          'Send proactive cancellation notices before severe weather to show patient care',
+          'No coordinator accountability — track separately from preventable cancellations'
+        ]
+      },
+      'Not Documented': {
+        icon: '📝', color: '#92400E', bg: '#FEF3C7', border: '#FDE68A',
+        impact: 'Cannot analyze root cause, skews all reporting and risk scoring',
+        nextSteps: [
+          'URGENT: Each coordinator must log into CRIO and add the cancellation reason today',
+          'Implement a same-day documentation requirement: reason must be logged within 4 hours of cancellation',
+          'Add cancellation reason as a required field in the CRIO workflow',
+          'Review undocumented cancellations in weekly team huddle'
+        ]
+      },
+      'Other': {
+        icon: '📋', color: '#475569', bg: '#F8FAFC', border: '#E2E8F0',
+        impact: 'Unclassified — may contain patterns worth isolating',
+        nextSteps: [
+          'Review all "Other" cancellations monthly to identify emerging patterns',
+          'If 3+ cancellations share a similar reason, create a new tracking category',
+          'Ensure coordinators are using the correct cancellation categories in CRIO',
+          'Discuss recurring "Other" reasons in monthly ops review'
+        ]
+      },
+      'Discontinued': {
+        icon: '⏹️', color: '#991B1B', bg: '#FEF2F2', border: '#FECACA',
+        impact: 'Patient permanently removed from study per protocol or medical decision',
+        nextSteps: [
+          'Verify discontinuation was per protocol criteria and properly documented',
+          'Complete all required discontinuation visit procedures and forms',
+          'Notify sponsor per protocol timelines',
+          'Archive patient record in CRIO with proper discontinuation coding'
+        ]
+      },
+      'No Response': {
+        icon: '📵', color: '#B45309', bg: '#FFFBEB', border: '#FDE68A',
+        impact: 'Patient engagement lost — at risk of becoming a no-show or withdrawal',
+        nextSteps: [
+          'Attempt contact via all available channels (phone, text, email, alternate contact)',
+          'If no response after 5 business days and 3+ attempts: flag as Lost to Follow-Up',
+          'Document all outreach attempts with timestamps in CRIO',
+          'Consider sending a certified letter as a final attempt before marking inactive'
+        ]
+      }
+    };
+
+    let pbHtml = '<div style="margin-bottom:12px;font-size:12px;color:#64748b">Based on <strong>' + totalCancels + ' true cancellations</strong> in the last 2 months. Rescheduled, completed, admin errors, and study closures are excluded from these counts.</div>';
+    pbHtml += '<div style="display:flex;flex-direction:column;gap:12px">';
+
+    reasons.forEach(r => {
+      const pb = PLAYBOOK[r.reason];
+      if (!pb) return;
+      const pct = totalCancels > 0 ? Math.round(r.count / totalCancels * 100) : 0;
+      pbHtml += '<div style="background:' + pb.bg + ';border:1px solid ' + pb.border + ';border-radius:10px;padding:16px;border-left:4px solid ' + pb.color + '">';
+      pbHtml += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">';
+      pbHtml += '<div style="display:flex;align-items:center;gap:8px"><span style="font-size:20px">' + pb.icon + '</span><span style="font-weight:700;font-size:14px;color:' + pb.color + '">' + r.reason + '</span></div>';
+      pbHtml += '<div style="display:flex;gap:8px;align-items:center"><span style="background:' + pb.color + ';color:white;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:700">' + r.count + ' (' + pct + '%)</span></div>';
+      pbHtml += '</div>';
+      pbHtml += '<div style="font-size:11px;color:#64748b;margin-bottom:8px;font-style:italic">Impact: ' + pb.impact + '</div>';
+      pbHtml += '<div style="font-size:12px;font-weight:700;color:#334155;margin-bottom:6px">Next Steps:</div>';
+      pbHtml += '<div style="display:flex;flex-direction:column;gap:4px">';
+      pb.nextSteps.forEach((step, i) => {
+        pbHtml += '<div style="display:flex;gap:8px;align-items:flex-start;font-size:12px;color:#475569;padding:4px 0"><span style="font-weight:700;color:' + pb.color + ';min-width:16px">' + (i+1) + '.</span><span>' + step + '</span></div>';
+      });
+      pbHtml += '</div></div>';
+    });
+
+    pbHtml += '</div>';
+    playbookEl.innerHTML = pbHtml;
+  }
+
   // AR Aging vs Enrollment
   const agingByStudy={};
   AGING_INV.forEach(a=>{const c=pid(a.study)||a.study;agingByStudy[c]={invCurrent:a.current,inv30:a.d30_60,inv60:a.d61_90,inv90:a.d91_120+a.d121_150+a.d150plus};});
@@ -4642,1566 +4770,1215 @@ const SAMPLE = {
   ],
   "allCancels": [
     {
-      "study": "N1T-MC-MALO",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "name": "John  Kenny",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "coord": "Angelina Mcmullen",
-      "cancel_date": "2026-03-05",
-      "date": "Mar 5",
-      "type": "Patient Cancelled",
-      "reason": "patient left VM that they need to reschedule",
-      "category": "Rescheduled"
-    },
-    {
-      "study": "J3F-MC-EZCC",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/172389/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/172389/subjects",
-      "name": "Rovshan  G Safarov",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/172389/subjects",
-      "coord": "Angelina Mcmullen",
-      "cancel_date": "2026-03-05",
-      "date": "Mar 5",
-      "type": "Patient Cancelled",
-      "reason": "was unable to make it, will reach out to reschedule",
-      "category": "Rescheduled"
-    },
-    {
-      "study": "J2A-MC-GZPO",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
-      "name": "Linda  Demeter",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
-      "coord": "Stacey Scott",
-      "cancel_date": "2026-03-04",
-      "date": "Apr 20",
-      "type": "Site Cancelled",
-      "reason": "subject is a transfer patient to Florida",
-      "category": "Other"
-    },
-    {
-      "study": "C4951063",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "name": "Stephanie  Madrinan",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "coord": "Ruby Pereira",
-      "cancel_date": "2026-03-03",
-      "date": "Mar 3",
-      "type": "Patient Cancelled",
-      "reason": "due to weather and her son school 2 hour delay",
-      "category": "Weather"
-    },
-    {
-      "study": "J2A-MC-GZPS",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "name": "AngelLewis AngelLewis",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "coord": "Jana Milankovic",
-      "cancel_date": "2026-03-03",
-      "date": "Mar 3",
-      "type": "Site Cancelled",
-      "reason": "No ultrasound tech available for appt several text messages were sent without a reply",
-      "category": "Other"
-    },
-    {
-      "study": "C4951063",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "name": "Jennyfer  Floyd",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "coord": "Jana Milankovic",
-      "cancel_date": "2026-03-03",
-      "date": "Mar 3",
-      "type": "No Show",
-      "reason": "Text message sent about rescheduling missed appt  if interested",
-      "category": "No Show"
-    },
-    {
-      "study": "88545223PSA2001",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/173860/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/173860/subjects",
-      "name": "Paul  McMenemy",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/173860/subjects",
-      "coord": "Gabrijela Ateljevic",
-      "cancel_date": "2026-03-03",
-      "date": "Feb 27",
-      "type": "Patient Cancelled",
-      "reason": "Patient cancelled due to work commitments. Tried two times to reach out and reschedule but no answer",
-      "category": "No Response"
-    },
-    {
-      "study": "MR-130A-01-TD-3001",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/109260/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/109260/subjects",
-      "name": "Haley  Robinson",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/109260/subjects",
-      "coord": "Jana Milankovic",
-      "cancel_date": "2026-03-03",
-      "date": "Apr 27",
-      "type": "Site Cancelled",
-      "reason": "Due to changes in the protocol criteria, I need to cancel her appointment because her BMI is below the updated eligibility requirement.",
-      "category": "Screen Fail/DNQ"
-    },
-    {
-      "study": "MR-130A-01-TD-3001",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/109260/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/109260/subjects",
-      "name": "Sofia  Retamal",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/109260/subjects",
-      "coord": "Jana Milankovic",
-      "cancel_date": "2026-03-03",
-      "date": "Mar 10",
-      "type": "Site Cancelled",
-      "reason": "Due to changes in the protocol criteria, I need to cancel her appointment because her BMI is below the updated eligibility requirement.",
-      "category": "Screen Fail/DNQ"
-    },
-    {
-      "study": "J2A-MC-GZPS",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "name": "Bernice Oglesby",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "coord": "Jana Milankovic",
-      "cancel_date": "2026-03-03",
-      "date": "Mar 31",
-      "type": "Patient Cancelled",
-      "reason": "Patient cancelled, She is no longer interested in the study",
-      "category": "Patient Withdrew"
-    },
-    {
-      "study": "N1T-MC-MALO",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "name": "Kenneth  Heim",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "coord": "Vlado Draganic",
-      "cancel_date": "2026-03-02",
-      "date": "Mar 4",
-      "type": "Patient Cancelled",
-      "reason": "Pt. called to cancel appt. due to unforeseen circumstances. He would like to talk with his PCP before rescheduling.",
-      "category": "Rescheduled"
-    },
-    {
-      "study": "MR-130A-01-TD-3001",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/109260/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/109260/subjects",
-      "name": "Devon  Anthony",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/109260/subjects",
-      "coord": "Jana Milankovic",
-      "cancel_date": "2026-03-02",
-      "date": "Mar 4",
-      "type": "Site Cancelled",
-      "reason": "Per Dr. A:  participant does not Qualify for the Contraceptive Patch Study. She is on topiramate (Topamax) and she has an IUD",
-      "category": "Screen Fail/DNQ"
-    },
-    {
-      "study": "M23-714",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/86826/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/86826/subjects",
-      "name": "Lakeisha  Johnson",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/86826/subjects",
-      "coord": "Ruby Pereira",
-      "cancel_date": "2026-03-02",
-      "date": "Mar 2",
-      "type": "Patient Cancelled",
-      "reason": "Pt rescheduled for 3/31 at 2pm",
-      "category": "Rescheduled"
-    },
-    {
-      "study": "C4951063",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "name": "Kathleen Brown",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "coord": "Jana Milankovic",
-      "cancel_date": "2026-03-02",
-      "date": "Mar 2",
-      "type": "No Show",
-      "reason": "Sent text about rescheduling if interested",
-      "category": "No Show"
-    },
-    {
-      "study": "95597528ADM2001",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/172395/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/172395/subjects",
-      "name": "Jacqueline  Rogers",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/172395/subjects",
-      "coord": "Gabrijela Ateljevic",
-      "cancel_date": "2026-02-27",
-      "date": "Feb 27",
-      "type": "Patient Cancelled",
-      "reason": "Pt cancelled, and said she will call to reschedule",
-      "category": "Rescheduled"
-    },
-    {
-      "study": "EFC17600 (ESTUARY)",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/122602/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/122602/subjects",
-      "name": "Barbara E Green",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/122602/subjects",
-      "coord": "Mario Castellanos",
-      "cancel_date": "2026-02-26",
-      "date": "Feb 26",
-      "type": "Patient Cancelled",
-      "reason": "Rescheduled for March 25th at 10am",
-      "category": "Rescheduled"
-    },
-    {
-      "study": "J2A-MC-GZPS",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "name": "Mikita Mickens",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "coord": "Jana Milankovic",
-      "cancel_date": "2026-02-25",
-      "date": "Mar 5",
-      "type": "Patient Cancelled",
-      "reason": "Not comfortable with releasing her medical records.",
-      "category": "Other"
-    },
-    {
-      "study": "J2A-MC-GZPS",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "name": "Kamela Green",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "coord": "Jana Milankovic",
-      "cancel_date": "2026-02-25",
-      "date": "Mar 4",
-      "type": "Patient Cancelled",
-      "reason": "Had emergency surgery last week, she will call us back when she's ready to reschedule.",
-      "category": "Rescheduled"
-    },
-    {
-      "study": "J2A-MC-GZPS",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "name": "Desiree Sommerville",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "coord": "Ana Lambic",
-      "cancel_date": "2026-02-25",
-      "date": "Mar 2",
-      "type": "Site Cancelled",
-      "reason": "Participant does not qualify for the study as she has Overactive bladder and pelvic floor dysfunction, which are exclusionary in the study",
-      "category": "Screen Fail/DNQ"
-    },
-    {
-      "study": "M23-698",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/67894/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/67894/subjects",
-      "name": "Regina  Santiago",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/67894/subjects",
-      "coord": "Mario Castellanos",
-      "cancel_date": "2026-02-24",
-      "date": "Feb 17",
-      "type": "No Show",
-      "reason": "nan",
-      "category": "No Show"
-    },
-    {
-      "study": "C4951063",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "name": "Kristina Wilson",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "coord": "Jana Milankovic",
-      "cancel_date": "2026-02-24",
-      "date": "Feb 24",
-      "type": "No Show",
-      "reason": "Text sent to participant about rescheduling if still interested in participating in the study",
-      "category": "No Show"
-    },
-    {
-      "study": "N1T-MC-MALO",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "name": "William  Birch",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "coord": "Vlado Draganic",
-      "cancel_date": "2026-02-24",
-      "date": "Feb 25",
-      "type": "Patient Cancelled",
-      "reason": "Site cancelled - Fibroscan only",
-      "category": "FibroScan Only"
-    },
-    {
-      "study": "N1T-MC-MALO",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "name": "sharon  Bagelo",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "coord": "Vlado Draganic",
-      "cancel_date": "2026-02-23",
-      "date": "Feb 24",
-      "type": "Patient Cancelled",
-      "reason": "Pt. cancelled due to weather conditions.",
-      "category": "Weather"
-    },
-    {
-      "study": "N1T-MC-MALO",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "name": "William  Birch",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "coord": "Vlado Draganic",
-      "cancel_date": "2026-02-23",
-      "date": "Feb 23",
-      "type": "Site Cancelled",
-      "reason": "Site cancelled due to weather.",
-      "category": "Weather"
-    },
-    {
-      "study": "J2A-MC-GZPS",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "name": "Shanan Olds",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "coord": "Jana Milankovic",
-      "cancel_date": "2026-02-23",
-      "date": "Mar 3",
-      "type": "Patient Cancelled",
-      "reason": "She is no longer interested",
-      "category": "Patient Withdrew"
-    },
-    {
-      "study": "20230222",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167794/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167794/subjects",
-      "name": "Gail Titus",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167794/subjects",
-      "coord": "Cady Chilensky",
-      "cancel_date": "2026-02-23",
-      "date": "Mar 3",
-      "type": "Site Cancelled",
-      "reason": "Patient needs a redraw",
-      "category": "Other"
-    },
-    {
-      "study": "J3F-MC-EZCC",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/172389/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/172389/subjects",
-      "name": "Billy Stanley",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/172389/subjects",
-      "coord": "Ema Gunic",
-      "cancel_date": "2026-02-23",
-      "date": "Feb 24",
-      "type": "Patient Cancelled",
-      "reason": "Patient is no longer interested in participation.",
-      "category": "Patient Withdrew"
-    },
-    {
-      "study": "J3F-MC-EZCC",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/172389/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/172389/subjects",
-      "name": "Dulana  Thaminda Ranaweera",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/172389/subjects",
-      "coord": "Ema Gunic",
-      "cancel_date": "2026-02-23",
-      "date": "Feb 23",
-      "type": "Site Cancelled",
-      "reason": "Site cancelled due to weather",
-      "category": "Weather"
-    },
-    {
-      "study": "20230222",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167794/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167794/subjects",
-      "name": "David  Tipton",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167794/subjects",
-      "coord": "Vlado Draganic",
-      "cancel_date": "2026-02-22",
-      "date": "Feb 23",
-      "type": "Patient Cancelled",
-      "reason": "Please see note regarding upcoming health procedure.",
-      "category": "Other"
-    },
-    {
-      "study": "C4951063",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "name": "Khadija  Butt",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "coord": "Jana Milankovic",
-      "cancel_date": "2026-02-22",
-      "date": "Feb 23",
-      "type": "Site Cancelled",
-      "reason": "Due to snow that is expected",
-      "category": "Weather"
-    },
-    {
-      "study": "C4951063",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "name": "Kayla  Baresich",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "coord": "Ruby Pereira",
-      "cancel_date": "2026-02-22",
-      "date": "Feb 23",
-      "type": "Site Cancelled",
-      "reason": "Due to snow that is expected",
-      "category": "Weather"
-    },
-    {
-      "study": "C4951063",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "name": "Anastasiia Oleksandruk",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "coord": "Jana Milankovic",
-      "cancel_date": "2026-02-22",
-      "date": "Feb 23",
-      "type": "Site Cancelled",
-      "reason": "Due to snow on 2/23, but participant informed me that she will be moving out of the Philadelphia area so appt was not rescheduled",
-      "category": "Rescheduled"
-    },
-    {
-      "study": "20230222",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167794/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167794/subjects",
-      "name": "Altina  Alvin",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167794/subjects",
-      "coord": "Angelina Mcmullen",
-      "cancel_date": "2026-02-22",
-      "date": "Feb 23",
-      "type": "Site Cancelled",
-      "reason": "Cancelled due to weather",
-      "category": "Weather"
-    },
-    {
-      "study": "C4951063",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "name": "Heidi  Mathis",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "coord": "Ruby Pereira",
-      "cancel_date": "2026-02-20",
-      "date": "Feb 26",
-      "type": "Site Cancelled",
-      "reason": "Participant is a screen failure",
-      "category": "Screen Fail/DNQ"
-    },
-    {
-      "study": "J3L-MC-EZEF",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/89175/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/89175/subjects",
-      "name": "Madearia Lowery",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/89175/subjects",
-      "coord": "Ruby Pereira",
-      "cancel_date": "2026-02-18",
-      "date": "Feb 18",
-      "type": "No Show",
-      "reason": "subject is a no show study coordinator left two messages and sent a text",
-      "category": "No Show"
-    },
-    {
-      "study": "N1T-MC-MALO",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "name": "Larry  King",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "coord": "Vlado Draganic",
-      "cancel_date": "2026-02-18",
-      "date": "Feb 20",
-      "type": "Patient Cancelled",
-      "reason": "Patient would like to call back to reschedule.",
-      "category": "Rescheduled"
-    },
-    {
-      "study": "J2A-MC-GZPS",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "name": "MsDidi Richardson",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "coord": "Ana Lambic",
-      "cancel_date": "2026-02-18",
-      "date": "Feb 18",
-      "type": "Patient Cancelled",
-      "reason": "Participant has do not solicit in file",
-      "category": "Other"
-    },
-    {
-      "study": "J3F-MC-EZCC",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/172389/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/172389/subjects",
-      "name": "Rodney Moe",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/172389/subjects",
-      "coord": "Ema Gunic",
-      "cancel_date": "2026-02-17",
-      "date": "Feb 17",
-      "type": "No Show",
-      "reason": "Site cancelled - Fibroscan only",
-      "category": "FibroScan Only"
-    },
-    {
-      "study": "88545223PSA2001",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/173860/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/173860/subjects",
-      "name": "Michael Rush",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/173860/subjects",
-      "coord": "Gabrijela Ateljevic",
-      "cancel_date": "2026-02-16",
-      "date": "Mar 10",
-      "type": "Site Cancelled",
-      "reason": "Wrong study",
-      "category": "Admin Error"
-    },
-    {
-      "study": "88545223PSA2001",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/173860/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/173860/subjects",
-      "name": "Victor Cantres",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/173860/subjects",
-      "coord": "Gabrijela Ateljevic",
-      "cancel_date": "2026-02-16",
-      "date": "Feb 24",
-      "type": "Site Cancelled",
-      "reason": "Wrong study",
-      "category": "Admin Error"
-    },
-    {
-      "study": "C4951063",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "name": "Larissa Oliveira",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "coord": "Jana Milankovic",
-      "cancel_date": "2026-02-16",
-      "date": "Feb 16",
-      "type": "No Show",
-      "reason": "Participant was a no show text message sent about rescheduling if interested.",
-      "category": "No Show"
-    },
-    {
-      "study": "N1T-MC-MALO",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "name": "Carolyn  Boxmeyer",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "coord": "Vlado Draganic",
-      "cancel_date": "2026-02-13",
-      "date": "Feb 13",
-      "type": "Site Cancelled",
-      "reason": "scheduled under Christine",
-      "category": "Other"
-    },
-    {
-      "study": "J2A-MC-GZPS",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "name": "Marion Groarke",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "coord": "Gabrijela Ateljevic",
-      "cancel_date": "2026-02-12",
-      "date": "Mar 10",
-      "type": "Patient Cancelled",
-      "reason": "Participant cancelled due to starting a new job.",
-      "category": "Other"
-    },
-    {
-      "study": "M23-714",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/86826/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/86826/subjects",
-      "name": "Leilani Leilani",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/86826/subjects",
-      "coord": "Jana Milankovic",
-      "cancel_date": "2026-02-12",
-      "date": "Feb 18",
-      "type": "Site Cancelled",
-      "reason": "Study is closed and patient is unresponsive",
-      "category": "Other"
-    },
-    {
-      "study": "N1T-MC-MALO",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "name": "Shana  Barreto",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "coord": "Angelina Mcmullen",
-      "cancel_date": "2026-02-11",
-      "date": "Feb 13",
-      "type": "Site Cancelled",
-      "reason": "She was a screen fail at Visit 1",
-      "category": "Screen Fail/DNQ"
-    },
-    {
-      "study": "J2A-MC-GZPS",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "name": "Stephanie Fortune-Beard",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "coord": "Jana Milankovic",
-      "cancel_date": "2026-02-11",
-      "date": "Feb 11",
-      "type": "No Show",
-      "reason": "no show left text message about rescheduling if interested in participating.",
-      "category": "No Show"
-    },
-    {
-      "study": "MR-130A-01-TD-3001",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/109260/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/109260/subjects",
-      "name": "Keegan  Mcloughlin",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/109260/subjects",
-      "coord": "Jana Milankovic",
-      "cancel_date": "2026-02-10",
-      "date": "Feb 10",
-      "type": "No Show",
-      "reason": "Text message sent participant was a no show",
-      "category": "No Show"
-    },
-    {
-      "study": "N1T-MC-MALO",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "name": "Andrew  M Shekhar",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "coord": "Angelina Mcmullen",
-      "cancel_date": "2026-02-10",
-      "date": "Feb 19",
-      "type": "Site Cancelled",
-      "reason": "Scheduled in error",
-      "category": "Other"
-    },
-    {
-      "study": "J3F-MC-EZCC",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/172389/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/172389/subjects",
-      "name": "Srinivas LS",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/172389/subjects",
-      "coord": "Ema Gunic",
-      "cancel_date": "2026-02-10",
-      "date": "Feb 26",
-      "type": "Site Cancelled",
-      "reason": "According to his medical records, the patient is enrolled in another clinical trial.",
-      "category": "Other"
-    },
-    {
-      "study": "N1T-MC-MALO",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "name": "Michael  Kinsey",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "coord": "Vlado Draganic",
-      "cancel_date": "2026-02-10",
-      "date": "Feb 11",
-      "type": "Patient Cancelled",
-      "reason": "cant make it, will call back to reschedule after talking with his doctor",
-      "category": "Rescheduled"
-    },
-    {
-      "study": "D6973C00001",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/161619/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/161619/subjects",
-      "name": "Larry Jordan",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/161619/subjects",
-      "coord": "Ema Gunic",
-      "cancel_date": "2026-02-09",
-      "date": "Feb 9",
-      "type": "No Show",
-      "reason": "subject was a no show study coordinator called the participant and sent text message",
-      "category": "No Show"
-    },
-    {
-      "study": "D7960C00015",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/154462/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/154462/subjects",
-      "name": "Gilbert Monte",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/154462/subjects",
-      "coord": "Stacey Scott",
-      "cancel_date": "2026-02-06",
-      "date": "Feb 23",
-      "type": "Site Cancelled",
-      "reason": "subject is a screen fail per PI inclusion 1A",
-      "category": "Screen Fail/DNQ"
-    },
-    {
-      "study": "MR-130A-01-TD-3001",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/109260/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/109260/subjects",
-      "name": "Janae  Rockemore",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/109260/subjects",
-      "coord": "Ruby Pereira",
-      "cancel_date": "2026-02-05",
-      "date": "Feb 5",
-      "type": "No Show",
-      "reason": "LM and text message sent to reschedule missed appt",
-      "category": "No Show"
-    },
-    {
-      "study": "J1G-MC-LAKI",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/119640/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/119640/subjects",
-      "name": "Patricia  Garland",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/119640/subjects",
-      "coord": "Ruby Pereira",
-      "cancel_date": "2026-02-05",
-      "date": "Feb 11",
-      "type": "Site Cancelled",
-      "reason": "Participant needs to have CDR done prior to injection",
-      "category": "Other"
-    },
-    {
-      "study": "MR-130A-01-TD-3001",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/109260/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/109260/subjects",
-      "name": "Katherine  Packel",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/109260/subjects",
-      "coord": "Jana Milankovic",
-      "cancel_date": "2026-02-05",
-      "date": "Feb 11",
-      "type": "Site Cancelled",
-      "reason": "Need to Reschedule her but she is Unresponsive",
-      "category": "Rescheduled"
-    },
-    {
-      "study": "D7960C00015",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/154462/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/154462/subjects",
-      "name": "David Rochlis",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/154462/subjects",
-      "coord": "Stacey Scott",
-      "cancel_date": "2026-02-04",
-      "date": "Feb 17",
-      "type": "Site Cancelled",
-      "reason": "SUBJECT IS A SCREEN FAIL",
-      "category": "Screen Fail/DNQ"
-    },
-    {
-      "study": "J2A-MC-GZPS",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "name": "Mitzi S",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "coord": "Jana Milankovic",
-      "cancel_date": "2026-02-04",
-      "date": "Feb 4",
-      "type": "No Show",
-      "reason": "No show LM about rescheduling if still interested in Participating the study",
-      "category": "No Show"
-    },
-    {
-      "study": "J2A-MC-GZPS",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "name": "Joanne Gebhardt",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "coord": "Jana Milankovic",
-      "cancel_date": "2026-02-03",
-      "date": "Feb 3",
-      "type": "No Show",
-      "reason": "Participant was a no show, text message sent",
-      "category": "No Show"
-    },
-    {
-      "study": "M20-465",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/107641/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/107641/subjects",
-      "name": "Kirshna  Hillyard",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/107641/subjects",
-      "coord": "Mario Castellanos",
-      "cancel_date": "2026-02-03",
-      "date": "Feb 3",
-      "type": "No Show",
-      "reason": "nan",
-      "category": "No Show"
-    },
-    {
-      "study": "J2A-MC-GZPS",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "name": "Julie Dowburd",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "coord": "Jana Milankovic",
-      "cancel_date": "2026-02-02",
-      "date": "Feb 19",
-      "type": "Site Cancelled",
-      "reason": "After reviewing her Med records Lita told us that she DNQ",
-      "category": "Screen Fail/DNQ"
-    },
-    {
-      "study": "J2A-MC-GZPS",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "name": "Sydney McMillan",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "coord": "Jana Milankovic",
-      "cancel_date": "2026-02-02",
-      "date": "Feb 26",
-      "type": "Site Cancelled",
-      "reason": "After reviewing her MR Lita told us she DNQ",
-      "category": "Screen Fail/DNQ"
-    },
-    {
-      "study": "J2A-MC-GZPS",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "name": "shareda Copps",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "coord": "Ana Lambic",
-      "cancel_date": "2026-02-02",
-      "date": "Feb 2",
-      "type": "No Show",
-      "reason": "No show, left text message about rescheduling",
-      "category": "No Show"
-    },
-    {
-      "study": "MR-130A-01-TD-3001",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/109260/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/109260/subjects",
-      "name": "Diyona  Hawkins",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/109260/subjects",
-      "coord": "Ruby Pereira",
-      "cancel_date": "2026-01-29",
-      "date": "Jan 29",
-      "type": "No Show",
-      "reason": "Participant was a no show. LM about rescheduling appt",
-      "category": "No Show"
-    },
-    {
-      "study": "C4951063",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "name": "Jennifer  Hopkins",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "coord": "Jana Milankovic",
-      "cancel_date": "2026-01-28",
-      "date": "Jan 28",
-      "type": "No Show",
-      "reason": "No show, Left text message",
-      "category": "No Show"
-    },
-    {
-      "study": "J2A-MC-GZPS",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "name": "Melissa Kingkiner",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "coord": "Jana Milankovic",
-      "cancel_date": "2026-01-28",
-      "date": "Jan 28",
-      "type": "No Show",
-      "reason": "No show, text message sent if interested in rescheduling.",
-      "category": "No Show"
-    },
-    {
-      "study": "M20-465",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/107641/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/107641/subjects",
-      "name": "Davia  Jones",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/107641/subjects",
-      "coord": "Mario Castellanos",
-      "cancel_date": "2026-01-28",
-      "date": "Jan 28",
-      "type": "Patient Cancelled",
-      "reason": "Discontinued",
-      "category": "Discontinued"
-    },
-    {
-      "study": "J2A-MC-GZPS",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "name": "Jill  Hurtado",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "coord": "Gabrijela Ateljevic",
-      "cancel_date": "2026-01-27",
-      "date": "Jan 27",
-      "type": "No Show",
-      "reason": "Participant was a no show, text message sent",
-      "category": "No Show"
-    },
-    {
-      "study": "N1T-MC-MALO",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "name": "Daniel Howard",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "coord": "Angelina Mcmullen",
-      "cancel_date": "2026-01-23",
-      "date": "Jan 23",
-      "type": "Patient Cancelled",
-      "reason": "The patient cancelled without explanation.",
-      "category": "Other"
-    },
-    {
-      "study": "M20-465",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/107641/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/107641/subjects",
-      "name": "Christopher  Glenn",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/107641/subjects",
-      "coord": "Gabrijela Ateljevic",
-      "cancel_date": "2026-01-22",
-      "date": "Jan 22",
-      "type": "No Show",
-      "reason": "nan",
-      "category": "No Show"
-    },
-    {
-      "study": "C4951063",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "name": "Kayla  Baresich",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "coord": "Jana Milankovic",
-      "cancel_date": "2026-01-22",
-      "date": "Jan 26",
-      "type": "Site Cancelled",
-      "reason": "Canceled because of weather",
-      "category": "Weather"
-    },
-    {
-      "study": "C4951063",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "name": "Alyssa Giungo",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "coord": "Jana Milankovic",
-      "cancel_date": "2026-01-21",
-      "date": "Jan 21",
-      "type": "No Show",
-      "reason": "Mailbox full unable to LM",
-      "category": "No Show"
-    },
-    {
-      "study": "C4951063",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "name": "Kimberly blossom",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "coord": "Jana Milankovic",
-      "cancel_date": "2026-01-21",
-      "date": "Jan 22",
-      "type": "Site Cancelled",
-      "reason": "After reviewing MR she has autoimmune neurological disorder",
-      "category": "Screen Fail/DNQ"
-    },
-    {
-      "study": "M23-714",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/86826/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/86826/subjects",
-      "name": "Annamarie  DeSantis",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/86826/subjects",
-      "coord": "Ruby Pereira",
-      "cancel_date": "2026-01-21",
-      "date": "Jan 26",
-      "type": "Site Cancelled",
-      "reason": "Due to expected snow.  Will reach out to participant next week to reschedule.",
-      "category": "Rescheduled"
-    },
-    {
-      "study": "D7960C00015",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/154462/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/154462/subjects",
-      "name": "Pamela Gallagher",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/154462/subjects",
-      "coord": "Gabrijela Ateljevic",
-      "cancel_date": "2026-01-21",
-      "date": "Jan 21",
-      "type": "Site Cancelled",
-      "reason": "She was rescheduled for today at 9:30, but she didn't show up. Study coordinator left voice mail and sent text message",
-      "category": "No Show"
-    },
-    {
-      "study": "N1T-MC-MALO",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "name": "Darryl  Pringle",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "coord": "Aneesh Vaze",
-      "cancel_date": "2026-01-21",
-      "date": "Jan 21",
-      "type": "Site Cancelled",
-      "reason": "Site cancelled. No reasons noted",
-      "category": "Not Documented"
-    },
-    {
-      "study": "C4951063",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "name": "Dominique Levere",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "coord": "Jana Milankovic",
-      "cancel_date": "2026-01-21",
-      "date": "Jan 26",
-      "type": "Site Cancelled",
-      "reason": "due to expected snow, will call participant next week to reschedule appt",
-      "category": "Rescheduled"
-    },
-    {
-      "study": "D7960C00015",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/154462/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/154462/subjects",
-      "name": "Bill Kaufman",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/154462/subjects",
-      "coord": "Jana Milankovic",
-      "cancel_date": "2026-01-20",
-      "date": "Jan 30",
-      "type": "Site Cancelled",
-      "reason": "Pt does not qualify",
-      "category": "Screen Fail/DNQ"
-    },
-    {
-      "study": "D6973C00001",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/161619/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/161619/subjects",
-      "name": "Renetta  Kinniebrew",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/161619/subjects",
-      "coord": "Angelina Mcmullen",
-      "cancel_date": "2026-01-20",
-      "date": "Jan 21",
-      "type": "Site Cancelled",
-      "reason": "Pending guidance from Sponsor about re-screening since participant was screened failed at Philadelpiha, PA site",
-      "category": "Other"
-    },
-    {
-      "study": "N1T-MC-MALO",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "name": "Mehrdad  Zoroufi",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "coord": "Ema Gunic",
-      "cancel_date": "2026-01-19",
-      "date": "Jan 22",
-      "type": "Patient Cancelled",
-      "reason": "Patient Not satisfied with compensation, does not wish to participate any longer.",
-      "category": "Other"
-    },
-    {
-      "study": "J2A-MC-GZPS",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "name": "Erika Markowitz",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "coord": "Jana Milankovic",
-      "cancel_date": "2026-01-19",
-      "date": "Jan 20",
-      "type": "Patient Cancelled",
-      "reason": "She is sick and called to reschedule",
-      "category": "Rescheduled"
-    },
-    {
-      "study": "N1T-MC-MALO",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "name": "Ronald  Falconio",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "coord": "Cady Chilensky",
-      "cancel_date": "2026-01-19",
-      "date": "Jan 21",
-      "type": "Patient Cancelled",
-      "reason": "Having car trouble - will call to reschedule",
-      "category": "Rescheduled"
-    },
-    {
-      "study": "N1T-MC-MALO",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "name": "Debra  Feldman",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "coord": "Aneesh Vaze",
-      "cancel_date": "2026-01-16",
-      "date": "Jan 20",
-      "type": "Site Cancelled",
-      "reason": "Entered in error",
-      "category": "Admin Error"
-    },
-    {
-      "study": "80202135SLE3001",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/177553/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/177553/subjects",
-      "name": "Gina Wilson",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/177553/subjects",
-      "coord": "Jana Milankovic",
-      "cancel_date": "2026-01-16",
-      "date": "Jan 16",
-      "type": "Site Cancelled",
-      "reason": "Scheduled in error.",
-      "category": "Other"
-    },
-    {
-      "study": "N1T-MC-MALO",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "name": "Cindy Oleck",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "coord": "Automated System",
-      "cancel_date": "2026-01-15",
-      "date": "Jan 16",
-      "type": "Site Cancelled",
-      "reason": "Cancelled due to exclusion criteria - She had a Adenocarcinoma in 2023 and it was metastasized",
-      "category": "Screen Fail/DNQ"
-    },
-    {
-      "study": "D7960C00015",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/154462/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/154462/subjects",
-      "name": "Pamela Gallagher",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/154462/subjects",
-      "coord": "Gabrijela Ateljevic",
-      "cancel_date": "2026-01-15",
-      "date": "Jan 15",
-      "type": "No Show",
-      "reason": "SUBJECT DID NOT SHOW FOR APPOINTMENT",
-      "category": "No Show"
-    },
-    {
-      "study": "J2A-MC-GZPS",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "name": "Jacquelyn F Amer",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "coord": "Ruby Pereira",
-      "cancel_date": "2026-01-15",
-      "date": "Jan 15",
-      "type": "No Show",
-      "reason": "Participant does not qualify for the study",
-      "category": "Screen Fail/DNQ"
-    },
-    {
-      "study": "J2A-MC-GZPS",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "name": "Donna  Virden",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "coord": "Jana Milankovic",
-      "cancel_date": "2026-01-15",
-      "date": "Jan 15",
-      "type": "Site Cancelled",
-      "reason": "Participant did not sign consent is on an excluded medication",
-      "category": "Other"
-    },
-    {
-      "study": "J3L-MC-EZEF",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/89175/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/89175/subjects",
-      "name": "Fred  Early",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/89175/subjects",
-      "coord": "Ruby Pereira",
-      "cancel_date": "2026-01-14",
-      "date": "Jan 14",
-      "type": "No Show",
-      "reason": "Text message sent about missed appointment",
-      "category": "No Show"
-    },
-    {
-      "study": "J2A-MC-GZPS",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "name": "LaMonika  Koley",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "coord": "Jana Milankovic",
-      "cancel_date": "2026-01-14",
-      "date": "Jan 14",
-      "type": "No Show",
-      "reason": "text message sent about missed appt and to reschedule if interested.",
-      "category": "No Show"
-    },
-    {
-      "study": "J2A-MC-GZGS",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/60296/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/60296/subjects",
-      "name": "Eloise  Browder",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/60296/subjects",
-      "coord": "Stacey Scott",
-      "cancel_date": "2026-01-13",
-      "date": "Jun 16",
-      "type": "Site Cancelled",
-      "reason": "She was rescheduled for today at 9:30, but she didn't show up. Study coordinator left voice mail and sent text message",
-      "category": "No Show"
-    },
-    {
-      "study": "J2A-MC-GZGS",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/60296/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/60296/subjects",
-      "name": "DARREN  CATHEY",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/60296/subjects",
-      "coord": "Stacey Scott",
-      "cancel_date": "2026-01-13",
-      "date": "Apr 13",
-      "type": "Site Cancelled",
-      "reason": "SCHEULED LTV",
-      "category": "Other"
-    },
-    {
-      "study": "J2A-MC-GZGS",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/60296/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/60296/subjects",
-      "name": "Gregory  Danowsky",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/60296/subjects",
-      "coord": "Stacey Scott",
-      "cancel_date": "2026-01-13",
-      "date": "Feb 4",
-      "type": "Site Cancelled",
-      "reason": "Completed",
-      "category": "Completed"
-    },
-    {
-      "study": "J2A-MC-GZGS",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/60296/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/60296/subjects",
-      "name": "victor  kirk",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/60296/subjects",
-      "coord": "Stacey Scott",
-      "cancel_date": "2026-01-13",
-      "date": "Apr 2",
-      "type": "No Show",
-      "reason": "Completed",
-      "category": "Completed"
-    },
-    {
-      "study": "J2A-MC-GZPS",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "name": "Jovon Thompson",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "coord": "Gabrijela Ateljevic",
-      "cancel_date": "2026-01-13",
-      "date": "Jan 13",
-      "type": "No Show",
-      "reason": "no show text message sent about missed appt",
-      "category": "No Show"
-    },
-    {
-      "study": "D6973C00001",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/161619/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/161619/subjects",
-      "name": "Patricia Gallagher",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/161619/subjects",
-      "coord": "Gabrijela Ateljevic",
-      "cancel_date": "2026-01-13",
-      "date": "Jan 19",
-      "type": "Patient Cancelled",
-      "reason": "Patient cancelled due to injury",
-      "category": "Other"
-    },
-    {
-      "study": "N1T-MC-MALO",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "name": "Ryan  Romero",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "coord": "Ema Gunic",
-      "cancel_date": "2026-01-13",
-      "date": "Jan 13",
-      "type": "No Show",
-      "reason": "nan",
-      "category": "No Show"
-    },
-    {
-      "study": "J2A-MC-GZGS",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/60296/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/60296/subjects",
-      "name": "Charles  Kelly",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/60296/subjects",
-      "coord": "Stacey Scott",
-      "cancel_date": "2026-01-13",
-      "date": "Jan 28",
-      "type": "Site Cancelled",
-      "reason": "Completed",
-      "category": "Completed"
-    },
-    {
-      "study": "C4951063",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "name": "Jenn  Bernard",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "coord": "Jana Milankovic",
-      "cancel_date": "2026-01-13",
-      "date": "Jan 13",
-      "type": "No Show",
-      "reason": "Text message sent about missed appt",
-      "category": "No Show"
-    },
-    {
-      "study": "J2A-MC-GZPO",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
-      "name": "Kevin  Sheils",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
-      "coord": "Ema Gunic",
-      "cancel_date": "2026-01-12",
-      "date": "Jan 21",
-      "type": "Site Cancelled",
-      "reason": "Study is closed",
-      "category": "Other"
-    },
-    {
-      "study": "D6973C00001",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/161619/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/161619/subjects",
-      "name": "Donald Garber",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/161619/subjects",
-      "coord": "Stacey Scott",
-      "cancel_date": "2026-01-12",
-      "date": "Jan 19",
-      "type": "Patient Cancelled",
-      "reason": "subject withdrew consent called site and stated he coukld not make study scheduled appointments and refuses to return study drug",
-      "category": "Patient Withdrew"
-    },
-    {
-      "study": "C4951063",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "name": "Tiffany Baldwin",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "coord": "Jana Milankovic",
-      "cancel_date": "2026-01-12",
-      "date": "Jan 12",
-      "type": "No Show",
-      "reason": "Participant never reached back with address to schedule Lyft ride",
-      "category": "No Show"
-    },
-    {
-      "study": "J2A-MC-GZPS",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "name": "Mary Dingle",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
-      "coord": "Jana Milankovic",
-      "cancel_date": "2026-01-12",
-      "date": "Jan 12",
-      "type": "No Show",
-      "reason": "No show for appt text message sent",
-      "category": "No Show"
-    },
-    {
-      "study": "J2A-MC-GZPO",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
-      "name": "Ronald Al-Uqdah",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
-      "coord": "Gabrijela Ateljevic",
-      "cancel_date": "2026-01-12",
-      "date": "Jan 26",
-      "type": "Site Cancelled",
-      "reason": "Visit cancelled due to the study closing.",
-      "category": "Study Closed"
-    },
-    {
-      "study": "J2A-MC-GZPO",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
-      "name": "Valincia  McClary",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
-      "coord": "Ema Gunic",
-      "cancel_date": "2026-01-12",
-      "date": "Jan 21",
-      "type": "Site Cancelled",
-      "reason": "The visit is canceled due to the study closing.",
-      "category": "Study Closed"
-    },
-    {
-      "study": "J2A-MC-GZPO",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
-      "name": "David  Thomas",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
-      "coord": "Ema Gunic",
-      "cancel_date": "2026-01-12",
-      "date": "Jan 22",
-      "type": "Site Cancelled",
-      "reason": "Study is closed",
-      "category": "Other"
-    },
-    {
-      "study": "J2A-MC-GZPO",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
-      "name": "Joann  Frazier",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
-      "coord": "Ema Gunic",
-      "cancel_date": "2026-01-12",
-      "date": "Jan 19",
-      "type": "Site Cancelled",
-      "reason": "Study is closed",
-      "category": "Other"
-    },
-    {
-      "study": "J2A-MC-GZPO",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
-      "name": "Jeffrey Reed",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
-      "coord": "Ana Lambic",
-      "cancel_date": "2026-01-12",
-      "date": "Jan 27",
-      "type": "Site Cancelled",
-      "reason": "Visit cancelled due to the study closing.",
-      "category": "Study Closed"
-    },
-    {
-      "study": "J2A-MC-GZPO",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
-      "name": "Peter Anto",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
-      "coord": "Gabrijela Ateljevic",
-      "cancel_date": "2026-01-12",
-      "date": "Jan 29",
-      "type": "Site Cancelled",
-      "reason": "Visit cancelled due to the study closing.",
-      "category": "Study Closed"
-    },
-    {
-      "study": "N1T-MC-MALO",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "name": "Calvin  Jones",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-      "coord": "Ema Gunic",
-      "cancel_date": "2026-01-12",
-      "date": "Jan 12",
-      "type": "No Show",
-      "reason": "nan",
-      "category": "No Show"
-    },
-    {
-      "study": "J2A-MC-GZPO",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
-      "name": "Denise  Esposito",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
-      "coord": "Ema Gunic",
-      "cancel_date": "2026-01-09",
-      "date": "Jan 8",
-      "type": "No Show",
-      "reason": "Text sent to participant about missed appt",
-      "category": "No Show"
-    },
-    {
-      "study": "J2A-MC-GZPO",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
-      "name": "JAMES Schwartz",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
-      "coord": "Stacey Scott",
-      "cancel_date": "2026-01-08",
-      "date": "Feb 5",
-      "type": "Site Cancelled",
-      "reason": "screen fail inclusion 2007 per PI",
-      "category": "Screen Fail/DNQ"
-    },
-    {
-      "study": "80202135SJS3001",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/150548/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/150548/subjects",
-      "name": "Tina  Pelligra",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/150548/subjects",
-      "coord": "Angelina Mcmullen",
-      "cancel_date": "2026-01-08",
-      "date": "Jan 8",
-      "type": "Patient Cancelled",
-      "reason": "Cancelled due to patient reported illness.",
-      "category": "Other"
-    },
-    {
-      "study": "C4951063",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "name": "Veronica  Grant",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "coord": "Jana Milankovic",
-      "cancel_date": "2026-01-07",
-      "date": "Jan 7",
-      "type": "Patient Cancelled",
-      "reason": "no reason provided",
-      "category": "Not Documented"
-    },
-    {
-      "study": "C4951063",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "name": "tasha pitts",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-      "coord": "Jana Milankovic",
-      "cancel_date": "2026-01-07",
-      "date": "Jan 7",
-      "type": "No Show",
-      "reason": "text message sent",
-      "category": "No Show"
-    },
-    {
-      "study": "MR-130A-01-TD-3001",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/109260/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/109260/subjects",
-      "name": "Emily  Pfeil",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/109260/subjects",
-      "coord": "Ruby Pereira",
-      "cancel_date": "2026-01-07",
-      "date": "Jan 7",
-      "type": "No Show",
-      "reason": "Site is unable to get in contact with the Participant possible lost to follow up",
-      "category": "No Show"
-    },
-    {
-      "study": "J2A-MC-GZPO",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
-      "name": "Grace Hankinson",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
-      "coord": "Stacey Scott",
-      "cancel_date": "2026-01-06",
-      "date": "Feb 3",
-      "type": "Site Cancelled",
-      "reason": "subject is a screenfail",
-      "category": "Screen Fail/DNQ"
-    },
-    {
-      "study": "D7960C00015",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/154462/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/154462/subjects",
-      "name": "Mary DeAngelis",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/154462/subjects",
-      "coord": "Gabrijela Ateljevic",
-      "cancel_date": "2026-01-06",
-      "date": "Jan 6",
-      "type": "Site Cancelled",
-      "reason": "subject did not sign consent does not qualify for study per Dr Heether was not on maximum therapy 40 mh og a statin for 30 days",
-      "category": "Screen Fail/DNQ"
-    },
-    {
-      "study": "M23-714",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/86826/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/86826/subjects",
-      "name": "Meg  Clark",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/86826/subjects",
-      "coord": "Jana Milankovic",
-      "cancel_date": "2026-01-06",
-      "date": "Jan 6",
-      "type": "No Show",
-      "reason": "Text sent to the Participant, she was a no show",
-      "category": "No Show"
-    },
-    {
-      "study": "CDX0159-12",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/102540/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/102540/subjects",
-      "name": "Vivienne Van Nguyen",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/102540/subjects",
-      "coord": "Mario Castellanos",
-      "cancel_date": "2026-01-06",
-      "date": "Jan 6",
-      "type": "Site Cancelled",
-      "reason": "nan",
-      "category": "Not Documented"
-    },
-    {
-      "study": "J2A-MC-GZPO",
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
-      "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
-      "name": "Barbara Walker",
-      "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
-      "coord": "Ana Lambic",
-      "cancel_date": "2026-01-06",
-      "date": "Jan 21",
-      "type": "No Show",
-      "reason": "nan",
-      "category": "No Show"
+        "study": "J2A-MC-GZPO",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
+        "name": "Linda  Demeter",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
+        "coord": "Stacey Scott",
+        "cancel_date": "2026-03-04",
+        "date": "Apr 20",
+        "type": "Site Cancelled",
+        "reason": "subject is a transfer patient to Florida",
+        "category": "Other"
+    },
+    {
+        "study": "C4951063",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+        "name": "Stephanie  Madrinan",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+        "coord": "Ruby Pereira",
+        "cancel_date": "2026-03-03",
+        "date": "Mar 3",
+        "type": "Patient Cancelled",
+        "reason": "due to weather and her son school 2 hour delay",
+        "category": "Weather"
+    },
+    {
+        "study": "J2A-MC-GZPS",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "name": "AngelLewis AngelLewis",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "coord": "Jana Milankovic",
+        "cancel_date": "2026-03-03",
+        "date": "Mar 3",
+        "type": "Site Cancelled",
+        "reason": "No ultrasound tech available for appt several text messages were sent without a reply",
+        "category": "Other"
+    },
+    {
+        "study": "C4951063",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+        "name": "Jennyfer  Floyd",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+        "coord": "Jana Milankovic",
+        "cancel_date": "2026-03-03",
+        "date": "Mar 3",
+        "type": "No Show",
+        "reason": "Text message sent about rescheduling missed appt  if interested",
+        "category": "No Show"
+    },
+    {
+        "study": "88545223PSA2001",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/173860/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/173860/subjects",
+        "name": "Paul  McMenemy",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/173860/subjects",
+        "coord": "Gabrijela Ateljevic",
+        "cancel_date": "2026-03-03",
+        "date": "Feb 27",
+        "type": "Patient Cancelled",
+        "reason": "Patient cancelled due to work commitments. Tried two times to reach out and reschedule but no answer",
+        "category": "No Response"
+    },
+    {
+        "study": "MR-130A-01-TD-3001",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/109260/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/109260/subjects",
+        "name": "Haley  Robinson",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/109260/subjects",
+        "coord": "Jana Milankovic",
+        "cancel_date": "2026-03-03",
+        "date": "Apr 27",
+        "type": "Site Cancelled",
+        "reason": "Due to changes in the protocol criteria, I need to cancel her appointment because her BMI is below the updated eligibility requirement.",
+        "category": "Screen Fail/DNQ"
+    },
+    {
+        "study": "MR-130A-01-TD-3001",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/109260/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/109260/subjects",
+        "name": "Sofia  Retamal",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/109260/subjects",
+        "coord": "Jana Milankovic",
+        "cancel_date": "2026-03-03",
+        "date": "Mar 10",
+        "type": "Site Cancelled",
+        "reason": "Due to changes in the protocol criteria, I need to cancel her appointment because her BMI is below the updated eligibility requirement.",
+        "category": "Screen Fail/DNQ"
+    },
+    {
+        "study": "J2A-MC-GZPS",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "name": "Bernice Oglesby",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "coord": "Jana Milankovic",
+        "cancel_date": "2026-03-03",
+        "date": "Mar 31",
+        "type": "Patient Cancelled",
+        "reason": "Patient cancelled, She is no longer interested in the study",
+        "category": "Patient Withdrew"
+    },
+    {
+        "study": "MR-130A-01-TD-3001",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/109260/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/109260/subjects",
+        "name": "Devon  Anthony",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/109260/subjects",
+        "coord": "Jana Milankovic",
+        "cancel_date": "2026-03-02",
+        "date": "Mar 4",
+        "type": "Site Cancelled",
+        "reason": "Per Dr. A:  participant does not Qualify for the Contraceptive Patch Study. She is on topiramate (Topamax) and she has an IUD",
+        "category": "Screen Fail/DNQ"
+    },
+    {
+        "study": "C4951063",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+        "name": "Kathleen Brown",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+        "coord": "Jana Milankovic",
+        "cancel_date": "2026-03-02",
+        "date": "Mar 2",
+        "type": "No Show",
+        "reason": "Sent text about rescheduling if interested",
+        "category": "No Show"
+    },
+    {
+        "study": "J2A-MC-GZPS",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "name": "Mikita Mickens",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "coord": "Jana Milankovic",
+        "cancel_date": "2026-02-25",
+        "date": "Mar 5",
+        "type": "Patient Cancelled",
+        "reason": "Not comfortable with releasing her medical records.",
+        "category": "Other"
+    },
+    {
+        "study": "J2A-MC-GZPS",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "name": "Desiree Sommerville",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "coord": "Ana Lambic",
+        "cancel_date": "2026-02-25",
+        "date": "Mar 2",
+        "type": "Site Cancelled",
+        "reason": "Participant does not qualify for the study as she has Overactive bladder and pelvic floor dysfunction, which are exclusionary in the study",
+        "category": "Screen Fail/DNQ"
+    },
+    {
+        "study": "M23-698",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/67894/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/67894/subjects",
+        "name": "Regina  Santiago",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/67894/subjects",
+        "coord": "Mario Castellanos",
+        "cancel_date": "2026-02-24",
+        "date": "Feb 17",
+        "type": "No Show",
+        "reason": "nan",
+        "category": "No Show"
+    },
+    {
+        "study": "C4951063",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+        "name": "Kristina Wilson",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+        "coord": "Jana Milankovic",
+        "cancel_date": "2026-02-24",
+        "date": "Feb 24",
+        "type": "No Show",
+        "reason": "Text sent to participant about rescheduling if still interested in participating in the study",
+        "category": "No Show"
+    },
+    {
+        "study": "N1T-MC-MALO",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
+        "name": "sharon  Bagelo",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
+        "coord": "Vlado Draganic",
+        "cancel_date": "2026-02-23",
+        "date": "Feb 24",
+        "type": "Patient Cancelled",
+        "reason": "Pt. cancelled due to weather conditions.",
+        "category": "Weather"
+    },
+    {
+        "study": "N1T-MC-MALO",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
+        "name": "William  Birch",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
+        "coord": "Vlado Draganic",
+        "cancel_date": "2026-02-23",
+        "date": "Feb 23",
+        "type": "Site Cancelled",
+        "reason": "Site cancelled due to weather.",
+        "category": "Weather"
+    },
+    {
+        "study": "J2A-MC-GZPS",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "name": "Shanan Olds",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "coord": "Jana Milankovic",
+        "cancel_date": "2026-02-23",
+        "date": "Mar 3",
+        "type": "Patient Cancelled",
+        "reason": "She is no longer interested",
+        "category": "Patient Withdrew"
+    },
+    {
+        "study": "20230222",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167794/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167794/subjects",
+        "name": "Gail Titus",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167794/subjects",
+        "coord": "Cady Chilensky",
+        "cancel_date": "2026-02-23",
+        "date": "Mar 3",
+        "type": "Site Cancelled",
+        "reason": "Patient needs a redraw",
+        "category": "Other"
+    },
+    {
+        "study": "J3F-MC-EZCC",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/172389/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/172389/subjects",
+        "name": "Billy Stanley",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/172389/subjects",
+        "coord": "Ema Gunic",
+        "cancel_date": "2026-02-23",
+        "date": "Feb 24",
+        "type": "Patient Cancelled",
+        "reason": "Patient is no longer interested in participation.",
+        "category": "Patient Withdrew"
+    },
+    {
+        "study": "J3F-MC-EZCC",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/172389/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/172389/subjects",
+        "name": "Dulana  Thaminda Ranaweera",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/172389/subjects",
+        "coord": "Ema Gunic",
+        "cancel_date": "2026-02-23",
+        "date": "Feb 23",
+        "type": "Site Cancelled",
+        "reason": "Site cancelled due to weather",
+        "category": "Weather"
+    },
+    {
+        "study": "20230222",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167794/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167794/subjects",
+        "name": "David  Tipton",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167794/subjects",
+        "coord": "Vlado Draganic",
+        "cancel_date": "2026-02-22",
+        "date": "Feb 23",
+        "type": "Patient Cancelled",
+        "reason": "Please see note regarding upcoming health procedure.",
+        "category": "Other"
+    },
+    {
+        "study": "C4951063",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+        "name": "Khadija  Butt",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+        "coord": "Jana Milankovic",
+        "cancel_date": "2026-02-22",
+        "date": "Feb 23",
+        "type": "Site Cancelled",
+        "reason": "Due to snow that is expected",
+        "category": "Weather"
+    },
+    {
+        "study": "C4951063",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+        "name": "Kayla  Baresich",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+        "coord": "Ruby Pereira",
+        "cancel_date": "2026-02-22",
+        "date": "Feb 23",
+        "type": "Site Cancelled",
+        "reason": "Due to snow that is expected",
+        "category": "Weather"
+    },
+    {
+        "study": "20230222",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167794/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167794/subjects",
+        "name": "Altina  Alvin",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167794/subjects",
+        "coord": "Angelina Mcmullen",
+        "cancel_date": "2026-02-22",
+        "date": "Feb 23",
+        "type": "Site Cancelled",
+        "reason": "Cancelled due to weather",
+        "category": "Weather"
+    },
+    {
+        "study": "C4951063",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+        "name": "Heidi  Mathis",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+        "coord": "Ruby Pereira",
+        "cancel_date": "2026-02-20",
+        "date": "Feb 26",
+        "type": "Site Cancelled",
+        "reason": "Participant is a screen failure",
+        "category": "Screen Fail/DNQ"
+    },
+    {
+        "study": "J3L-MC-EZEF",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/89175/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/89175/subjects",
+        "name": "Madearia Lowery",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/89175/subjects",
+        "coord": "Ruby Pereira",
+        "cancel_date": "2026-02-18",
+        "date": "Feb 18",
+        "type": "No Show",
+        "reason": "subject is a no show study coordinator left two messages and sent a text",
+        "category": "No Show"
+    },
+    {
+        "study": "J2A-MC-GZPS",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "name": "MsDidi Richardson",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "coord": "Ana Lambic",
+        "cancel_date": "2026-02-18",
+        "date": "Feb 18",
+        "type": "Patient Cancelled",
+        "reason": "Participant has do not solicit in file",
+        "category": "Other"
+    },
+    {
+        "study": "C4951063",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+        "name": "Larissa Oliveira",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+        "coord": "Jana Milankovic",
+        "cancel_date": "2026-02-16",
+        "date": "Feb 16",
+        "type": "No Show",
+        "reason": "Participant was a no show text message sent about rescheduling if interested.",
+        "category": "No Show"
+    },
+    {
+        "study": "N1T-MC-MALO",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
+        "name": "Carolyn  Boxmeyer",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
+        "coord": "Vlado Draganic",
+        "cancel_date": "2026-02-13",
+        "date": "Feb 13",
+        "type": "Site Cancelled",
+        "reason": "scheduled under Christine",
+        "category": "Other"
+    },
+    {
+        "study": "J2A-MC-GZPS",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "name": "Marion Groarke",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "coord": "Gabrijela Ateljevic",
+        "cancel_date": "2026-02-12",
+        "date": "Mar 10",
+        "type": "Patient Cancelled",
+        "reason": "Participant cancelled due to starting a new job.",
+        "category": "Other"
+    },
+    {
+        "study": "M23-714",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/86826/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/86826/subjects",
+        "name": "Leilani Leilani",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/86826/subjects",
+        "coord": "Jana Milankovic",
+        "cancel_date": "2026-02-12",
+        "date": "Feb 18",
+        "type": "Site Cancelled",
+        "reason": "Study is closed and patient is unresponsive",
+        "category": "Other"
+    },
+    {
+        "study": "N1T-MC-MALO",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
+        "name": "Shana  Barreto",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
+        "coord": "Angelina Mcmullen",
+        "cancel_date": "2026-02-11",
+        "date": "Feb 13",
+        "type": "Site Cancelled",
+        "reason": "She was a screen fail at Visit 1",
+        "category": "Screen Fail/DNQ"
+    },
+    {
+        "study": "J2A-MC-GZPS",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "name": "Stephanie Fortune-Beard",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "coord": "Jana Milankovic",
+        "cancel_date": "2026-02-11",
+        "date": "Feb 11",
+        "type": "No Show",
+        "reason": "no show left text message about rescheduling if interested in participating.",
+        "category": "No Show"
+    },
+    {
+        "study": "MR-130A-01-TD-3001",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/109260/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/109260/subjects",
+        "name": "Keegan  Mcloughlin",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/109260/subjects",
+        "coord": "Jana Milankovic",
+        "cancel_date": "2026-02-10",
+        "date": "Feb 10",
+        "type": "No Show",
+        "reason": "Text message sent participant was a no show",
+        "category": "No Show"
+    },
+    {
+        "study": "N1T-MC-MALO",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
+        "name": "Andrew  M Shekhar",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
+        "coord": "Angelina Mcmullen",
+        "cancel_date": "2026-02-10",
+        "date": "Feb 19",
+        "type": "Site Cancelled",
+        "reason": "Scheduled in error",
+        "category": "Other"
+    },
+    {
+        "study": "J3F-MC-EZCC",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/172389/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/172389/subjects",
+        "name": "Srinivas LS",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/172389/subjects",
+        "coord": "Ema Gunic",
+        "cancel_date": "2026-02-10",
+        "date": "Feb 26",
+        "type": "Site Cancelled",
+        "reason": "According to his medical records, the patient is enrolled in another clinical trial.",
+        "category": "Other"
+    },
+    {
+        "study": "D6973C00001",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/161619/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/161619/subjects",
+        "name": "Larry Jordan",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/161619/subjects",
+        "coord": "Ema Gunic",
+        "cancel_date": "2026-02-09",
+        "date": "Feb 9",
+        "type": "No Show",
+        "reason": "subject was a no show study coordinator called the participant and sent text message",
+        "category": "No Show"
+    },
+    {
+        "study": "D7960C00015",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/154462/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/154462/subjects",
+        "name": "Gilbert Monte",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/154462/subjects",
+        "coord": "Stacey Scott",
+        "cancel_date": "2026-02-06",
+        "date": "Feb 23",
+        "type": "Site Cancelled",
+        "reason": "subject is a screen fail per PI inclusion 1A",
+        "category": "Screen Fail/DNQ"
+    },
+    {
+        "study": "MR-130A-01-TD-3001",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/109260/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/109260/subjects",
+        "name": "Janae  Rockemore",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/109260/subjects",
+        "coord": "Ruby Pereira",
+        "cancel_date": "2026-02-05",
+        "date": "Feb 5",
+        "type": "No Show",
+        "reason": "LM and text message sent to reschedule missed appt",
+        "category": "No Show"
+    },
+    {
+        "study": "J1G-MC-LAKI",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/119640/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/119640/subjects",
+        "name": "Patricia  Garland",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/119640/subjects",
+        "coord": "Ruby Pereira",
+        "cancel_date": "2026-02-05",
+        "date": "Feb 11",
+        "type": "Site Cancelled",
+        "reason": "Participant needs to have CDR done prior to injection",
+        "category": "Other"
+    },
+    {
+        "study": "D7960C00015",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/154462/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/154462/subjects",
+        "name": "David Rochlis",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/154462/subjects",
+        "coord": "Stacey Scott",
+        "cancel_date": "2026-02-04",
+        "date": "Feb 17",
+        "type": "Site Cancelled",
+        "reason": "SUBJECT IS A SCREEN FAIL",
+        "category": "Screen Fail/DNQ"
+    },
+    {
+        "study": "J2A-MC-GZPS",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "name": "Mitzi S",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "coord": "Jana Milankovic",
+        "cancel_date": "2026-02-04",
+        "date": "Feb 4",
+        "type": "No Show",
+        "reason": "No show LM about rescheduling if still interested in Participating the study",
+        "category": "No Show"
+    },
+    {
+        "study": "J2A-MC-GZPS",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "name": "Joanne Gebhardt",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "coord": "Jana Milankovic",
+        "cancel_date": "2026-02-03",
+        "date": "Feb 3",
+        "type": "No Show",
+        "reason": "Participant was a no show, text message sent",
+        "category": "No Show"
+    },
+    {
+        "study": "M20-465",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/107641/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/107641/subjects",
+        "name": "Kirshna  Hillyard",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/107641/subjects",
+        "coord": "Mario Castellanos",
+        "cancel_date": "2026-02-03",
+        "date": "Feb 3",
+        "type": "No Show",
+        "reason": "nan",
+        "category": "No Show"
+    },
+    {
+        "study": "J2A-MC-GZPS",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "name": "Julie Dowburd",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "coord": "Jana Milankovic",
+        "cancel_date": "2026-02-02",
+        "date": "Feb 19",
+        "type": "Site Cancelled",
+        "reason": "After reviewing her Med records Lita told us that she DNQ",
+        "category": "Screen Fail/DNQ"
+    },
+    {
+        "study": "J2A-MC-GZPS",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "name": "Sydney McMillan",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "coord": "Jana Milankovic",
+        "cancel_date": "2026-02-02",
+        "date": "Feb 26",
+        "type": "Site Cancelled",
+        "reason": "After reviewing her MR Lita told us she DNQ",
+        "category": "Screen Fail/DNQ"
+    },
+    {
+        "study": "J2A-MC-GZPS",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "name": "shareda Copps",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "coord": "Ana Lambic",
+        "cancel_date": "2026-02-02",
+        "date": "Feb 2",
+        "type": "No Show",
+        "reason": "No show, left text message about rescheduling",
+        "category": "No Show"
+    },
+    {
+        "study": "MR-130A-01-TD-3001",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/109260/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/109260/subjects",
+        "name": "Diyona  Hawkins",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/109260/subjects",
+        "coord": "Ruby Pereira",
+        "cancel_date": "2026-01-29",
+        "date": "Jan 29",
+        "type": "No Show",
+        "reason": "Participant was a no show. LM about rescheduling appt",
+        "category": "No Show"
+    },
+    {
+        "study": "C4951063",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+        "name": "Jennifer  Hopkins",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+        "coord": "Jana Milankovic",
+        "cancel_date": "2026-01-28",
+        "date": "Jan 28",
+        "type": "No Show",
+        "reason": "No show, Left text message",
+        "category": "No Show"
+    },
+    {
+        "study": "J2A-MC-GZPS",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "name": "Melissa Kingkiner",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "coord": "Jana Milankovic",
+        "cancel_date": "2026-01-28",
+        "date": "Jan 28",
+        "type": "No Show",
+        "reason": "No show, text message sent if interested in rescheduling.",
+        "category": "No Show"
+    },
+    {
+        "study": "M20-465",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/107641/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/107641/subjects",
+        "name": "Davia  Jones",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/107641/subjects",
+        "coord": "Mario Castellanos",
+        "cancel_date": "2026-01-28",
+        "date": "Jan 28",
+        "type": "Patient Cancelled",
+        "reason": "Discontinued",
+        "category": "Discontinued"
+    },
+    {
+        "study": "J2A-MC-GZPS",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "name": "Jill  Hurtado",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "coord": "Gabrijela Ateljevic",
+        "cancel_date": "2026-01-27",
+        "date": "Jan 27",
+        "type": "No Show",
+        "reason": "Participant was a no show, text message sent",
+        "category": "No Show"
+    },
+    {
+        "study": "N1T-MC-MALO",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
+        "name": "Daniel Howard",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
+        "coord": "Angelina Mcmullen",
+        "cancel_date": "2026-01-23",
+        "date": "Jan 23",
+        "type": "Patient Cancelled",
+        "reason": "The patient cancelled without explanation.",
+        "category": "Other"
+    },
+    {
+        "study": "M20-465",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/107641/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/107641/subjects",
+        "name": "Christopher  Glenn",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/107641/subjects",
+        "coord": "Gabrijela Ateljevic",
+        "cancel_date": "2026-01-22",
+        "date": "Jan 22",
+        "type": "No Show",
+        "reason": "nan",
+        "category": "No Show"
+    },
+    {
+        "study": "C4951063",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+        "name": "Kayla  Baresich",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+        "coord": "Jana Milankovic",
+        "cancel_date": "2026-01-22",
+        "date": "Jan 26",
+        "type": "Site Cancelled",
+        "reason": "Canceled because of weather",
+        "category": "Weather"
+    },
+    {
+        "study": "C4951063",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+        "name": "Alyssa Giungo",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+        "coord": "Jana Milankovic",
+        "cancel_date": "2026-01-21",
+        "date": "Jan 21",
+        "type": "No Show",
+        "reason": "Mailbox full unable to LM",
+        "category": "No Show"
+    },
+    {
+        "study": "C4951063",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+        "name": "Kimberly blossom",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+        "coord": "Jana Milankovic",
+        "cancel_date": "2026-01-21",
+        "date": "Jan 22",
+        "type": "Site Cancelled",
+        "reason": "After reviewing MR she has autoimmune neurological disorder",
+        "category": "Screen Fail/DNQ"
+    },
+    {
+        "study": "D7960C00015",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/154462/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/154462/subjects",
+        "name": "Pamela Gallagher",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/154462/subjects",
+        "coord": "Gabrijela Ateljevic",
+        "cancel_date": "2026-01-21",
+        "date": "Jan 21",
+        "type": "Site Cancelled",
+        "reason": "She was rescheduled for today at 9:30, but she didn't show up. Study coordinator left voice mail and sent text message",
+        "category": "No Show"
+    },
+    {
+        "study": "N1T-MC-MALO",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
+        "name": "Darryl  Pringle",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
+        "coord": "Aneesh Vaze",
+        "cancel_date": "2026-01-21",
+        "date": "Jan 21",
+        "type": "Site Cancelled",
+        "reason": "Site cancelled. No reasons noted",
+        "category": "Not Documented"
+    },
+    {
+        "study": "D7960C00015",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/154462/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/154462/subjects",
+        "name": "Bill Kaufman",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/154462/subjects",
+        "coord": "Jana Milankovic",
+        "cancel_date": "2026-01-20",
+        "date": "Jan 30",
+        "type": "Site Cancelled",
+        "reason": "Pt does not qualify",
+        "category": "Screen Fail/DNQ"
+    },
+    {
+        "study": "D6973C00001",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/161619/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/161619/subjects",
+        "name": "Renetta  Kinniebrew",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/161619/subjects",
+        "coord": "Angelina Mcmullen",
+        "cancel_date": "2026-01-20",
+        "date": "Jan 21",
+        "type": "Site Cancelled",
+        "reason": "Pending guidance from Sponsor about re-screening since participant was screened failed at Philadelpiha, PA site",
+        "category": "Other"
+    },
+    {
+        "study": "N1T-MC-MALO",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
+        "name": "Mehrdad  Zoroufi",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
+        "coord": "Ema Gunic",
+        "cancel_date": "2026-01-19",
+        "date": "Jan 22",
+        "type": "Patient Cancelled",
+        "reason": "Patient Not satisfied with compensation, does not wish to participate any longer.",
+        "category": "Other"
+    },
+    {
+        "study": "80202135SLE3001",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/177553/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/177553/subjects",
+        "name": "Gina Wilson",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/177553/subjects",
+        "coord": "Jana Milankovic",
+        "cancel_date": "2026-01-16",
+        "date": "Jan 16",
+        "type": "Site Cancelled",
+        "reason": "Scheduled in error.",
+        "category": "Other"
+    },
+    {
+        "study": "N1T-MC-MALO",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
+        "name": "Cindy Oleck",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
+        "coord": "Automated System",
+        "cancel_date": "2026-01-15",
+        "date": "Jan 16",
+        "type": "Site Cancelled",
+        "reason": "Cancelled due to exclusion criteria - She had a Adenocarcinoma in 2023 and it was metastasized",
+        "category": "Screen Fail/DNQ"
+    },
+    {
+        "study": "D7960C00015",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/154462/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/154462/subjects",
+        "name": "Pamela Gallagher",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/154462/subjects",
+        "coord": "Gabrijela Ateljevic",
+        "cancel_date": "2026-01-15",
+        "date": "Jan 15",
+        "type": "No Show",
+        "reason": "SUBJECT DID NOT SHOW FOR APPOINTMENT",
+        "category": "No Show"
+    },
+    {
+        "study": "J2A-MC-GZPS",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "name": "Jacquelyn F Amer",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "coord": "Ruby Pereira",
+        "cancel_date": "2026-01-15",
+        "date": "Jan 15",
+        "type": "No Show",
+        "reason": "Participant does not qualify for the study",
+        "category": "Screen Fail/DNQ"
+    },
+    {
+        "study": "J2A-MC-GZPS",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "name": "Donna  Virden",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "coord": "Jana Milankovic",
+        "cancel_date": "2026-01-15",
+        "date": "Jan 15",
+        "type": "Site Cancelled",
+        "reason": "Participant did not sign consent is on an excluded medication",
+        "category": "Other"
+    },
+    {
+        "study": "J3L-MC-EZEF",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/89175/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/89175/subjects",
+        "name": "Fred  Early",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/89175/subjects",
+        "coord": "Ruby Pereira",
+        "cancel_date": "2026-01-14",
+        "date": "Jan 14",
+        "type": "No Show",
+        "reason": "Text message sent about missed appointment",
+        "category": "No Show"
+    },
+    {
+        "study": "J2A-MC-GZPS",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "name": "LaMonika  Koley",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "coord": "Jana Milankovic",
+        "cancel_date": "2026-01-14",
+        "date": "Jan 14",
+        "type": "No Show",
+        "reason": "text message sent about missed appt and to reschedule if interested.",
+        "category": "No Show"
+    },
+    {
+        "study": "J2A-MC-GZGS",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/60296/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/60296/subjects",
+        "name": "Eloise  Browder",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/60296/subjects",
+        "coord": "Stacey Scott",
+        "cancel_date": "2026-01-13",
+        "date": "Jun 16",
+        "type": "Site Cancelled",
+        "reason": "She was rescheduled for today at 9:30, but she didn't show up. Study coordinator left voice mail and sent text message",
+        "category": "No Show"
+    },
+    {
+        "study": "J2A-MC-GZGS",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/60296/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/60296/subjects",
+        "name": "DARREN  CATHEY",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/60296/subjects",
+        "coord": "Stacey Scott",
+        "cancel_date": "2026-01-13",
+        "date": "Apr 13",
+        "type": "Site Cancelled",
+        "reason": "SCHEULED LTV",
+        "category": "Other"
+    },
+    {
+        "study": "J2A-MC-GZPS",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "name": "Jovon Thompson",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "coord": "Gabrijela Ateljevic",
+        "cancel_date": "2026-01-13",
+        "date": "Jan 13",
+        "type": "No Show",
+        "reason": "no show text message sent about missed appt",
+        "category": "No Show"
+    },
+    {
+        "study": "D6973C00001",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/161619/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/161619/subjects",
+        "name": "Patricia Gallagher",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/161619/subjects",
+        "coord": "Gabrijela Ateljevic",
+        "cancel_date": "2026-01-13",
+        "date": "Jan 19",
+        "type": "Patient Cancelled",
+        "reason": "Patient cancelled due to injury",
+        "category": "Other"
+    },
+    {
+        "study": "N1T-MC-MALO",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
+        "name": "Ryan  Romero",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
+        "coord": "Ema Gunic",
+        "cancel_date": "2026-01-13",
+        "date": "Jan 13",
+        "type": "No Show",
+        "reason": "nan",
+        "category": "No Show"
+    },
+    {
+        "study": "C4951063",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+        "name": "Jenn  Bernard",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+        "coord": "Jana Milankovic",
+        "cancel_date": "2026-01-13",
+        "date": "Jan 13",
+        "type": "No Show",
+        "reason": "Text message sent about missed appt",
+        "category": "No Show"
+    },
+    {
+        "study": "J2A-MC-GZPO",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
+        "name": "Kevin  Sheils",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
+        "coord": "Ema Gunic",
+        "cancel_date": "2026-01-12",
+        "date": "Jan 21",
+        "type": "Site Cancelled",
+        "reason": "Study is closed",
+        "category": "Other"
+    },
+    {
+        "study": "D6973C00001",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/161619/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/161619/subjects",
+        "name": "Donald Garber",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/161619/subjects",
+        "coord": "Stacey Scott",
+        "cancel_date": "2026-01-12",
+        "date": "Jan 19",
+        "type": "Patient Cancelled",
+        "reason": "subject withdrew consent called site and stated he coukld not make study scheduled appointments and refuses to return study drug",
+        "category": "Patient Withdrew"
+    },
+    {
+        "study": "C4951063",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+        "name": "Tiffany Baldwin",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+        "coord": "Jana Milankovic",
+        "cancel_date": "2026-01-12",
+        "date": "Jan 12",
+        "type": "No Show",
+        "reason": "Participant never reached back with address to schedule Lyft ride",
+        "category": "No Show"
+    },
+    {
+        "study": "J2A-MC-GZPS",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "name": "Mary Dingle",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects",
+        "coord": "Jana Milankovic",
+        "cancel_date": "2026-01-12",
+        "date": "Jan 12",
+        "type": "No Show",
+        "reason": "No show for appt text message sent",
+        "category": "No Show"
+    },
+    {
+        "study": "J2A-MC-GZPO",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
+        "name": "David  Thomas",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
+        "coord": "Ema Gunic",
+        "cancel_date": "2026-01-12",
+        "date": "Jan 22",
+        "type": "Site Cancelled",
+        "reason": "Study is closed",
+        "category": "Other"
+    },
+    {
+        "study": "J2A-MC-GZPO",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
+        "name": "Joann  Frazier",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
+        "coord": "Ema Gunic",
+        "cancel_date": "2026-01-12",
+        "date": "Jan 19",
+        "type": "Site Cancelled",
+        "reason": "Study is closed",
+        "category": "Other"
+    },
+    {
+        "study": "N1T-MC-MALO",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
+        "name": "Calvin  Jones",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
+        "coord": "Ema Gunic",
+        "cancel_date": "2026-01-12",
+        "date": "Jan 12",
+        "type": "No Show",
+        "reason": "nan",
+        "category": "No Show"
+    },
+    {
+        "study": "J2A-MC-GZPO",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
+        "name": "Denise  Esposito",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
+        "coord": "Ema Gunic",
+        "cancel_date": "2026-01-09",
+        "date": "Jan 8",
+        "type": "No Show",
+        "reason": "Text sent to participant about missed appt",
+        "category": "No Show"
+    },
+    {
+        "study": "J2A-MC-GZPO",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
+        "name": "JAMES Schwartz",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
+        "coord": "Stacey Scott",
+        "cancel_date": "2026-01-08",
+        "date": "Feb 5",
+        "type": "Site Cancelled",
+        "reason": "screen fail inclusion 2007 per PI",
+        "category": "Screen Fail/DNQ"
+    },
+    {
+        "study": "80202135SJS3001",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/150548/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/150548/subjects",
+        "name": "Tina  Pelligra",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/150548/subjects",
+        "coord": "Angelina Mcmullen",
+        "cancel_date": "2026-01-08",
+        "date": "Jan 8",
+        "type": "Patient Cancelled",
+        "reason": "Cancelled due to patient reported illness.",
+        "category": "Other"
+    },
+    {
+        "study": "C4951063",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+        "name": "Veronica  Grant",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+        "coord": "Jana Milankovic",
+        "cancel_date": "2026-01-07",
+        "date": "Jan 7",
+        "type": "Patient Cancelled",
+        "reason": "no reason provided",
+        "category": "Not Documented"
+    },
+    {
+        "study": "C4951063",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+        "name": "tasha pitts",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+        "coord": "Jana Milankovic",
+        "cancel_date": "2026-01-07",
+        "date": "Jan 7",
+        "type": "No Show",
+        "reason": "text message sent",
+        "category": "No Show"
+    },
+    {
+        "study": "MR-130A-01-TD-3001",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/109260/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/109260/subjects",
+        "name": "Emily  Pfeil",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/109260/subjects",
+        "coord": "Ruby Pereira",
+        "cancel_date": "2026-01-07",
+        "date": "Jan 7",
+        "type": "No Show",
+        "reason": "Site is unable to get in contact with the Participant possible lost to follow up",
+        "category": "No Show"
+    },
+    {
+        "study": "J2A-MC-GZPO",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
+        "name": "Grace Hankinson",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
+        "coord": "Stacey Scott",
+        "cancel_date": "2026-01-06",
+        "date": "Feb 3",
+        "type": "Site Cancelled",
+        "reason": "subject is a screenfail",
+        "category": "Screen Fail/DNQ"
+    },
+    {
+        "study": "D7960C00015",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/154462/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/154462/subjects",
+        "name": "Mary DeAngelis",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/154462/subjects",
+        "coord": "Gabrijela Ateljevic",
+        "cancel_date": "2026-01-06",
+        "date": "Jan 6",
+        "type": "Site Cancelled",
+        "reason": "subject did not sign consent does not qualify for study per Dr Heether was not on maximum therapy 40 mh og a statin for 30 days",
+        "category": "Screen Fail/DNQ"
+    },
+    {
+        "study": "M23-714",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/86826/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/86826/subjects",
+        "name": "Meg  Clark",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/86826/subjects",
+        "coord": "Jana Milankovic",
+        "cancel_date": "2026-01-06",
+        "date": "Jan 6",
+        "type": "No Show",
+        "reason": "Text sent to the Participant, she was a no show",
+        "category": "No Show"
+    },
+    {
+        "study": "CDX0159-12",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/102540/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/102540/subjects",
+        "name": "Vivienne Van Nguyen",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/102540/subjects",
+        "coord": "Mario Castellanos",
+        "cancel_date": "2026-01-06",
+        "date": "Jan 6",
+        "type": "Site Cancelled",
+        "reason": "nan",
+        "category": "Not Documented"
+    },
+    {
+        "study": "J2A-MC-GZPO",
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
+        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
+        "name": "Barbara Walker",
+        "patient_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects",
+        "coord": "Ana Lambic",
+        "cancel_date": "2026-01-06",
+        "date": "Jan 21",
+        "type": "No Show",
+        "reason": "nan",
+        "category": "No Show"
     }
-  ],
+],
   "coordinators": [
     {
       "name": "Angelina Mcmullen",
@@ -7518,111 +7295,101 @@ const SAMPLE = {
   ],
   "cancelByStudy": [
     {
-      "study": "J2A-MC-GZPS",
-      "count": 22,
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects"
+        "name": "J2A-MC-GZPS",
+        "count": 20,
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/162596/subjects"
     },
     {
-      "study": "N1T-MC-MALO",
-      "count": 18,
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects"
+        "name": "C4951063",
+        "count": 16,
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects"
     },
     {
-      "study": "C4951063",
-      "count": 18,
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects"
+        "name": "N1T-MC-MALO",
+        "count": 11,
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects"
     },
     {
-      "study": "J2A-MC-GZPO",
-      "count": 12,
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects"
+        "name": "J2A-MC-GZPO",
+        "count": 8,
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135157/subjects"
     },
     {
-      "study": "MR-130A-01-TD-3001",
-      "count": 8,
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/109260/subjects"
+        "name": "MR-130A-01-TD-3001",
+        "count": 7,
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/109260/subjects"
     },
     {
-      "study": "D7960C00015",
-      "count": 6,
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/154462/subjects"
+        "name": "D7960C00015",
+        "count": 6,
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/154462/subjects"
     },
     {
-      "study": "J3F-MC-EZCC",
-      "count": 5,
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/172389/subjects"
+        "name": "D6973C00001",
+        "count": 4,
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/161619/subjects"
     },
     {
-      "study": "J2A-MC-GZGS",
-      "count": 5,
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/60296/subjects"
+        "name": "20230222",
+        "count": 3,
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167794/subjects"
     },
     {
-      "study": "M23-714",
-      "count": 4,
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/86826/subjects"
+        "name": "J3F-MC-EZCC",
+        "count": 3,
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/172389/subjects"
     },
     {
-      "study": "D6973C00001",
-      "count": 4,
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/161619/subjects"
+        "name": "M20-465",
+        "count": 3,
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/107641/subjects"
     },
     {
-      "study": "88545223PSA2001",
-      "count": 3,
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/173860/subjects"
+        "name": "J3L-MC-EZEF",
+        "count": 2,
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/89175/subjects"
     },
     {
-      "study": "20230222",
-      "count": 3,
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167794/subjects"
+        "name": "M23-714",
+        "count": 2,
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/86826/subjects"
     },
     {
-      "study": "M20-465",
-      "count": 3,
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/107641/subjects"
+        "name": "J2A-MC-GZGS",
+        "count": 2,
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/60296/subjects"
     },
     {
-      "study": "J3L-MC-EZEF",
-      "count": 2,
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/89175/subjects"
+        "name": "88545223PSA2001",
+        "count": 1,
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/173860/subjects"
     },
     {
-      "study": "95597528ADM2001",
-      "count": 1,
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/172395/subjects"
+        "name": "M23-698",
+        "count": 1,
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/67894/subjects"
     },
     {
-      "study": "EFC17600 (ESTUARY)",
-      "count": 1,
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/122602/subjects"
+        "name": "J1G-MC-LAKI",
+        "count": 1,
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/119640/subjects"
     },
     {
-      "study": "M23-698",
-      "count": 1,
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/67894/subjects"
+        "name": "80202135SLE3001",
+        "count": 1,
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/177553/subjects"
     },
     {
-      "study": "J1G-MC-LAKI",
-      "count": 1,
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/119640/subjects"
+        "name": "80202135SJS3001",
+        "count": 1,
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/150548/subjects"
     },
     {
-      "study": "80202135SLE3001",
-      "count": 1,
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/177553/subjects"
-    },
-    {
-      "study": "80202135SJS3001",
-      "count": 1,
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/150548/subjects"
-    },
-    {
-      "study": "CDX0159-12",
-      "count": 1,
-      "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/102540/subjects"
+        "name": "CDX0159-12",
+        "count": 1,
+        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/102540/subjects"
     }
-  ],
+],
   "upcomingByStudyFull": [
     {
       "study": "J3L-MC-EZEF",
@@ -9342,16 +9109,8 @@ const SAMPLE = {
       "count": 23
     },
     {
-      "reason": "Not Documented",
-      "count": 16
-    },
-    {
       "reason": "Screen Fail/DNQ",
-      "count": 15
-    },
-    {
-      "reason": "Rescheduled",
-      "count": 11
+      "count": 17
     },
     {
       "reason": "Weather",
@@ -9362,12 +9121,16 @@ const SAMPLE = {
       "count": 4
     },
     {
-      "reason": "Study Closed",
-      "count": 4
+      "reason": "Not Documented",
+      "count": 3
     },
     {
-      "reason": "Admin Error",
-      "count": 3
+      "reason": "Discontinued",
+      "count": 1
+    },
+    {
+      "reason": "No Response",
+      "count": 1
     }
   ],
   "riskFlags": [
@@ -9394,175 +9157,47 @@ const SAMPLE = {
   "marchTotal": 62,
   "aprilTotal": 39,
   "next14Total": 45,
-  "cancelTotal": 120,
+  "cancelTotal": 93,
   "activeStudies": 17,
   "snapshotDate": "March 9, 2026",
   "cancelWeekly": [
     {
-      "week": "Jan 6",
-      "count": 5
+        "week": "Jan 5",
+        "count": 11
     },
     {
-      "week": "Jan 7",
-      "count": 3
+        "week": "Jan 12",
+        "count": 20
     },
     {
-      "week": "Jan 8",
-      "count": 2
+        "week": "Jan 19",
+        "count": 10
     },
     {
-      "week": "Jan 9",
-      "count": 1
+        "week": "Jan 26",
+        "count": 5
     },
     {
-      "week": "Jan 12",
-      "count": 11
+        "week": "Feb 2",
+        "count": 10
     },
     {
-      "week": "Jan 13",
-      "count": 9
+        "week": "Feb 9",
+        "count": 9
     },
     {
-      "week": "Jan 14",
-      "count": 2
+        "week": "Feb 16",
+        "count": 8
     },
     {
-      "week": "Jan 15",
-      "count": 4
+        "week": "Feb 23",
+        "count": 10
     },
     {
-      "week": "Jan 16",
-      "count": 2
-    },
-    {
-      "week": "Jan 19",
-      "count": 3
-    },
-    {
-      "week": "Jan 20",
-      "count": 2
-    },
-    {
-      "week": "Jan 21",
-      "count": 6
-    },
-    {
-      "week": "Jan 22",
-      "count": 2
-    },
-    {
-      "week": "Jan 23",
-      "count": 1
-    },
-    {
-      "week": "Jan 27",
-      "count": 1
-    },
-    {
-      "week": "Jan 28",
-      "count": 3
-    },
-    {
-      "week": "Jan 29",
-      "count": 1
-    },
-    {
-      "week": "Feb 2",
-      "count": 3
-    },
-    {
-      "week": "Feb 3",
-      "count": 2
-    },
-    {
-      "week": "Feb 4",
-      "count": 2
-    },
-    {
-      "week": "Feb 5",
-      "count": 3
-    },
-    {
-      "week": "Feb 6",
-      "count": 1
-    },
-    {
-      "week": "Feb 9",
-      "count": 1
-    },
-    {
-      "week": "Feb 10",
-      "count": 4
-    },
-    {
-      "week": "Feb 11",
-      "count": 2
-    },
-    {
-      "week": "Feb 12",
-      "count": 2
-    },
-    {
-      "week": "Feb 13",
-      "count": 1
-    },
-    {
-      "week": "Feb 16",
-      "count": 3
-    },
-    {
-      "week": "Feb 17",
-      "count": 1
-    },
-    {
-      "week": "Feb 18",
-      "count": 3
-    },
-    {
-      "week": "Feb 20",
-      "count": 1
-    },
-    {
-      "week": "Feb 22",
-      "count": 5
-    },
-    {
-      "week": "Feb 23",
-      "count": 6
-    },
-    {
-      "week": "Feb 24",
-      "count": 3
-    },
-    {
-      "week": "Feb 25",
-      "count": 3
-    },
-    {
-      "week": "Feb 26",
-      "count": 1
-    },
-    {
-      "week": "Feb 27",
-      "count": 1
-    },
-    {
-      "week": "Mar 2",
-      "count": 4
-    },
-    {
-      "week": "Mar 3",
-      "count": 7
-    },
-    {
-      "week": "Mar 4",
-      "count": 1
-    },
-    {
-      "week": "Mar 5",
-      "count": 2
+        "week": "Mar 2",
+        "count": 10
     }
-  ],
+],
   "upcomingWeekly": [
     {
       "week": "Mar 9",
@@ -10624,182 +10259,39 @@ const SAMPLE = {
   "actionDetails": {
     "undocumented": [
       {
-        "name": "Paul  McMenemy",
-        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/173860/subjects",
-        "study": "88545223PSA2001",
-        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/173860/subjects",
-        "coord": "Gabrijela Ateljevic",
-        "type": "Patient Cancelled",
-        "reason": "Patient cancelled due to work commitments. Tried two times to reach out and reschedule but no answer",
-        "cancel_date": "Feb 27",
-        "category": "No Response"
+            "name": "Darryl  Pringle",
+            "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
+            "study": "N1T-MC-MALO",
+            "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
+            "coord": "Aneesh Vaze",
+            "type": "Site Cancelled",
+            "reason": "Site cancelled. No reasons noted",
+            "cancel_date": "Jan 21",
+            "category": "Not Documented"
       },
       {
-        "name": "Kenneth  Heim",
-        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-        "study": "N1T-MC-MALO",
-        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-        "coord": "Vlado Draganic",
-        "type": "Patient Cancelled",
-        "reason": "Pt. called to cancel appt. due to unforeseen circumstances. He would like to talk with his PCP before rescheduling.",
-        "cancel_date": "Mar 4",
-        "category": "Rescheduled"
+            "name": "Veronica  Grant",
+            "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+            "study": "C4951063",
+            "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
+            "coord": "Jana Milankovic",
+            "type": "Patient Cancelled",
+            "reason": "no reason provided",
+            "cancel_date": "Jan 7",
+            "category": "Not Documented"
       },
       {
-        "name": "Lakeisha  Johnson",
-        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/86826/subjects",
-        "study": "M23-714",
-        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/86826/subjects",
-        "coord": "Ruby Pereira",
-        "type": "Patient Cancelled",
-        "reason": "Pt rescheduled for 3/31 at 2pm",
-        "cancel_date": "Mar 2",
-        "category": "Rescheduled"
-      },
-      {
-        "name": "Jacqueline  Rogers",
-        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/172395/subjects",
-        "study": "95597528ADM2001",
-        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/172395/subjects",
-        "coord": "Gabrijela Ateljevic",
-        "type": "Patient Cancelled",
-        "reason": "Pt cancelled, and said she will call to reschedule",
-        "cancel_date": "Feb 27",
-        "category": "Rescheduled"
-      },
-      {
-        "name": "Barbara E Green",
-        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/122602/subjects",
-        "study": "EFC17600 (ESTUARY)",
-        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/122602/subjects",
-        "coord": "Mario Castellanos",
-        "type": "Patient Cancelled",
-        "reason": "Rescheduled for March 25th at 10am",
-        "cancel_date": "Feb 26",
-        "category": "Rescheduled"
-      },
-      {
-        "name": "William  Birch",
-        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-        "study": "N1T-MC-MALO",
-        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-        "coord": "Vlado Draganic",
-        "type": "Patient Cancelled",
-        "reason": "Site cancelled - Fibroscan only",
-        "cancel_date": "Feb 25",
-        "category": "FibroScan Only"
-      },
-      {
-        "name": "Shana  Barreto",
-        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-        "study": "N1T-MC-MALO",
-        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-        "coord": "Angelina Mcmullen",
-        "type": "Site Cancelled",
-        "reason": "She was a screen fail at Visit 1",
-        "cancel_date": "Feb 13",
-        "category": "Screen Fail/DNQ"
-      },
-      {
-        "name": "Davia  Jones",
-        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/107641/subjects",
-        "study": "M20-465",
-        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/107641/subjects",
-        "coord": "Mario Castellanos",
-        "type": "Patient Cancelled",
-        "reason": "Discontinued",
-        "cancel_date": "Jan 28",
-        "category": "Discontinued"
-      },
-      {
-        "name": "Pamela Gallagher",
-        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/154462/subjects",
-        "study": "D7960C00015",
-        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/154462/subjects",
-        "coord": "Gabrijela Ateljevic",
-        "type": "Site Cancelled",
-        "reason": "She was rescheduled for today at 9:30, but she didn't show up. Study coordinator left voice mail and sent text message",
-        "cancel_date": "Jan 21",
-        "category": "No Show"
-      },
-      {
-        "name": "Darryl  Pringle",
-        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-        "study": "N1T-MC-MALO",
-        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-        "coord": "Aneesh Vaze",
-        "type": "Site Cancelled",
-        "reason": "Site cancelled. No reasons noted",
-        "cancel_date": "Jan 21",
-        "category": "Not Documented"
-      },
-      {
-        "name": "Cindy Oleck",
-        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-        "study": "N1T-MC-MALO",
-        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/clinical-research-philadelphia-pennington/study/167755/subjects",
-        "coord": "Automated System",
-        "type": "Site Cancelled",
-        "reason": "Cancelled due to exclusion criteria - She had a Adenocarcinoma in 2023 and it was metastasized",
-        "cancel_date": "Jan 16",
-        "category": "Screen Fail/DNQ"
-      },
-      {
-        "name": "Eloise  Browder",
-        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/60296/subjects",
-        "study": "J2A-MC-GZGS",
-        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/60296/subjects",
-        "coord": "Stacey Scott",
-        "type": "Site Cancelled",
-        "reason": "Completed",
-        "cancel_date": "Jun 16",
-        "category": "Completed"
-      },
-      {
-        "name": "Gregory  Danowsky",
-        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/60296/subjects",
-        "study": "J2A-MC-GZGS",
-        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/60296/subjects",
-        "coord": "Stacey Scott",
-        "type": "Site Cancelled",
-        "reason": "Completed",
-        "cancel_date": "Feb 4",
-        "category": "Completed"
-      },
-      {
-        "name": "Charles  Kelly",
-        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/60296/subjects",
-        "study": "J2A-MC-GZGS",
-        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/60296/subjects",
-        "coord": "Stacey Scott",
-        "type": "Site Cancelled",
-        "reason": "Completed",
-        "cancel_date": "Jan 28",
-        "category": "Completed"
-      },
-      {
-        "name": "Veronica  Grant",
-        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-        "study": "C4951063",
-        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/135648/subjects",
-        "coord": "Jana Milankovic",
-        "type": "Patient Cancelled",
-        "reason": "no reason provided",
-        "cancel_date": "Jan 7",
-        "category": "Not Documented"
-      },
-      {
-        "name": "Vivienne Van Nguyen",
-        "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/102540/subjects",
-        "study": "CDX0159-12",
-        "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/102540/subjects",
-        "coord": "Mario Castellanos",
-        "type": "Site Cancelled",
-        "reason": "nan",
-        "cancel_date": "Jan 6",
-        "category": "Not Documented"
+            "name": "Vivienne Van Nguyen",
+            "url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/102540/subjects",
+            "study": "CDX0159-12",
+            "study_url": "https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/102540/subjects",
+            "coord": "Mario Castellanos",
+            "type": "Site Cancelled",
+            "reason": "nan",
+            "cancel_date": "Jan 6",
+            "category": "Not Documented"
       }
-    ],
+],
     "protocol_updates": {},
     "screen_fail_groups": {
       "generic|MR-130A-01-TD-3001": {
@@ -12657,13 +12149,35 @@ function processLiveData(upcoming, cancels) {
       && isCoord(r['Full Name']);
   });
 
-  const recentCancels = cancels.filter(r => {
+  // Step 1: Basic date/study filter
+  const rawCancels = cancels.filter(r => {
     const d = parseDate(r['Cancel Date'] || r['Scheduled Date'] || r['snapshot_date']);
     return d && d >= twoMonthsAgo && d <= today
-      && !EXCLUDE_STUDIES.has(r['Study Name'])
-      && !FIBRO.test(r['Cancel Reason'] || '')
-      && !FIBRO.test(r['Appointment Cancellation Type'] || '');
+      && !EXCLUDE_STUDIES.has(r['Study Name']);
   });
+
+  // Step 2: Deduplicate (same patient + study + cancel date)
+  const seenCancels = new Set();
+  const dedupedCancels = rawCancels.filter(r => {
+    const key = ((r['Subject Full Name']||'').trim().toLowerCase()) + '|' +
+                ((r['Study Name']||'').trim().toLowerCase()) + '|' +
+                ((r['Cancel Date']||r['Scheduled Date']||'').trim());
+    if (seenCancels.has(key)) return false;
+    seenCancels.add(key);
+    return true;
+  });
+
+  // Step 3: Categorize and split into true cancellations vs excluded
+  const allCategorized = dedupedCancels.map(r => {
+    r._category = categorizeReason(r['Cancel Reason'], r['Appointment Cancellation Type']);
+    return r;
+  });
+
+  // recentCancels = only TRUE cancellations (excludes rescheduled, completed, admin error, fibroscan, study closed)
+  const recentCancels = allCategorized.filter(r => !EXCLUDED_CANCEL_CATS.has(r._category));
+
+  // Keep all categorized for the full allCancels detail view (including excluded categories, marked as such)
+  const allCategorizedForDetail = allCategorized;
 
   // ── Helpers ──
   function weekBucket(rows, dateField) {
@@ -12686,6 +12200,9 @@ function processLiveData(upcoming, cancels) {
 
   function categorizeReason(reason, apptType) {
     const r = (reason||'').toLowerCase(); const t = (apptType||'').toLowerCase();
+    if (/\bcompleted?\b/.test(r) && !/not completed|never completed/.test(r)) return 'Completed';
+    if (/fibroscan|fibrosan|fibro scan|scan only|scan visit/i.test(r) || /fibroscan|fibrosan|fibro scan|scan only|scan visit/i.test(t)) return 'FibroScan Only';
+    if (/discontinu/i.test(r)) return 'Discontinued';
     if (t === 'no show') return 'No Show';
     if (/screen.?fail|screenfail|dnq|does not qualify|not qualify|protocol criteria|excluded medication|autoimmune|bmi/.test(r)) return 'Screen Fail / DNQ';
     if (/reschedul|will call back|call back|reach out/.test(r) && !r.includes('no show')) return 'Rescheduled';
@@ -12697,6 +12214,9 @@ function processLiveData(upcoming, cancels) {
     if (!r || r === 'nan') return 'Not Documented';
     return 'Other';
   }
+
+  // Categories that should NOT count as true cancellations
+  const EXCLUDED_CANCEL_CATS = new Set(['Rescheduled','Completed','Admin Error','FibroScan Only','Study Closed']);
 
   // ── cancelByStudy with CRIO links ──
   const cancelStudyMap = {};
@@ -12849,10 +12369,10 @@ function processLiveData(upcoming, cancels) {
     if (date >= `${yy}-${mm}-01` && date <= `${yy}-${mm}-31`) coordGoals.byMonth[name]++;
   });
 
-  // ── cancelReasons ──
+  // ── cancelReasons (only true cancellations — excludes rescheduled, completed, admin error, fibroscan, study closed) ──
   const rb = {};
   recentCancels.forEach(r => {
-    const cat = categorizeReason(r['Cancel Reason'], r['Appointment Cancellation Type']);
+    const cat = r._category || categorizeReason(r['Cancel Reason'], r['Appointment Cancellation Type']);
     rb[cat] = (rb[cat]||0) + 1;
   });
   const cancelReasons = Object.entries(rb).map(([reason,count])=>({reason,count})).sort((a,b)=>b.count-a.count);
@@ -12875,6 +12395,7 @@ function processLiveData(upcoming, cancels) {
   // ── actionDetails from live CSV ──
   const sfGroups = {}, protoUpdates = {}, reschedPromises = [], noShowUnreach = [];
   const reschedNeeded = [], wdrRecoverable = [], wdrFinal = [], adminFixes = [];
+  const undocumentedList = [];
 
   const SF_CONCURRENT  = /enrolled in|concurrent|other (study|trial)/i;
   const SF_MED         = /excluded medication|on an excluded/i;
@@ -12891,15 +12412,29 @@ function processLiveData(upcoming, cancels) {
 
   function sfKey(sub, study) { return sub + '|' + study; }
 
-  recentCancels.forEach(r => {
+  // Use allCategorizedForDetail for actionDetails (includes all categories for routing)
+  allCategorizedForDetail.forEach(r => {
     const reason = r['Cancel Reason']||'', atype = r['Appointment Cancellation Type']||'';
     const patient = (r['Subject Full Name']||'').trim(), study = (r['Study Name']||'').split(' - ').pop();
     const pu = patientUrl(r['Study Key'], r['Subject Key (Back End)'], r['Site Name']);
     const su = studyUrl(r['Study Key'], r['Site Name']);
-    const row = {patient, study, url: pu, study_url: su, reason: reason.substring(0,80)};
+    const coord = cleanCoord(r['Staff Full Name']||r['Full Name']||'');
+    const cancelDate = (() => { try { const d=new Date(r['Cancel Date']); return d.toLocaleDateString('en-US',{month:'short',day:'numeric'}); } catch(e) { return ''; } })();
+    const row = {patient, study, url: pu, study_url: su, reason: reason.substring(0,80), coord, cancel_date: cancelDate};
+    const cat = r._category;
 
-    if (STUDY_CLOSE.test(reason)) return;
-    if (FIBRO_PAT.test(reason) || FIBRO_PAT.test(atype)) return;
+    // Skip excluded categories from action routing (they're not real cancellations)
+    if (cat === 'Completed' || cat === 'FibroScan Only' || cat === 'Study Closed' || cat === 'Admin Error') return;
+    // Rescheduled: route to reschedule promises for follow-up only
+    if (cat === 'Rescheduled') {
+      reschedPromises.push({...row, still_upcoming: false});
+      return;
+    }
+
+    // Truly undocumented: no reason at all
+    if (cat === 'Not Documented') {
+      undocumentedList.push({name:patient, url:pu, study, study_url:su, coord, type:atype, reason:reason||'', cancel_date:cancelDate, category:'Not Documented'});
+    }
 
     if (SF_PROTOCOL.test(reason)) {
       if (!protoUpdates[study]) protoUpdates[study] = {patients:[],study_url:su};
@@ -12934,6 +12469,7 @@ function processLiveData(upcoming, cancels) {
   });
 
   const actionDetails = {
+    undocumented: undocumentedList,
     screen_fail_groups: sfGroups,
     protocol_updates: protoUpdates,
     open_reschedule_promises: reschedPromises,
@@ -13004,6 +12540,7 @@ function processLiveData(upcoming, cancels) {
       coord: r['Staff Full Name']||'',
       type: r['Appointment Cancellation Type']||'',
       reason: r['Cancel Reason']||'',
+      category: r._category || categorizeReason(r['Cancel Reason'], r['Appointment Cancellation Type']),
       cancel_date: (() => { try { const d=new Date(r['Cancel Date']);return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});}catch(e){return '';}})()
     })),
   };
@@ -14269,6 +13806,14 @@ document.addEventListener('DOMContentLoaded', () => {
     <div class="group-title"><span class="gt-icon" style="background:#F59E0B"></span> Revenue Impact of Cancellations</div>
     <div class="panel-body" id="ins-cancel-revenue" style="padding:12px">
       <div style="color:#718096;font-size:13px;padding:12px">Loading...</div>
+    </div>
+  </div>
+
+  <!-- Cancellation Root Cause Playbook -->
+  <div class="group-panel" style="margin-bottom:18px">
+    <div class="group-title"><span class="gt-icon" style="background:#7C3AED"></span> Cancellation Root Cause Playbook</div>
+    <div class="panel-body" id="ins-cancel-playbook" style="padding:16px">
+      <div style="color:#718096;font-size:13px">Loading playbook...</div>
     </div>
   </div>
 
