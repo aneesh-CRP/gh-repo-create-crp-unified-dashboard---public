@@ -802,6 +802,39 @@ body {
     </div>
   </div>
 
+  <!-- Recruitment Pipeline KPIs (cross-source) -->
+  <div class="time-banner fade-in" style="margin-bottom:16px;background:linear-gradient(135deg,#f0f4fa 0%,#e8eeff 100%);" id="recruitment-kpi-banner">
+    <div class="tb-section">
+      <div class="tb-label">📥 Active Referrals</div>
+      <div class="tb-value blue" id="ov-kpi-refs" style="cursor:pointer" onclick="switchTab('referrals',document.querySelector('.nav-tab[onclick*=referrals]'))">—</div>
+      <div class="tb-sub">In referral pipeline</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section">
+      <div class="tb-label">🏥 Med Records Active</div>
+      <div class="tb-value" style="color:#8b5cf6" id="ov-kpi-medrec">—</div>
+      <div class="tb-sub">Patients in records pipeline</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section">
+      <div class="tb-label">📱 FB Leads (30d)</div>
+      <div class="tb-value" style="color:#3b82f6" id="ov-kpi-fb">—</div>
+      <div class="tb-sub">New Meta/Facebook leads</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section">
+      <div class="tb-label">📢 Marketing Tasks</div>
+      <div class="tb-value" style="color:#f59e0b" id="ov-kpi-mktg">—</div>
+      <div class="tb-sub">Active campaigns &amp; tasks</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section">
+      <div class="tb-label">🎯 Lead→Enrolled</div>
+      <div class="tb-value" style="color:#059669" id="ov-kpi-conv">—</div>
+      <div class="tb-sub">Referral conversion rate</div>
+    </div>
+  </div>
+
   <!-- Row 2: Trend Charts -->
   <div class="grid-2 fade-in">
     <div class="card">
@@ -904,6 +937,8 @@ body {
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;" onclick="sortMergedTable(this,7)">SF Rate ↕</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Site</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Pipeline</th>
+            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Med Rec</th>
+            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Leads</th>
           </tr>
         </thead>
         <tbody id="merged-study-tbody"></tbody>
@@ -1918,6 +1953,17 @@ body {
     </div>
   </div>
 
+  <!-- Medical Records Follow-Up (cross-source alerts) -->
+  <div class="card fade-in" style="margin-bottom:16px;">
+    <div class="card-header">
+      <span class="card-title">🏥 Medical Records Follow-Up Required</span>
+      <span class="badge badge-purple" id="medrec-alerts-badge">Loading...</span>
+    </div>
+    <div id="medrec-alerts-content" style="max-height:300px;overflow-y:auto;">
+      <div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">Loading medical records alerts...</div>
+    </div>
+  </div>
+
   <div class="section-title">📋 Prioritized Action Plan</div>
   <div class="grid-2">
     <div>
@@ -2074,6 +2120,17 @@ body {
       </div>
       <div style="padding:0;" id="ref-tracker-detail">
         <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Loading tracker data...</div>
+      </div>
+    </div>
+
+    <!-- Patient Journey Funnel (cross-source) -->
+    <div class="card fade-in" style="margin-bottom:16px;">
+      <div class="card-header">
+        <span class="card-title">🎯 Patient Journey Funnel — Lead to Enrollment</span>
+        <span class="badge badge-purple" id="ref-journey-badge">Cross-source</span>
+      </div>
+      <div style="padding:16px;" id="ref-journey-funnel">
+        <div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">Loading cross-source data...</div>
       </div>
     </div>
 
@@ -2567,8 +2624,8 @@ const CRP_CONFIG = {
   },
 
   // Version
-  VERSION: '2.8.0',
-  BUILD_DATE: '2026-03-10T18:00:00Z',
+  VERSION: '2.9.0',
+  BUILD_DATE: '2026-03-10T22:00:00Z',
 };
 
 // ═══ EVENT BUS (for plugin extensibility) ═══
@@ -11422,11 +11479,27 @@ function buildUpcomingDetailTable(rows) {
     const patientCell = r.patient_url
       ? `<a href="${r.patient_url}" target="_blank" rel="noopener" style="text-decoration:none;color:var(--navy);font-weight:600;">${r.patient}${extIcon}</a>`
       : `<strong>${r.patient}</strong>`;
+    // Med records context dot
+    const isMaintenance = (r.visit||'').toLowerCase().includes('maintenance') || (r.visit||'').toLowerCase().includes('follow');
+    let medDot = '';
+    if (!isMaintenance && typeof MED_RECORDS_DATA !== 'undefined' && MED_RECORDS_DATA.length > 0) {
+      const pName = (r.patient||'').toLowerCase().trim();
+      const medMatch = MED_RECORDS_DATA.find(m => m.name.toLowerCase().trim() === pName);
+      if (medMatch) {
+        if (medMatch.records_received === 'Yes' || medMatch.status === 'Enrolled' || medMatch.status === 'Complete') {
+          medDot = '<span title="Records complete" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#059669;margin-left:5px;vertical-align:middle;"></span>';
+        } else {
+          medDot = '<span title="Records pending" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#f59e0b;margin-left:5px;vertical-align:middle;"></span>';
+        }
+      } else {
+        medDot = '<span title="No med records entry" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#dc2626;margin-left:5px;vertical-align:middle;"></span>';
+      }
+    }
     return `<tr>
       <td style="font-weight:600;color:var(--blue);white-space:nowrap">${r.date}</td>
       <td>${studyCell}</td>
       <td style="color:var(--muted);font-size:11px">${r.visit}</td>
-      <td>${patientCell}</td>
+      <td>${patientCell}${medDot}</td>
       <td><span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:${sc}20;color:${sc}">${r.status}</span></td>
       <td style="font-size:11px">${r.coord}</td>
       <td><span style="font-size:9px;font-weight:700;padding:2px 5px;border-radius:3px;background:${siteColor}20;color:${siteColor}">${siteShort}</span></td>
@@ -11835,6 +11908,42 @@ function buildInsights() {
     });
   }
 
+  // Cross-source: referrals without med records
+  var refsNoMR = findReferralsWithoutMedRecords();
+  if (refsNoMR.length > 0) {
+    flagItems.push({
+      urgent: false,
+      html: `<div class="insight-item warning"><span class="insight-icon">📋</span><div>
+        <div class="insight-title">${refsNoMR.length} active referrals have no medical records entry</div>
+        <div class="insight-desc">Create medical records entries for these referrals to track their intake progress</div>
+      </div></div>`
+    });
+  }
+
+  // Cross-source: ready to schedule but no visit
+  var readyNV = findReadyNoVisit();
+  if (readyNV.length > 0) {
+    flagItems.push({
+      urgent: readyNV.length >= 3,
+      html: `<div class="insight-item ${readyNV.length >= 3 ? 'danger' : 'warning'}"><span class="insight-icon">📅</span><div>
+        <div class="insight-title">${readyNV.length} patient${readyNV.length>1?'s':''} ready to schedule but no upcoming visit</div>
+        <div class="insight-desc">${readyNV.slice(0,3).map(r => r.name).join(', ')}${readyNV.length>3 ? ' +' + (readyNV.length-3) + ' more' : ''} — schedule appointments now</div>
+      </div></div>`
+    });
+  }
+
+  // Cross-source: stale referrals
+  var staleRefs = REFERRAL_DATA ? REFERRAL_DATA.filter(function(r) { return !r.is_closed && r.days_since_update >= 14; }).length : 0;
+  if (staleRefs > 0) {
+    flagItems.push({
+      urgent: false,
+      html: `<div class="insight-item warning"><span class="insight-icon">⏰</span><div>
+        <div class="insight-title">${staleRefs} referrals stale for 14+ days</div>
+        <div class="insight-desc">Review and update stale leads in the referral pipeline to prevent drop-off</div>
+      </div></div>`
+    });
+  }
+
   // Sort urgent first
   flagItems.sort((a, b) => (b.urgent ? 1 : 0) - (a.urgent ? 1 : 0));
   flagEl.innerHTML = flagItems.length > 0 ? flagItems.map(f => f.html).join('') :
@@ -11872,6 +11981,34 @@ function buildInsights() {
       <div class="insight-desc">Strong retention and scheduling momentum</div>
     </div></div>`);
   });
+
+  // Cross-source: referral pipeline enrolled
+  var enrolledRefs = REFERRAL_DATA ? REFERRAL_DATA.filter(function(r){ return r.stage === 'Enrolled' || r.stage === 'Screened'; }).length : 0;
+  if (enrolledRefs > 0) {
+    posItems.push(`<div class="insight-item positive"><span class="insight-icon">🎯</span><div>
+      <div class="insight-title">${enrolledRefs} patients enrolled via referral pipeline</div>
+      <div class="insight-desc">From ${REFERRAL_DATA.length} total referrals — ${REFERRAL_DATA.length > 0 ? Math.round(enrolledRefs/REFERRAL_DATA.length*100) : 0}% conversion rate</div>
+    </div></div>`);
+  }
+
+  // Cross-source: medical records flowing
+  var medActive = MED_RECORDS_DATA ? MED_RECORDS_DATA.filter(function(r){ return r.is_active; }).length : 0;
+  if (medActive > 0) {
+    posItems.push(`<div class="insight-item positive"><span class="insight-icon">🏥</span><div>
+      <div class="insight-title">${medActive} patients active in medical records pipeline</div>
+      <div class="insight-desc">Across ${MED_RECORDS_DATA.reduce(function(s,r){ s.add(r.study); return s; }, new Set()).size} studies — records intake tracking active</div>
+    </div></div>`);
+  }
+
+  // Cross-source: marketing activity
+  var mktgActive = MARKETING_DATA ? MARKETING_DATA.length : 0;
+  var campActive = CAMPAIGN_DATA ? CAMPAIGN_DATA.filter(function(c){ return c.first_contact > 0; }).length : 0;
+  if (campActive > 0) {
+    posItems.push(`<div class="insight-item positive"><span class="insight-icon">📣</span><div>
+      <div class="insight-title">${campActive} active campaigns driving referrals</div>
+      <div class="insight-desc">${mktgActive > 0 ? mktgActive + ' marketing tasks in progress · ' : ''}${FB_CRM_DATA.length > 0 ? FB_CRM_DATA.length + ' FB leads captured' : ''}</div>
+    </div></div>`);
+  }
 
   posEl.innerHTML = posItems.length > 0 ? posItems.join('') :
     '<div class="insight-item"><span class="insight-icon">📊</span><div><div class="insight-title">Connect live data to see trend insights</div></div></div>';
@@ -13441,6 +13578,100 @@ function safe(fn, name) {
   }
 }
 
+// ══════════════════════════════════════════════════════════════
+// CROSS-SOURCE: OVERVIEW RECRUITMENT KPIs
+// ══════════════════════════════════════════════════════════════
+function buildRecruitmentKPIs() {
+  var el = function(id) { return document.getElementById(id); };
+  // Active referrals
+  var activeRefs = REFERRAL_DATA ? REFERRAL_DATA.filter(function(r){ return !r.is_closed; }).length : 0;
+  if (el('ov-kpi-refs')) el('ov-kpi-refs').textContent = activeRefs || '—';
+  // Med records active
+  var medActive = MED_RECORDS_DATA ? MED_RECORDS_DATA.filter(function(r){ return r.is_active; }).length : 0;
+  if (el('ov-kpi-medrec')) el('ov-kpi-medrec').textContent = medActive || '—';
+  // FB leads (30 days)
+  var now = Date.now();
+  var fbRecent = FB_CRM_DATA ? FB_CRM_DATA.filter(function(f) {
+    var d = f['Date Created'] || '';
+    if (!d) return false;
+    try { return (now - new Date(d).getTime()) < 30 * 86400000; } catch(e) { return false; }
+  }).length : 0;
+  if (el('ov-kpi-fb')) el('ov-kpi-fb').textContent = fbRecent || '—';
+  // Marketing tasks
+  var mktgCount = MARKETING_DATA ? MARKETING_DATA.length : 0;
+  if (el('ov-kpi-mktg')) el('ov-kpi-mktg').textContent = mktgCount || '—';
+  // Conversion rate
+  var totalRefs = REFERRAL_DATA ? REFERRAL_DATA.length : 0;
+  var enrolledRefs = REFERRAL_DATA ? REFERRAL_DATA.filter(function(r){ return r.stage === 'Enrolled' || r.stage === 'Screened'; }).length : 0;
+  var convRate = totalRefs > 0 ? Math.round(enrolledRefs / totalRefs * 100) + '%' : '—';
+  if (el('ov-kpi-conv')) el('ov-kpi-conv').textContent = convRate;
+}
+
+// ══════════════════════════════════════════════════════════════
+// CROSS-SOURCE: MEDICAL RECORDS ALERTS (Actions Tab)
+// ══════════════════════════════════════════════════════════════
+function buildMedRecAlerts() {
+  var container = document.getElementById('medrec-alerts-content');
+  if (!container) return;
+  if (!MED_RECORDS_DATA || MED_RECORDS_DATA.length === 0) {
+    container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">Connect ClickUp to see medical records alerts</div>';
+    return;
+  }
+
+  var alerts = [];
+
+  // 1. Patients in screening with records NOT received
+  MED_RECORDS_DATA.filter(function(r) {
+    return r.status === 'In Screening' && r.records_received !== 'Yes';
+  }).forEach(function(r) {
+    alerts.push({ priority: 1, icon: '🔴', title: r.name + ' — records not received', desc: r.study + ' · In Screening · Medical records need follow-up', url: r.url });
+  });
+
+  // 2. Ready to Schedule but no upcoming visit
+  var readyNoVisit = findReadyNoVisit();
+  readyNoVisit.forEach(function(r) {
+    alerts.push({ priority: 2, icon: '🟡', title: r.name + ' — ready but no visit scheduled', desc: r.study + ' · Ready to Schedule · Needs appointment', url: r.url });
+  });
+
+  // 3. Pending investigator approval
+  MED_RECORDS_DATA.filter(function(r) {
+    return r.is_active && r.investigator_approval && r.investigator_approval !== 'Approved' && r.investigator_approval !== '';
+  }).forEach(function(r) {
+    alerts.push({ priority: 3, icon: '🟠', title: r.name + ' — pending investigator approval', desc: r.study + ' · ' + r.investigator_approval + ' · Follow up with PI', url: r.url });
+  });
+
+  // 4. Referrals with no medical records entry
+  var refsNoMedRec = findReferralsWithoutMedRecords();
+  if (refsNoMedRec.length > 0) {
+    alerts.push({ priority: 4, icon: '📋', title: refsNoMedRec.length + ' referrals have no medical records entry', desc: 'Active referrals not yet in the medical records system — create entries', url: '' });
+  }
+
+  alerts.sort(function(a,b){ return a.priority - b.priority; });
+
+  var badge = document.getElementById('medrec-alerts-badge');
+  if (badge) badge.textContent = alerts.length > 0 ? alerts.length + ' items' : '✓ Clear';
+
+  if (alerts.length === 0) {
+    container.innerHTML = '<div style="text-align:center;padding:20px;color:#059669;font-size:13px;">✅ No medical records follow-ups needed</div>';
+    return;
+  }
+
+  var html = '';
+  alerts.slice(0, 20).forEach(function(a) {
+    html += '<div style="display:flex;gap:10px;align-items:flex-start;padding:10px 16px;border-bottom:1px solid #f1f5f9;">';
+    html += '<span style="font-size:14px;flex-shrink:0;margin-top:2px;">' + a.icon + '</span>';
+    html += '<div style="flex:1;">';
+    if (a.url) {
+      html += '<div style="font-size:12px;font-weight:600;color:#1e293b;"><a href="' + a.url + '" target="_blank" style="color:#1e293b;text-decoration:none;">' + a.title + '</a></div>';
+    } else {
+      html += '<div style="font-size:12px;font-weight:600;color:#1e293b;">' + a.title + '</div>';
+    }
+    html += '<div style="font-size:11px;color:#64748b;">' + a.desc + '</div>';
+    html += '</div></div>';
+  });
+  container.innerHTML = html;
+}
+
 function renderAll() {
   document.getElementById('kpi-cancels').textContent  = DATA.cancelTotal  || 0;
   document.getElementById('kpi-upcoming').textContent = DATA.upcomingTotal || 0;
@@ -13461,6 +13692,8 @@ function renderAll() {
   safe(renderCoordinatorGoals, 'renderCoordinatorGoals');
   safe(buildActionSteps,     'buildActionSteps');
   safe(buildInsights,        'buildInsights');
+  safe(buildRecruitmentKPIs, 'buildRecruitmentKPIs');
+  safe(buildMedRecAlerts,    'buildMedRecAlerts');
   // Note: buildRiskTable/buildStudyCards removed — Studies tab now uses buildStudiesView (lazy-loaded on tab click)
   if (typeof buildRiskFlagCards === 'function')     safe(buildRiskFlagCards,     'buildRiskFlagCards');
   // Pre-build schedule so it's ready when tab is clicked
@@ -13669,7 +13902,195 @@ function showStudyDetail(studyName, studyUrl) {
   openModal(studyName, (cancels?cancels.count+' cancels · ':'') + upcoming.length+' upcoming', body);
 }
 
+/* ── Unified Study Drill-Down Modal ────────────────────── */
+function showStudyUnifiedModal(studyName) {
+  var sectionStyle = 'font-size:12px;font-weight:700;color:#475569;margin:16px 0 8px 0;text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid #e2e8f0;padding-bottom:4px;';
+  var body = '';
 
+  /* 1 — Enrollment & Visits (from CRIO DATA) */
+  var cancels = (DATA.cancelByStudy||[]).find(function(s){ return s.name===studyName||s.full===studyName; });
+  var upcoming = (DATA.allVisitDetail||[]).filter(function(r){ return r.study===studyName; });
+  var allCancelRows = (DATA.allCancels||[]).filter(function(r){ return r.study===studyName; });
+  var riskEntry = (DATA.riskMatrix||[]).find(function(r){ return r.study===studyName; });
+
+  body += '<h4 style="' + sectionStyle + '">📆 Enrollment & Visits</h4>';
+  if (riskEntry) {
+    var pct = riskEntry.target > 0 ? Math.round(riskEntry.enrolled / riskEntry.target * 100) : 0;
+    body += '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;">';
+    body += '<div style="font-size:11px;"><strong>Enrolled:</strong> ' + riskEntry.enrolled + (riskEntry.target > 0 ? '/' + riskEntry.target + ' (' + pct + '%)' : '') + '</div>';
+    body += '<div style="font-size:11px;"><strong>Screening:</strong> ' + (riskEntry.screening||0) + '</div>';
+    body += '<div style="font-size:11px;"><strong>Screen Fail:</strong> ' + (riskEntry.screen_fail_pct||0) + '%</div>';
+    body += '<div style="font-size:11px;"><strong>Upcoming:</strong> ' + upcoming.length + '</div>';
+    body += '<div style="font-size:11px;"><strong>Cancels:</strong> ' + (cancels?cancels.count:0) + '</div>';
+    body += '</div>';
+  }
+  if (upcoming.length) {
+    body += '<table class="detail-table" style="margin-bottom:12px;"><thead><tr><th>Date</th><th>Patient</th><th>Visit</th><th>Status</th><th>Coordinator</th></tr></thead><tbody>';
+    upcoming.slice(0,10).forEach(function(r) {
+      body += '<tr><td style="font-weight:600;color:#1843ad">' + r.date + '</td>';
+      body += '<td>' + extLink(r.patient, r.patient_url) + '</td>';
+      body += '<td style="font-size:11px;color:#64748b">' + r.visit + '</td>';
+      body += '<td>' + statusBadge(r.status) + '</td>';
+      body += '<td style="font-size:11px">' + r.coord + '</td></tr>';
+    });
+    body += '</tbody></table>';
+    if (upcoming.length > 10) body += '<div style="font-size:10px;color:#94a3b8;margin-bottom:8px;">+' + (upcoming.length - 10) + ' more visits</div>';
+  }
+  if (allCancelRows.length) {
+    body += '<details style="margin-bottom:12px;"><summary style="font-size:11px;cursor:pointer;color:#dc2626;font-weight:600;">' + allCancelRows.length + ' Recent Cancellations</summary>';
+    body += '<table class="detail-table" style="margin-top:6px;"><thead><tr><th>Patient</th><th>Type</th><th>Date</th><th>Reason</th></tr></thead><tbody>';
+    allCancelRows.slice(0,10).forEach(function(r) {
+      body += '<tr><td>' + extLink(r.name, r.url) + '</td><td>' + typeBadge2(r.type) + '</td>';
+      body += '<td style="font-size:11px;color:#64748b">' + (r.cancel_date||'—') + '</td>';
+      body += '<td style="font-size:11px;color:#64748b;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + (r.reason||'').replace(/"/g,"'") + '">' + (r.reason||'—') + '</td></tr>';
+    });
+    body += '</tbody></table></details>';
+  }
+
+  /* 2 — Referral Pipeline (from REFERRAL_DATA) */
+  var refs = REFERRAL_DATA.filter(function(r) { return matchesStudy(r.study, studyName); });
+  if (refs.length > 0) {
+    body += '<h4 style="' + sectionStyle + '">🔄 Referral Pipeline (' + refs.length + ')</h4>';
+    var stages = {};
+    refs.forEach(function(r) { var s = r.stage || 'Unknown'; stages[s] = (stages[s]||0) + 1; });
+    body += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">';
+    var stageColors = {'New Lead':'#94a3b8','Contacted':'#3b82f6','Pre-Screening':'#8b5cf6','Screening':'#d97706','Screened':'#06b6d4','Enrolled':'#059669','DNQ':'#dc2626','Screen Fail':'#ef4444','Lost':'#6b7280'};
+    Object.keys(stages).forEach(function(stage) {
+      var sc = stageColors[stage] || '#94a3b8';
+      body += '<span style="font-size:10px;padding:3px 8px;border-radius:4px;background:' + sc + '20;color:' + sc + ';font-weight:600;">' + stage + ': ' + stages[stage] + '</span>';
+    });
+    body += '</div>';
+    var activeRefs = refs.filter(function(r) { return !r.is_closed; });
+    if (activeRefs.length > 0) {
+      body += '<table class="detail-table" style="margin-bottom:12px;"><thead><tr><th>Patient</th><th>Stage</th><th>Source</th><th>Days</th></tr></thead><tbody>';
+      activeRefs.slice(0,8).forEach(function(r) {
+        var sc = stageColors[r.stage] || '#94a3b8';
+        body += '<tr><td><a href="' + r.url + '" target="_blank" style="color:#1e293b;text-decoration:none;font-weight:600;">' + r.name + '</a></td>';
+        body += '<td><span style="font-size:10px;padding:2px 6px;border-radius:4px;background:' + sc + '20;color:' + sc + ';font-weight:600;">' + r.stage + '</span></td>';
+        body += '<td style="font-size:11px;color:#64748b">' + (r.source||'—') + '</td>';
+        body += '<td style="font-size:11px;color:' + (r.days_since_update > 14 ? '#dc2626' : '#64748b') + ';">' + (r.days_since_update||'—') + 'd</td></tr>';
+      });
+      body += '</tbody></table>';
+      if (activeRefs.length > 8) body += '<div style="font-size:10px;color:#94a3b8;margin-bottom:8px;">+' + (activeRefs.length - 8) + ' more active referrals</div>';
+    }
+  }
+
+  /* 3 — Medical Records (from MED_RECORDS_DATA) */
+  var medRec = getStudyMedRecords(studyName);
+  if (medRec && medRec.total > 0) {
+    body += '<h4 style="' + sectionStyle + '">🏥 Medical Records (' + medRec.total + ')</h4>';
+    body += '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px;">';
+    body += '<div style="font-size:11px;"><span style="color:#8b5cf6;font-weight:700;">' + medRec.active + '</span> active</div>';
+    body += '<div style="font-size:11px;"><span style="color:#059669;font-weight:700;">' + medRec.enrolled + '</span> enrolled</div>';
+    body += '<div style="font-size:11px;"><span style="color:#d97706;font-weight:700;">' + medRec.screening + '</span> screening</div>';
+    body += '<div style="font-size:11px;"><span style="color:#f59e0b;font-weight:700;">' + medRec.readySched + '</span> ready to schedule</div>';
+    if (medRec.dnq > 0) body += '<div style="font-size:11px;"><span style="color:#dc2626;font-weight:700;">' + medRec.dnq + '</span> DNQ</div>';
+    body += '</div>';
+    if (medRec.patients && medRec.patients.length > 0) {
+      var activePatients = medRec.patients.filter(function(p){ return p.is_active; });
+      if (activePatients.length > 0) {
+        body += '<table class="detail-table" style="margin-bottom:12px;"><thead><tr><th>Patient</th><th>Status</th><th>Records</th><th>Approval</th></tr></thead><tbody>';
+        activePatients.slice(0,8).forEach(function(p) {
+          var statusColors = {'Enrolled':'#059669','In Screening':'#8b5cf6','Visit Scheduled':'#06b6d4','Ready to Schedule':'#f59e0b','Pending Release':'#94a3b8','Under Review':'#64748b'};
+          var sc = statusColors[p.status] || '#94a3b8';
+          var recBadge = p.records_received === 'Yes' ? '<span style="color:#059669;font-weight:700;">✓</span>' : '<span style="color:#dc2626;">✗</span>';
+          var appBadge = p.investigator_approval === 'Approved' ? '<span style="color:#059669;">✓</span>' : (p.investigator_approval ? '<span style="color:#f59e0b;">' + p.investigator_approval + '</span>' : '—');
+          body += '<tr><td><a href="' + p.url + '" target="_blank" style="color:#1e293b;text-decoration:none;font-weight:600;">' + p.name + '</a></td>';
+          body += '<td><span style="font-size:10px;padding:2px 6px;border-radius:4px;background:' + sc + '22;color:' + sc + ';font-weight:600;">' + p.status + '</span></td>';
+          body += '<td style="text-align:center;">' + recBadge + '</td>';
+          body += '<td style="text-align:center;">' + appBadge + '</td></tr>';
+        });
+        body += '</tbody></table>';
+        if (activePatients.length > 8) body += '<div style="font-size:10px;color:#94a3b8;margin-bottom:8px;">+' + (activePatients.length - 8) + ' more active patients</div>';
+      }
+    }
+  }
+
+  /* 4 — Campaign Activity (from CAMPAIGN_DATA) */
+  var campaigns = CAMPAIGN_DATA.filter(function(c) { return matchesStudy(c.study||c.campaign, studyName); });
+  if (campaigns.length > 0) {
+    var totalContacts = campaigns.reduce(function(sum, c) { return sum + (c.contacts||0); }, 0);
+    var totalConversions = campaigns.reduce(function(sum, c) { return sum + (c.conversions||0); }, 0);
+    body += '<h4 style="' + sectionStyle + '">📊 Campaign Activity (' + campaigns.length + ' campaigns)</h4>';
+    body += '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px;">';
+    body += '<div style="font-size:11px;"><strong>Contacts:</strong> ' + totalContacts + '</div>';
+    body += '<div style="font-size:11px;"><strong>Conversions:</strong> ' + totalConversions + '</div>';
+    body += '<div style="font-size:11px;"><strong>Rate:</strong> ' + (totalContacts > 0 ? Math.round(totalConversions / totalContacts * 100) : 0) + '%</div>';
+    body += '</div>';
+  }
+
+  /* 5 — FB/Meta Leads (from FB_CRM_DATA) */
+  var fbData = getStudyFBLeads(studyName);
+  if (fbData.count > 0) {
+    body += '<h4 style="' + sectionStyle + '">📱 Facebook/Meta Leads (' + fbData.count + ')</h4>';
+    if (fbData.recent > 0) body += '<div style="font-size:11px;margin-bottom:6px;color:#3b82f6;font-weight:600;">' + fbData.recent + ' new leads in last 30 days</div>';
+    if (fbData.leads && fbData.leads.length > 0) {
+      body += '<table class="detail-table" style="margin-bottom:12px;"><thead><tr><th>Name</th><th>Phone</th><th>Created</th></tr></thead><tbody>';
+      fbData.leads.slice(0,6).forEach(function(l) {
+        body += '<tr><td style="font-weight:600;">' + (l.name||'—') + '</td>';
+        body += '<td style="font-size:11px;color:#64748b">' + (l.phone||'—') + '</td>';
+        body += '<td style="font-size:11px;color:#64748b">' + (l.created||'—') + '</td></tr>';
+      });
+      body += '</tbody></table>';
+      if (fbData.leads.length > 6) body += '<div style="font-size:10px;color:#94a3b8;margin-bottom:8px;">+' + (fbData.leads.length - 6) + ' more leads</div>';
+    }
+  }
+
+  /* 6 — Marketing Tasks (from MARKETING_DATA) */
+  var mktg = getStudyMarketingTasks(studyName);
+  if (mktg.count > 0) {
+    body += '<h4 style="' + sectionStyle + '">📣 Marketing Tasks (' + mktg.count + ')</h4>';
+    body += '<table class="detail-table" style="margin-bottom:12px;"><thead><tr><th>Task</th><th>Status</th><th>Due</th></tr></thead><tbody>';
+    mktg.tasks.slice(0,6).forEach(function(t) {
+      body += '<tr><td><a href="' + (t.url||'#') + '" target="_blank" style="color:#1e293b;text-decoration:none;font-weight:600;">' + t.name + '</a></td>';
+      body += '<td style="font-size:11px;color:#64748b">' + (t.status||'—') + '</td>';
+      body += '<td style="font-size:11px;color:#64748b">' + (t.due_date||'—') + '</td></tr>';
+    });
+    body += '</tbody></table>';
+  }
+
+  /* 7 — Integration Alerts (cross-source flags) */
+  var alerts = [];
+  if (refs.length > 0 && medRec) {
+    var refsNoMed = refs.filter(function(r) {
+      if (r.is_closed) return false;
+      return !MED_RECORDS_DATA.some(function(m) {
+        return matchesStudy(m.study, studyName) && m.name.toLowerCase().trim() === r.name.toLowerCase().trim();
+      });
+    });
+    if (refsNoMed.length > 0) alerts.push({icon: '⚠️', text: refsNoMed.length + ' referral(s) with no medical records entry', color: '#d97706'});
+  }
+  if (medRec && medRec.readySched > 0) {
+    var readyNoVisit = MED_RECORDS_DATA.filter(function(m) {
+      return matchesStudy(m.study, studyName) && m.status === 'Ready to Schedule';
+    }).filter(function(m) {
+      return !(DATA.allVisitDetail||[]).some(function(v) {
+        return v.patient.toLowerCase().trim() === m.name.toLowerCase().trim();
+      });
+    });
+    if (readyNoVisit.length > 0) alerts.push({icon: '🔔', text: readyNoVisit.length + ' patient(s) ready to schedule but no upcoming visit', color: '#dc2626'});
+  }
+  if (medRec) {
+    var pendingApproval = MED_RECORDS_DATA.filter(function(m) {
+      return matchesStudy(m.study, studyName) && m.is_active && m.investigator_approval && m.investigator_approval !== 'Approved';
+    });
+    if (pendingApproval.length > 0) alerts.push({icon: '📋', text: pendingApproval.length + ' patient(s) pending investigator approval', color: '#f59e0b'});
+  }
+  if (alerts.length > 0) {
+    body += '<h4 style="' + sectionStyle + '">🚨 Integration Alerts</h4>';
+    alerts.forEach(function(a) {
+      body += '<div style="font-size:11px;padding:6px 10px;margin-bottom:4px;border-radius:6px;background:' + a.color + '12;border-left:3px solid ' + a.color + ';color:' + a.color + ';">' + a.icon + ' ' + a.text + '</div>';
+    });
+  }
+
+  if (!body) body = '<p style="color:#94a3b8;padding:20px;text-align:center">No data available for this study across any source.</p>';
+
+  var subtitle = '';
+  if (riskEntry) subtitle += (riskEntry.enroll_status||'') + ' · ';
+  subtitle += upcoming.length + ' upcoming · ' + refs.length + ' referrals · ' + (medRec ? medRec.total : 0) + ' med records';
+
+  openModal('🔬 ' + studyName, subtitle, body);
+}
 
 function showCancelsByReason(reason) {
   showCancels(
@@ -14144,6 +14565,75 @@ function renderReferralDashboard() {
 
   // Render the cross-reference detail section
   renderCampaignXRef();
+
+  // Render cross-source patient journey funnel
+  buildPatientJourneyFunnel();
+}
+
+function buildPatientJourneyFunnel() {
+  var container = document.getElementById('ref-journey-funnel');
+  if (!container) return;
+
+  // Cross-source funnel stages
+  var totalLeads = (REFERRAL_DATA ? REFERRAL_DATA.length : 0) + (FB_CRM_DATA ? FB_CRM_DATA.length : 0);
+  var contacted = REFERRAL_DATA ? REFERRAL_DATA.filter(function(r){ return r.stage === 'Contacted' || r.stage === 'Pre-Screening'; }).length : 0;
+  var medRecsCreated = MED_RECORDS_DATA ? MED_RECORDS_DATA.length : 0;
+  var inScreening = (MED_RECORDS_DATA ? MED_RECORDS_DATA.filter(function(r){ return r.status === 'In Screening' || r.status === 'Visit Scheduled'; }).length : 0);
+  var enrolled = (MED_RECORDS_DATA ? MED_RECORDS_DATA.filter(function(r){ return r.status === 'Enrolled' || r.status === 'Complete'; }).length : 0);
+  var njPatients = PATIENT_NJ_DATA ? PATIENT_NJ_DATA.length : 0;
+
+  if (totalLeads === 0 && medRecsCreated === 0) {
+    container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">No cross-source data available yet</div>';
+    return;
+  }
+
+  var stages = [
+    { label: 'Total Leads', count: totalLeads, color: '#3b82f6', sources: 'Referrals + FB CRM' },
+    { label: 'Contacted / Pre-Screen', count: contacted, color: '#f59e0b', sources: 'Referral Pipeline' },
+    { label: 'Medical Records Created', count: medRecsCreated, color: '#8b5cf6', sources: 'Med Records System' },
+    { label: 'In Screening / Scheduled', count: inScreening, color: '#06b6d4', sources: 'Med Records + Referrals' },
+    { label: 'Enrolled / Complete', count: enrolled, color: '#059669', sources: 'Med Records System' },
+  ];
+
+  var maxCount = Math.max.apply(null, stages.map(function(s){ return s.count; })) || 1;
+
+  var html = '';
+
+  // Funnel bars
+  stages.forEach(function(stage, i) {
+    var pct = Math.max(stage.count / maxCount * 100, 3);
+    var convPct = i > 0 && stages[i-1].count > 0 ? Math.round(stage.count / stages[i-1].count * 100) : 0;
+    html += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">';
+    html += '<div style="width:180px;text-align:right;"><div style="font-size:12px;font-weight:600;color:#1e293b;">' + stage.label + '</div><div style="font-size:9px;color:#94a3b8;">' + stage.sources + '</div></div>';
+    html += '<div style="flex:1;background:#f1f5f9;border-radius:6px;height:32px;overflow:hidden;position:relative;">';
+    html += '<div style="width:' + pct + '%;background:' + stage.color + ';height:100%;border-radius:6px;display:flex;align-items:center;justify-content:center;transition:width 0.5s;">';
+    html += '<span style="font-size:12px;font-weight:800;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.3);">' + stage.count + '</span>';
+    html += '</div></div>';
+    if (i > 0 && convPct > 0) {
+      html += '<div style="min-width:50px;text-align:center;"><span style="font-size:10px;font-weight:700;color:' + (convPct >= 50 ? '#059669' : convPct >= 20 ? '#d97706' : '#dc2626') + ';">' + convPct + '%</span></div>';
+    } else {
+      html += '<div style="min-width:50px;"></div>';
+    }
+    html += '</div>';
+  });
+
+  // NJ tracker callout
+  if (njPatients > 0) {
+    html += '<div style="margin-top:12px;padding:8px 16px;background:#f0fdf4;border-radius:8px;border:1px solid #a7f3d0;display:flex;align-items:center;gap:8px;">';
+    html += '<span style="font-size:14px;">🌿</span>';
+    html += '<div><span style="font-size:12px;font-weight:600;color:#059669;">Pennington NJ:</span> <span style="font-size:12px;color:#475569;">' + njPatients + ' patients tracked separately</span></div>';
+    html += '</div>';
+  }
+
+  // Overall conversion
+  if (totalLeads > 0 && enrolled > 0) {
+    var overallConv = Math.round(enrolled / totalLeads * 100);
+    html += '<div style="margin-top:12px;text-align:center;padding:8px;background:#e8eeff;border-radius:8px;">';
+    html += '<span style="font-size:12px;color:#1843ad;font-weight:600;">Overall Lead → Enrolled: <span style="font-size:16px;font-weight:800;">' + overallConv + '%</span></span>';
+    html += '</div>';
+  }
+
+  container.innerHTML = html;
 }
 
 
@@ -15266,6 +15756,81 @@ function sortMergedTable(th, col) {
   renderStudiesTable();
 }
 
+// ══════════════════════════════════════════════════════════════
+// CROSS-SOURCE ENRICHMENT UTILITIES
+// ══════════════════════════════════════════════════════════════
+function matchesStudy(a, b) {
+  var n1 = (a || '').toLowerCase().trim();
+  var n2 = (b || '').toLowerCase().trim();
+  if (!n1 || !n2) return false;
+  return n1 === n2 || n1.includes(n2) || n2.includes(n1);
+}
+
+function getStudyMedRecords(studyName) {
+  if (!MED_RECORDS_DATA || MED_RECORDS_DATA.length === 0) return null;
+  var patients = MED_RECORDS_DATA.filter(function(r) { return matchesStudy(r.study, studyName); });
+  if (patients.length === 0) return null;
+  return {
+    total: patients.length,
+    active: patients.filter(function(r){ return r.is_active; }).length,
+    enrolled: patients.filter(function(r){ return r.status === 'Enrolled' || r.status === 'Complete'; }).length,
+    screening: patients.filter(function(r){ return r.status === 'In Screening'; }).length,
+    readySched: patients.filter(function(r){ return r.status === 'Ready to Schedule'; }).length,
+    visitSched: patients.filter(function(r){ return r.status === 'Visit Scheduled'; }).length,
+    pendingRecords: patients.filter(function(r){ return r.status === 'Pending Release' || r.status === 'Under Review'; }).length,
+    dnq: patients.filter(function(r){ return r.status === 'DNQ' || r.status === 'Screen Fail'; }).length,
+    noRecords: patients.filter(function(r){ return r.records_received === 'No' || !r.records_received; }).length,
+    patients: patients,
+  };
+}
+
+function getStudyFBLeads(studyName) {
+  if (!FB_CRM_DATA || FB_CRM_DATA.length === 0) return { count: 0, recent: 0 };
+  var sn = (studyName || '').toLowerCase().trim();
+  var leads = FB_CRM_DATA.filter(function(f) {
+    var campaign = (f['Study Campaign'] || f['Campaign'] || f['campaign'] || '').toLowerCase().trim();
+    return campaign && (campaign.includes(sn) || sn.includes(campaign));
+  });
+  var now = Date.now();
+  var recent = leads.filter(function(f) {
+    var d = f['Date Created'] || '';
+    if (!d) return false;
+    try { return (now - new Date(d).getTime()) < 30 * 86400000; } catch(e) { return false; }
+  }).length;
+  return { count: leads.length, recent: recent, leads: leads };
+}
+
+function getStudyMarketingTasks(studyName) {
+  if (!MARKETING_DATA || MARKETING_DATA.length === 0) return { count: 0 };
+  var tasks = MARKETING_DATA.filter(function(t) {
+    return matchesStudy(t.name, studyName) || matchesStudy(t.list, studyName);
+  });
+  return { count: tasks.length, tasks: tasks };
+}
+
+// Cross-source: find referrals with no medical records entry
+function findReferralsWithoutMedRecords() {
+  if (!REFERRAL_DATA || REFERRAL_DATA.length === 0 || !MED_RECORDS_DATA || MED_RECORDS_DATA.length === 0) return [];
+  var medNames = {};
+  MED_RECORDS_DATA.forEach(function(m) { medNames[(m.name||'').toLowerCase().trim()] = true; });
+  return REFERRAL_DATA.filter(function(r) {
+    if (r.is_closed) return false;
+    var key = (r.name||'').toLowerCase().trim();
+    return !medNames[key];
+  });
+}
+
+// Cross-source: find med records ready to schedule with no upcoming visit
+function findReadyNoVisit() {
+  if (!MED_RECORDS_DATA || MED_RECORDS_DATA.length === 0) return [];
+  var visitPatients = {};
+  (DATA.allVisitDetail || []).forEach(function(v) { visitPatients[(v.patient||'').toLowerCase().trim()] = true; });
+  return MED_RECORDS_DATA.filter(function(r) {
+    if (r.status !== 'Ready to Schedule') return false;
+    return !visitPatients[(r.name||'').toLowerCase().trim()];
+  });
+}
+
 function buildPipelineCell(studyName, safeStudy) {
   const refData = getStudyReferralPipeline(studyName);
   if (!refData || refData.total === 0) return '<span style="font-size:10px;color:#cbd5e1;">\u2014</span>';
@@ -15276,6 +15841,26 @@ function buildPipelineCell(studyName, safeStudy) {
     return c > 0 ? '<div style="width:'+Math.max(c*6,4)+'px;height:10px;background:'+colors[st]+';border-radius:2px;" title="'+st+': '+c+'"></div>' : '';
   }).filter(Boolean).join('');
   return '<div style="cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;" onclick="showStudyPipelineModal(\''+safeStudy+'\')"><div style="display:flex;gap:1px;">'+miniBar+'</div><div style="font-size:9px;font-weight:600;color:#475569;">'+refData.active+'<span style="color:#94a3b8;font-weight:400">/'+refData.total+'</span></div></div>';
+}
+
+function buildMedRecCell(studyName, safeStudy) {
+  var d = getStudyMedRecords(studyName);
+  if (!d) return '<span style="font-size:10px;color:#cbd5e1;">\u2014</span>';
+  var color = d.active > 0 ? (d.readySched > 0 ? '#f59e0b' : '#8b5cf6') : (d.enrolled > 0 ? '#059669' : '#94a3b8');
+  return '<div style="cursor:pointer;text-align:center;" onclick="showMedRecDetailModal(\'' + safeStudy + '\')">' +
+    '<div style="font-size:11px;font-weight:700;color:' + color + ';">' + d.active + '</div>' +
+    '<div style="font-size:9px;color:#94a3b8;">' + d.total + ' total</div>' +
+    '</div>';
+}
+
+function buildFBLeadCell(studyName) {
+  var d = getStudyFBLeads(studyName);
+  if (d.count === 0) return '<span style="font-size:10px;color:#cbd5e1;">\u2014</span>';
+  var color = d.recent > 0 ? '#3b82f6' : '#94a3b8';
+  return '<div style="text-align:center;">' +
+    '<div style="font-size:11px;font-weight:700;color:' + color + ';">' + d.count + '</div>' +
+    (d.recent > 0 ? '<div style="font-size:9px;color:#3b82f6;">' + d.recent + ' new</div>' : '') +
+    '</div>';
 }
 
 function renderStudiesTable() {
@@ -15317,9 +15902,8 @@ function renderStudiesTable() {
     const barColor = !hasTarget ? '#94a3b8' :
       pct >= 100 ? '#059669' : pct >= 75 ? '#1843ad' : pct >= 50 ? '#d97706' : pct >= 25 ? '#f97316' : '#dc2626';
 
-    const studyCell = s.study_url
-      ? `<a href="${s.study_url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="font-weight:700;color:var(--navy);text-decoration:none">${s.study}<svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-left:3px;opacity:0.4;vertical-align:middle"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>`
-      : `<span style="font-weight:700;color:var(--navy)">${s.study}</span>`;
+    const studyCell = `<span style="font-weight:700;color:var(--navy);cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px;" onclick="showStudyUnifiedModal('${safeStudy}')">${s.study}</span>` +
+      (s.study_url ? `<a href="${s.study_url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="margin-left:4px;opacity:0.4;vertical-align:middle"><svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>` : '');
     const statusBadge = s.enroll_status
       ? `<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;margin-left:5px;background:${s.enroll_status==='Enrolling'?'#e8eeff':s.enroll_status==='Maintenance'?'#f0fdf4':'#f1f5f9'};color:${s.enroll_status==='Enrolling'?'#1843ad':s.enroll_status==='Maintenance'?'#059669':'#94a3b8'}">${s.enroll_status}</span>` : '';
 
@@ -15372,6 +15956,8 @@ function renderStudiesTable() {
       <td style="padding:10px 8px;text-align:center;font-size:11px;color:${sfColor};font-weight:600">${s.screen_fail_pct > 0 ? s.screen_fail_pct+'%' : '—'}</td>
       <td style="padding:10px 8px;text-align:center">${siteTags}</td>
       <td style="padding:10px 8px;text-align:center">${buildPipelineCell(s.study, safeStudy)}</td>
+      <td style="padding:10px 8px;text-align:center">${buildMedRecCell(s.study, safeStudy)}</td>
+      <td style="padding:10px 8px;text-align:center">${buildFBLeadCell(s.study)}</td>
     </tr>`;
   }).join('');
 }
