@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CRP · Unified Operations & Finance Dashboard</title>
+<title>CRP · Unified Intelligence Dashboard</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap');
@@ -877,7 +877,7 @@ body {
 
   <!-- Header + filters -->
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
-    <div style="font-size:18px;font-weight:700;color:var(--navy)">All Studies <span id="studies-count-badge" style="font-size:12px;font-weight:500;color:var(--muted);margin-left:6px"></span></div>
+    <div><span class="card-title" style="font-size:16px;">All Studies</span> <span id="studies-count-badge" style="font-size:12px;font-weight:500;color:var(--muted);margin-left:6px"></span></div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;" id="studies-filter-bar">
       <button onclick="filterStudies('all',this)" class="sched-filter active" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid #1843ad;background:#e8eeff;color:#1843ad;cursor:pointer">All</button>
       <button onclick="filterStudies('critical',this)" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">🔴 Critical</button>
@@ -1817,7 +1817,7 @@ body {
 <div id="view-actions" class="view">
 
   <!-- At-Risk Patients (formerly Risk Flags tab) — most urgent, at top -->
-  <div style="font-size:13px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">🚨 At-Risk Patients — Immediate Action Required</div>
+  <div class="section-title" style="margin-bottom:10px;">🚨 At-Risk Patients — Immediate Action Required</div>
 
 
   <!-- KPI banner -->
@@ -1880,7 +1880,7 @@ body {
 
 
   <!-- Contact Quality Alerts (from CRIO Patient Database cross-reference) -->
-  <div style="font-size:13px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.5px;margin:20px 0 10px;">📇 Contact Quality Alerts</div>
+  <div class="section-title">📇 Contact Quality Alerts</div>
 
   <div class="time-banner fade-in" style="margin-bottom:16px;">
     <div class="tb-section">
@@ -1918,7 +1918,7 @@ body {
     </div>
   </div>
 
-  <div style="font-size:13px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.5px;margin:20px 0 10px;">📋 Prioritized Action Plan</div>
+  <div class="section-title">📋 Prioritized Action Plan</div>
   <div class="grid-2">
     <div>
       <div class="steps-list" id="action-steps"></div>
@@ -1984,7 +1984,7 @@ body {
   <div id="referral-dashboard" style="display:none;">
 
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-      <div style="font-size:13px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.5px;">📊 Referral Pipeline</div>
+      <span class="card-title">📊 Referral Pipeline</span>
       <div style="display:flex;gap:8px;align-items:center;">
         <span class="data-badge" id="ref-status-badge" style="font-size:10px;">Loading...</span>
         <button onclick="refreshReferrals()" style="padding:4px 12px;background:#e8eeff;color:#1843ad;border:1px solid #1843ad;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">↻ Refresh</button>
