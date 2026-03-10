@@ -2457,6 +2457,7 @@ const CRP_CONFIG = {
     PIPELINE_ORDER: ['New Lead', 'Contacted', 'Pre-Screening', 'Screening', 'Screened', 'Enrolled'],
     // Closed/terminal stages (not in funnel)
     CLOSED_STAGES: ['DNQ', 'Screen Fail', 'Lost'],
+    SOURCE_RENAME: { 'Practice': 'Princeton CardioMetabolic' },
   },
 
   // Master Sheet (for Apps Script consolidation)
@@ -2487,7 +2488,7 @@ const CRP_CONFIG = {
   },
 
   // Version
-  VERSION: '2.7.0',
+  VERSION: '2.7.1',
   BUILD_DATE: '2026-03-10T16:00:00Z',
 };
 
@@ -13743,7 +13744,7 @@ async function refreshReferrals() {
           name: t.name,
           tracker: list.name,
           source_type: list.source_type,
-          source: fields['Source'] || list.name,
+          source: CU.SOURCE_RENAME[fields['Source']] || fields['Source'] || list.name,
           study: fields['Study'] || '',
           status_raw: t.status?.status || '',
           stage,
@@ -14345,9 +14346,48 @@ async function fetchFacebookCRM() {
   const url = CRP_CONFIG.CLICKUP.FACEBOOK_CRM_URL;
   if (!url) return;
   try {
-    const rows = await fetchCSV(url);
-    FB_CRM_DATA = rows;
-    console.log(`CRP: Facebook CRM loaded — ${rows.length} rows`);
+    // Fetch raw CSV text (may not have headers)
+    const resp = await fetch(url);
+    const text = await resp.text();
+    const lines = text.split('\n').filter(l => l.trim());
+
+    // Detect if first row is headers or data
+    const firstLine = lines[0] || '';
+    const hasHeaders = /^(name|email|phone|status|lead|campaign)/i.test(firstLine.split(',')[0]);
+
+    if (hasHeaders) {
+      // Standard CSV with headers — use fetchCSV approach
+      const rows = await fetchCSV(url);
+      FB_CRM_DATA = rows;
+    } else {
+      // Headerless Facebook Leads CSV — map by position
+      // Known format: LeadID, Timestamp, AdGroupID, Campaign, AdSetID, AdSetName, CampaignID,
+      //   CampaignName, FormID, FormName, IsOrganic, Platform, Q1, Q2, Q3,
+      //   Email, Name, Phone, Zip, DOB, ..., Status(last non-empty)
+      FB_CRM_DATA = lines.map(line => {
+        const cols = line.split(',').map(c => c.replace(/\r/g, '').trim());
+        // Find last non-empty column for status
+        let status = '';
+        for (let i = cols.length - 1; i >= 20; i--) {
+          if (cols[i] && cols[i] !== '') { status = cols[i]; break; }
+        }
+        return {
+          'Lead ID': cols[0] || '',
+          'Date Created': cols[1] || '',
+          'Study Campaign': cols[3] || cols[5] || '',
+          'Platform': cols[11] || '',
+          'Email': cols[15] || '',
+          'Full Name': cols[16] || '',
+          'Phone': (cols[17] || '').replace(/^p:\+?/, ''),
+          'Zip': (cols[18] || '').replace(/^z:/, ''),
+          'DOB': cols[19] || '',
+          'Status': status,
+          'Delfa': cols[12] === 'yes' ? 'Yes' : '',
+        };
+      });
+    }
+
+    console.log(`CRP: Facebook CRM loaded — ${FB_CRM_DATA.length} rows`);
     renderFacebookCRM();
   } catch(e) {
     console.warn('CRP: Facebook CRM fetch failed:', e.message);
