@@ -1877,6 +1877,45 @@ body {
 
 
 
+  <!-- Contact Quality Alerts (from CRIO Patient Database cross-reference) -->
+  <div style="font-size:13px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.5px;margin:20px 0 10px;">📇 Contact Quality Alerts</div>
+
+  <div class="time-banner fade-in" style="margin-bottom:16px;">
+    <div class="tb-section">
+      <div class="tb-label">🔴 Red Flags</div>
+      <div class="tb-value red" id="cq-kpi-red">0</div>
+      <div class="tb-sub">Do Not Solicit / Enroll / Deceased</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section">
+      <div class="tb-label">🟡 Yellow Flags</div>
+      <div class="tb-value yellow" id="cq-kpi-yellow">0</div>
+      <div class="tb-sub">Bad contact info or missing email/phone</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section">
+      <div class="tb-label">✅ Clean</div>
+      <div class="tb-value green" id="cq-kpi-clean">0</div>
+      <div class="tb-sub">Active patients with good contact data</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section">
+      <div class="tb-label">📇 Patient DB</div>
+      <div class="tb-value blue" id="cq-kpi-db-total">—</div>
+      <div class="tb-sub" id="cq-kpi-db-sub">Loading...</div>
+    </div>
+  </div>
+
+  <div class="card fade-in" style="margin-bottom:16px;">
+    <div class="card-header">
+      <span class="card-title">📇 Patient Contact Cross-Reference</span>
+      <span class="badge badge-blue" id="cq-badge">Checking patient database...</span>
+    </div>
+    <div id="contact-alert-cards" style="padding:12px 16px;">
+      <div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">⏳ Fetching CRIO patient database...</div>
+    </div>
+  </div>
+
   <div style="font-size:13px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.5px;margin:20px 0 10px;">📋 Prioritized Action Plan</div>
   <div class="grid-2">
     <div>
@@ -2228,6 +2267,9 @@ const CRP_CONFIG = {
     PAYMENTS:      '454961282',
   },
 
+  // Patient Database (CRIO daily export — published CSV)
+  PATIENT_DB_URL: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSF6m57VM1I7VMG__gFSRGWGFUc05ZIymyMDCu4RiLcgNlBwgqccQmnT2A-bbfkm6f7mjb9f2Qe5lLf/pub?output=csv',
+
   // Master Sheet (for Apps Script consolidation)
   MASTER_SHEET_ID: '1LZWJeJE9EJqe1Th13sSazrWOI5k8I56mbZPieAHqoyo',
 
@@ -2256,8 +2298,8 @@ const CRP_CONFIG = {
   },
 
   // Version
-  VERSION: '2.3.0',
-  BUILD_DATE: '2026-03-09T21:15:00Z',
+  VERSION: '2.4.0',
+  BUILD_DATE: '2026-03-10T14:00:00Z',
 };
 
 // ═══ EVENT BUS (for plugin extensibility) ═══
@@ -2463,6 +2505,10 @@ let UNPAID_AP_DETAIL = [];     // [{study,visit,revType,amount,daysUnpaid},...]
 let UNPAID_AP_BY_TYPE = [];    // [{type:'Visit',amount:423073},{type:'Procedure',amount:35008},...]
 let UNPAID_AP_AGING = [];      // [{bucket:'0-30',amount:X,count:N},...]
 let REVENUE_ITEMS_TOP = [];    // [{item:'Visit 3 - Week 1...',amount:X,count:N},...]
+
+// ══════════ PATIENT DATABASE (populated by live fetch) ══════════
+let PATIENT_DB = [];           // [{name,status,email,phone,record_number},...]
+let CONTACT_ALERTS = [];       // [{patient,study,alert_type,severity,detail,patient_url,study_url},...]
 
 // ══════════ HELPERS ══════════
 const fmt=v=>'$'+Math.abs(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -12102,6 +12148,270 @@ async function fetchFinanceLive() {
   }
 }
 
+// ═══════════════════════════════════════════════════
+// PATIENT DATABASE — Cross-reference with active study patients
+// ═══════════════════════════════════════════════════
+async function fetchPatientDB() {
+  const url = CRP_CONFIG.PATIENT_DB_URL;
+  if (!url) { console.log('CRP: No patient DB URL configured'); return false; }
+  console.log('CRP: Fetching patient database...');
+  try {
+    const rows = await fetchCSV(url);
+    PATIENT_DB = rows.map(r => ({
+      name: (r['Patient Full Name']||'').trim(),
+      name_lower: (r['Patient Full Name']||'').trim().toLowerCase(),
+      status: (r['Patient Status']||'Available').trim(),
+      email: (r['Email']||'').trim(),
+      mobile: (r['Mobile Phone']||'').trim(),
+      home_phone: (r['Home Phone']||'').trim(),
+      work_phone: (r['Work Phone']||'').trim(),
+      record: (r['Record Number']||'').trim(),
+      site: (r['Site Name']||'').trim(),
+      city: (r['City']||'').trim(),
+      state: (r['State']||'').trim(),
+    }));
+    console.log(`CRP: Patient DB loaded — ${PATIENT_DB.length} records`);
+
+    // Run cross-reference against active patients
+    crossReferencePatients();
+    renderContactAlerts();
+    return true;
+  } catch(e) {
+    console.warn('CRP: Patient DB fetch failed:', e.message);
+    const el = document.getElementById('contact-alert-cards');
+    if (el) el.innerHTML = '<div style="text-align:center;padding:20px;color:#94a3b8;font-size:13px;">⚠️ Could not load patient database — cross-reference unavailable</div>';
+    const badge = document.getElementById('cq-badge');
+    if (badge) { badge.textContent = 'Offline'; badge.className = 'badge badge-gray'; }
+    return false;
+  }
+}
+
+function crossReferencePatients() {
+  CONTACT_ALERTS = [];
+
+  // Build lookup map from patient DB (by normalized name)
+  const dbMap = {};
+  PATIENT_DB.forEach(p => {
+    const key = p.name_lower;
+    if (key && (!dbMap[key] || p.status !== 'Available')) dbMap[key] = p;
+  });
+
+  // Collect all active patients from upcoming visits + recent cancellations
+  const activePatients = new Map(); // name_lower -> {patient, study, patient_url, study_url, has_upcoming, has_cancel}
+  (DATA.allVisitDetail || []).forEach(v => {
+    const key = (v.patient||'').toLowerCase().trim();
+    if (!key) return;
+    const existing = activePatients.get(key);
+    if (!existing) {
+      activePatients.set(key, {
+        patient: v.patient, study: v.study, patient_url: v.patient_url, study_url: v.study_url,
+        has_upcoming: true, has_cancel: false, studies: new Set([v.study])
+      });
+    } else {
+      existing.studies.add(v.study);
+      existing.has_upcoming = true;
+    }
+  });
+  (DATA.allCancels || []).forEach(c => {
+    const key = (c.name||'').toLowerCase().trim();
+    if (!key) return;
+    const existing = activePatients.get(key);
+    if (!existing) {
+      activePatients.set(key, {
+        patient: c.name, study: c.study, patient_url: c.url, study_url: c.study_url,
+        has_upcoming: false, has_cancel: true, studies: new Set([c.study])
+      });
+    } else {
+      existing.studies.add(c.study);
+      existing.has_cancel = true;
+    }
+  });
+
+  let matched = 0, cleanCount = 0;
+
+  activePatients.forEach((info, nameKey) => {
+    const dbRecord = dbMap[nameKey];
+    if (!dbRecord) return; // Not found in patient DB — skip (not flaggable)
+    matched++;
+
+    const status = dbRecord.status;
+    const hasEmail = !!dbRecord.email;
+    const hasPhone = !!(dbRecord.mobile || dbRecord.home_phone || dbRecord.work_phone);
+
+    // RED FLAGS: Do Not Solicit, Do Not Enroll, Deceased — with active visits
+    if (status === 'Do Not Solicit' || status === 'Do Not Enroll' || status === 'Deceased') {
+      CONTACT_ALERTS.push({
+        patient: info.patient, study: info.study, studies: [...info.studies],
+        patient_url: info.patient_url, study_url: info.study_url,
+        severity: 'red',
+        alert_type: status,
+        detail: info.has_upcoming
+          ? `Patient marked "${status}" in recruitment DB but has upcoming visits`
+          : `Patient marked "${status}" in recruitment DB with recent cancellations`,
+        has_upcoming: info.has_upcoming, has_cancel: info.has_cancel,
+        email: dbRecord.email, phone: dbRecord.mobile || dbRecord.home_phone || '',
+      });
+      return;
+    }
+
+    // RED FLAG: Bad Contact Info with upcoming visits
+    if (status === 'Bad Contact Info' && info.has_upcoming) {
+      CONTACT_ALERTS.push({
+        patient: info.patient, study: info.study, studies: [...info.studies],
+        patient_url: info.patient_url, study_url: info.study_url,
+        severity: 'red',
+        alert_type: 'Bad Contact Info',
+        detail: 'Patient has bad contact info in recruitment DB but has upcoming visits — verify contact details in CRIO',
+        has_upcoming: true, has_cancel: info.has_cancel,
+        email: dbRecord.email, phone: dbRecord.mobile || dbRecord.home_phone || '',
+      });
+      return;
+    }
+
+    // YELLOW FLAGS: Missing email or phone
+    if (!hasEmail && !hasPhone) {
+      CONTACT_ALERTS.push({
+        patient: info.patient, study: info.study, studies: [...info.studies],
+        patient_url: info.patient_url, study_url: info.study_url,
+        severity: 'yellow',
+        alert_type: 'No Contact Info',
+        detail: 'No email or phone number on file — unable to send reminders or reach patient',
+        has_upcoming: info.has_upcoming, has_cancel: info.has_cancel,
+        email: '', phone: '',
+      });
+    } else if (!hasEmail) {
+      CONTACT_ALERTS.push({
+        patient: info.patient, study: info.study, studies: [...info.studies],
+        patient_url: info.patient_url, study_url: info.study_url,
+        severity: 'yellow',
+        alert_type: 'Missing Email',
+        detail: 'No email address on file — cannot send visit reminders or study communications',
+        has_upcoming: info.has_upcoming, has_cancel: info.has_cancel,
+        email: '', phone: dbRecord.mobile || dbRecord.home_phone || '',
+      });
+    } else if (!hasPhone) {
+      CONTACT_ALERTS.push({
+        patient: info.patient, study: info.study, studies: [...info.studies],
+        patient_url: info.patient_url, study_url: info.study_url,
+        severity: 'yellow',
+        alert_type: 'Missing Phone',
+        detail: 'No phone number on file — cannot call for appointment confirmations',
+        has_upcoming: info.has_upcoming, has_cancel: info.has_cancel,
+        email: dbRecord.email, phone: '',
+      });
+    } else {
+      cleanCount++;
+    }
+  });
+
+  // Sort: red first, then yellow; within each, upcoming first
+  CONTACT_ALERTS.sort((a,b) => {
+    if (a.severity !== b.severity) return a.severity === 'red' ? -1 : 1;
+    if (a.has_upcoming !== b.has_upcoming) return a.has_upcoming ? -1 : 1;
+    return a.patient.localeCompare(b.patient);
+  });
+
+  // Update KPIs
+  const redCount = CONTACT_ALERTS.filter(a => a.severity === 'red').length;
+  const yellowCount = CONTACT_ALERTS.filter(a => a.severity === 'yellow').length;
+  const el = id => document.getElementById(id);
+  if (el('cq-kpi-red')) el('cq-kpi-red').textContent = redCount;
+  if (el('cq-kpi-yellow')) el('cq-kpi-yellow').textContent = yellowCount;
+  if (el('cq-kpi-clean')) el('cq-kpi-clean').textContent = cleanCount;
+  if (el('cq-kpi-db-total')) el('cq-kpi-db-total').textContent = PATIENT_DB.length.toLocaleString();
+  if (el('cq-kpi-db-sub')) el('cq-kpi-db-sub').textContent = `${matched} matched to active patients`;
+
+  console.log(`CRP: Contact cross-ref — ${redCount} red, ${yellowCount} yellow, ${cleanCount} clean out of ${matched} matched`);
+}
+
+function renderContactAlerts() {
+  const el = document.getElementById('contact-alert-cards');
+  const badge = document.getElementById('cq-badge');
+  if (!el) return;
+
+  if (CONTACT_ALERTS.length === 0) {
+    el.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);font-size:13px;">🟢 All active patients have clean contact data — no flags found</div>';
+    if (badge) { badge.textContent = 'All clear'; badge.className = 'badge badge-green'; }
+    return;
+  }
+
+  const redAlerts = CONTACT_ALERTS.filter(a => a.severity === 'red');
+  const yellowAlerts = CONTACT_ALERTS.filter(a => a.severity === 'yellow');
+  if (badge) {
+    badge.textContent = `${redAlerts.length} red · ${yellowAlerts.length} yellow`;
+    badge.className = redAlerts.length ? 'badge badge-red' : 'badge badge-yellow';
+  }
+
+  function alertCard(a) {
+    const isRed = a.severity === 'red';
+    const border = isRed ? '#dc2626' : '#d97706';
+    const bg = isRed ? '#fef2f2' : '#fffbeb';
+    const icon = isRed ? '🔴' : '🟡';
+    const typeLabel = a.alert_type;
+    const typeBg = isRed ? '#dc2626' : '#d97706';
+    const pLink = a.patient_url
+      ? `<a href="${a.patient_url}" target="_blank" rel="noopener" style="text-decoration:none;color:#1e293b;font-weight:700;">${a.patient}<svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-left:2px;opacity:0.4;vertical-align:middle"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>`
+      : `<strong style="color:#1e293b">${a.patient}</strong>`;
+    const studyList = (a.studies||[a.study]).join(', ');
+    const contactLine = [];
+    if (a.email) contactLine.push(`📧 ${a.email}`);
+    if (a.phone) contactLine.push(`📱 ${a.phone}`);
+    if (!a.email && !a.phone) contactLine.push('❌ No contact info on file');
+
+    return `<div style="border:1.5px solid ${border};border-radius:10px;padding:14px 16px;background:${bg};">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">
+        <div>
+          <div style="font-size:14px;font-weight:700;color:#1e293b">${pLink}</div>
+          <div style="font-size:11px;color:#64748b;margin-top:2px">${studyList}</div>
+        </div>
+        <span style="font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px;background:${typeBg};color:#fff;white-space:nowrap;">${icon} ${typeLabel}</span>
+      </div>
+      <div style="font-size:12px;color:#475569;margin-bottom:6px;">${a.detail}</div>
+      <div style="font-size:11px;color:#94a3b8;display:flex;gap:12px;flex-wrap:wrap;">
+        ${contactLine.map(c => `<span>${c}</span>`).join('')}
+        ${a.has_upcoming ? '<span style="color:#dc2626;font-weight:600;">📅 Has upcoming visits</span>' : ''}
+      </div>
+    </div>`;
+  }
+
+  let html = '';
+
+  if (redAlerts.length > 0) {
+    html += `<div style="margin-bottom:12px;">
+      <div style="font-size:12px;font-weight:700;color:#dc2626;margin-bottom:8px;">🔴 Immediate Action Required (${redAlerts.length})</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:10px;">
+        ${redAlerts.map(alertCard).join('')}
+      </div>
+    </div>`;
+  }
+
+  if (yellowAlerts.length > 0) {
+    // Show first 10 yellow alerts, with expand option if more
+    const showCount = 10;
+    const visibleYellow = yellowAlerts.slice(0, showCount);
+    const hiddenYellow = yellowAlerts.slice(showCount);
+    html += `<div>
+      <div style="font-size:12px;font-weight:700;color:#d97706;margin-bottom:8px;">🟡 Contact Data Gaps (${yellowAlerts.length})</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:10px;" id="cq-yellow-grid">
+        ${visibleYellow.map(alertCard).join('')}
+      </div>
+      ${hiddenYellow.length > 0 ? `
+        <div id="cq-yellow-more" style="text-align:center;margin-top:10px;">
+          <button onclick="document.getElementById('cq-yellow-hidden').style.display='grid';this.parentElement.style.display='none';"
+            style="font-size:12px;color:#1843ad;background:#e8eeff;border:1px solid #1843ad;border-radius:8px;padding:6px 16px;cursor:pointer;font-weight:600;">
+            Show ${hiddenYellow.length} more yellow alerts
+          </button>
+        </div>
+        <div id="cq-yellow-hidden" style="display:none;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:10px;margin-top:10px;">
+          ${hiddenYellow.map(alertCard).join('')}
+        </div>
+      ` : ''}
+    </div>`;
+  }
+
+  el.innerHTML = html;
+}
+
 async function connectSheets() {
   const url1 = document.getElementById('url1-input').value.trim();
   const url2 = document.getElementById('url2-input').value.trim();
@@ -12601,6 +12911,8 @@ async function refreshData() {
     const [rows1, rows2] = await Promise.all([fetchCSV(url1), fetchCSV(url2)]);
     DATA = processLiveData(rows1, rows2);
     renderAll();
+    // Also refresh patient DB cross-reference
+    fetchPatientDB().catch(e => console.warn('Patient DB refresh failed:', e));
     document.getElementById('last-refresh-badge').textContent = 'Updated: ' + new Date().toLocaleTimeString();
   } catch(e) {
     document.getElementById('last-refresh-badge').textContent = 'Refresh failed';
@@ -13454,6 +13766,11 @@ document.addEventListener('DOMContentLoaded', () => {
       if (typeof renderStudiesTable === 'function') try { renderStudiesTable(); } catch(e) {}
     }
   }).catch(e => console.warn('CRP Finance fetch failed:', e));
+
+  // Fetch patient database for contact quality cross-reference (non-blocking)
+  fetchPatientDB().then(ok => {
+    if (ok) console.log('CRP: Patient DB cross-reference complete');
+  }).catch(e => console.warn('CRP: Patient DB fetch failed:', e));
 
   // Self-heal: if insights are still empty after render, retry once
   setTimeout(() => {
