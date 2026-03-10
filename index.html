@@ -913,8 +913,7 @@ body {
 
 
 <!-- ══ VIEW: SCHEDULE ══════════════════════ -->
-<<div
-id="view-schedule" class="view">
+<div id="view-schedule" class="view">
 
   <!-- KPI Row -->
   <div class="time-banner fade-in" style="margin-bottom:16px;">
@@ -2709,7 +2708,7 @@ function renderRevenueItems() {
     const avg = r.count > 0 ? r.amount / r.count : 0;
     return '<tr><td style="max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + r.item + '</td><td class="r">' + fmt(r.amount) + '</td><td class="r">' + r.count.toLocaleString() + '</td><td class="r">' + fmt(avg) + '</td></tr>';
   }).join('');
-  tb.innerHTML += '<tr class="total-row"><td>TOP 20 TOTAL</td><td class="r">' + fmt(total) + '</td><td></td><td></td></tr>';
+  tb.innerHTML += '<tr class="total-row"><td>TOTAL</td><td class="r">' + fmt(total) + '</td><td></td><td></td></tr>';
 }
 // ══════════ ENHANCED ACCRUALS TAB ══════════
 function renderAccruals() {
