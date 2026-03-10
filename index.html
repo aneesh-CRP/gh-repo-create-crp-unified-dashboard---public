@@ -11743,8 +11743,35 @@ function buildCoordList() {
 }
 
 // ══════════ COORDINATOR DAILY GOALS ══════════
+function computeCoordGoals() {
+  // Compute from allVisitDetail if coordGoals not pre-computed
+  const COORDS = CRP_CONFIG.COORDINATORS || [];
+  const COORD_LOWER = COORDS.map(c => c.toLowerCase());
+  const goals = { byDay: {}, byMonth: {} };
+  COORDS.forEach(c => { goals.byDay[c] = {}; goals.byMonth[c] = 0; });
+  const seen = new Set();
+  const visits = DATA.allVisitDetail || [];
+  const now = new Date();
+  const mm = String(now.getMonth()+1).padStart(2,'0');
+  const yy = now.getFullYear();
+  visits.forEach(r => {
+    const rawName = r.coord || '';
+    const date = r.date_iso || '';
+    const patient = r.patient || '';
+    const idx = COORD_LOWER.indexOf(rawName.toLowerCase());
+    if (idx === -1) return;
+    const name = COORDS[idx];
+    const key = name + '|' + date + '|' + patient;
+    if (seen.has(key)) return;
+    seen.add(key);
+    goals.byDay[name][date] = (goals.byDay[name][date]||0) + 1;
+    if (date >= `${yy}-${mm}-01` && date <= `${yy}-${mm}-31`) goals.byMonth[name]++;
+  });
+  return goals;
+}
+
 function renderCoordinatorGoals() {
-  const goals = DATA.coordGoals;
+  const goals = DATA.coordGoals || computeCoordGoals();
   if (!goals) return;
   const COORDS = CRP_CONFIG.COORDINATORS || [];
   const DAILY_GOAL = CRP_CONFIG.COORD_DAILY_GOAL || 2;
