@@ -11745,6 +11745,7 @@ function buildCoordList() {
 // ══════════ COORDINATOR DAILY GOALS ══════════
 function computeCoordGoals() {
   // Compute from allVisitDetail if coordGoals not pre-computed
+  // Only counts weekday (Mon-Fri) visits toward goals
   const COORDS = CRP_CONFIG.COORDINATORS || [];
   const COORD_LOWER = COORDS.map(c => c.toLowerCase());
   const goals = { byDay: {}, byMonth: {} };
@@ -11758,6 +11759,9 @@ function computeCoordGoals() {
     const rawName = r.coord || '';
     const date = r.date_iso || '';
     const patient = r.patient || '';
+    // Skip weekend visits (Sat=6, Sun=0)
+    const dayOfWeek = new Date(date + 'T12:00:00').getDay();
+    if (dayOfWeek === 0 || dayOfWeek === 6) return;
     const idx = COORD_LOWER.indexOf(rawName.toLowerCase());
     if (idx === -1) return;
     const name = COORDS[idx];
@@ -12791,7 +12795,7 @@ function processLiveData(upcoming, cancels) {
   });
   const coordinators = Object.values(coordMap2).sort((a,b) => b.upcoming - a.upcoming);
 
-  // ── coordinator daily goals ──
+  // ── coordinator daily goals (weekdays only) ──
   const COORD_NAMES = CRP_CONFIG.COORDINATORS || [];
   const COORD_LOWER = COORD_NAMES.map(c => c.toLowerCase());
   const coordGoals = { byDay: {}, byMonth: {} };
@@ -12801,6 +12805,9 @@ function processLiveData(upcoming, cancels) {
     const rawName = (r['Full Name']||'').trim();
     const date = (r['Scheduled Date']||'').trim();
     const subjectId = (r['Subject ID']||'').trim();
+    // Skip weekend visits (Sat=6, Sun=0)
+    const dayOfWeek = new Date(date + 'T12:00:00').getDay();
+    if (dayOfWeek === 0 || dayOfWeek === 6) return;
     const idx = COORD_LOWER.indexOf(rawName.toLowerCase());
     if (idx === -1) return;
     const name = COORD_NAMES[idx]; // use canonical name
