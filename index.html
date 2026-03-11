@@ -15516,23 +15516,16 @@ function renderFacebookCRM() {
   }
   html += `</div>`;
 
-  // Recent leads table (most recent 20)
-  const displayCols = [nameCol, phoneCol, studyCol, statusCol, notesCol, dateCol].filter(Boolean);
-  const recentRows = FB_CRM_DATA.slice(0, 30);
-  html += `<div style="overflow-x:auto;"><table class="fin-table" style="width:100%;font-size:11px;">
-    <thead><tr>${displayCols.map(c => `<th style="text-align:left;padding:8px 10px;white-space:nowrap;">${c}</th>`).join('')}</tr></thead>
-    <tbody>${recentRows.map(r => `<tr>${displayCols.map(c => {
-      let val = (r[c] || '').trim();
-      if (val.length > 60) val = val.substring(0, 57) + '...';
-      // Highlight Delfa mentions
-      if (val.toLowerCase().includes('delfa')) val = `<span style="background:#ede9fe;color:#7C3AED;padding:0 4px;border-radius:3px;font-weight:600;">${val}</span>`;
-      return `<td style="padding:6px 10px;border-bottom:1px solid #f8fafc;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${(r[c]||'').replace(/"/g,"'")}">${val || '<span style="color:#cbd5e1">—</span>'}</td>`;
-    }).join('')}</tr>`).join('')}</tbody>
-  </table></div>`;
-
-  if (FB_CRM_DATA.length > 30) {
-    html += `<div style="text-align:center;padding:8px;font-size:11px;color:#94a3b8;">Showing 30 of ${FB_CRM_DATA.length} leads</div>`;
-  }
+  // Recent 30d count
+  const now = Date.now();
+  const recent30 = FB_CRM_DATA.filter(r => {
+    const d = dateCol ? (r[dateCol] || '') : '';
+    if (!d) return false;
+    try { return (now - new Date(d).getTime()) < 30 * 86400000; } catch(e) { return false; }
+  }).length;
+  html += `<div style="padding:10px 16px;font-size:11px;color:#64748b;border-top:1px solid #f1f5f9;">
+    <strong>${FB_CRM_DATA.length}</strong> total leads · <strong>${recent30}</strong> in last 30 days
+  </div>`;
 
   el.innerHTML = html;
 }
