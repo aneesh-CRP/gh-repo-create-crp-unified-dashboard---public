@@ -12863,6 +12863,7 @@ function processLiveData(upcoming, cancels) {
     if (!maxSnap) return rows;                         // no snapshot col → pass through
     return rows.filter(r => (r.snapshot_date || '').trim() === maxSnap);
   }
+  const upcomingAllSnapshots = upcoming;   // keep full history for coord daily goals
   upcoming = latestSnapshotOnly(upcoming);
   cancels  = latestSnapshotOnly(cancels);
   console.log('CRP: Snapshot dedup → upcoming', upcoming.length, 'cancels', cancels.length);
@@ -13122,7 +13123,8 @@ function processLiveData(upcoming, cancels) {
   const coordinators = Object.values(coordMap2).sort((a,b) => b.upcoming - a.upcoming);
 
   // ── coordinator daily goals (weekdays only) ──
-  // Use full upcoming list (not activeUpcoming) so past visits this week/month are included
+  // Use upcomingAllSnapshots (all daily CRIO snapshots) so past visits are included.
+  // The seenCoordVisits set deduplicates by coord+date+subjectId across snapshots.
   const COORD_NAMES = CRP_CONFIG.COORDINATORS || [];
   const COORD_LOWER = COORD_NAMES.map(c => c.toLowerCase());
   const coordGoals = { byDay: {}, byMonth: {} };
@@ -13132,7 +13134,7 @@ function processLiveData(upcoming, cancels) {
   const _cgMM = String(_cgNow.getMonth()+1).padStart(2,'0');
   const _cgYY = _cgNow.getFullYear();
   const _cgMonthStart = `${_cgYY}-${_cgMM}-01`;
-  upcoming.forEach(r => {
+  upcomingAllSnapshots.forEach(r => {
     const rawName = (r['Full Name']||'').trim();
     const date = (r['Scheduled Date']||'').trim();
     const subjectId = (r['Subject ID']||'').trim();
