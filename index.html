@@ -12928,6 +12928,9 @@ function processLiveData(upcoming, cancels) {
     return true;
   });
 
+  // Categories that should NOT count as true cancellations
+  const EXCLUDED_CANCEL_CATS = new Set(['Rescheduled','Completed','Admin Error','FibroScan Only','Study Closed']);
+
   // Step 3: Categorize and split into true cancellations vs excluded
   const allCategorized = dedupedCancels.map(r => {
     r._category = categorizeReason(r['Cancel Reason'], r['Appointment Cancellation Type']);
@@ -12975,9 +12978,6 @@ function processLiveData(upcoming, cancels) {
     if (!r || r === 'nan') return 'Not Documented';
     return 'Other';
   }
-
-  // Categories that should NOT count as true cancellations
-  const EXCLUDED_CANCEL_CATS = new Set(['Rescheduled','Completed','Admin Error','FibroScan Only','Study Closed']);
 
   // ── cancelByStudy with CRIO links ──
   const cancelStudyMap = {};
@@ -15909,6 +15909,7 @@ function renderStudiesTable() {
     const barColor = !hasTarget ? '#94a3b8' :
       pct >= 100 ? '#059669' : pct >= 75 ? '#1843ad' : pct >= 50 ? '#d97706' : pct >= 25 ? '#f97316' : '#dc2626';
 
+    const safeStudy = s.study.replace(/'/g,"\\'");
     const studyCell = `<span style="font-weight:700;color:var(--navy);cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px;" onclick="showStudyUnifiedModal('${safeStudy}')">${s.study}</span>` +
       (s.study_url ? `<a href="${s.study_url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="margin-left:4px;opacity:0.4;vertical-align:middle"><svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>` : '');
     const statusBadge = s.enroll_status
@@ -15931,7 +15932,6 @@ function renderStudiesTable() {
       `<span style="font-size:9px;font-weight:700;padding:1px 4px;border-radius:3px;background:${st==='PNJ'?'#05996920':'#07206120'};color:${st==='PNJ'?'#059669':'#072061'}">${st}</span>`
     ).join(' ');
 
-    const safeStudy = s.study.replace(/'/g,"\\'");
     const riskScoreCell = (s.risk_level === 'n/a' || s.enroll_status !== 'Enrolling')
       ? `<span style="font-size:10px;color:#94a3b8;font-style:italic">N/A</span>`
       : s.risk_score > 0
