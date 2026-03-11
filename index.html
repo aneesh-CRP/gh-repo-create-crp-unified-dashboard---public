@@ -14053,24 +14053,27 @@ function safe(fn, name) {
 // ══════════════════════════════════════════════════════════════
 function buildRecruitmentKPIs() {
   var el = function(id) { return document.getElementById(id); };
-  // Active referrals
-  var activeRefs = REFERRAL_DATA ? REFERRAL_DATA.filter(function(r){ return !r.is_closed; }).length : 0;
-  if (el('ov-kpi-refs')) el('ov-kpi-refs').textContent = activeRefs || '—';
+  // Active referrals (show 0 as a real value, only dash if data not loaded)
+  var hasRefData = REFERRAL_DATA && REFERRAL_DATA.length > 0;
+  var activeRefs = hasRefData ? REFERRAL_DATA.filter(function(r){ return !r.is_closed; }).length : null;
+  if (el('ov-kpi-refs')) el('ov-kpi-refs').textContent = activeRefs !== null ? activeRefs : '--';
   // Med records active
-  var medActive = MED_RECORDS_DATA ? MED_RECORDS_DATA.filter(function(r){ return r.is_active; }).length : 0;
-  if (el('ov-kpi-medrec')) el('ov-kpi-medrec').textContent = medActive || '—';
+  var hasMedData = MED_RECORDS_DATA && MED_RECORDS_DATA.length > 0;
+  var medActive = hasMedData ? MED_RECORDS_DATA.filter(function(r){ return r.is_active; }).length : null;
+  if (el('ov-kpi-medrec')) el('ov-kpi-medrec').textContent = medActive !== null ? medActive : '--';
   // FB leads (30 days)
   var now = Date.now();
-  var fbRecent = FB_CRM_DATA ? FB_CRM_DATA.filter(function(f) {
+  var hasFBData = FB_CRM_DATA && FB_CRM_DATA.length > 0;
+  var fbRecent = hasFBData ? FB_CRM_DATA.filter(function(f) {
     var d = f['Date Created'] || '';
     if (!d) return false;
     try { return (now - new Date(d).getTime()) < 30 * 86400000; } catch(e) { return false; }
-  }).length : 0;
-  if (el('ov-kpi-fb')) el('ov-kpi-fb').textContent = fbRecent || '—';
+  }).length : null;
+  if (el('ov-kpi-fb')) el('ov-kpi-fb').textContent = fbRecent !== null ? fbRecent : '--';
   // Conversion rate
   var totalRefs = REFERRAL_DATA ? REFERRAL_DATA.length : 0;
   var enrolledRefs = REFERRAL_DATA ? REFERRAL_DATA.filter(function(r){ return r.stage === 'Enrolled' || r.stage === 'Screened'; }).length : 0;
-  var convRate = totalRefs > 0 ? Math.round(enrolledRefs / totalRefs * 100) + '%' : '—';
+  var convRate = totalRefs > 0 ? Math.round(enrolledRefs / totalRefs * 100) + '%' : '--';
   if (el('ov-kpi-conv')) el('ov-kpi-conv').textContent = convRate;
 }
 
@@ -14749,15 +14752,18 @@ async function refreshReferrals() {
     // Refresh cross-source KPIs now that referral data is loaded
     safe(buildRecruitmentKPIs, 'buildRecruitmentKPIs');
     safe(buildInsights, 'buildInsights');
+    if (typeof renderStudiesTable === 'function') try { renderStudiesTable(); } catch(e) {}
 
     // Also fetch additional ClickUp sources + Facebook CRM (non-blocking)
     fetchFacebookCRM().then(function() {
       safe(buildRecruitmentKPIs, 'buildRecruitmentKPIs');
+      if (typeof renderStudiesTable === 'function') try { renderStudiesTable(); } catch(e) {}
     }).catch(e => console.warn('FB CRM fetch failed:', e));
     fetchMedicalRecords().then(function() {
       safe(buildRecruitmentKPIs, 'buildRecruitmentKPIs');
       safe(buildMedRecAlerts, 'buildMedRecAlerts');
       safe(buildInsights, 'buildInsights');
+      if (typeof renderStudiesTable === 'function') try { renderStudiesTable(); } catch(e) {}
     }).catch(e => console.warn('Medical Records fetch failed:', e));
     fetchPatientTrackerNJ().catch(e => console.warn('Patient Tracker NJ fetch failed:', e));
     safe(buildRecruitmentKPIs, 'buildRecruitmentKPIs');
@@ -16569,13 +16575,22 @@ document.addEventListener('DOMContentLoaded', () => {
     // ── Phase 3: Supplemental data (Patient DB + Facebook CRM — lowest priority) ──
     console.log('CRP: Phase 3 — loading supplemental data...');
     fetchPatientDB().then(ok => {
-      if (ok) { console.log('CRP: Patient DB cross-reference complete'); setHealthChip('dh-patientdb','ok','Patient DB'); }
+      if (ok) {
+        console.log('CRP: Patient DB cross-reference complete');
+        setHealthChip('dh-patientdb','ok','Patient DB');
+        // Re-render views that depend on Patient DB
+        if (typeof renderStudiesTable === 'function') try { renderStudiesTable(); } catch(e) {}
+      }
       else setHealthChip('dh-patientdb','warn','Patient DB (empty)');
     }).catch(e => { console.warn('CRP: Patient DB fetch failed:', e); setHealthChip('dh-patientdb','fail','Patient DB (failed)'); });
 
     setTimeout(() => {
-      fetchFacebookCRM().then(() => { setHealthChip('dh-fbcrm','ok','FB CRM (' + (FB_CRM_DATA||[]).length + ')'); })
-        .catch(e => { console.warn('CRP: Facebook CRM initial load failed:', e); setHealthChip('dh-fbcrm','fail','FB CRM (failed)'); });
+      fetchFacebookCRM().then(() => {
+        setHealthChip('dh-fbcrm','ok','FB CRM (' + (FB_CRM_DATA||[]).length + ')');
+        // Re-render views that depend on FB CRM data
+        safe(buildRecruitmentKPIs, 'buildRecruitmentKPIs');
+        if (typeof renderStudiesTable === 'function') try { renderStudiesTable(); } catch(e) {}
+      }).catch(e => { console.warn('CRP: Facebook CRM initial load failed:', e); setHealthChip('dh-fbcrm','fail','FB CRM (failed)'); });
     }, 1500);
   }
 
