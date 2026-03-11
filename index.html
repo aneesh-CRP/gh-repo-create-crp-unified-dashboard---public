@@ -12274,8 +12274,16 @@ function filterTable(filter, btn) {
 async function fetchCSV(url) {
   const proxyUrl = url; // Direct fetch — works if sheet is published publicly
   const resp = await fetch(proxyUrl);
-  if (!resp.ok) throw new Error('Failed to fetch: ' + url);
+  if (!resp.ok) throw new Error('HTTP ' + resp.status + ' fetching: ' + url);
   const text = await resp.text();
+  // Guard: Google Sheets sometimes returns an HTML error/captcha page with 200 status
+  const trimmed = text.trimStart();
+  if (trimmed.startsWith('<!') || trimmed.startsWith('<html') || trimmed.startsWith('<HTML')) {
+    throw new Error('Received HTML instead of CSV (likely rate-limited) from: ' + url.slice(0, 80));
+  }
+  if (!trimmed || trimmed.length < 20) {
+    throw new Error('Empty or invalid CSV response from: ' + url.slice(0, 80));
+  }
   return parseCSV(text);
 }
 
@@ -13714,8 +13722,14 @@ async function refreshData() {
       fetchCSV(LIVE_URL2_LEGACY).catch(() => []),
       fetchCSV(AUDIT_LOG_URL).catch(() => [])
     ]);
-    DATA = processLiveData(rows1, legacyCancels, auditRows);
-    renderAll();
+    const newData = processLiveData(rows1, legacyCancels, auditRows);
+    if ((newData.upcomingTotal || 0) < 5 && (DATA.upcomingTotal || 0) > 5) {
+      console.warn('CRP Refresh: new data looks empty — keeping previous data');
+      document.getElementById('last-refresh-badge').textContent = 'Refresh returned empty data';
+    } else {
+      DATA = newData;
+      renderAll();
+    }
     // Also refresh patient DB cross-reference
     fetchPatientDB().catch(e => console.warn('Patient DB refresh failed:', e));
     document.getElementById('last-refresh-badge').textContent = 'Updated: ' + new Date().toLocaleTimeString();
@@ -16354,13 +16368,41 @@ document.addEventListener('DOMContentLoaded', () => {
         fetchCSV(LIVE_URL2_LEGACY).catch(() => []),
         fetchCSV(AUDIT_LOG_URL).catch(e => { console.warn('CRP: Audit log fetch failed, continuing without:', e.message); return []; })
       ]);
-      DATA = processLiveData(rows1, legacyCancels, auditRows);
-      document.getElementById('data-source-badge').textContent = '🔗 Live Google Sheets';
-      document.getElementById('last-refresh-badge').textContent = 'Updated: ' + new Date().toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'});
-      renderAll();
-      console.log('CRP: Live data loaded — upcoming:', rows1.length, 'audit:', auditRows.length);
+      const newData = processLiveData(rows1, legacyCancels, auditRows);
+      // Guard: don't replace good data with empty results (Google Sheets rate-limit)
+      if ((newData.upcomingTotal || 0) < 5 && rows1.length > 10) {
+        console.warn('CRP: processLiveData returned suspiciously low upcomingTotal (' + (newData.upcomingTotal||0) + ') from ' + rows1.length + ' rows — skipping');
+      } else {
+        DATA = newData;
+        document.getElementById('data-source-badge').textContent = '🔗 Live Google Sheets';
+        document.getElementById('last-refresh-badge').textContent = 'Updated: ' + new Date().toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'});
+        renderAll();
+        console.log('CRP: Live data loaded — upcoming:', rows1.length, 'audit:', auditRows.length);
+      }
     } catch(e) {
-      console.warn('CRP: Auto-load live data failed, using SAMPLE:', e.message);
+      console.warn('CRP: Auto-load live data failed:', e.message, '— retrying in 5s...');
+      // Retry once after 5 seconds (Google Sheets rate-limit is usually brief)
+      setTimeout(async () => {
+        try {
+          const [rows1b, legacyB, auditB] = await Promise.all([
+            fetchCSV(LIVE_URL1),
+            fetchCSV(LIVE_URL2_LEGACY).catch(() => []),
+            fetchCSV(AUDIT_LOG_URL).catch(() => [])
+          ]);
+          const retryData = processLiveData(rows1b, legacyB, auditB);
+          if ((retryData.upcomingTotal || 0) >= 5) {
+            DATA = retryData;
+            document.getElementById('data-source-badge').textContent = '🔗 Live Google Sheets';
+            document.getElementById('last-refresh-badge').textContent = 'Updated: ' + new Date().toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'});
+            renderAll();
+            console.log('CRP: Retry succeeded — upcoming:', rows1b.length, 'audit:', auditB.length);
+          } else {
+            console.warn('CRP: Retry also returned low data — staying on SAMPLE');
+          }
+        } catch(e2) {
+          console.warn('CRP: Retry also failed:', e2.message, '— using SAMPLE data');
+        }
+      }, 5000);
     }
   })();
 
@@ -16407,9 +16449,15 @@ document.addEventListener('DOMContentLoaded', () => {
           fetchCSV(LIVE_URL2_LEGACY).catch(() => []),
           fetchCSV(AUDIT_LOG_URL).catch(() => [])
         ]);
-        DATA = processLiveData(rows1, legacyCancels, auditRows);
-        renderAll();
-        console.log('CRP Auto-Refresh: refreshed — upcoming:', rows1.length, 'audit:', auditRows.length);
+        const newData = processLiveData(rows1, legacyCancels, auditRows);
+        // Guard: don't replace good data with empty/bad results
+        if ((newData.upcomingTotal || 0) < 5 && (DATA.upcomingTotal || 0) > 5) {
+          console.warn('CRP Auto-Refresh: new data looks empty (' + (newData.upcomingTotal||0) + ' upcoming) — keeping previous data');
+        } else {
+          DATA = newData;
+          renderAll();
+          console.log('CRP Auto-Refresh: refreshed — upcoming:', rows1.length, 'audit:', auditRows.length);
+        }
       } catch(e) { console.warn('CRP Auto-Refresh: CRIO refresh failed:', e.message); }
     })();
 
