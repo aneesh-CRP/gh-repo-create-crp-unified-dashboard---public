@@ -1,5 +1,5 @@
 // ============================================================
-// CLINICAL TRIAL DASHBOARD — Daily Data Consolidator
+// CLINICAL TRIAL DASHBOARD -- Daily Data Consolidator
 // ============================================================
 // Folder:  Automations > Looker Reports (ID hardcoded below)
 // File 1:  "Upcoming scheduled appointments.csv"
@@ -8,12 +8,12 @@
 // v7:      Column-pruning + row-filtering for Audit Log to avoid
 //          Google Sheets' 10M cell limit. Only keeps the 4 columns
 //          the dashboard actually uses, and only "User Added" rows.
-//          Content-based dedup — prevents duplicate rows even when
+//          Content-based dedup -- prevents duplicate rows even when
 //          multiple files (PHL + PNJ) are appended on the same day.
 //          Dedup keys:
 //            Upcoming:      snapshot_date + Subject Full Name + Study Name + Scheduled Date
 //            Cancellations: snapshot_date + Subject Full Name + Study Name + Cancel Date
-//            Audit Log:     Calendar Appointment Key (back end) + Appointment For User + Appointment Change Type (GLOBAL — no snapshot_date)
+//            Audit Log:     Calendar Appointment Key (back end) + Appointment For User + Appointment Change Type (GLOBAL -- no snapshot_date)
 // ============================================================
 
 var FOLDER_ID           = "13-pkMP-OK_EdPJecPRvTKpKFUv0Z-4sC";
@@ -73,7 +73,7 @@ function categorizeVisit(reason, apptType) {
 
 
 // ============================================================
-// MAIN — runs daily via trigger
+// MAIN -- runs daily via trigger
 // ============================================================
 function consolidateAll() {
   Logger.log("=== CT Dashboard Consolidation: " + new Date() + " ===");
@@ -253,7 +253,7 @@ function readFileRows(file, skipExclusions) {
 
 
 // ============================================================
-// APPEND TO MASTER SHEET — with content-based dedup
+// APPEND TO MASTER SHEET -- with content-based dedup
 // ============================================================
 function appendRowsToMaster(sheetName, rows, snapshotDate) {
   var ss    = SpreadsheetApp.getActiveSpreadsheet();
@@ -276,11 +276,11 @@ function appendRowsToMaster(sheetName, rows, snapshotDate) {
   var sheetHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn())
                           .getValues()[0].map(String);
 
-  // ── Build existing dedup key set ──────────────────────────────
+  // --Build existing dedup key set ------------------------------
   // Upcoming key:      snapshot_date + Subject Full Name + Study Name + Scheduled Date
   // Cancellations key: snapshot_date + Subject Full Name + Study Name + Cancel Date
   // Audit Log key:     Calendar Appointment Key (back end) + Appointment For User + Appointment Change Type
-  //                    (GLOBAL dedup — audit entries are immutable, no snapshot_date prefix)
+  //                    (GLOBAL dedup -- audit entries are immutable, no snapshot_date prefix)
   var isUpcoming     = sheetName === UPCOMING_SHEET_NAME;
   var isAudit        = sheetName === AUDIT_SHEET_NAME;
 
@@ -304,7 +304,7 @@ function appendRowsToMaster(sheetName, rows, snapshotDate) {
     if (allFound) {
       var existingData = sheet.getRange(2, 1, lastRow - 1, sheetHeaders.length).getValues();
       existingData.forEach(function(r) {
-        // Audit log: global dedup (no snapshot_date filter — same entry never duplicated)
+        // Audit log: global dedup (no snapshot_date filter -- same entry never duplicated)
         // Upcoming/Cancels: dedup within same snapshot_date only
         if (!isAudit && String(r[snapCol - 1]) !== snapshotDate) return;
 
@@ -319,7 +319,7 @@ function appendRowsToMaster(sheetName, rows, snapshotDate) {
 
   Logger.log("Existing dedup keys (" + (isAudit ? "global" : snapshotDate) + "): " + existingKeys.size);
 
-  // ── Filter out rows that already exist ───────────────────────
+  // --Filter out rows that already exist -----------------------
   var outputRows = [];
   var dupCount   = 0;
 
@@ -422,14 +422,14 @@ function getAllSpreadsheetFiles(folder) {
 
 
 // ============================================================
-// ONE-TIME CLEANUP — removes duplicate rows from existing master
+// ONE-TIME CLEANUP -- removes duplicate rows from existing master
 // Run this ONCE manually to clean up the historical bloat.
-// Safe to run multiple times — idempotent.
+// Safe to run multiple times -- idempotent.
 // ============================================================
 function deduplicateMasterSheets() {
   var ui = SpreadsheetApp.getUi();
   var res = ui.alert(
-    "🧹 Deduplicate Master Sheets?",
+    "[Cleanup] Deduplicate Master Sheets?",
     "This will remove duplicate rows from Master - Upcoming, Master - Cancellations, and Appointment Audit Log.\n\nThis is safe and reversible (make a backup copy first if you prefer).\n\nContinue?",
     ui.ButtonSet.YES_NO
   );
@@ -439,7 +439,7 @@ function deduplicateMasterSheets() {
   _deduplicateSheet(CANCEL_SHEET_NAME,    "Subject Full Name", "Study Name", "Cancel Date");
   _deduplicateSheet(AUDIT_SHEET_NAME,     "Calendar Appointment Key (back end)", "Appointment For User", "Appointment Change Type");
 
-  ui.alert("✅ Done", "Duplicate rows have been removed from all master sheets.", ui.ButtonSet.OK);
+  ui.alert("[OK] Done", "Duplicate rows have been removed from all master sheets.", ui.ButtonSet.OK);
 }
 
 function _deduplicateSheet(sheetName, col1, col2, col3) {
@@ -462,11 +462,11 @@ function _deduplicateSheet(sheetName, col1, col2, col3) {
 
   // Audit log doesn't require snapshot_date for dedup (global dedup)
   if (!isAudit && snapIdx < 0) {
-    Logger.log(sheetName + ": snapshot_date column not found — skipping");
+    Logger.log(sheetName + ": snapshot_date column not found -- skipping");
     return;
   }
   if (c1Idx < 0 || c2Idx < 0 || c3Idx < 0) {
-    Logger.log(sheetName + ": required columns not found — skipping");
+    Logger.log(sheetName + ": required columns not found -- skipping");
     return;
   }
 
@@ -504,14 +504,14 @@ function _deduplicateSheet(sheetName, col1, col2, col3) {
 
 
 // ============================================================
-// MIGRATE AUDIT LOG — prune columns + filter to "User Added"
+// MIGRATE AUDIT LOG -- prune columns + filter to "User Added"
 // Run ONCE if the Audit Log sheet already has wide-format data.
 // ============================================================
 function migrateAuditLog() {
   var ss    = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(AUDIT_SHEET_NAME);
   if (!sheet || sheet.getLastRow() < 2) {
-    Logger.log("Audit log sheet not found or empty — nothing to migrate.");
+    Logger.log("Audit log sheet not found or empty -- nothing to migrate.");
     return;
   }
 
@@ -531,7 +531,7 @@ function migrateAuditLog() {
 
   // If already migrated (only 5 columns), skip
   if (headers.length <= 5) {
-    Logger.log("Audit log already has " + headers.length + " columns — appears migrated.");
+    Logger.log("Audit log already has " + headers.length + " columns -- appears migrated.");
     return;
   }
 
@@ -547,7 +547,7 @@ function migrateAuditLog() {
     keepRows.push(newRow);
   }
 
-  Logger.log("Audit migration: " + data.length + " → " + keepRows.length + " rows (" + filtered + " non-User-Added filtered out), " + headers.length + " → " + KEEP_COLS.length + " columns");
+  Logger.log("Audit migration: " + data.length + " -> " + keepRows.length + " rows (" + filtered + " non-User-Added filtered out), " + headers.length + " -> " + KEEP_COLS.length + " columns");
 
   // Clear and rewrite
   sheet.clearContents();
@@ -574,7 +574,7 @@ function diagnose() {
 
   try {
     var folder = DriveApp.getFolderById(FOLDER_ID);
-    sheet.appendRow(["Folder access", "✓ " + folder.getName()]);
+    sheet.appendRow(["Folder access", "[OK] " + folder.getName()]);
 
     var files = folder.getFiles();
     var count = 0;
@@ -668,7 +668,7 @@ function resetAndReprocessAudit() {
 
 function DANGER_resetEverything() {
   var ui  = SpreadsheetApp.getUi();
-  var res = ui.alert("⚠ RESET?", "Delete ALL data from master sheets and log?", ui.ButtonSet.YES_NO);
+  var res = ui.alert("[WARNING] RESET?", "Delete ALL data from master sheets and log?", ui.ButtonSet.YES_NO);
   if (res !== ui.Button.YES) return;
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   [UPCOMING_SHEET_NAME, CANCEL_SHEET_NAME, AUDIT_SHEET_NAME, LOG_SHEET_NAME].forEach(function(name) {
