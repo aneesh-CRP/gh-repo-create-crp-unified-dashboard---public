@@ -13202,7 +13202,7 @@ function processLiveData(upcoming, cancels) {
     const su = studyUrl(r['Study Key'], r['Site Name']);
     const coord = cleanCoord(r['Staff Full Name']||r['Full Name']||'');
     const cancelDate = (() => { try { const d=new Date(r['Cancel Date']); return d.toLocaleDateString('en-US',{month:'short',day:'numeric'}); } catch(e) { return ''; } })();
-    const row = {patient, study, url: pu, study_url: su, reason: reason.substring(0,80), coord, cancel_date: cancelDate};
+    const row = {name: patient, patient, study, url: pu, study_url: su, reason: reason.substring(0,80), coord, cancel_date: cancelDate};
     const cat = r._category;
 
     // Skip excluded categories from action routing (they're not real cancellations)
