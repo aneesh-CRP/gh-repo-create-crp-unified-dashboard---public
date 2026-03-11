@@ -13089,9 +13089,9 @@ function processLiveData(allRows, legacyCancels, auditLog) {
     return '';
   }
 
-  // Debug: log first 3 rows' investigator resolution
+  // Debug: log first 5 upcoming rows' investigator resolution (uses allRows before filter)
   let _invDebugCount = 0;
-  activeUpcoming.slice(0, 5).forEach(r => {
+  (allRows || []).slice(0, 5).forEach(r => {
     const ak = (r['Calendar Appointment Key (back end)'] || r['Calendar Appointment Key'] || '').toString().trim();
     const sk = (r['Subject Key (Back End)'] || '').toString().trim();
     const inv = resolveInvestigator(r);
