@@ -12854,14 +12854,14 @@ async function connectSheets() {
     </div>`;
 
   try {
-    const [rows1, rows2] = await Promise.all([fetchCSV(url1), fetchCSV(url2)]);
-    DATA = processLiveData(rows1, rows2);
+    const [rows1, rows2, auditRows] = await Promise.all([fetchCSV(url1), fetchCSV(url2), fetchCSV(AUDIT_LOG_URL).catch(() => [])]);
+    DATA = processLiveData(rows1, rows2, auditRows);
     document.getElementById('data-source-badge').textContent = '🔗 Live Google Sheets';
     document.getElementById('last-refresh-badge').textContent = 'Updated: ' + new Date().toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'});
     closeSetup();
     renderAll();
     CRP.emit('dataLoaded', { source: 'google-sheets', timestamp: new Date() });
-    console.log('CRP: Live data loaded from Google Sheets');
+    console.log('CRP: Live data loaded from Google Sheets (audit log rows: ' + auditRows.length + ')');
   } catch(e) {
     alert('Could not load data: ' + e.message + '\n\nMake sure the sheet is published as CSV (File → Share → Publish to web → CSV format).');
     location.reload();
@@ -12875,7 +12875,7 @@ async function connectFromGuide() {
   connectSheets();
 }
 
-function processLiveData(upcoming, cancels) {
+function processLiveData(upcoming, cancels, auditLog) {
   const today = new Date();
   today.setHours(0,0,0,0);
   const twoMonthsAgo   = new Date(today); twoMonthsAgo.setDate(today.getDate() - 61);
@@ -12898,6 +12898,80 @@ function processLiveData(upcoming, cancels) {
   upcoming = latestSnapshotOnly(upcoming);
   cancels  = latestSnapshotOnly(cancels);
   console.log('CRP: Snapshot dedup → upcoming', upcoming.length, 'cancels', cancels.length);
+
+  // ── Audit Log Coordinator Resolution ──
+  // Build lookup maps from audit log to resolve the actual clinical coordinator
+  // when the upcoming report shows a scheduler/study coordinator instead.
+  // Join on Calendar Appointment Key (precise) with Subject Key fallback.
+  const _auditByApptKey = {};   // Calendar Appointment Key → Set of "Appointment For User"
+  const _auditBySubjKey = {};   // Subject Key → Set of "Appointment For User"
+  (auditLog || []).forEach(r => {
+    const apptFor = (r['Appointment For User'] || '').trim();
+    const changeType = (r['Appointment Change Type'] || '').trim();
+    if (!apptFor || changeType !== 'User Added') return;
+    const apptKey = (r['Calendar Appointment Key (back end)'] || '').toString().trim();
+    const subjKey = (r['Subject Key (Back End)'] || '').toString().trim();
+    if (apptKey) {
+      if (!_auditByApptKey[apptKey]) _auditByApptKey[apptKey] = new Set();
+      _auditByApptKey[apptKey].add(apptFor);
+    }
+    if (subjKey) {
+      if (!_auditBySubjKey[subjKey]) _auditBySubjKey[subjKey] = new Set();
+      _auditBySubjKey[subjKey].add(apptFor);
+    }
+  });
+  console.log('CRP: Audit log loaded — apptKey entries:', Object.keys(_auditByApptKey).length, 'subjKey entries:', Object.keys(_auditBySubjKey).length);
+
+  // Resolve actual coordinator for a row: if Full Name is an excluded coordinator,
+  // look up the real coordinator from the audit log.
+  // Returns the first non-excluded coordinator found, or original Full Name as fallback.
+  function resolveCoordinator(row) {
+    const origName = (row['Full Name'] || '').trim();
+    const origLower = origName.toLowerCase().replace(/\s+/g, ' ');
+    // If already a real coordinator, no resolution needed
+    if (!EXCL_COORD.has(origLower)) return origName;
+    // Try Calendar Appointment Key first (most precise)
+    const apptKey = (row['Calendar Appointment Key (back end)'] || row['Calendar Appointment Key'] || '').toString().trim();
+    if (apptKey && _auditByApptKey[apptKey]) {
+      for (const name of _auditByApptKey[apptKey]) {
+        if (!EXCL_COORD.has(name.toLowerCase().replace(/\s+/g, ' '))) return name;
+      }
+    }
+    // Fall back to Subject Key
+    const subjKey = (row['Subject Key (Back End)'] || '').toString().trim();
+    if (subjKey && _auditBySubjKey[subjKey]) {
+      for (const name of _auditBySubjKey[subjKey]) {
+        if (!EXCL_COORD.has(name.toLowerCase().replace(/\s+/g, ' '))) return name;
+      }
+    }
+    return origName; // no resolution found, keep original
+  }
+
+  // Enrich all upcoming rows with resolved coordinator
+  let _resolvedCount = 0;
+  [...upcoming, ...upcomingAllSnapshots].forEach(r => {
+    const orig = (r['Full Name'] || '').trim();
+    const resolved = resolveCoordinator(r);
+    if (resolved !== orig) {
+      r['_Resolved Coordinator'] = resolved;
+      r['Full Name'] = resolved;
+      _resolvedCount++;
+    }
+  });
+  // Also enrich cancels rows
+  cancels.forEach(r => {
+    const origStaff = (r['Staff Full Name'] || r['Full Name'] || '').trim();
+    const origLower = origStaff.toLowerCase().replace(/\s+/g, ' ');
+    if (EXCL_COORD.has(origLower)) {
+      const resolved = resolveCoordinator(r);
+      if (resolved !== origStaff) {
+        r['_Resolved Coordinator'] = resolved;
+        if (r['Staff Full Name']) r['Staff Full Name'] = resolved;
+        if (r['Full Name']) r['Full Name'] = resolved;
+      }
+    }
+  });
+  console.log('CRP: Coordinator resolution — resolved', _resolvedCount, 'rows via audit log');
 
   const BASE = 'https://app.clinicalresearch.io/clinical-research-philadelphia-crp';
   const PHL  = 'philadelphia-pa';
@@ -13411,8 +13485,8 @@ async function refreshData() {
   const url2 = LIVE_URL2;
   document.getElementById('last-refresh-badge').textContent = 'Refreshing...';
   try {
-    const [rows1, rows2] = await Promise.all([fetchCSV(url1), fetchCSV(url2)]);
-    DATA = processLiveData(rows1, rows2);
+    const [rows1, rows2, auditRows] = await Promise.all([fetchCSV(url1), fetchCSV(url2), fetchCSV(AUDIT_LOG_URL).catch(() => [])]);
+    DATA = processLiveData(rows1, rows2, auditRows);
     renderAll();
     // Also refresh patient DB cross-reference
     fetchPatientDB().catch(e => console.warn('Patient DB refresh failed:', e));
@@ -15578,6 +15652,7 @@ function renderFacebookCRM() {
 
 const LIVE_URL1 = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRUXJxTDsr5IRByMfuLF0P3hVq_QuEw6M1MPNDwd1CaV2UZ9tnFflUwsmUKAd3xeX3_esn0c4YlrV0q/pub?gid=0&single=true&output=csv';
 const LIVE_URL2 = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRUXJxTDsr5IRByMfuLF0P3hVq_QuEw6M1MPNDwd1CaV2UZ9tnFflUwsmUKAd3xeX3_esn0c4YlrV0q/pub?gid=1487298034&single=true&output=csv';
+const AUDIT_LOG_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRpPUZFSyW0rrx2yQdqYPyccRZC0wqUCWyCfX_n2XTMPyKQr9da4jl1jMbZ5_KKFkYZjJiNl_ClYbXk/pub?gid=0&single=true&output=csv';
 
 function loadLongitudinalData() {
   // Longitudinal/trends data loads from Master Sheet
@@ -16004,12 +16079,12 @@ document.addEventListener('DOMContentLoaded', () => {
   // Auto-load live CRIO data (upcoming visits + cancellations) from published Sheets
   (async () => {
     try {
-      const [rows1, rows2] = await Promise.all([fetchCSV(LIVE_URL1), fetchCSV(LIVE_URL2)]);
-      DATA = processLiveData(rows1, rows2);
+      const [rows1, rows2, auditRows] = await Promise.all([fetchCSV(LIVE_URL1), fetchCSV(LIVE_URL2), fetchCSV(AUDIT_LOG_URL).catch(e => { console.warn('CRP: Audit log fetch failed, continuing without:', e.message); return []; })]);
+      DATA = processLiveData(rows1, rows2, auditRows);
       document.getElementById('data-source-badge').textContent = '🔗 Live Google Sheets';
       document.getElementById('last-refresh-badge').textContent = 'Updated: ' + new Date().toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'});
       renderAll();
-      console.log('CRP: Live CRIO data auto-loaded from Google Sheets');
+      console.log('CRP: Live CRIO data auto-loaded from Google Sheets (audit log rows: ' + auditRows.length + ')');
     } catch(e) {
       console.warn('CRP: Auto-load live data failed, using SAMPLE:', e.message);
     }
@@ -16053,10 +16128,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // 0. Refresh live CRIO data (visits + cancels)
     (async () => {
       try {
-        const [rows1, rows2] = await Promise.all([fetchCSV(LIVE_URL1), fetchCSV(LIVE_URL2)]);
-        DATA = processLiveData(rows1, rows2);
+        const [rows1, rows2, auditRows] = await Promise.all([fetchCSV(LIVE_URL1), fetchCSV(LIVE_URL2), fetchCSV(AUDIT_LOG_URL).catch(() => [])]);
+        DATA = processLiveData(rows1, rows2, auditRows);
         renderAll();
-        console.log('CRP Auto-Refresh: Live CRIO data refreshed');
+        console.log('CRP Auto-Refresh: Live CRIO data refreshed (audit log rows: ' + auditRows.length + ')');
       } catch(e) { console.warn('CRP Auto-Refresh: CRIO refresh failed:', e.message); }
     })();
 
