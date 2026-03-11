@@ -384,7 +384,11 @@ function getOrCreateLogSheet() {
     sheet.appendRow(["file_id", "file_name", "processed_at", "status", "file_modified_date"]);
     sheet.getRange(1, 1, 1, 5).setFontWeight("bold")
          .setBackground("#334155").setFontColor("#ffffff");
-    sheet.setColumnWidths(1, 5, [240, 320, 160, 280, 160]);
+    sheet.setColumnWidth(1, 240);
+    sheet.setColumnWidth(2, 320);
+    sheet.setColumnWidth(3, 160);
+    sheet.setColumnWidth(4, 280);
+    sheet.setColumnWidth(5, 160);
     sheet.hideSheet();
   }
   return sheet;
