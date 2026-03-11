@@ -12854,14 +12854,14 @@ async function connectSheets() {
     </div>`;
 
   try {
-    const [rows1, rows2, auditRows] = await Promise.all([fetchCSV(url1), fetchCSV(url2), fetchCSV(AUDIT_LOG_URL).catch(() => [])]);
-    DATA = processLiveData(rows1, rows2, auditRows);
+    const [rows1, legacyCancels, auditRows] = await Promise.all([fetchCSV(url1), fetchCSV(url2).catch(() => []), fetchCSV(AUDIT_LOG_URL).catch(() => [])]);
+    DATA = processLiveData(rows1, legacyCancels, auditRows);
     document.getElementById('data-source-badge').textContent = '🔗 Live Google Sheets';
     document.getElementById('last-refresh-badge').textContent = 'Updated: ' + new Date().toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'});
     closeSetup();
     renderAll();
     CRP.emit('dataLoaded', { source: 'google-sheets', timestamp: new Date() });
-    console.log('CRP: Live data loaded from Google Sheets (audit log rows: ' + auditRows.length + ')');
+    console.log('CRP: Live data loaded from setup (audit log rows: ' + auditRows.length + ')');
   } catch(e) {
     alert('Could not load data: ' + e.message + '\n\nMake sure the sheet is published as CSV (File → Share → Publish to web → CSV format).');
     location.reload();
@@ -12875,7 +12875,7 @@ async function connectFromGuide() {
   connectSheets();
 }
 
-function processLiveData(upcoming, cancels, auditLog) {
+function processLiveData(allRows, legacyCancels, auditLog) {
   const today = new Date();
   today.setHours(0,0,0,0);
   const twoMonthsAgo   = new Date(today); twoMonthsAgo.setDate(today.getDate() - 61);
@@ -12883,7 +12883,6 @@ function processLiveData(upcoming, cancels, auditLog) {
   const next14End      = new Date(today); next14End.setDate(today.getDate() + 14);
 
   // ── Snapshot dedup: keep only the latest snapshot_date from each sheet ──
-  // Both Google Sheets contain daily CRIO snapshots; each day repeats all rows.
   const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
   function latestSnapshotOnly(rows) {
     let maxSnap = '';
@@ -12894,10 +12893,43 @@ function processLiveData(upcoming, cancels, auditLog) {
     if (!maxSnap) return rows;                         // no snapshot col → pass through
     return rows.filter(r => (r.snapshot_date || '').trim() === maxSnap);
   }
-  const upcomingAllSnapshots = upcoming;   // keep full history for coord daily goals
-  upcoming = latestSnapshotOnly(upcoming);
-  cancels  = latestSnapshotOnly(cancels);
-  console.log('CRP: Snapshot dedup → upcoming', upcoming.length, 'cancels', cancels.length);
+
+  // ── Single-report split: upcoming report includes cancelled visits ──
+  // Split by Appointment Status into upcoming (active) vs cancels.
+  // Map field names so downstream code works: Full Name → Staff Full Name, Scheduled Date → Cancel Date
+  const upcomingAllSnapshots = allRows;   // keep full history for coord daily goals
+  const allLatest = latestSnapshotOnly(allRows);
+  let upcoming = allLatest.filter(r => {
+    const status = (r['Appointment Status'] || '').trim().toLowerCase();
+    return status !== 'cancelled' && status !== 'canceled';
+  });
+  // Extract cancels from the unified report
+  const derivedCancels = allLatest.filter(r => {
+    const status = (r['Appointment Status'] || '').trim().toLowerCase();
+    return status === 'cancelled' || status === 'canceled';
+  }).map(r => {
+    // Map fields so downstream cancel processing code works
+    // (it expects 'Staff Full Name', 'Cancel Date', 'Site Name')
+    r['Staff Full Name'] = r['Staff Full Name'] || r['Full Name'] || '';
+    r['Cancel Date'] = r['Cancel Date'] || r['Scheduled Date'] || '';
+    r['Site Name'] = r['Site Name'] || '';
+    return r;
+  });
+  // Merge with legacy cancels (if available) for richer history, dedup by patient+study+date
+  const _cancelSeen = new Set();
+  const allCancelSources = [...derivedCancels];
+  if (legacyCancels && legacyCancels.length) {
+    const legacyLatest = latestSnapshotOnly(legacyCancels);
+    legacyLatest.forEach(r => allCancelSources.push(r));
+  }
+  let cancels = [];
+  allCancelSources.forEach(r => {
+    const key = ((r['Subject Full Name']||'').trim().toLowerCase()) + '|' +
+                ((r['Study Name']||'').trim().toLowerCase()) + '|' +
+                ((r['Cancel Date']||r['Scheduled Date']||'').trim());
+    if (!_cancelSeen.has(key)) { _cancelSeen.add(key); cancels.push(r); }
+  });
+  console.log('CRP: Split report → upcoming', upcoming.length, ', derived cancels', derivedCancels.length, ', total cancels (merged+deduped)', cancels.length);
 
   // ── Audit Log Coordinator Resolution ──
   // Build lookup maps from audit log to resolve the actual clinical coordinator
@@ -13002,7 +13034,10 @@ function processLiveData(upcoming, cancels, auditLog) {
   const COORD_MAP = {
     'stacey scott':'Stacey Scott','ruby pereira':'Ruby Pereira',
     'mario castellanos':'Mario Castellanos','angelina mcmullen':'Angelina McMullen',
-    'cady chilensky':'Cady Chilensky'
+    'cady chilensky':'Cady Chilensky','eugene andruczyk':'Eugene Andruczyk',
+    'lolita vaughan':'Lolita Vaughan','michael tomeo':'Michael Tomeo',
+    'joseph heether':'Joseph Heether','brian shaffer':'Brian Shaffer',
+    'taher modarressi':'Taher Modarressi'
   };
   function normName(n)   { return (n||'').trim().replace(/\s+/g,' '); }
   function cleanCoord(n) { return COORD_MAP[normName(n).toLowerCase()] || normName(n); }
@@ -13481,12 +13516,14 @@ function processLiveData(upcoming, cancels, auditLog) {
 }
 
 async function refreshData() {
-  const url1 = LIVE_URL1;
-  const url2 = LIVE_URL2;
   document.getElementById('last-refresh-badge').textContent = 'Refreshing...';
   try {
-    const [rows1, rows2, auditRows] = await Promise.all([fetchCSV(url1), fetchCSV(url2), fetchCSV(AUDIT_LOG_URL).catch(() => [])]);
-    DATA = processLiveData(rows1, rows2, auditRows);
+    const [rows1, legacyCancels, auditRows] = await Promise.all([
+      fetchCSV(LIVE_URL1),
+      fetchCSV(LIVE_URL2_LEGACY).catch(() => []),
+      fetchCSV(AUDIT_LOG_URL).catch(() => [])
+    ]);
+    DATA = processLiveData(rows1, legacyCancels, auditRows);
     renderAll();
     // Also refresh patient DB cross-reference
     fetchPatientDB().catch(e => console.warn('Patient DB refresh failed:', e));
@@ -15650,8 +15687,9 @@ function renderFacebookCRM() {
 }
 
 
-const LIVE_URL1 = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRUXJxTDsr5IRByMfuLF0P3hVq_QuEw6M1MPNDwd1CaV2UZ9tnFflUwsmUKAd3xeX3_esn0c4YlrV0q/pub?gid=0&single=true&output=csv';
-const LIVE_URL2 = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRUXJxTDsr5IRByMfuLF0P3hVq_QuEw6M1MPNDwd1CaV2UZ9tnFflUwsmUKAd3xeX3_esn0c4YlrV0q/pub?gid=1487298034&single=true&output=csv';
+// ── Data Source URLs (Looker → Google Sheets, auto-pushed every 15 min) ──
+const LIVE_URL1 = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSQJ_QKC-ttmVuaYZokhz6NPNsMUpMe262mqAXbLocxOgGqbxHIMschUhE6FERyYwJfARhVg3wppBZS/pub?output=csv';
+const LIVE_URL2_LEGACY = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRUXJxTDsr5IRByMfuLF0P3hVq_QuEw6M1MPNDwd1CaV2UZ9tnFflUwsmUKAd3xeX3_esn0c4YlrV0q/pub?gid=1487298034&single=true&output=csv';
 const AUDIT_LOG_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRpPUZFSyW0rrx2yQdqYPyccRZC0wqUCWyCfX_n2XTMPyKQr9da4jl1jMbZ5_KKFkYZjJiNl_ClYbXk/pub?gid=0&single=true&output=csv';
 
 function loadLongitudinalData() {
@@ -16079,12 +16117,16 @@ document.addEventListener('DOMContentLoaded', () => {
   // Auto-load live CRIO data (upcoming visits + cancellations) from published Sheets
   (async () => {
     try {
-      const [rows1, rows2, auditRows] = await Promise.all([fetchCSV(LIVE_URL1), fetchCSV(LIVE_URL2), fetchCSV(AUDIT_LOG_URL).catch(e => { console.warn('CRP: Audit log fetch failed, continuing without:', e.message); return []; })]);
-      DATA = processLiveData(rows1, rows2, auditRows);
+      const [rows1, legacyCancels, auditRows] = await Promise.all([
+        fetchCSV(LIVE_URL1),
+        fetchCSV(LIVE_URL2_LEGACY).catch(() => []),
+        fetchCSV(AUDIT_LOG_URL).catch(e => { console.warn('CRP: Audit log fetch failed, continuing without:', e.message); return []; })
+      ]);
+      DATA = processLiveData(rows1, legacyCancels, auditRows);
       document.getElementById('data-source-badge').textContent = '🔗 Live Google Sheets';
       document.getElementById('last-refresh-badge').textContent = 'Updated: ' + new Date().toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'});
       renderAll();
-      console.log('CRP: Live CRIO data auto-loaded from Google Sheets (audit log rows: ' + auditRows.length + ')');
+      console.log('CRP: Live data loaded — upcoming:', rows1.length, 'audit:', auditRows.length);
     } catch(e) {
       console.warn('CRP: Auto-load live data failed, using SAMPLE:', e.message);
     }
@@ -16128,10 +16170,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // 0. Refresh live CRIO data (visits + cancels)
     (async () => {
       try {
-        const [rows1, rows2, auditRows] = await Promise.all([fetchCSV(LIVE_URL1), fetchCSV(LIVE_URL2), fetchCSV(AUDIT_LOG_URL).catch(() => [])]);
-        DATA = processLiveData(rows1, rows2, auditRows);
+        const [rows1, legacyCancels, auditRows] = await Promise.all([
+          fetchCSV(LIVE_URL1),
+          fetchCSV(LIVE_URL2_LEGACY).catch(() => []),
+          fetchCSV(AUDIT_LOG_URL).catch(() => [])
+        ]);
+        DATA = processLiveData(rows1, legacyCancels, auditRows);
         renderAll();
-        console.log('CRP Auto-Refresh: Live CRIO data refreshed (audit log rows: ' + auditRows.length + ')');
+        console.log('CRP Auto-Refresh: refreshed — upcoming:', rows1.length, 'audit:', auditRows.length);
       } catch(e) { console.warn('CRP Auto-Refresh: CRIO refresh failed:', e.message); }
     })();
 
