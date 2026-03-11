@@ -12921,9 +12921,8 @@ function processLiveData(upcoming, cancels) {
     return `${BASE}/${siteSlug(sk, siteName)}/study/${sk}/subject/${pk}`;
   }
 
-  const EXCLUDE_STUDIES = new Set([
-    'Cardiology Pre-Screening'
-  ]);
+  const EXCLUDE_STUDIES = new Set([]);
+  const isExcludedStudy = (name) => EXCLUDE_STUDIES.has(name) || /pre-screening/i.test(name);
   const FIBRO = /fibroscan|fibrosan|fibro scan|scan only|scan visit/i;
   const EXCL_COORD = new Set(['jana milankovic','ema gunic','gabrijela ateljevic','ana lambic','vlado draganic']);
   const COORD_MAP = {
@@ -12948,7 +12947,7 @@ function processLiveData(upcoming, cancels) {
   const activeUpcoming = upcoming.filter(r => {
     const d = parseDate(r['Scheduled Date'] || r['snapshot_date']);
     return d && d >= today && d <= twoMonthsAhead
-      && !EXCLUDE_STUDIES.has(r['Study Name'])
+      && !isExcludedStudy(r['Study Name'])
       && !FIBRO.test(r['Cancel Reason'] || '')
       && isCoord(r['Full Name']);
   });
@@ -12957,7 +12956,7 @@ function processLiveData(upcoming, cancels) {
   const rawCancels = cancels.filter(r => {
     const d = parseDate(r['Cancel Date'] || r['Scheduled Date'] || r['snapshot_date']);
     return d && d >= twoMonthsAgo && d <= today
-      && !EXCLUDE_STUDIES.has(r['Study Name']);
+      && !isExcludedStudy(r['Study Name']);
   });
 
   // Step 2: Deduplicate (same patient + study + cancel date)
@@ -13169,7 +13168,7 @@ function processLiveData(upcoming, cancels) {
     // Skip weekend visits (Sat=6, Sun=0)
     const dayOfWeek = new Date(date + 'T12:00:00').getDay();
     if (dayOfWeek === 0 || dayOfWeek === 6) return;
-    if (EXCLUDE_STUDIES.has(r['Study Name'])) return;
+    if (isExcludedStudy(r['Study Name'])) return;
     const idx = COORD_LOWER.indexOf(rawName.toLowerCase());
     if (idx === -1) return;
     const name = COORD_NAMES[idx]; // use canonical name
