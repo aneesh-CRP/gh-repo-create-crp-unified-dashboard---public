@@ -925,9 +925,10 @@ body {
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;" onclick="sortMergedTable(this,6)">In Screen ↕</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;" onclick="sortMergedTable(this,7)">SF Rate ↕</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Site</th>
-            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Pipeline</th>
+            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Referrals</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Med Rec</th>
-            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Leads</th>
+            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">FB Leads</th>
+            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Total Leads</th>
           </tr>
         </thead>
         <tbody id="merged-study-tbody"></tbody>
@@ -1257,7 +1258,7 @@ body {
     <div style="max-height:480px;overflow-y:auto;border-radius:0 0 8px 8px;">
       <table class="data-table sortable" id="vis-table">
         <thead>
-          <tr><th onclick="sortTable(this)">Date</th><th onclick="sortTable(this)">Study</th><th onclick="sortTable(this)">Visit</th><th onclick="sortTable(this)">Patient</th><th onclick="sortTable(this)">Status</th><th onclick="sortTable(this)">Coordinator</th><th onclick="sortTable(this)">Site</th></tr>
+          <tr><th onclick="sortTable(this)">Date</th><th onclick="sortTable(this)">Study</th><th onclick="sortTable(this)">Visit</th><th onclick="sortTable(this)">Patient</th><th onclick="sortTable(this)">Status</th><th onclick="sortTable(this)">Coordinator</th><th onclick="sortTable(this)">Investigator</th><th onclick="sortTable(this)">Site</th></tr>
         </thead>
         <tbody id="upcoming-tbody">
 <tr data-date="2026-03-09" data-site="PNJ" data-coord="Cady Chilensky">
@@ -2572,6 +2573,7 @@ const CRP_CONFIG = {
 
   // Coordinator visit goals
   COORDINATORS: ['Mario Castellanos','Stacey Scott','Ruby Pereira','Cady Chilensky','Angelina Mcmullen'],
+  INVESTIGATORS: ['Taher Modarressi','Eugene Andruczyk','Lolita Vaughan','Michael Tomeo','Joseph Heether','Brian Shaffer'],
   COORD_DAILY_GOAL: 2,
 
   // Auto-refresh interval (ms) — 0 to disable
@@ -11483,6 +11485,7 @@ function buildUpcomingDetailTable(rows) {
       <td>${patientCell}${medDot}</td>
       <td><span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:${sc}20;color:${sc}">${r.status}</span></td>
       <td style="font-size:11px">${r.coord}</td>
+      <td style="font-size:11px;color:${r.investigator ? '#7c3aed' : '#cbd5e1'}">${r.investigator || '—'}</td>
       <td><span style="font-size:9px;font-weight:700;padding:2px 5px;border-radius:3px;background:${siteColor}20;color:${siteColor}">${siteShort}</span></td>
     </tr>`;
   }).join('');
@@ -11589,13 +11592,14 @@ function showHorizonDetail(type, weekLabel) {
       <thead><tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0">
         <th style="padding:8px;text-align:left">Date</th><th style="padding:8px;text-align:left">Patient</th>
         <th style="padding:8px;text-align:left">Study</th><th style="padding:8px;text-align:left">Visit</th>
-        <th style="padding:8px;text-align:left">Coordinator</th>
+        <th style="padding:8px;text-align:left">Coordinator</th><th style="padding:8px;text-align:left">Investigator</th>
       </tr></thead><tbody>${rows.map(r => `<tr style="border-bottom:1px solid #f1f5f9">
         <td style="padding:6px 8px;font-weight:600;color:var(--blue)">${r.date}</td>
         <td style="padding:6px 8px"><a href="${r.patient_url}" target="_blank" style="text-decoration:none;color:var(--navy);font-weight:600">${r.patient}${linkIcon}</a></td>
         <td style="padding:6px 8px;font-size:11px">${r.study}</td>
         <td style="padding:6px 8px;font-size:11px;color:var(--muted)">${r.visit}</td>
         <td style="padding:6px 8px;font-size:11px">${r.coord}</td>
+        <td style="padding:6px 8px;font-size:11px;color:${r.investigator ? '#7c3aed' : '#cbd5e1'}">${r.investigator || '—'}</td>
       </tr>`).join('')}</tbody></table>`;
   }
 
@@ -12969,7 +12973,41 @@ function processLiveData(allRows, legacyCancels, auditLog) {
       _auditBySubjKey[subjKey].add(apptFor);
     }
   });
-  console.log('CRP: Audit log loaded — apptKey entries:', Object.keys(_auditByApptKey).length, 'subjKey entries:', Object.keys(_auditBySubjKey).length);
+  // Build investigator lookup — keyed by apptKey and subjKey → Set of investigator names
+  const INVESTIGATOR_SET = new Set((CRP_CONFIG.INVESTIGATORS || []).map(n => n.toLowerCase().replace(/\s+/g, ' ')));
+  const _invByApptKey = {};
+  const _invBySubjKey = {};
+  (auditLog || []).forEach(r => {
+    const apptFor = (r['Appointment For User'] || '').trim();
+    const changeType = (r['Appointment Change Type'] || '').trim();
+    if (!apptFor || changeType !== 'User Added') return;
+    const apptForLower = apptFor.toLowerCase().replace(/\s+/g, ' ');
+    if (!INVESTIGATOR_SET.has(apptForLower)) return;
+    const apptKey = (r['Calendar Appointment Key (back end)'] || '').toString().trim();
+    const subjKey = (r['Subject Key (Back End)'] || '').toString().trim();
+    if (apptKey) {
+      if (!_invByApptKey[apptKey]) _invByApptKey[apptKey] = new Set();
+      _invByApptKey[apptKey].add(apptFor);
+    }
+    if (subjKey) {
+      if (!_invBySubjKey[subjKey]) _invBySubjKey[subjKey] = new Set();
+      _invBySubjKey[subjKey].add(apptFor);
+    }
+  });
+  console.log('CRP: Audit log loaded — apptKey entries:', Object.keys(_auditByApptKey).length, 'subjKey entries:', Object.keys(_auditBySubjKey).length, 'investigator apptKeys:', Object.keys(_invByApptKey).length);
+
+  // Resolve investigator for a row from the audit log
+  function resolveInvestigator(row) {
+    const apptKey = (row['Calendar Appointment Key (back end)'] || row['Calendar Appointment Key'] || '').toString().trim();
+    if (apptKey && _invByApptKey[apptKey]) {
+      for (const name of _invByApptKey[apptKey]) return name;
+    }
+    const subjKey = (row['Subject Key (Back End)'] || '').toString().trim();
+    if (subjKey && _invBySubjKey[subjKey]) {
+      for (const name of _invBySubjKey[subjKey]) return name;
+    }
+    return '';
+  }
 
   // Resolve actual coordinator for a row: if Full Name is an excluded coordinator,
   // look up the real coordinator from the audit log.
@@ -13454,6 +13492,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
         patient_url: `${base}/study/${+sk}/subject/${+subk}`,
         status: r['Subject Status']||'',
         coord: cleanCoord(r['Full Name']),
+        investigator: cleanCoord(resolveInvestigator(r)),
         site: r['Site Name']||'',
       };
     }),
@@ -14038,7 +14077,7 @@ function showCancels(filterFn, title, sub) {
 function showUpcoming(filterFn, title, sub) {
   const rows = (DATA.allVisitDetail||DATA.next14Detail||[]).filter(filterFn||(()=>true));
   const body = `<table class="detail-table"><thead><tr>
-    <th>Date</th><th>Patient</th><th>Study</th><th>Visit</th><th>Status</th><th>Coordinator</th><th>Site</th>
+    <th>Date</th><th>Patient</th><th>Study</th><th>Visit</th><th>Status</th><th>Coordinator</th><th>Investigator</th><th>Site</th>
   </tr></thead><tbody>` +
   rows.map(r=>`<tr>
     <td style="font-weight:600;color:#1843ad;white-space:nowrap">${r.date}</td>
@@ -14047,6 +14086,7 @@ function showUpcoming(filterFn, title, sub) {
     <td style="font-size:11px;color:#64748b">${r.visit||'—'}</td>
     <td>${statusBadge(r.status)}</td>
     <td style="font-size:11px">${r.coord||'—'}</td>
+    <td style="font-size:11px;color:${r.investigator?'#7c3aed':'#cbd5e1'}">${r.investigator||'—'}</td>
     <td>${siteBadge(r.site)}</td>
   </tr>`).join('') +
   `</tbody></table>`;
@@ -14078,7 +14118,7 @@ function showStudyDetail(studyName, studyUrl) {
   if(upcoming.length) {
     body += `<h4 style="font-size:12px;font-weight:700;color:#475569;margin:0 0 8px;text-transform:uppercase;letter-spacing:.5px;">📆 Upcoming Visits (${upcoming.length})</h4>
     <table class="detail-table" style="margin-bottom:20px"><thead><tr>
-      <th>Date</th><th>Patient</th><th>Visit</th><th>Status</th><th>Coordinator</th>
+      <th>Date</th><th>Patient</th><th>Visit</th><th>Status</th><th>Coordinator</th><th>Investigator</th>
     </tr></thead><tbody>` +
     upcoming.map(r=>`<tr>
       <td style="font-weight:600;color:#1843ad">${r.date}</td>
@@ -14086,6 +14126,7 @@ function showStudyDetail(studyName, studyUrl) {
       <td style="font-size:11px;color:#64748b">${r.visit}</td>
       <td>${statusBadge(r.status)}</td>
       <td style="font-size:11px">${r.coord}</td>
+      <td style="font-size:11px;color:${r.investigator?'#7c3aed':'#cbd5e1'}">${r.investigator||'—'}</td>
     </tr>`).join('') + `</tbody></table>`;
   }
   if(allCancelRows.length) {
@@ -14298,7 +14339,7 @@ function showCoordDetail(coordName) {
   if(upcoming.length) {
     body += `<h4 style="font-size:12px;font-weight:700;color:#475569;margin:0 0 8px;text-transform:uppercase;letter-spacing:.5px;">📆 Upcoming Visits (${upcoming.length})</h4>
     <table class="detail-table" style="margin-bottom:20px"><thead><tr>
-      <th>Date</th><th>Patient</th><th>Study</th><th>Visit</th><th>Status</th>
+      <th>Date</th><th>Patient</th><th>Study</th><th>Visit</th><th>Status</th><th>Investigator</th>
     </tr></thead><tbody>` +
     upcoming.map(r=>`<tr>
       <td style="font-weight:600;color:#1843ad;white-space:nowrap">${r.date}</td>
@@ -14306,6 +14347,7 @@ function showCoordDetail(coordName) {
       <td style="font-size:11px">${extLink(r.study,r.study_url)}</td>
       <td style="font-size:11px;color:#64748b">${r.visit}</td>
       <td>${statusBadge(r.status)}</td>
+      <td style="font-size:11px;color:${r.investigator?'#7c3aed':'#cbd5e1'}">${r.investigator||'—'}</td>
     </tr>`).join('') + `</tbody></table>`;
   }
   if(allCancelRows.length) {
@@ -15937,21 +15979,43 @@ function findReadyNoVisit() {
 function buildPipelineCell(studyName, safeStudy) {
   const refData = getStudyReferralPipeline(studyName);
   if (!refData || refData.total === 0) return '<span style="font-size:10px;color:#cbd5e1;">\u2014</span>';
-  const stages = ['New Lead','Contacted','Pre-Screening','Screening','Screened','Enrolled'];
-  const colors = {'New Lead':'#3b82f6','Contacted':'#f59e0b','Pre-Screening':'#8b5cf6','Screening':'#06b6d4','Screened':'#10b981','Enrolled':'#059669'};
-  const miniBar = stages.map(function(st) {
-    const c = refData.stages[st] || 0;
-    return c > 0 ? '<div style="width:'+Math.max(c*6,4)+'px;height:10px;background:'+colors[st]+';border-radius:2px;" title="'+st+': '+c+'"></div>' : '';
-  }).filter(Boolean).join('');
-  return '<div style="cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;" onclick="showStudyPipelineModal(\''+safeStudy+'\')"><div style="display:flex;gap:1px;">'+miniBar+'</div><div style="font-size:9px;font-weight:600;color:#475569;">'+refData.active+'<span style="color:#94a3b8;font-weight:400">/'+refData.total+'</span></div></div>';
+  const activeColor = refData.active > 5 ? '#059669' : refData.active > 0 ? '#3b82f6' : '#94a3b8';
+  return '<div style="cursor:pointer;text-align:center;" onclick="showStudyPipelineModal(\''+safeStudy+'\')">' +
+    '<div style="font-size:12px;font-weight:700;color:'+activeColor+';">'+refData.active+'</div>' +
+    '<div style="font-size:9px;color:#94a3b8;">'+refData.total+' total</div>' +
+    '</div>';
 }
 
 function buildMedRecCell(studyName, safeStudy) {
   var d = getStudyMedRecords(studyName);
+  // Check records received for scheduled visit patients
+  var upcoming = (DATA.allVisitDetail||[]).filter(function(v){ return v.study === studyName; });
+  var schedPatients = [];
+  var _seen = {};
+  upcoming.forEach(function(v) {
+    var key = (v.patient||'').toLowerCase().trim();
+    if (!_seen[key]) { _seen[key] = true; schedPatients.push(key); }
+  });
+  var recvCount = 0, totalSched = schedPatients.length;
+  if (typeof MED_RECORDS_DATA !== 'undefined' && MED_RECORDS_DATA.length > 0 && totalSched > 0) {
+    schedPatients.forEach(function(pName) {
+      var medMatch = MED_RECORDS_DATA.find(function(m){ return m.name.toLowerCase().trim() === pName; });
+      if (medMatch && (medMatch.records_received === 'Yes' || medMatch.status === 'Enrolled' || medMatch.status === 'Complete')) recvCount++;
+    });
+  }
+  // Show records received for scheduled patients
+  if (totalSched > 0) {
+    var pct = Math.round(recvCount / totalSched * 100);
+    var color = pct === 100 ? '#059669' : pct >= 50 ? '#d97706' : '#dc2626';
+    return '<div style="cursor:pointer;text-align:center;" onclick="showMedRecDetailModal(\'' + safeStudy + '\')">' +
+      '<div style="font-size:12px;font-weight:700;color:' + color + ';">' + recvCount + '/' + totalSched + '</div>' +
+      '<div style="font-size:9px;color:' + color + ';">' + pct + '% received</div>' +
+      '</div>';
+  }
   if (!d) return '<span style="font-size:10px;color:#cbd5e1;">\u2014</span>';
-  var color = d.active > 0 ? (d.readySched > 0 ? '#f59e0b' : '#8b5cf6') : (d.enrolled > 0 ? '#059669' : '#94a3b8');
+  var color2 = d.active > 0 ? (d.readySched > 0 ? '#f59e0b' : '#8b5cf6') : (d.enrolled > 0 ? '#059669' : '#94a3b8');
   return '<div style="cursor:pointer;text-align:center;" onclick="showMedRecDetailModal(\'' + safeStudy + '\')">' +
-    '<div style="font-size:11px;font-weight:700;color:' + color + ';">' + d.active + '</div>' +
+    '<div style="font-size:11px;font-weight:700;color:' + color2 + ';">' + d.active + '</div>' +
     '<div style="font-size:9px;color:#94a3b8;">' + d.total + ' total</div>' +
     '</div>';
 }
@@ -15963,6 +16027,20 @@ function buildFBLeadCell(studyName) {
   return '<div style="text-align:center;">' +
     '<div style="font-size:11px;font-weight:700;color:' + color + ';">' + d.count + '</div>' +
     (d.recent > 0 ? '<div style="font-size:9px;color:#3b82f6;">' + d.recent + ' new</div>' : '') +
+    '</div>';
+}
+
+function buildTotalLeadsCell(studyName, safeStudy) {
+  var refData = getStudyReferralPipeline(studyName);
+  var fbData = getStudyFBLeads(studyName);
+  var refCount = refData ? refData.total : 0;
+  var fbCount = fbData ? fbData.count : 0;
+  var total = refCount + fbCount;
+  if (total === 0) return '<span style="font-size:10px;color:#cbd5e1;">\u2014</span>';
+  var color = total > 5 ? '#059669' : total > 0 ? '#3b82f6' : '#94a3b8';
+  return '<div style="text-align:center;">' +
+    '<div style="font-size:12px;font-weight:700;color:' + color + ';">' + total + '</div>' +
+    '<div style="font-size:9px;color:#94a3b8;">' + refCount + ' ref + ' + fbCount + ' FB</div>' +
     '</div>';
 }
 
@@ -16061,6 +16139,7 @@ function renderStudiesTable() {
       <td style="padding:10px 8px;text-align:center">${buildPipelineCell(s.study, safeStudy)}</td>
       <td style="padding:10px 8px;text-align:center">${buildMedRecCell(s.study, safeStudy)}</td>
       <td style="padding:10px 8px;text-align:center">${buildFBLeadCell(s.study)}</td>
+      <td style="padding:10px 8px;text-align:center">${buildTotalLeadsCell(s.study, safeStudy)}</td>
     </tr>`;
   }).join('');
 }
