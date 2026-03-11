@@ -818,12 +818,6 @@ body {
     </div>
     <div class="tb-divider"></div>
     <div class="tb-section">
-      <div class="tb-label">📢 Marketing Tasks</div>
-      <div class="tb-value" style="color:#f59e0b" id="ov-kpi-mktg">—</div>
-      <div class="tb-sub">Active campaigns &amp; tasks</div>
-    </div>
-    <div class="tb-divider"></div>
-    <div class="tb-section">
       <div class="tb-label">🎯 Lead→Enrolled</div>
       <div class="tb-value" style="color:#059669" id="ov-kpi-conv">—</div>
       <div class="tb-sub">Referral conversion rate</div>
@@ -2177,17 +2171,6 @@ body {
       </div>
     </div>
 
-    <!-- CRP Marketing & Digital World -->
-    <div class="card fade-in" style="margin-bottom:16px;">
-      <div class="card-header">
-        <span class="card-title">📢 CRP Marketing &amp; Digital World</span>
-        <span class="badge badge-blue" id="ref-marketing-badge">Loading...</span>
-      </div>
-      <div style="padding:0;" id="ref-marketing-content">
-        <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Loading marketing data...</div>
-      </div>
-    </div>
-
   </div><!-- /referral-dashboard -->
 </div><!-- /view-referrals -->
 
@@ -2582,13 +2565,6 @@ const CRP_CONFIG = {
     // Patient tracker NJ (Pennington site)
     PATIENT_TRACKER_NJ: '901413875382',
 
-    // CRP Marketing & Digital World space
-    MARKETING_SPACE: '90144349799',
-    MARKETING_FOLDERS: {
-      CAMPAIGNS: '90147134843',
-      EVENTS: '90147290115',
-      CONTENT_CALENDAR: '90147290109',
-    },
   },
 
   // Master Sheet (for Apps Script consolidation)
@@ -2619,8 +2595,8 @@ const CRP_CONFIG = {
   },
 
   // Version
-  VERSION: '2.9.3',
-  BUILD_DATE: '2026-03-10T23:00:00Z',
+  VERSION: '2.9.5',
+  BUILD_DATE: '2026-03-11T12:00:00Z',
 };
 
 // ═══ EVENT BUS (for plugin extensibility) ═══
@@ -12013,13 +11989,12 @@ function buildInsights() {
     </div></div>`);
   }
 
-  // Cross-source: marketing activity
-  var mktgActive = MARKETING_DATA ? MARKETING_DATA.length : 0;
+  // Cross-source: campaign activity
   var campActive = CAMPAIGN_DATA ? CAMPAIGN_DATA.filter(function(c){ return c.first_contact > 0; }).length : 0;
   if (campActive > 0) {
     posItems.push(`<div class="insight-item positive"><span class="insight-icon">📣</span><div>
       <div class="insight-title">${campActive} active campaigns driving referrals</div>
-      <div class="insight-desc">${mktgActive > 0 ? mktgActive + ' marketing tasks in progress · ' : ''}${FB_CRM_DATA.length > 0 ? FB_CRM_DATA.length + ' FB leads captured' : ''}</div>
+      <div class="insight-desc">${FB_CRM_DATA.length > 0 ? FB_CRM_DATA.length + ' FB leads captured' : ''}</div>
     </div></div>`);
   }
 
@@ -13671,9 +13646,6 @@ function buildRecruitmentKPIs() {
     try { return (now - new Date(d).getTime()) < 30 * 86400000; } catch(e) { return false; }
   }).length : 0;
   if (el('ov-kpi-fb')) el('ov-kpi-fb').textContent = fbRecent || '—';
-  // Marketing tasks
-  var mktgCount = MARKETING_DATA ? MARKETING_DATA.length : 0;
-  if (el('ov-kpi-mktg')) el('ov-kpi-mktg').textContent = mktgCount || '—';
   // Conversion rate
   var totalRefs = REFERRAL_DATA ? REFERRAL_DATA.length : 0;
   var enrolledRefs = REFERRAL_DATA ? REFERRAL_DATA.filter(function(r){ return r.stage === 'Enrolled' || r.stage === 'Screened'; }).length : 0;
@@ -14110,20 +14082,7 @@ function showStudyUnifiedModal(studyName) {
     }
   }
 
-  /* 6 — Marketing Tasks (from MARKETING_DATA) */
-  var mktg = getStudyMarketingTasks(studyName);
-  if (mktg.count > 0) {
-    body += '<h4 style="' + sectionStyle + '">📣 Marketing Tasks (' + mktg.count + ')</h4>';
-    body += '<table class="detail-table" style="margin-bottom:12px;"><thead><tr><th>Task</th><th>Status</th><th>Due</th></tr></thead><tbody>';
-    mktg.tasks.slice(0,6).forEach(function(t) {
-      body += '<tr><td><a href="' + (t.url||'#') + '" target="_blank" style="color:#1e293b;text-decoration:none;font-weight:600;">' + t.name + '</a></td>';
-      body += '<td style="font-size:11px;color:#64748b">' + (t.status||'—') + '</td>';
-      body += '<td style="font-size:11px;color:#64748b">' + (t.due_date||'—') + '</td></tr>';
-    });
-    body += '</tbody></table>';
-  }
-
-  /* 7 — Integration Alerts (cross-source flags) */
+  /* 6 — Integration Alerts (cross-source flags) */
   var alerts = [];
   if (refs.length > 0 && medRec) {
     var refsNoMed = refs.filter(function(r) {
@@ -14218,7 +14177,6 @@ let CAMPAIGN_DATA = [];        // central campaign aggregates
 let FB_CRM_DATA = [];          // Facebook CRM leads from Google Sheet
 let MED_RECORDS_DATA = [];     // Medical Records & Patient's Path (per-study patient tracking)
 let PATIENT_NJ_DATA = [];      // Patient tracker NJ (Pennington site)
-let MARKETING_DATA = [];       // CRP Marketing & Digital World tasks
 let _referralsLoaded = false;
 
 function getClickUpToken() { return localStorage.getItem('crp_clickup_token') || ''; }
@@ -14377,9 +14335,7 @@ async function refreshReferrals() {
       safe(buildInsights, 'buildInsights');
     }).catch(e => console.warn('Medical Records fetch failed:', e));
     fetchPatientTrackerNJ().catch(e => console.warn('Patient Tracker NJ fetch failed:', e));
-    fetchMarketingData().then(function() {
-      safe(buildRecruitmentKPIs, 'buildRecruitmentKPIs');
-    }).catch(e => console.warn('Marketing data fetch failed:', e));
+    safe(buildRecruitmentKPIs, 'buildRecruitmentKPIs');
   } catch(e) {
     console.error('CRP Referrals: Fetch failed', e);
     if (badge) badge.textContent = '❌ Fetch failed — check API token';
@@ -15418,167 +15374,7 @@ function renderPatientTrackerNJ() {
 }
 
 
-// ══════════════════════════════════════════════════════════════
-// CRP MARKETING & DIGITAL WORLD
-// ══════════════════════════════════════════════════════════════
-async function fetchMarketingData() {
-  var token = getClickUpToken();
-  if (!token) return;
-  var CU = CRP_CONFIG.CLICKUP;
-  var API = 'https://api.clickup.com/api/v2';
-  var H = { 'Authorization': token };
 
-  try {
-    // Fetch all folders in the Marketing space
-    var spaceResp = await fetch(API + '/space/' + CU.MARKETING_SPACE + '/folder', { headers: H });
-    if (!spaceResp.ok) throw new Error('Failed to fetch Marketing space folders');
-    var spaceData = await spaceResp.json();
-    var folders = spaceData.folders || [];
-
-    // Get lists from each folder
-    var allLists = [];
-    folders.forEach(function(folder) {
-      (folder.lists || []).forEach(function(list) {
-        allLists.push({ id: list.id, name: list.name, folder: folder.name, taskCount: list.task_count || 0 });
-      });
-    });
-
-    // Also fetch folderless lists in the space
-    var folderlessResp = await fetch(API + '/space/' + CU.MARKETING_SPACE + '/list', { headers: H });
-    if (folderlessResp.ok) {
-      var folderlessData = await folderlessResp.json();
-      (folderlessData.lists || []).forEach(function(list) {
-        allLists.push({ id: list.id, name: list.name, folder: 'General', taskCount: list.task_count || 0 });
-      });
-    }
-
-    // Fetch tasks from key folders: Campaigns, Events, Content Calendar
-    var keyFolders = ['Campaigns', 'Events', 'Content Calendar'];
-    var taskPromises = allLists.filter(function(l) {
-      return keyFolders.some(function(kf) { return l.folder.toLowerCase().includes(kf.toLowerCase()); });
-    }).map(async function(list) {
-      var resp = await fetch(API + '/list/' + list.id + '/task?page=0&subtasks=false&include_closed=false&limit=100', { headers: H });
-      if (!resp.ok) return { list: list, tasks: [] };
-      var data = await resp.json();
-      return { list: list, tasks: data.tasks || [] };
-    });
-
-    var results = await Promise.all(taskPromises);
-
-    MARKETING_DATA = [];
-    results.forEach(function(r) {
-      r.tasks.forEach(function(t) {
-        var fields = {};
-        (t.custom_fields || []).forEach(function(f) {
-          if (f.value === null || f.value === undefined) return;
-          if (f.type === 'date') {
-            fields[f.name] = f.value ? new Date(parseInt(f.value)).toISOString().split('T')[0] : null;
-          } else if (f.type === 'drop_down') {
-            var opt = (f.type_config?.options || []).find(function(o){ return o.orderindex === f.value; });
-            fields[f.name] = opt ? opt.name : String(f.value);
-          } else {
-            fields[f.name] = String(f.value);
-          }
-        });
-
-        MARKETING_DATA.push({
-          id: t.id,
-          name: t.name,
-          folder: r.list.folder,
-          list: r.list.name,
-          status: (t.status?.status || '').trim(),
-          priority: t.priority ? t.priority.priority : 'none',
-          due_date: t.due_date ? new Date(parseInt(t.due_date)).toISOString().split('T')[0] : '',
-          start_date: t.start_date ? new Date(parseInt(t.start_date)).toISOString().split('T')[0] : '',
-          assignees: (t.assignees || []).map(function(a){ return a.username || a.email || ''; }).join(', '),
-          url: t.url || 'https://app.clickup.com/t/' + t.id,
-          fields: fields,
-        });
-      });
-    });
-
-    // Also store folder overview
-    MARKETING_DATA._folders = allLists;
-
-    console.log('CRP: Marketing data loaded —', MARKETING_DATA.length, 'tasks from', allLists.length, 'lists');
-    renderMarketingData();
-  } catch(e) {
-    console.error('CRP: Marketing data fetch failed:', e);
-    var el = document.getElementById('ref-marketing-badge');
-    if (el) el.textContent = '❌ Failed';
-  }
-}
-
-function renderMarketingData() {
-  var container = document.getElementById('ref-marketing-content');
-  var badge = document.getElementById('ref-marketing-badge');
-  if (!container) return;
-
-  if (MARKETING_DATA.length === 0) {
-    container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">No marketing data</div>';
-    if (badge) badge.textContent = '—';
-    return;
-  }
-
-  var folders = MARKETING_DATA._folders || [];
-  if (badge) badge.textContent = MARKETING_DATA.length + ' tasks · ' + folders.length + ' lists';
-
-  // Group by folder
-  var folderMap = {};
-  MARKETING_DATA.forEach(function(t) {
-    if (!folderMap[t.folder]) folderMap[t.folder] = [];
-    folderMap[t.folder].push(t);
-  });
-
-  // Folder overview with task counts
-  var html = '<div style="display:flex;gap:12px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid #f1f5f9;">';
-  var folderColors = {'Campaigns':'#3b82f6','Events':'#f59e0b','Content Calendar':'#10b981','Advertising':'#8b5cf6','Website & SEO':'#06b6d4','Tech & IT management':'#64748b','Goals & Documentation':'#94a3b8','General':'#475569'};
-  Object.entries(folderMap).sort(function(a,b){ return b[1].length - a[1].length; }).forEach(function(entry) {
-    var fname = entry[0], tasks = entry[1];
-    var clr = folderColors[fname] || '#475569';
-    html += '<div style="text-align:center;min-width:70px;"><div style="font-size:18px;font-weight:800;color:' + clr + ';">' + tasks.length + '</div><div style="font-size:10px;color:#94a3b8;">' + fname + '</div></div>';
-  });
-  html += '</div>';
-
-  // Upcoming / active tasks grouped by folder
-  Object.entries(folderMap).sort(function(a,b){ return b[1].length - a[1].length; }).forEach(function(entry) {
-    var fname = entry[0], tasks = entry[1];
-    var clr = folderColors[fname] || '#475569';
-    // Sort by due date (upcoming first)
-    tasks.sort(function(a,b) {
-      if (a.due_date && b.due_date) return a.due_date.localeCompare(b.due_date);
-      if (a.due_date) return -1;
-      if (b.due_date) return 1;
-      return 0;
-    });
-
-    html += '<div style="padding:8px 16px;border-bottom:1px solid #f1f5f9;"><span style="font-size:11px;font-weight:700;color:' + clr + ';text-transform:uppercase;letter-spacing:.5px;">' + fname + '</span> <span style="font-size:10px;color:#94a3b8;">(' + tasks.length + ' tasks)</span></div>';
-    html += '<div style="overflow-x:auto;"><table class="fin-table" style="width:100%;font-size:11px;">';
-    html += '<thead><tr><th style="text-align:left;padding:6px 12px;">Task</th><th>List</th><th>Status</th><th>Due Date</th><th>Assignee</th></tr></thead>';
-    html += '<tbody>';
-    tasks.slice(0, 20).forEach(function(t) {
-      var priorityColors = {'urgent':'#dc2626','high':'#f97316','normal':'#3b82f6','low':'#94a3b8','none':'#cbd5e1'};
-      var pColor = priorityColors[t.priority] || '#cbd5e1';
-      var dueColor = '#475569';
-      if (t.due_date) {
-        var today = new Date().toISOString().split('T')[0];
-        if (t.due_date < today) dueColor = '#dc2626';
-        else if (t.due_date <= new Date(Date.now() + 7*86400000).toISOString().split('T')[0]) dueColor = '#f59e0b';
-      }
-      html += '<tr>';
-      html += '<td style="padding:6px 12px;font-weight:600;max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><span style="display:inline-block;width:4px;height:12px;border-radius:2px;background:' + pColor + ';margin-right:6px;"></span><a href="' + t.url + '" target="_blank" style="color:#1e293b;text-decoration:none;">' + t.name + '</a></td>';
-      html += '<td style="font-size:10px;color:#64748b;">' + t.list + '</td>';
-      html += '<td><span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#e8eeff;color:#1843ad;">' + t.status + '</span></td>';
-      html += '<td style="font-size:11px;color:' + dueColor + ';font-weight:' + (dueColor === '#dc2626' ? '700' : '400') + ';">' + (t.due_date || '—') + '</td>';
-      html += '<td style="font-size:10px;color:#64748b;">' + (t.assignees || '—') + '</td>';
-      html += '</tr>';
-    });
-    if (tasks.length > 20) html += '<tr><td colspan="5" style="text-align:center;padding:6px;font-size:10px;color:#94a3b8;">+' + (tasks.length - 20) + ' more tasks</td></tr>';
-    html += '</tbody></table></div>';
-  });
-
-  container.innerHTML = html;
-}
 
 
 async function fetchFacebookCRM() {
@@ -15961,14 +15757,6 @@ function getStudyFBLeads(studyName) {
     try { return (now - new Date(d).getTime()) < 30 * 86400000; } catch(e) { return false; }
   }).length;
   return { count: leads.length, recent: recent, leads: leads };
-}
-
-function getStudyMarketingTasks(studyName) {
-  if (!MARKETING_DATA || MARKETING_DATA.length === 0) return { count: 0 };
-  var tasks = MARKETING_DATA.filter(function(t) {
-    return matchesStudy(t.name, studyName) || matchesStudy(t.list, studyName);
-  });
-  return { count: tasks.length, tasks: tasks };
 }
 
 // Cross-source: find referrals with no medical records entry
