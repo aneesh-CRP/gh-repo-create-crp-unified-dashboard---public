@@ -1,9 +1,16 @@
 {
-  "date": "2026-03-10",
+  "date": "2026-03-11",
   "performance": {
     "active_studies": 0
   },
   "finance": {
     "total_ar": 0
-  }
+  },
+  "status": "DATA_FETCH_FAILED",
+  "errors": [
+    "Google Sheets CSV endpoints blocked by network egress proxy (403 Forbidden)",
+    "WebFetch tool: docs.google.com blocked by EGRESS_BLOCKED policy",
+    "Chrome browser MCP tools: all calls timed out after 60s",
+    "Google Drive API: no matching spreadsheets found (account mismatch)"
+  ]
 }
