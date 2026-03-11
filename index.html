@@ -11760,6 +11760,7 @@ function renderCoordinatorGoals() {
     const weekPct = Math.min(100, Math.round(weekTotal / weekGoal * 100));
     const weekColor = weekPct >= 80 ? '#059669' : weekPct >= 50 ? '#D97706' : '#DC2626';
 
+    const detail = goals.byDayDetail ? (goals.byDayDetail[name] || {}) : {};
     const dayBars = weekDays.map((d,i) => {
       const visits = byDay[d] || 0;
       const met = visits >= DAILY_GOAL;
@@ -11767,7 +11768,10 @@ function renderCoordinatorGoals() {
       const isPast = d < todayISO;
       const barColor = !isPast && !isToday ? '#E5E7EB' : met ? '#059669' : visits > 0 ? '#D97706' : '#EF4444';
       const barH = Math.min(100, Math.round((visits / (DAILY_GOAL * 1.5)) * 100));
-      return `<div style="text-align:center;flex:1">
+      const hasVisits = visits > 0 && (isPast || isToday);
+      const cursor = hasVisits ? 'cursor:pointer;' : '';
+      const clickAttr = hasVisits ? `onclick="toggleCoordDayDetail('${name}','${d}',this)"` : '';
+      return `<div style="text-align:center;flex:1;${cursor}position:relative" ${clickAttr}>
         <div style="height:40px;display:flex;align-items:flex-end;justify-content:center">
           <div style="width:18px;height:${isPast || isToday ? Math.max(4,barH) : 4}%;background:${barColor};border-radius:3px 3px 0 0;transition:height 0.3s"></div>
         </div>
@@ -11783,6 +11787,7 @@ function renderCoordinatorGoals() {
         <span style="font-size:12px;font-weight:700;color:${weekColor}">${weekTotal}/${weekGoal}</span>
       </div>
       <div style="display:flex;gap:4px;margin-bottom:8px">${dayBars}</div>
+      <div class="coord-day-detail" data-coord="${name}" style="display:none;margin-bottom:8px;background:#fff;border:1px solid #E5E7EB;border-radius:6px;padding:8px;font-size:11px"></div>
       <div style="background:#E5E7EB;border-radius:6px;height:6px;overflow:hidden">
         <div style="background:${weekColor};height:100%;width:${weekPct}%;border-radius:6px;transition:width 0.5s"></div>
       </div>
@@ -11808,6 +11813,32 @@ function renderCoordinatorGoals() {
       <td style="padding:8px 8px;text-align:center"><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:${statusColor}20;color:${statusColor}">${statusLabel}</span></td>
     </tr>`;
   }).join('');
+}
+
+function toggleCoordDayDetail(coordName, date, el) {
+  const card = el.closest('.coord-day-detail')?.parentElement || el.closest('[style*="background:#F9FAFB"]');
+  if (!card) return;
+  const detailDiv = card.querySelector('.coord-day-detail');
+  if (!detailDiv) return;
+  const goals = DATA.coordGoals || {};
+  const visits = goals.byDayDetail && goals.byDayDetail[coordName] && goals.byDayDetail[coordName][date];
+  // Toggle: if already showing this date, hide it
+  if (detailDiv.style.display !== 'none' && detailDiv.dataset.activeDate === date) {
+    detailDiv.style.display = 'none';
+    detailDiv.dataset.activeDate = '';
+    return;
+  }
+  if (!visits || visits.length === 0) { detailDiv.style.display = 'none'; return; }
+  const dayLabel = new Date(date + 'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+  const rows = visits.map(v => {
+    const pLink = v.url ? `<a href="${v.url}" target="_blank" style="color:#1843AD;text-decoration:none;font-weight:600">${v.patient}</a>` : `<span style="font-weight:600">${v.patient}</span>`;
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid #F3F4F6">
+      ${pLink}<span style="color:#6B7280;font-size:10px;max-width:50%;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${v.study}</span>
+    </div>`;
+  }).join('');
+  detailDiv.innerHTML = `<div style="font-weight:700;color:#374151;margin-bottom:4px;font-size:11px">${dayLabel} — ${visits.length} visit${visits.length>1?'s':''}</div>${rows}`;
+  detailDiv.style.display = 'block';
+  detailDiv.dataset.activeDate = date;
 }
 
 function buildInsights() {
@@ -13128,9 +13159,9 @@ function processLiveData(upcoming, cancels) {
   // The seenCoordVisits set deduplicates by coord+date+subjectId across snapshots.
   const COORD_NAMES = CRP_CONFIG.COORDINATORS || [];
   const COORD_LOWER = COORD_NAMES.map(c => c.toLowerCase());
-  const coordGoals = { byDay: {}, byMonth: {} };
+  const coordGoals = { byDay: {}, byMonth: {}, byDayDetail: {} };
   const seenCoordVisits = new Set();
-  COORD_NAMES.forEach(c => { coordGoals.byDay[c] = {}; coordGoals.byMonth[c] = 0; });
+  COORD_NAMES.forEach(c => { coordGoals.byDay[c] = {}; coordGoals.byMonth[c] = 0; coordGoals.byDayDetail[c] = {}; });
   const _cgNow = new Date();
   const _cgMM = String(_cgNow.getMonth()+1).padStart(2,'0');
   const _cgYY = _cgNow.getFullYear();
@@ -13151,6 +13182,11 @@ function processLiveData(upcoming, cancels) {
     if (seenCoordVisits.has(key)) return;
     seenCoordVisits.add(key);
     coordGoals.byDay[name][date] = (coordGoals.byDay[name][date]||0) + 1;
+    if (!coordGoals.byDayDetail[name][date]) coordGoals.byDayDetail[name][date] = [];
+    const _ptName = normName(r['Subject Full Name']);
+    const _ptStudy = (r['Study Name']||'').split(' - ').pop().trim();
+    const _ptUrl = patientUrl(r['Study Key'], r['Subject Key (Back End)'], r['Site Name']);
+    coordGoals.byDayDetail[name][date].push({ patient: _ptName, study: _ptStudy, url: _ptUrl });
     if (date >= _cgMonthStart && date <= `${_cgYY}-${_cgMM}-31`) coordGoals.byMonth[name]++;
   });
 
