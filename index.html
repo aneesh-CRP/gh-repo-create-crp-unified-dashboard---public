@@ -2619,8 +2619,8 @@ const CRP_CONFIG = {
   },
 
   // Version
-  VERSION: '2.9.1',
-  BUILD_DATE: '2026-03-10T22:00:00Z',
+  VERSION: '2.9.3',
+  BUILD_DATE: '2026-03-10T23:00:00Z',
 };
 
 // ═══ EVENT BUS (for plugin extensibility) ═══
@@ -12858,6 +12858,22 @@ function processLiveData(upcoming, cancels) {
   const twoMonthsAhead = new Date(today); twoMonthsAhead.setDate(today.getDate() + 61);
   const next14End      = new Date(today); next14End.setDate(today.getDate() + 14);
 
+  // ── Snapshot dedup: keep only the latest snapshot_date from each sheet ──
+  // Both Google Sheets contain daily CRIO snapshots; each day repeats all rows.
+  const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+  function latestSnapshotOnly(rows) {
+    let maxSnap = '';
+    rows.forEach(r => {
+      const s = (r.snapshot_date || '').trim();
+      if (DATE_RE.test(s) && s > maxSnap) maxSnap = s;
+    });
+    if (!maxSnap) return rows;                         // no snapshot col → pass through
+    return rows.filter(r => (r.snapshot_date || '').trim() === maxSnap);
+  }
+  upcoming = latestSnapshotOnly(upcoming);
+  cancels  = latestSnapshotOnly(cancels);
+  console.log('CRP: Snapshot dedup → upcoming', upcoming.length, 'cancels', cancels.length);
+
   const BASE = 'https://app.clinicalresearch.io/clinical-research-philadelphia-crp';
   const PHL  = 'philadelphia-pa';
   const PNJ  = 'clinical-research-philadelphia-pennington';
@@ -13304,6 +13320,51 @@ function processLiveData(upcoming, cancels) {
       category: r._category || categorizeReason(r['Cancel Reason'], r['Appointment Cancellation Type']),
       cancel_date: (() => { try { const d=new Date(r['Cancel Date']);return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});}catch(e){return '';}})()
     })),
+    // ── Preserve enrollmentData from SAMPLE and rebuild mergedStudies with live counts ──
+    enrollmentData: (typeof DATA !== 'undefined' ? DATA.enrollmentData : null) || SAMPLE.enrollmentData || [],
+    mergedStudies: (() => {
+      const ed = (typeof DATA !== 'undefined' && DATA.enrollmentData) ? DATA.enrollmentData : (SAMPLE.enrollmentData || []);
+      // Build study-level cancel/upcoming counts from live data
+      const liveCancels = {};
+      cancelByStudy.forEach(s => { liveCancels[s.name] = s.count; liveCancels[s.full] = s.count; });
+      const liveUpcoming = {};
+      const liveStudyUrl = {};
+      const liveSites = {};
+      upcomingByStudy.forEach(s => {
+        liveUpcoming[s.name] = s.count; liveUpcoming[s.full] = s.count;
+        liveStudyUrl[s.name] = s.study_url; liveStudyUrl[s.full] = s.study_url;
+        if (s.site) { if (!liveSites[s.name]) liveSites[s.name] = new Set(); liveSites[s.name].add(s.site.includes('Penn') ? 'PNJ' : 'PHL'); }
+      });
+      const riskLookup = {};
+      riskMatrix.forEach(r => { riskLookup[r.study] = r; riskLookup[r.full] = r; });
+      return ed.map(e => {
+        const shortName = e.study;
+        const c = liveCancels[shortName] || 0;
+        const u = liveUpcoming[shortName] || 0;
+        const rm = riskLookup[shortName] || {};
+        return {
+          study: shortName,
+          study_url: liveStudyUrl[shortName] || e.study_url || '',
+          sites: e.sites || (liveSites[shortName] ? [...liveSites[shortName]] : ['PHL']),
+          enroll_status: e.status || 'Enrolling',
+          cancels: c,
+          upcoming: u,
+          risk_score: rm.score || 0,
+          risk_level: rm.level || (e.status !== 'Enrolling' ? 'n/a' : 'low'),
+          target: e.target,
+          enrolled: e.enrolled || 0,
+          pct: e.pct || 0,
+          remaining: e.remaining || 0,
+          over: e.over || 0,
+          screening: e.screening || 0,
+          screened: e.screened || 0,
+          screen_fail: e.screen_fail || 0,
+          screen_fail_pct: e.screen_fail_pct || 0,
+          active: e.active || 0,
+          completed: e.completed || 0
+        };
+      }).sort((a,b) => b.risk_score - a.risk_score);
+    })(),
   };
 }
 
