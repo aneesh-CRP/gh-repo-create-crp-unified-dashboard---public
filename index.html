@@ -3161,7 +3161,17 @@ function renderUnpaidApAging() {
   const total = UNPAID_AP_AGING.reduce((s,d) => s + d.amount, 0);
   const maxAmt = Math.max(...UNPAID_AP_AGING.map(d => d.amount));
   const agingColors = { '0-30': '#10B981', '31-60': '#F59E0B', '61-90': '#F97316', '91-120': '#EF4444', '121+': '#7F1D1D' };
-  container.innerHTML = '<div style="display:flex;gap:12px;flex-wrap:wrap">' + UNPAID_AP_AGING.map(d => {
+  // Check for data concentration warning — if 121+ bucket has >80% of total
+  const bucket121 = UNPAID_AP_AGING.find(d => d.bucket === '121+');
+  const pct121 = (bucket121 && total > 0) ? Math.round(bucket121.amount / total * 100) : 0;
+  let warningHtml = '';
+  if (pct121 >= 80) {
+    warningHtml = '<div style="background:#FEF3C7;border:1px solid #F59E0B;border-radius:8px;padding:12px 16px;margin-bottom:12px;display:flex;align-items:center;gap:10px;">' +
+      '<span style="font-size:18px;">⚠️</span>' +
+      '<div><div style="font-weight:700;font-size:12px;color:#92400E;">Data Quality Flag: ' + pct121 + '% of unpaid autopay is in the 121+ day bucket</div>' +
+      '<div style="font-size:11px;color:#B45309;margin-top:2px;">This may indicate stale data or a batch processing delay. Verify autopay payment records are current in the Master Sheet.</div></div></div>';
+  }
+  container.innerHTML = warningHtml + '<div style="display:flex;gap:12px;flex-wrap:wrap">' + UNPAID_AP_AGING.map(d => {
     const pct = total > 0 ? Math.round(d.amount / total * 100) : 0;
     const c = agingColors[d.bucket] || '#6B7280';
     return '<div style="flex:1;min-width:140px;background:#F9FAFB;border-radius:10px;padding:16px;text-align:center;border:2px solid ' + c + '20">' +
@@ -11887,17 +11897,25 @@ function buildInsights() {
     return daysOut <= 7;
   });
   if (thisWeek.length > 0) {
+    // Deduplicate patient names for display
+    const seenPats = new Set();
+    const uniqueThisWeek = thisWeek.filter(d => {
+      const key = d.patient.toLowerCase().trim();
+      if (seenPats.has(key)) return false;
+      seenPats.add(key);
+      return true;
+    });
     flagItems.push({
       urgent: false,
       html: `<div class="insight-item warning">
         <span class="insight-icon">📅</span>
         <div>
-          <div class="insight-title">${thisWeek.length} visits scheduled this week</div>
-          <div class="insight-desc">Confirm attendance for all patients — ${thisWeek.map(d => {
+          <div class="insight-title">${thisWeek.length} visits scheduled this week (${uniqueThisWeek.length} patients)</div>
+          <div class="insight-desc">Confirm attendance — ${uniqueThisWeek.slice(0, 15).map(d => {
             return d.patient_url
               ? `<a href="${d.patient_url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:inherit;text-decoration:underline;text-decoration-style:dotted;">${d.patient.split(' ')[0]}</a>`
               : d.patient.split(' ')[0];
-          }).join(', ')}</div>
+          }).join(', ')}${uniqueThisWeek.length > 15 ? ' +' + (uniqueThisWeek.length - 15) + ' more' : ''}</div>
         </div>
       </div>`
     });
@@ -15082,6 +15100,8 @@ async function fetchMedicalRecords() {
   }
 }
 
+let _medRecFilter = 'upcoming'; // 'upcoming' or 'all'
+
 function renderMedicalRecords() {
   const container = document.getElementById('ref-medrec-content');
   const badge = document.getElementById('ref-medrec-badge');
@@ -15093,21 +15113,59 @@ function renderMedicalRecords() {
     return;
   }
 
+  // ── Cross-reference with CRIO upcoming visits ──
+  const upcomingByName = {};
+  (DATA.allVisitDetail || []).forEach(v => {
+    const key = v.patient.toLowerCase().trim();
+    if (!upcomingByName[key]) upcomingByName[key] = [];
+    upcomingByName[key].push({ date_iso: v.date_iso, date: v.date, study: v.study, visit: v.visit });
+  });
+
+  // Tag each med record with upcoming visit info
+  const tagged = MED_RECORDS_DATA.map(r => {
+    const visits = upcomingByName[r.name.toLowerCase().trim()] || [];
+    const soonest = visits.sort((a,b) => (a.date_iso||'').localeCompare(b.date_iso||''))[0];
+    return { ...r, _hasUpcoming: visits.length > 0, _nextVisitDate: soonest?.date_iso || '', _nextVisitLabel: soonest?.date || '', _nextVisitType: soonest?.visit || '' };
+  });
+
+  const withUpcoming = tagged.filter(r => r._hasUpcoming);
+  const isUpcomingView = _medRecFilter === 'upcoming';
+  const displayData = isUpcomingView ? withUpcoming : tagged;
+
   const CU = CRP_CONFIG.CLICKUP;
   const total = MED_RECORDS_DATA.length;
-  const activeCount = MED_RECORDS_DATA.filter(r => r.is_active).length;
-  const enrolled = MED_RECORDS_DATA.filter(r => r.status === 'Enrolled' || r.status === 'Complete').length;
-  const screening = MED_RECORDS_DATA.filter(r => r.status === 'In Screening').length;
-  const readySched = MED_RECORDS_DATA.filter(r => r.status === 'Ready to Schedule').length;
-  const visitSched = MED_RECORDS_DATA.filter(r => r.status === 'Visit Scheduled').length;
-  const dnq = MED_RECORDS_DATA.filter(r => r.status === 'DNQ' || r.status === 'Screen Fail').length;
-  const pending = MED_RECORDS_DATA.filter(r => r.status === 'Pending Release' || r.status === 'Under Review').length;
+  const activeCount = displayData.filter(r => r.is_active).length;
+  const enrolled = displayData.filter(r => r.status === 'Enrolled' || r.status === 'Complete').length;
+  const screening = displayData.filter(r => r.status === 'In Screening').length;
+  const readySched = displayData.filter(r => r.status === 'Ready to Schedule').length;
+  const visitSched = displayData.filter(r => r.status === 'Visit Scheduled').length;
+  const dnq = displayData.filter(r => r.status === 'DNQ' || r.status === 'Screen Fail').length;
+  const pending = displayData.filter(r => r.status === 'Pending Release' || r.status === 'Under Review').length;
+  const needsRecords = displayData.filter(r => r._hasUpcoming && r.records_received !== 'Yes').length;
 
-  if (badge) badge.textContent = total + ' patients · ' + MED_RECORDS_DATA.reduce((acc, r) => { acc.add(r.study); return acc; }, new Set()).size + ' studies';
+  if (badge) badge.textContent = (isUpcomingView ? withUpcoming.length + ' with visits' : total + ' patients') + ' · ' + displayData.reduce((acc, r) => { acc.add(r.study); return acc; }, new Set()).size + ' studies';
+
+  // Toggle bar
+  let html = '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #f1f5f9;background:#fafbfc;">';
+  html += '<div style="display:flex;gap:6px;">';
+  html += '<button onclick="_medRecFilter=\'upcoming\';renderMedicalRecords()" style="padding:4px 12px;border-radius:14px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid ' + (isUpcomingView ? '#1843ad' : 'var(--border)') + ';background:' + (isUpcomingView ? '#e8eeff' : 'var(--surface)') + ';color:' + (isUpcomingView ? '#1843ad' : 'var(--muted)') + '">⚡ Upcoming Visits (' + withUpcoming.length + ')</button>';
+  html += '<button onclick="_medRecFilter=\'all\';renderMedicalRecords()" style="padding:4px 12px;border-radius:14px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid ' + (!isUpcomingView ? '#1843ad' : 'var(--border)') + ';background:' + (!isUpcomingView ? '#e8eeff' : 'var(--surface)') + ';color:' + (!isUpcomingView ? '#1843ad' : 'var(--muted)') + '">All Patients (' + total + ')</button>';
+  html += '</div>';
+  if (isUpcomingView && needsRecords > 0) {
+    html += '<span style="font-size:11px;font-weight:700;color:#dc2626;background:#fef2f2;padding:3px 8px;border-radius:4px;">' + needsRecords + ' missing records before visit</span>';
+  }
+  html += '</div>';
 
   // KPI row
-  let html = '<div style="display:flex;gap:12px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid #f1f5f9;">';
-  const kpis = [
+  html += '<div style="display:flex;gap:12px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid #f1f5f9;">';
+  const kpis = isUpcomingView ? [
+    { label: 'With Visits', val: withUpcoming.length, color: '#1e293b' },
+    { label: 'Active', val: activeCount, color: '#3b82f6' },
+    { label: 'Needs Records', val: needsRecords, color: '#dc2626' },
+    { label: 'Enrolled', val: enrolled, color: '#059669' },
+    { label: 'In Screening', val: screening, color: '#8b5cf6' },
+    { label: 'Pending Records', val: pending, color: '#94a3b8' },
+  ] : [
     { label: 'Total Patients', val: total, color: '#1e293b' },
     { label: 'Active', val: activeCount, color: '#3b82f6' },
     { label: 'Enrolled/Complete', val: enrolled, color: '#059669' },
@@ -15126,15 +15184,16 @@ function renderMedicalRecords() {
   const statusOrder = ['Enrolled','Complete','In Screening','Visit Scheduled','Ready to Schedule','Pending Release','Under Review','Unable to Reach','Not Interested','DNQ','Screen Fail','No Show'];
   const statusColors = {'Enrolled':'#059669','Complete':'#047857','In Screening':'#8b5cf6','Visit Scheduled':'#06b6d4','Ready to Schedule':'#f59e0b','Pending Release':'#94a3b8','Under Review':'#64748b','Unable to Reach':'#f97316','Not Interested':'#9ca3af','DNQ':'#dc2626','Screen Fail':'#ef4444','No Show':'#b91c1c'};
   const statusCounts = {};
-  MED_RECORDS_DATA.forEach(r => { statusCounts[r.status] = (statusCounts[r.status] || 0) + 1; });
+  displayData.forEach(r => { statusCounts[r.status] = (statusCounts[r.status] || 0) + 1; });
 
   html += '<div style="padding:12px 16px;border-bottom:1px solid #f1f5f9;">';
   html += '<div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:6px;">STATUS DISTRIBUTION</div>';
   html += '<div style="display:flex;height:24px;border-radius:6px;overflow:hidden;background:#f1f5f9;">';
+  const barTotal = displayData.length || 1;
   statusOrder.forEach(function(st) {
     var c = statusCounts[st] || 0;
     if (c > 0) {
-      var pct = (c / total * 100).toFixed(1);
+      var pct = (c / barTotal * 100).toFixed(1);
       html += '<div style="width:' + pct + '%;background:' + (statusColors[st]||'#94a3b8') + ';display:flex;align-items:center;justify-content:center;" title="' + st + ': ' + c + ' (' + pct + '%)"><span style="font-size:9px;font-weight:700;color:#fff;text-shadow:0 1px 1px rgba(0,0,0,.3);">' + (c >= 5 ? c : '') + '</span></div>';
     }
   });
@@ -15146,36 +15205,61 @@ function renderMedicalRecords() {
   });
   html += '</div></div>';
 
-  // By-study table
-  var studyMap = {};
-  MED_RECORDS_DATA.forEach(function(r) {
-    if (!studyMap[r.study]) studyMap[r.study] = { total: 0, active: 0, enrolled: 0, screening: 0, scheduled: 0, dnq: 0 };
-    studyMap[r.study].total++;
-    if (r.is_active) studyMap[r.study].active++;
-    if (r.status === 'Enrolled' || r.status === 'Complete') studyMap[r.study].enrolled++;
-    if (r.status === 'In Screening') studyMap[r.study].screening++;
-    if (r.status === 'Visit Scheduled' || r.status === 'Ready to Schedule') studyMap[r.study].scheduled++;
-    if (r.status === 'DNQ' || r.status === 'Screen Fail') studyMap[r.study].dnq++;
-  });
-  var studyRows = Object.entries(studyMap).sort(function(a,b){ return b[1].total - a[1].total; });
+  // By-study table — in upcoming view, show patient-level detail sorted by visit date
+  if (isUpcomingView && withUpcoming.length > 0) {
+    const sorted = withUpcoming.sort((a,b) => (a._nextVisitDate||'z').localeCompare(b._nextVisitDate||'z'));
+    html += '<div style="overflow-x:auto;"><table class="fin-table" style="width:100%;font-size:11px;">';
+    html += '<thead><tr><th style="text-align:left;padding:8px 12px;">Patient</th><th style="text-align:left;">Study</th><th style="text-align:center;">Next Visit</th><th style="text-align:center;">Status</th><th style="text-align:center;">Records</th><th style="text-align:center;">Inv. Appr.</th></tr></thead>';
+    html += '<tbody>';
+    sorted.forEach(p => {
+      const sc = statusColors[p.status] || '#94a3b8';
+      const recBadge = p.records_received === 'Yes' ? '<span style="color:#059669;font-weight:700;">✓ Yes</span>' : '<span style="color:#dc2626;font-weight:700;">✗ Missing</span>';
+      const appBadge = p.investigator_approval === 'Approved' ? '<span style="color:#059669;">✓</span>' : (p.investigator_approval ? '<span style="color:#f59e0b;">' + p.investigator_approval + '</span>' : '—');
+      const visitDate = p._nextVisitLabel || '—';
+      const daysOut = p._nextVisitDate ? Math.round((new Date(p._nextVisitDate) - new Date()) / 86400000) : 999;
+      const urgency = daysOut <= 3 ? 'color:#dc2626;font-weight:700;' : daysOut <= 7 ? 'color:#d97706;font-weight:600;' : '';
+      html += '<tr onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'\'">';
+      html += '<td style="padding:7px 12px;font-weight:600;"><a href="' + (p.url||'#') + '" target="_blank" style="color:#1e293b;text-decoration:none;">' + p.name + '</a></td>';
+      html += '<td style="padding:7px 8px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + p.study + '">' + p.study + '</td>';
+      html += '<td style="padding:7px 8px;text-align:center;' + urgency + '">' + visitDate + '</td>';
+      html += '<td style="padding:7px 8px;text-align:center;"><span style="font-size:10px;font-weight:600;padding:2px 6px;border-radius:4px;background:' + sc + '20;color:' + sc + ';">' + (p.status||'—') + '</span></td>';
+      html += '<td style="padding:7px 8px;text-align:center;">' + recBadge + '</td>';
+      html += '<td style="padding:7px 8px;text-align:center;">' + appBadge + '</td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table></div>';
+  } else {
+    // All patients view — by-study summary table (original)
+    var studyMap = {};
+    displayData.forEach(function(r) {
+      if (!studyMap[r.study]) studyMap[r.study] = { total: 0, active: 0, enrolled: 0, screening: 0, scheduled: 0, dnq: 0 };
+      studyMap[r.study].total++;
+      if (r.is_active) studyMap[r.study].active++;
+      if (r.status === 'Enrolled' || r.status === 'Complete') studyMap[r.study].enrolled++;
+      if (r.status === 'In Screening') studyMap[r.study].screening++;
+      if (r.status === 'Visit Scheduled' || r.status === 'Ready to Schedule') studyMap[r.study].scheduled++;
+      if (r.status === 'DNQ' || r.status === 'Screen Fail') studyMap[r.study].dnq++;
+    });
+    var studyRows = Object.entries(studyMap).sort(function(a,b){ return b[1].total - a[1].total; });
 
-  html += '<div style="overflow-x:auto;"><table class="fin-table" style="width:100%;font-size:11px;">';
-  html += '<thead><tr><th style="text-align:left;padding:8px 12px;">Study</th><th style="text-align:center;">Total</th><th style="text-align:center;">Active</th><th style="text-align:center;">Screening</th><th style="text-align:center;">Scheduled</th><th style="text-align:center;">Enrolled</th><th style="text-align:center;">DNQ/SF</th></tr></thead>';
-  html += '<tbody>';
-  studyRows.forEach(function(row) {
-    var name = row[0], d = row[1];
-    var safeName = name.replace(/'/g, "\\'");
-    html += '<tr style="cursor:pointer;" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'\'" onclick="showMedRecDetailModal(\'' + safeName + '\')">';
-    html += '<td style="padding:7px 12px;font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + name + '">' + name + '</td>';
-    html += '<td style="text-align:center;font-weight:700;">' + d.total + '</td>';
-    html += '<td style="text-align:center;color:#3b82f6;">' + d.active + '</td>';
-    html += '<td style="text-align:center;color:#8b5cf6;">' + d.screening + '</td>';
-    html += '<td style="text-align:center;color:#06b6d4;">' + d.scheduled + '</td>';
-    html += '<td style="text-align:center;color:#059669;font-weight:700;">' + d.enrolled + '</td>';
-    html += '<td style="text-align:center;color:#dc2626;">' + d.dnq + '</td>';
-    html += '</tr>';
-  });
-  html += '</tbody></table></div>';
+    html += '<div style="overflow-x:auto;"><table class="fin-table" style="width:100%;font-size:11px;">';
+    html += '<thead><tr><th style="text-align:left;padding:8px 12px;">Study</th><th style="text-align:center;">Total</th><th style="text-align:center;">Active</th><th style="text-align:center;">Screening</th><th style="text-align:center;">Scheduled</th><th style="text-align:center;">Enrolled</th><th style="text-align:center;">DNQ/SF</th></tr></thead>';
+    html += '<tbody>';
+    studyRows.forEach(function(row) {
+      var name = row[0], d = row[1];
+      var safeName = name.replace(/'/g, "\\'");
+      html += '<tr style="cursor:pointer;" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'\'" onclick="showMedRecDetailModal(\'' + safeName + '\')">';
+      html += '<td style="padding:7px 12px;font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + name + '">' + name + '</td>';
+      html += '<td style="text-align:center;font-weight:700;">' + d.total + '</td>';
+      html += '<td style="text-align:center;color:#3b82f6;">' + d.active + '</td>';
+      html += '<td style="text-align:center;color:#8b5cf6;">' + d.screening + '</td>';
+      html += '<td style="text-align:center;color:#06b6d4;">' + d.scheduled + '</td>';
+      html += '<td style="text-align:center;color:#059669;font-weight:700;">' + d.enrolled + '</td>';
+      html += '<td style="text-align:center;color:#dc2626;">' + d.dnq + '</td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table></div>';
+  }
 
   container.innerHTML = html;
 }
@@ -15280,16 +15364,27 @@ function renderPatientTrackerNJ() {
   var badge = document.getElementById('ref-nj-badge');
   if (!container) return;
 
-  if (PATIENT_NJ_DATA.length === 0) {
+  // Filter out junk/placeholder entries (e.g. "Window", "Screen Fails", single-word non-names)
+  var JUNK_RE = /^(window|screen fails?|test|template|example|sample|new task|untitled)/i;
+  var cleanData = PATIENT_NJ_DATA.filter(function(r) {
+    var n = (r.name || '').trim();
+    if (n.length < 3) return false;
+    if (JUNK_RE.test(n)) return false;
+    if (/^\d+$/.test(n)) return false;
+    return true;
+  });
+
+  if (cleanData.length === 0) {
     container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">No NJ patient data</div>';
     if (badge) badge.textContent = '—';
     return;
   }
 
-  if (badge) badge.textContent = PATIENT_NJ_DATA.length + ' patients';
+  var filtered = PATIENT_NJ_DATA.length - cleanData.length;
+  if (badge) badge.textContent = cleanData.length + ' patients' + (filtered > 0 ? ' (' + filtered + ' junk filtered)' : '');
 
   var statusCounts = {};
-  PATIENT_NJ_DATA.forEach(function(r) {
+  cleanData.forEach(function(r) {
     var s = r.status || 'Unknown';
     statusCounts[s] = (statusCounts[s] || 0) + 1;
   });
@@ -15308,7 +15403,7 @@ function renderPatientTrackerNJ() {
   html += '<div style="overflow-x:auto;"><table class="fin-table" style="width:100%;font-size:11px;">';
   html += '<thead><tr><th style="text-align:left;padding:8px 12px;">Patient</th><th>Status</th><th>Next Visit</th><th>Updated</th></tr></thead>';
   html += '<tbody>';
-  PATIENT_NJ_DATA.forEach(function(p) {
+  cleanData.forEach(function(p) {
     var sc = statusColors2[p.status] || '#475569';
     html += '<tr>';
     html += '<td style="padding:7px 12px;font-weight:600;"><a href="' + p.url + '" target="_blank" style="color:#1e293b;text-decoration:none;">' + p.name + '</a></td>';
