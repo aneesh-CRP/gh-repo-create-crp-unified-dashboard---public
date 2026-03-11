@@ -150,23 +150,23 @@ body {
 .nav {
   background: #fff;
   border-bottom: 1px solid var(--border);
-  padding: 0 20px;
-  display: flex; align-items: center; gap: 6px;
-  height: 52px;
+  padding: 0 28px;
+  display: flex; align-items: center; justify-content: space-between;
+  height: 58px;
   position: sticky; top: 0; z-index: 100;
   box-shadow: 0 1px 3px rgba(0,0,0,0.05);
 }
 .nav-brand {
   display: flex; align-items: center; gap: 10px;
 }
-.nav-logo { width:32px; height:32px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.nav-logo { width:40px; height:40px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
 .nav-title { font-size: 15px; font-weight: 700; color: var(--text); }
 .nav-sub { font-size: 11px; color: var(--muted); }
 .nav-right { display: flex; align-items: center; gap: 12px; }
 .nav-tab {
-  padding: 5px 10px; border-radius: 6px; font-size: 12px; font-weight: 500;
+  padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: 500;
   cursor: pointer; color: var(--muted); transition: all 0.15s;
-  border: 1px solid transparent; white-space: nowrap;
+  border: 1px solid transparent;
 }
 .nav-tab.active { background: #e8eeff; color: #072061; border-color: #1843ad; font-weight: 700; }
 .nav-tab:hover:not(.active) { background: var(--surface2); color: var(--text); }
@@ -715,21 +715,25 @@ body {
     </g>
   </g>
 </svg></div>
-    <div class="nav-title" style="color:#072061;font-weight:700;font-size:14px;white-space:nowrap;">Unified Intelligence Dashboard</div>
+    <div style="display:flex;flex-direction:column;justify-content:center;">
+      <div class="nav-title" style="color:#072061;font-weight:800;font-size:15px;white-space:nowrap;">Clinical Research <span style="color:#ff9933;">Philadelphia</span> <span style="font-weight:400;color:var(--blue);font-size:13px;">· Unified Intelligence Dashboard</span></div>
+    </div>
   </div>
-  <span class="nav-tab active" onclick="switchTab('patient-journey', this)" role="tab" aria-selected="true">Patient Journey</span>
-  <span class="nav-tab" onclick="switchTab('operations', this)" role="tab">Operations</span>
-  <span class="nav-tab" onclick="switchTab('referrals-marketing', this)" role="tab">Referrals</span>
-  <span class="nav-tab" onclick="switchTab('admin', this)" role="tab">⚙</span>
-  <span style="width:1px;background:#CBD5E0;margin:8px 2px"></span>
-  <span class="nav-tab fin-tab" onclick="switchTab('fin-overview',this)" role="tab">🔒 Finance</span>
-  <span class="nav-tab fin-tab" onclick="switchTab('fin-collections',this)">🔒 Collections</span>
-  <span class="nav-tab fin-tab" onclick="switchTab('fin-aging',this)">🔒 Aging AR</span>
-  <span class="nav-tab fin-tab" onclick="switchTab('fin-revenue',this)">🔒 Revenue</span>
-  <span class="nav-tab fin-tab" onclick="switchTab('fin-accruals',this)">🔒 Accruals</span>
-  <span style="width:1px;background:#CBD5E0;margin:8px 2px"></span>
-  <span class="nav-tab fin-tab" onclick="switchTab('insights',this)" role="tab">🔒 Insights</span>
-  <div class="nav-right" style="margin-left:auto;">
+  <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+    <span class="nav-tab active" onclick="switchTab('patient-journey', this)" role="tab" aria-selected="true">Patient Journey</span>
+    <span class="nav-tab" onclick="switchTab('operations', this)" role="tab">Operations</span>
+    <span class="nav-tab" onclick="switchTab('referrals-marketing', this)" role="tab">Referrals</span>
+    <span class="nav-tab" onclick="switchTab('admin', this)" role="tab">⚙ Admin</span>
+    <span style="width:1px;background:#CBD5E0;margin:8px 4px"></span>
+    <span class="nav-tab fin-tab" onclick="switchTab('fin-overview',this)" role="tab">🔒 Finance</span>
+    <span class="nav-tab fin-tab" onclick="switchTab('fin-collections',this)">🔒 Collections</span>
+    <span class="nav-tab fin-tab" onclick="switchTab('fin-aging',this)">🔒 Aging AR</span>
+    <span class="nav-tab fin-tab" onclick="switchTab('fin-revenue',this)">🔒 Revenue</span>
+    <span class="nav-tab fin-tab" onclick="switchTab('fin-accruals',this)">🔒 Accruals</span>
+    <span style="width:1px;background:#CBD5E0;margin:8px 4px"></span>
+    <span class="nav-tab fin-tab" onclick="switchTab('insights',this)" role="tab">🔒 Insights</span>
+  </div>
+  <div class="nav-right">
     <span class="data-badge" id="data-source-badge" style="display:none;"></span>
     <span class="data-badge" id="last-refresh-badge">Updated: Mar 10, 2026</span>
     <button class="refresh-btn" onclick="refreshData()">↻ Refresh</button>
@@ -1222,7 +1226,7 @@ body {
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Site</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Pipeline</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Med Rec</th>
-            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Total Leads</th>
+            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Leads</th>
           </tr>
         </thead>
         <tbody id="merged-study-tbody"></tbody>
@@ -1233,8 +1237,8 @@ body {
 </div><!-- /view-studies -->
 
 
-<!-- ══ VIEW: SCHEDULE (hidden — content moved to Operations) ══════════ -->
-<div id="view-schedule" class="view" style="display:none;">
+<!-- ══ VIEW: SCHEDULE ══════════════════════ -->
+<div id="view-schedule" class="view">
 
   <!-- KPI Row -->
   <div class="time-banner fade-in" style="margin-bottom:16px;">
@@ -2132,8 +2136,8 @@ body {
 
 </div><!-- /view-schedule -->
 
-<!-- ══ VIEW: ACTIONS (hidden — content moved to Operations) ══════════ -->
-<div id="view-actions" class="view" style="display:none;">
+<!-- ══ VIEW: ACTIONS ══════════════════════ -->
+<div id="view-actions" class="view">
 
   <!-- At-Risk Patients (formerly Risk Flags tab) — most urgent, at top -->
   <div class="section-title" style="margin-bottom:10px;">🚨 At-Risk Patients — Immediate Action Required</div>
@@ -2290,8 +2294,8 @@ body {
 </div><!-- /view-actions -->
 
 
-<!-- ══ VIEW: REFERRALS (hidden — content moved to Referrals & Marketing) ══════════ -->
-<div id="view-referrals" class="view" style="display:none;">
+<!-- ══ VIEW: REFERRALS ══════════════════════ -->
+<div id="view-referrals" class="view">
 
   <!-- ClickUp API Key Setup (shown if no key stored) -->
   <div id="referral-setup" style="display:none;">
@@ -2908,8 +2912,8 @@ const CRP_CONFIG = {
   },
 
   // Version
-  VERSION: '3.0.0',
-  BUILD_DATE: '2026-03-10T23:00:00Z',
+  VERSION: '2.9.0',
+  BUILD_DATE: '2026-03-10T22:00:00Z',
 };
 
 // ═══ EVENT BUS (for plugin extensibility) ═══
@@ -3650,67 +3654,17 @@ function initFinanceDashboard() {
 
 // ═══ UNIFIED TAB SWITCHER (wraps perf switchView + finance gating) ═══
 function switchTab(name, el) {
-  // New 3-tab layout + admin
-  const NEW_TABS = ['patient-journey','operations','referrals-marketing','admin'];
-  // Legacy tabs redirect to new structure
-  const LEGACY_MAP = {'overview':'patient-journey','studies':'operations','schedule':'operations','actions':'operations','referrals':'referrals-marketing'};
-  if (LEGACY_MAP[name]) name = LEGACY_MAP[name];
-
-  if (NEW_TABS.includes(name)) {
-    // Hide finance+insights views
+  // Performance tabs → delegate to switchView (handles lazy building)
+  const PERF_TABS = ['overview','studies','schedule','actions','referrals','admin'];
+  if (PERF_TABS.includes(name)) {
+    // Hide finance+insights views first
     document.querySelectorAll('[id^="view-fin-"], #view-insights').forEach(v => {
       v.style.display = 'none';
       v.classList.remove('active');
     });
+    // Deactivate finance tab highlights
     document.querySelectorAll('.nav-tab.fin-tab').forEach(t => t.classList.remove('active'));
-
-    // Hide all new main views
-    NEW_TABS.forEach(function(t) {
-      var v = document.getElementById('view-' + t);
-      if (v) { v.style.display = 'none'; v.classList.remove('active'); }
-    });
-
-    // Deactivate all non-finance tabs, activate current
-    document.querySelectorAll('.nav-tab:not(.fin-tab)').forEach(t => {
-      t.classList.remove('active');
-      t.setAttribute('aria-selected', 'false');
-    });
-    if (el) { el.classList.add('active'); el.setAttribute('aria-selected', 'true'); }
-
-    // Show target view
-    var view = document.getElementById('view-' + name);
-    if (view) { view.style.display = 'block'; view.classList.add('active'); }
-
-    // Tab-specific init
-    if (name === 'patient-journey') {
-      setTimeout(function() { safe(buildPatientJourneyView, 'buildPatientJourneyView'); }, 50);
-    } else if (name === 'operations') {
-      moveOpsContent();
-      // Update Operations KPI banner from DATA
-      var sk = function(id, v) { var e = document.getElementById(id); if(e && v != null) e.textContent = v; };
-      sk('ops-kpi-cancels', DATA.cancelTotal || 0);
-      sk('ops-kpi-14days', DATA.next14 || 0);
-      sk('ops-kpi-upcoming', DATA.upcomingTotal || 0);
-      sk('ops-kpi-risk', (DATA.riskMatrix||[]).filter(function(r){return r.level==='critical';}).length);
-      sk('ops-kpi-studies', DATA.activeStudies || (DATA.riskMatrix||[]).length || 0);
-      // Default to Studies sub-tab
-      var activeBtn = document.querySelector('.ops-subtab');
-      if (activeBtn) switchOpsSubtab('studies', activeBtn);
-    } else if (name === 'referrals-marketing') {
-      setTimeout(function() {
-        syncReferralsToNewTab();
-        // Also trigger original init if needed
-        if (typeof initReferrals === 'function') initReferrals();
-      }, 50);
-    } else if (name === 'admin') {
-      setTimeout(function() { switchAdmin('trends', document.querySelector('#admin-filter-bar .sched-filter')); }, 50);
-    }
-    return;
-  }
-
-  // Old performance tabs — shouldn't reach here but just in case
-  const PERF_TABS = ['overview','studies','schedule','actions','referrals'];
-  if (PERF_TABS.includes(name)) {
+    // Delegate to performance's switchView
     switchView(name, el);
     return;
   }
@@ -3738,13 +3692,13 @@ function switchTab(name, el) {
   }
 
   // Show target view
-  var finViewId = 'view-' + name;
-  var finView = document.getElementById(finViewId);
-  if (finView) {
-    finView.style.display = 'block';
-    finView.classList.add('active');
+  const viewId = 'view-' + name;
+  const view = document.getElementById(viewId);
+  if (view) {
+    view.style.display = 'block';
+    view.classList.add('active');
   } else {
-    console.warn('switchTab: view not found:', finViewId);
+    console.warn('switchTab: view not found:', viewId);
   }
 
   // Finance init on first access
@@ -14028,6 +13982,7 @@ function renderAll() {
   safe(buildInsights,        'buildInsights');
   safe(buildRecruitmentKPIs, 'buildRecruitmentKPIs');
   safe(buildMedRecAlerts,    'buildMedRecAlerts');
+  // Note: buildRiskTable/buildStudyCards removed — Studies tab now uses buildStudiesView (lazy-loaded on tab click)
   if (typeof buildRiskFlagCards === 'function')     safe(buildRiskFlagCards,     'buildRiskFlagCards');
   // Pre-build schedule so it's ready when tab is clicked
   safe(buildWeeklyBySiteChart,   'buildWeeklyBySiteChart');
@@ -14037,8 +13992,6 @@ function renderAll() {
   safe(buildSchedStudyBars,      'buildSchedStudyBars');
   safe(buildSchedCoordList,      'buildSchedCoordList');
   safe(() => filterSchedTable('all', null), 'buildUpcomingDetailTable');
-  // Patient Journey: build if Patient Journey tab is active (default tab)
-  safe(buildPatientJourneyView, 'buildPatientJourneyView');
 }
 
 function closeSetup() {
@@ -14629,14 +14582,6 @@ async function refreshReferrals() {
     fetchMedicalRecords().catch(e => console.warn('Medical Records fetch failed:', e));
     fetchPatientTrackerNJ().catch(e => console.warn('Patient Tracker NJ fetch failed:', e));
     fetchMarketingData().catch(e => console.warn('Marketing data fetch failed:', e));
-    // Refresh Patient Journey cache + sync Referrals & Marketing tab
-    setTimeout(function() {
-      window._patientJourneyCache = getAllPatientJourneyData();
-      window._patientJourneyKPIs = computePatientJourneyKPIs(window._patientJourneyCache);
-      var pjView = document.getElementById('view-patient-journey');
-      if (pjView && pjView.classList.contains('active')) safe(buildPatientJourneyView, 'buildPatientJourneyView');
-      syncReferralsToNewTab();
-    }, 2000);
   } catch(e) {
     console.error('CRP Referrals: Fetch failed', e);
     if (badge) badge.textContent = '❌ Fetch failed — check API token';
@@ -16174,610 +16119,6 @@ function findReadyNoVisit() {
   });
 }
 
-/* ══════════════════════════════════════════════════════════
-   PATIENT JOURNEY DATA ENGINE
-   ══════════════════════════════════════════════════════════ */
-
-var PJ_STAGES = ['Referral Created','Contacted','Med Records Created','Records Received','Screening','Scheduled Visit','Enrolled'];
-var PJ_STAGE_COLORS = {'Referral Created':'#3b82f6','Contacted':'#f59e0b','Med Records Created':'#8b5cf6','Records Received':'#06b6d4','Screening':'#d97706','Scheduled Visit':'#0284c7','Enrolled':'#059669','DNQ':'#dc2626','Screen Fail':'#ef4444','Lost':'#6b7280','Unknown':'#94a3b8'};
-
-function computePatientBlockers(referral, medRec, visits) {
-  var blockers = [];
-  if (referral && !referral.is_closed && !medRec) {
-    blockers.push('No med records entry');
-  }
-  if (medRec && medRec.is_active && (!medRec.records_received || medRec.records_received === 'No')) {
-    blockers.push('Records not received');
-  }
-  if (medRec && medRec.is_active && medRec.investigator_approval && medRec.investigator_approval !== 'Approved') {
-    blockers.push('Pending approval');
-  }
-  if (medRec && medRec.status === 'Ready to Schedule' && (!visits || visits.length === 0)) {
-    blockers.push('Ready but no visit');
-  }
-  if (referral && !referral.is_closed && referral.days_since_update > 14) {
-    blockers.push('Stale (' + referral.days_since_update + 'd)');
-  } else if (medRec && medRec.is_active) {
-    var updMs = medRec.date_updated ? (Date.now() - new Date(medRec.date_updated).getTime()) : 0;
-    if (updMs > 14 * 86400000) blockers.push('Stale (' + Math.floor(updMs / 86400000) + 'd)');
-  }
-  return blockers;
-}
-
-function computePatientJourneyStage(patientName) {
-  var norm = (patientName || '').toLowerCase().trim();
-  if (!norm) return null;
-
-  var referral = (REFERRAL_DATA || []).find(function(r) { return (r.name||'').toLowerCase().trim() === norm; });
-  var medRec = (MED_RECORDS_DATA || []).find(function(m) { return (m.name||'').toLowerCase().trim() === norm; });
-  var fbLead = (FB_CRM_DATA || []).find(function(f) { return ((f['Full Name']||f['name']||'')).toLowerCase().trim() === norm; });
-  var njPat = (PATIENT_NJ_DATA || []).find(function(p) { return (p.name||'').toLowerCase().trim() === norm; });
-  var visits = (DATA.allVisitDetail || []).filter(function(v) { return (v.patient||'').toLowerCase().trim() === norm; });
-  var cancels = (DATA.allCancels || []).filter(function(c) { return (c.name||'').toLowerCase().trim() === norm; });
-
-  var stage = 'Unknown';
-  var stageIndex = -1;
-  var lastUpdated = null;
-  var study = '';
-
-  // Determine study
-  if (referral && referral.study) study = referral.study;
-  else if (medRec && medRec.study) study = medRec.study;
-  else if (njPat && njPat.study) study = njPat.study;
-  else if (fbLead) study = fbLead['Study Campaign'] || fbLead['Campaign'] || fbLead['campaign'] || '';
-
-  // Determine stage from most advanced source
-  if (medRec) {
-    lastUpdated = medRec.date_updated;
-    if (medRec.status === 'Enrolled' || medRec.status === 'Complete') { stage = 'Enrolled'; stageIndex = 6; }
-    else if (medRec.status === 'Visit Scheduled') { stage = 'Scheduled Visit'; stageIndex = 5; }
-    else if (medRec.status === 'In Screening') { stage = 'Screening'; stageIndex = 4; }
-    else if (medRec.records_received === 'Yes' || medRec.status === 'Ready to Schedule') { stage = 'Records Received'; stageIndex = 3; }
-    else if (medRec.status === 'DNQ') { stage = 'DNQ'; stageIndex = -1; }
-    else if (medRec.status === 'Screen Fail') { stage = 'Screen Fail'; stageIndex = -1; }
-    else if (medRec.status === 'Not Interested' || medRec.status === 'Unable to Reach' || medRec.status === 'No Show') { stage = 'Lost'; stageIndex = -1; }
-    else { stage = 'Med Records Created'; stageIndex = 2; }
-  } else if (referral) {
-    lastUpdated = referral.date_updated;
-    if (referral.is_closed) {
-      if (referral.stage === 'Enrolled') { stage = 'Enrolled'; stageIndex = 6; }
-      else if (referral.stage === 'DNQ') { stage = 'DNQ'; stageIndex = -1; }
-      else if (referral.stage === 'Screen Fail') { stage = 'Screen Fail'; stageIndex = -1; }
-      else { stage = 'Lost'; stageIndex = -1; }
-    } else if (referral.stage === 'Enrolled') { stage = 'Enrolled'; stageIndex = 6; }
-    else if (referral.stage === 'Screened') { stage = 'Screening'; stageIndex = 4; }
-    else if (referral.stage === 'Screening' || referral.stage === 'Pre-Screening') { stage = 'Screening'; stageIndex = 4; }
-    else if (referral.stage === 'Contacted') { stage = 'Contacted'; stageIndex = 1; }
-    else { stage = 'Referral Created'; stageIndex = 0; }
-  } else if (fbLead) {
-    lastUpdated = fbLead['Date Created'] || null;
-    stage = 'Referral Created'; stageIndex = 0;
-  } else if (njPat) {
-    lastUpdated = njPat.date_updated;
-    stage = 'Screening'; stageIndex = 4;
-  }
-
-  // Calculate days in stage
-  var daysInStage = null;
-  if (lastUpdated) {
-    try {
-      var diff = Date.now() - new Date(lastUpdated).getTime();
-      daysInStage = Math.max(0, Math.floor(diff / 86400000));
-    } catch(e) {}
-  }
-
-  var blockers = computePatientBlockers(referral, medRec, visits);
-  var isStale = daysInStage !== null && daysInStage > 14;
-  var source = fbLead ? 'Facebook' : (referral ? (referral.source_type || 'Referral') : (medRec ? 'Med Records' : 'Other'));
-
-  return {
-    patientName: patientName,
-    normalized: norm,
-    stage: stage,
-    stageIndex: stageIndex,
-    study: study,
-    daysInStage: daysInStage,
-    lastUpdated: lastUpdated,
-    blockers: blockers,
-    isStale: isStale,
-    source: source,
-    referral: referral || null,
-    medRec: medRec || null,
-    fbLead: fbLead || null,
-    njPatient: njPat || null,
-    upcomingVisits: visits,
-    recentCancels: cancels,
-    url: (referral && referral.url) ? referral.url : (medRec && medRec.url) ? medRec.url : null
-  };
-}
-
-function getAllPatientJourneyData() {
-  var patientMap = {};
-
-  // Collect from referrals
-  (REFERRAL_DATA || []).forEach(function(r) {
-    var key = (r.name||'').toLowerCase().trim();
-    if (key) patientMap[key] = r.name;
-  });
-  // Collect from med records
-  (MED_RECORDS_DATA || []).forEach(function(m) {
-    var key = (m.name||'').toLowerCase().trim();
-    if (key && !patientMap[key]) patientMap[key] = m.name;
-  });
-  // Collect from FB CRM
-  (FB_CRM_DATA || []).forEach(function(f) {
-    var name = f['Full Name'] || f['name'] || '';
-    var key = name.toLowerCase().trim();
-    if (key && !patientMap[key]) patientMap[key] = name;
-  });
-  // Collect from NJ tracker
-  (PATIENT_NJ_DATA || []).forEach(function(p) {
-    var key = (p.name||'').toLowerCase().trim();
-    if (key && !patientMap[key]) patientMap[key] = p.name;
-  });
-
-  var results = [];
-  var names = Object.values(patientMap);
-  for (var i = 0; i < names.length; i++) {
-    var entry = computePatientJourneyStage(names[i]);
-    if (entry) results.push(entry);
-  }
-
-  // Sort: active stages first (by stageIndex desc), then by recency
-  results.sort(function(a, b) {
-    // Terminal stages (stageIndex -1) go to bottom
-    if (a.stageIndex >= 0 && b.stageIndex < 0) return -1;
-    if (a.stageIndex < 0 && b.stageIndex >= 0) return 1;
-    // Then by stage descending
-    if (a.stageIndex !== b.stageIndex) return b.stageIndex - a.stageIndex;
-    // Then by days ascending (most recent first)
-    return (a.daysInStage || 0) - (b.daysInStage || 0);
-  });
-
-  return results;
-}
-
-function computePatientJourneyKPIs(journeyData) {
-  var counts = {};
-  PJ_STAGES.forEach(function(s) { counts[s] = 0; });
-
-  var totalActive = 0;
-  var withBlockers = 0;
-  var stale = 0;
-  var enrolledDays = [];
-
-  journeyData.forEach(function(p) {
-    if (p.stage && counts[p.stage] !== undefined) counts[p.stage]++;
-    if (p.stageIndex >= 0) totalActive++;
-    if (p.blockers && p.blockers.length > 0) withBlockers++;
-    if (p.isStale && p.stageIndex >= 0) stale++;
-    if (p.stage === 'Enrolled' && p.daysInStage !== null) enrolledDays.push(p.daysInStage);
-  });
-
-  var avgDays = enrolledDays.length > 0 ? Math.round(enrolledDays.reduce(function(s, d) { return s + d; }, 0) / enrolledDays.length) : null;
-  var convRate = totalActive > 0 ? Math.round(counts['Enrolled'] / totalActive * 100) : 0;
-
-  return {
-    totalPatients: totalActive,
-    stageCounts: counts,
-    avgDaysToEnroll: avgDays,
-    conversionRate: convRate,
-    patientsWithBlockers: withBlockers,
-    stalePatients: stale
-  };
-}
-
-/* ══════════════════════════════════════════════════════════
-   PATIENT JOURNEY RENDERING FUNCTIONS
-   ══════════════════════════════════════════════════════════ */
-
-function buildPatientJourneyView() {
-  var data = getAllPatientJourneyData();
-  window._patientJourneyCache = data;
-  var kpis = computePatientJourneyKPIs(data);
-  window._patientJourneyKPIs = kpis;
-
-  // Update KPI banner
-  var set = function(id, val) { var el = document.getElementById(id); if (el) el.textContent = val; };
-  set('pj-kpi-total', kpis.totalPatients);
-  set('pj-kpi-avg-days', kpis.avgDaysToEnroll !== null ? kpis.avgDaysToEnroll + 'd' : '—');
-  set('pj-kpi-conv-rate', kpis.conversionRate + '%');
-  set('pj-kpi-blockers', kpis.patientsWithBlockers);
-  set('pj-kpi-stale', kpis.stalePatients);
-
-  // Update stage counters
-  PJ_STAGES.forEach(function(stage, idx) {
-    set('pj-stage-' + idx, kpis.stageCounts[stage] || 0);
-  });
-
-  // Populate study filter dropdown
-  var studyFilter = document.getElementById('pj-study-filter');
-  if (studyFilter && studyFilter.options.length <= 1) {
-    var studies = {};
-    data.forEach(function(p) { if (p.study) studies[p.study] = true; });
-    Object.keys(studies).sort().forEach(function(s) {
-      var opt = document.createElement('option');
-      opt.value = s; opt.textContent = s;
-      studyFilter.appendChild(opt);
-    });
-  }
-
-  // Render roadblocks
-  renderPatientRoadblocks(data);
-
-  // Render table
-  renderPatientJourneyTable(data);
-}
-
-function renderPatientRoadblocks(data) {
-  var withBlockers = (data || window._patientJourneyCache || []).filter(function(p) { return p.blockers && p.blockers.length > 0 && p.stageIndex >= 0; });
-
-  var countEl = document.getElementById('pj-roadblock-count');
-  if (countEl) countEl.textContent = withBlockers.length;
-
-  var contentEl = document.getElementById('pj-roadblocks-content');
-  if (!contentEl) return;
-
-  if (withBlockers.length === 0) {
-    contentEl.innerHTML = '<div style="text-align:center;padding:16px;color:#059669;font-size:12px;font-weight:600;">No roadblocks detected</div>';
-    return;
-  }
-
-  var html = '';
-  withBlockers.slice(0, 20).forEach(function(p) {
-    var badges = p.blockers.map(function(b) {
-      return '<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;background:#fef2f2;color:#dc2626;margin:1px 2px;">' + b + '</span>';
-    }).join('');
-    var sc = PJ_STAGE_COLORS[p.stage] || '#94a3b8';
-    var safeName = (p.patientName||'').replace(/'/g, "\\'");
-    html += '<div style="padding:10px 16px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:center;gap:12px;" onclick="openPatientJourneyModal(\'' + safeName + '\')">';
-    html += '<div style="flex:1;"><div style="font-weight:600;font-size:12px;color:var(--navy);">' + p.patientName + '</div>';
-    html += '<div style="font-size:10px;color:var(--muted);">' + (p.study||'—') + '</div></div>';
-    html += '<span style="font-size:10px;padding:2px 8px;border-radius:4px;background:' + sc + '20;color:' + sc + ';font-weight:600;">' + p.stage + '</span>';
-    html += '<div style="flex:1;">' + badges + '</div>';
-    html += '<span style="font-size:10px;color:var(--muted);">' + (p.daysInStage !== null ? p.daysInStage + 'd' : '') + '</span>';
-    html += '</div>';
-  });
-  if (withBlockers.length > 20) html += '<div style="text-align:center;padding:8px;font-size:10px;color:var(--muted);">+' + (withBlockers.length - 20) + ' more</div>';
-  contentEl.innerHTML = html;
-}
-
-function renderPatientJourneyTable(data) {
-  var tbody = document.getElementById('pj-tbody');
-  if (!tbody) return;
-
-  if (!data || data.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--muted);">No patient data available. Connect ClickUp and refresh.</td></tr>';
-    return;
-  }
-
-  var html = '';
-  data.forEach(function(p) {
-    var sc = PJ_STAGE_COLORS[p.stage] || '#94a3b8';
-    var blocker = '';
-    if (p.blockers && p.blockers.length > 0) {
-      blocker = '<span style="font-size:9px;padding:2px 6px;border-radius:3px;background:#fef2f2;color:#dc2626;font-weight:600;">' + p.blockers[0] + '</span>';
-      if (p.blockers.length > 1) blocker += ' <span style="font-size:9px;color:var(--muted);">+' + (p.blockers.length - 1) + '</span>';
-    }
-    var daysDisplay = p.daysInStage !== null ? p.daysInStage : '—';
-    var daysColor = p.daysInStage > 14 ? '#dc2626' : p.daysInStage > 7 ? '#d97706' : 'var(--muted)';
-    var safeName = (p.patientName||'').replace(/'/g, "\\'");
-    var nameLink = p.url
-      ? '<a href="' + p.url + '" target="_blank" onclick="event.stopPropagation();" style="font-weight:600;color:var(--navy);text-decoration:none;">' + p.patientName + '</a>'
-      : '<span style="font-weight:600;">' + p.patientName + '</span>';
-
-    html += '<tr style="cursor:pointer;border-bottom:1px solid var(--border);" onclick="openPatientJourneyModal(\'' + safeName + '\')" onmouseover="this.style.background=\'var(--surface2)\'" onmouseout="this.style.background=\'\'">';
-    html += '<td style="padding:8px 12px;">' + nameLink + '</td>';
-    html += '<td style="padding:8px 6px;font-size:11px;color:var(--muted);">' + (p.study||'—') + '</td>';
-    html += '<td style="padding:8px 6px;text-align:center;"><span style="font-size:10px;padding:2px 8px;border-radius:4px;background:' + sc + '20;color:' + sc + ';font-weight:600;white-space:nowrap;">' + p.stage + '</span></td>';
-    html += '<td style="padding:8px 6px;text-align:center;font-weight:600;color:' + daysColor + ';">' + daysDisplay + '</td>';
-    html += '<td style="padding:8px 6px;">' + blocker + '</td>';
-    html += '<td style="padding:8px 6px;font-size:10px;color:var(--muted);">' + p.source + '</td>';
-    html += '<td style="padding:8px 6px;font-size:10px;color:var(--muted);white-space:nowrap;">' + (p.lastUpdated ? p.lastUpdated.split('T')[0] : '—') + '</td>';
-    html += '</tr>';
-  });
-  tbody.innerHTML = html;
-}
-
-function filterPatientJourneyTable() {
-  var search = (document.getElementById('pj-search') || {}).value || '';
-  search = search.toLowerCase();
-  var stageF = (document.getElementById('pj-stage-filter') || {}).value || '';
-  var blockerF = (document.getElementById('pj-blocker-filter') || {}).value || '';
-  var studyF = (document.getElementById('pj-study-filter') || {}).value || '';
-
-  var data = window._patientJourneyCache || [];
-  var filtered = data.filter(function(p) {
-    if (search && p.patientName.toLowerCase().indexOf(search) === -1 && (p.study||'').toLowerCase().indexOf(search) === -1) return false;
-    if (stageF && p.stage !== stageF) return false;
-    if (studyF && p.study !== studyF) return false;
-    if (blockerF === 'with-blockers' && (!p.blockers || p.blockers.length === 0)) return false;
-    if (blockerF === 'stale' && !p.isStale) return false;
-    return true;
-  });
-  renderPatientJourneyTable(filtered);
-}
-
-function sortPJTable(th, colIdx) {
-  var tbody = document.getElementById('pj-tbody');
-  if (!tbody) return;
-  var rows = Array.from(tbody.querySelectorAll('tr'));
-  var asc = !th.classList.contains('sort-asc');
-  // Clear sort classes on all headers
-  th.closest('tr').querySelectorAll('th').forEach(function(t) { t.classList.remove('sort-asc','sort-desc'); });
-  th.classList.add(asc ? 'sort-asc' : 'sort-desc');
-
-  rows.sort(function(a, b) {
-    var aText = (a.children[colIdx] || {}).textContent || '';
-    var bText = (b.children[colIdx] || {}).textContent || '';
-    var aNum = parseFloat(aText);
-    var bNum = parseFloat(bText);
-    if (!isNaN(aNum) && !isNaN(bNum)) return asc ? aNum - bNum : bNum - aNum;
-    return asc ? aText.localeCompare(bText) : bText.localeCompare(aText);
-  });
-  rows.forEach(function(r) { tbody.appendChild(r); });
-}
-
-function togglePJRoadblocks() {
-  var content = document.getElementById('pj-roadblocks-content');
-  var toggle = document.getElementById('pj-roadblock-toggle');
-  if (!content) return;
-  if (content.style.display === 'none') {
-    content.style.display = '';
-    if (toggle) toggle.innerHTML = '&#9660;';
-  } else {
-    content.style.display = 'none';
-    if (toggle) toggle.innerHTML = '&#9654;';
-  }
-}
-
-function openPatientJourneyModal(patientName) {
-  var patient = (window._patientJourneyCache || []).find(function(p) { return p.patientName === patientName; });
-  if (!patient) {
-    patient = computePatientJourneyStage(patientName);
-    if (!patient) return;
-  }
-
-  var body = '';
-
-  // Stage progress bar
-  body += '<div style="display:flex;gap:4px;align-items:center;margin-bottom:16px;padding:12px;background:var(--surface);border-radius:8px;">';
-  PJ_STAGES.forEach(function(stage, idx) {
-    var isCurrent = patient.stage === stage;
-    var isPast = patient.stageIndex > idx;
-    var sc = PJ_STAGE_COLORS[stage];
-    var bg = isCurrent ? sc : (isPast ? sc + '40' : '#e2e8f0');
-    var textC = isCurrent ? '#fff' : (isPast ? sc : '#94a3b8');
-    body += '<div style="flex:1;text-align:center;padding:6px 4px;border-radius:6px;background:' + bg + ';font-size:9px;font-weight:600;color:' + textC + ';white-space:nowrap;">' + stage.replace('Med Records Created','Med Rec').replace('Records Received','Rec Recv').replace('Referral Created','Referral').replace('Scheduled Visit','Scheduled') + '</div>';
-    if (idx < PJ_STAGES.length - 1) body += '<div style="font-size:10px;color:#cbd5e1;">→</div>';
-  });
-  body += '</div>';
-
-  // Current status
-  var sc = PJ_STAGE_COLORS[patient.stage] || '#94a3b8';
-  body += '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;padding:12px;background:' + sc + '10;border-radius:8px;border-left:4px solid ' + sc + ';">';
-  body += '<div><div style="font-size:10px;color:var(--muted);">Current Stage</div><div style="font-weight:700;color:' + sc + ';">' + patient.stage + '</div></div>';
-  body += '<div><div style="font-size:10px;color:var(--muted);">Days in Stage</div><div style="font-weight:700;">' + (patient.daysInStage !== null ? patient.daysInStage : '—') + '</div></div>';
-  body += '<div><div style="font-size:10px;color:var(--muted);">Study</div><div style="font-weight:700;">' + (patient.study||'—') + '</div></div>';
-  body += '<div><div style="font-size:10px;color:var(--muted);">Source</div><div style="font-weight:700;">' + patient.source + '</div></div>';
-  body += '</div>';
-
-  // Blockers
-  if (patient.blockers && patient.blockers.length > 0) {
-    body += '<div style="padding:10px 12px;margin-bottom:12px;background:#fef2f2;border-radius:6px;border:1px solid #fecaca;">';
-    body += '<div style="font-weight:700;color:#dc2626;font-size:11px;margin-bottom:4px;">Active Blockers</div>';
-    patient.blockers.forEach(function(b) { body += '<div style="font-size:11px;color:#dc2626;margin:2px 0;">• ' + b + '</div>'; });
-    body += '</div>';
-  }
-
-  // Referral data
-  if (patient.referral) {
-    var r = patient.referral;
-    body += '<div style="margin-bottom:12px;padding:12px;background:#e8eeff;border-radius:6px;">';
-    body += '<div style="font-weight:700;color:#1843ad;font-size:11px;margin-bottom:6px;">Referral Pipeline</div>';
-    body += '<div style="font-size:11px;display:grid;grid-template-columns:1fr 1fr;gap:4px;">';
-    body += '<div>Stage: <strong>' + (r.stage||'—') + '</strong></div>';
-    body += '<div>Source: ' + (r.source||r.source_type||'—') + '</div>';
-    body += '<div>Created: ' + (r.date_created ? r.date_created.split('T')[0] : '—') + '</div>';
-    body += '<div>Updated: ' + (r.date_updated ? r.date_updated.split('T')[0] : '—') + ' (' + (r.days_since_update||0) + 'd ago)</div>';
-    body += '</div>';
-    if (r.url) body += '<div style="margin-top:6px;"><a href="' + r.url + '" target="_blank" style="font-size:11px;color:#1843ad;">View in ClickUp →</a></div>';
-    body += '</div>';
-  }
-
-  // Med records data
-  if (patient.medRec) {
-    var m = patient.medRec;
-    body += '<div style="margin-bottom:12px;padding:12px;background:#f0fdf4;border-radius:6px;">';
-    body += '<div style="font-weight:700;color:#059669;font-size:11px;margin-bottom:6px;">Medical Records</div>';
-    body += '<div style="font-size:11px;display:grid;grid-template-columns:1fr 1fr;gap:4px;">';
-    body += '<div>Status: <strong>' + m.status + '</strong></div>';
-    body += '<div>Records: ' + (m.records_received === 'Yes' ? '<span style="color:#059669;font-weight:700;">Received</span>' : '<span style="color:#dc2626;">Not Received</span>') + '</div>';
-    body += '<div>Approval: ' + (m.investigator_approval === 'Approved' ? '<span style="color:#059669;">Approved</span>' : (m.investigator_approval || '<span style="color:var(--muted);">Pending</span>')) + '</div>';
-    if (m.next_visit) body += '<div>Next Visit: ' + m.next_visit + '</div>';
-    body += '</div>';
-    if (m.url) body += '<div style="margin-top:6px;"><a href="' + m.url + '" target="_blank" style="font-size:11px;color:#059669;">View in ClickUp →</a></div>';
-    body += '</div>';
-  }
-
-  // FB lead
-  if (patient.fbLead) {
-    var f = patient.fbLead;
-    body += '<div style="margin-bottom:12px;padding:12px;background:#eff6ff;border-radius:6px;">';
-    body += '<div style="font-weight:700;color:#3b82f6;font-size:11px;margin-bottom:6px;">Facebook/Meta Lead</div>';
-    body += '<div style="font-size:11px;">';
-    body += '<div>Campaign: ' + (f['Study Campaign']||f['Campaign']||'—') + '</div>';
-    body += '<div>Phone: ' + (f['Phone']||f['phone']||'—') + '</div>';
-    body += '<div>Created: ' + (f['Date Created']||'—') + '</div>';
-    body += '</div></div>';
-  }
-
-  // Upcoming visits
-  if (patient.upcomingVisits && patient.upcomingVisits.length > 0) {
-    body += '<div style="margin-bottom:12px;padding:12px;background:#e0f2fe;border-radius:6px;">';
-    body += '<div style="font-weight:700;color:#0284c7;font-size:11px;margin-bottom:6px;">Upcoming Visits (' + patient.upcomingVisits.length + ')</div>';
-    patient.upcomingVisits.slice(0,5).forEach(function(v) {
-      body += '<div style="font-size:11px;margin:4px 0;">' + v.date + ' — ' + v.visit + ' (' + v.status + ') — ' + v.coord + '</div>';
-    });
-    body += '</div>';
-  }
-
-  // Recent cancels
-  if (patient.recentCancels && patient.recentCancels.length > 0) {
-    body += '<div style="margin-bottom:12px;padding:12px;background:#fef2f2;border-radius:6px;">';
-    body += '<div style="font-weight:700;color:#dc2626;font-size:11px;margin-bottom:6px;">Recent Cancellations (' + patient.recentCancels.length + ')</div>';
-    patient.recentCancels.slice(0,3).forEach(function(c) {
-      body += '<div style="font-size:11px;margin:4px 0;">' + (c.cancel_date||'—') + ' — ' + (c.reason||'No reason') + '</div>';
-    });
-    body += '</div>';
-  }
-
-  if (!body) body = '<div style="text-align:center;padding:20px;color:var(--muted);">No data available.</div>';
-  openModal(patient.patientName + ' — Patient Journey', patient.study || '', body);
-}
-
-/* ══════════════════════════════════════════════════════════
-   OPERATIONS TAB SUB-TAB SWITCHING
-   ══════════════════════════════════════════════════════════ */
-
-var _opsContentMoved = false;
-
-function moveOpsContent() {
-  if (_opsContentMoved) return;
-  _opsContentMoved = true;
-
-  // Move Studies content
-  var studiesView = document.getElementById('view-studies');
-  var opsStudies = document.getElementById('ops-studies-view');
-  if (studiesView && opsStudies) {
-    while (studiesView.firstChild) opsStudies.appendChild(studiesView.firstChild);
-  }
-
-  // Move Schedule content
-  var schedView = document.getElementById('view-schedule');
-  var opsSched = document.getElementById('ops-schedule-view');
-  if (schedView && opsSched) {
-    while (schedView.firstChild) opsSched.appendChild(schedView.firstChild);
-  }
-
-  // Move Actions content
-  var actionsView = document.getElementById('view-actions');
-  var opsAlerts = document.getElementById('ops-alerts-view');
-  if (actionsView && opsAlerts) {
-    while (actionsView.firstChild) opsAlerts.appendChild(actionsView.firstChild);
-  }
-
-  // Add Overview charts into studies sub-view
-  var overviewView = document.getElementById('view-overview');
-  if (overviewView && opsStudies) {
-    // Move cancel trend, cancel study bars, reason chart, site chart into studies
-    var cancelTrendCard = document.getElementById('cancelTrendChart');
-    if (cancelTrendCard) {
-      var card = cancelTrendCard.closest('.card');
-      if (card && card.parentElement) {
-        var wrapper = card.parentElement.classList.contains('grid-2') ? card.parentElement : card;
-        opsStudies.insertBefore(wrapper, opsStudies.firstChild);
-      }
-    }
-  }
-}
-
-function switchOpsSubtab(name, btn) {
-  moveOpsContent();
-
-  ['studies','schedule','alerts'].forEach(function(s) {
-    var el = document.getElementById('ops-' + s + '-view');
-    if (el) el.style.display = s === name ? '' : 'none';
-  });
-
-  document.querySelectorAll('.ops-subtab').forEach(function(b) {
-    b.style.color = 'var(--muted)';
-    b.style.borderBottomColor = 'transparent';
-  });
-  if (btn) {
-    btn.style.color = 'var(--navy)';
-    btn.style.borderBottomColor = 'var(--navy)';
-  }
-
-  // Trigger chart rendering for the selected sub-tab
-  if (name === 'studies') {
-    setTimeout(function() {
-      safe(buildStudiesView, 'buildStudiesView');
-      safe(buildCancelTrend, 'buildCancelTrend');
-      safe(buildCancelStudyBars, 'buildCancelStudyBars');
-      safe(buildReasonChart, 'buildReasonChart');
-      safe(buildSiteChart, 'buildSiteChart');
-    }, 50);
-  } else if (name === 'schedule') {
-    setTimeout(function() {
-      safe(buildHorizon, 'buildHorizon');
-      safe(buildUpcomingTrend, 'buildUpcomingTrend');
-      safe(buildWeeklyBySiteChart, 'wkChart');
-      safe(buildVisitTypeChart, 'visitChart');
-      safe(buildStatusChart, 'statusChart');
-      safe(buildStatusLegend, 'statusLegend');
-      safe(buildSchedStudyBars, 'schedBars');
-      safe(buildSchedCoordList, 'schedCoord');
-      safe(function() { filterSchedTable('all', null); }, 'schedTable');
-      safe(renderCoordinatorGoals, 'renderCoordinatorGoals');
-    }, 50);
-  } else if (name === 'alerts') {
-    setTimeout(function() {
-      safe(buildActionSteps, 'buildActionSteps');
-      if (typeof buildRiskFlagCards === 'function') safe(buildRiskFlagCards, 'buildRiskFlagCards');
-      safe(buildMedRecAlerts, 'buildMedRecAlerts');
-      safe(buildInsights, 'buildInsights');
-    }, 50);
-  }
-}
-
-/* ══════════════════════════════════════════════════════════
-   REFERRALS & MARKETING TAB — mirror rendering to new IDs
-   ══════════════════════════════════════════════════════════ */
-
-function syncReferralsToNewTab() {
-  // Mirror old referral dashboard content to new tab IDs
-  var pairs = [
-    ['ref-status-badge', 'ref-status-badge-rm'],
-    ['ref-kpi-leads', 'ref-kpi-leads-rm'],
-    ['ref-kpi-contact', 'ref-kpi-contact-rm'],
-    ['ref-kpi-screening', 'ref-kpi-screening-rm'],
-    ['ref-kpi-enrolled', 'ref-kpi-enrolled-rm'],
-    ['ref-kpi-conversion', 'ref-kpi-conversion-rm'],
-    ['ref-total-badge', 'ref-total-badge-rm'],
-    ['ref-camp-badge', 'ref-camp-badge-rm'],
-    ['ref-fb-badge', 'ref-fb-badge-rm'],
-    ['ref-xref-badge', 'ref-xref-badge-rm']
-  ];
-  pairs.forEach(function(pair) {
-    var src = document.getElementById(pair[0]);
-    var dst = document.getElementById(pair[1]);
-    if (src && dst) dst.textContent = src.textContent;
-  });
-
-  var htmlPairs = [
-    ['ref-funnel-chart', 'ref-funnel-chart-rm'],
-    ['ref-source-chart', 'ref-source-chart-rm'],
-    ['ref-study-table', 'ref-study-table-rm'],
-    ['ref-campaigns-table', 'ref-campaigns-table-rm'],
-    ['ref-campaign-xref', 'ref-campaign-xref-rm'],
-    ['ref-fb-table', 'ref-fb-table-rm']
-  ];
-  htmlPairs.forEach(function(pair) {
-    var src = document.getElementById(pair[0]);
-    var dst = document.getElementById(pair[1]);
-    if (src && dst && src.innerHTML !== dst.innerHTML) dst.innerHTML = src.innerHTML;
-  });
-
-  // Show/hide based on old referral dashboard state
-  var oldSetup = document.getElementById('referral-setup');
-  var oldDash = document.getElementById('referral-dashboard');
-  var newSetup = document.getElementById('referral-setup-rm');
-  var newDash = document.getElementById('referral-dashboard-rm');
-  if (oldSetup && newSetup) newSetup.style.display = oldSetup.style.display;
-  if (oldDash && newDash) newDash.style.display = oldDash.style.display;
-}
-
 function buildPipelineCell(studyName, safeStudy) {
   const refData = getStudyReferralPipeline(studyName);
   if (!refData || refData.total === 0) return '<span style="font-size:10px;color:#cbd5e1;">\u2014</span>';
@@ -16801,14 +16142,12 @@ function buildMedRecCell(studyName, safeStudy) {
 }
 
 function buildFBLeadCell(studyName) {
-  var fb = getStudyFBLeads(studyName);
-  var refCount = (REFERRAL_DATA || []).filter(function(r) { return matchesStudy(r.study, studyName); }).length;
-  var total = fb.count + refCount;
-  if (total === 0) return '<span style="font-size:10px;color:#cbd5e1;">\u2014</span>';
-  var color = total > 5 ? '#059669' : total > 0 ? '#3b82f6' : '#94a3b8';
+  var d = getStudyFBLeads(studyName);
+  if (d.count === 0) return '<span style="font-size:10px;color:#cbd5e1;">\u2014</span>';
+  var color = d.recent > 0 ? '#3b82f6' : '#94a3b8';
   return '<div style="text-align:center;">' +
-    '<div style="font-size:11px;font-weight:700;color:' + color + ';">' + total + '</div>' +
-    '<div style="font-size:9px;color:#94a3b8;">' + refCount + ' ref · ' + fb.count + ' fb</div>' +
+    '<div style="font-size:11px;font-weight:700;color:' + color + ';">' + d.count + '</div>' +
+    (d.recent > 0 ? '<div style="font-size:9px;color:#3b82f6;">' + d.recent + ' new</div>' : '') +
     '</div>';
 }
 
