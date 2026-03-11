@@ -12931,6 +12931,23 @@ function processLiveData(allRows, legacyCancels, auditLog) {
   });
   console.log('CRP: Split report → upcoming', upcoming.length, ', derived cancels', derivedCancels.length, ', total cancels (merged+deduped)', cancels.length);
 
+  // ── Coordinator definitions (must be before audit log resolution) ──
+  const EXCLUDE_STUDIES = new Set([]);
+  const isExcludedStudy = (name) => EXCLUDE_STUDIES.has(name) || /pre-screening/i.test(name);
+  const FIBRO = /fibroscan|fibrosan|fibro scan|scan only|scan visit/i;
+  const EXCL_COORD = new Set(['jana milankovic','ema gunic','gabrijela ateljevic','ana lambic','vlado draganic']);
+  const COORD_MAP = {
+    'stacey scott':'Stacey Scott','ruby pereira':'Ruby Pereira',
+    'mario castellanos':'Mario Castellanos','angelina mcmullen':'Angelina McMullen',
+    'cady chilensky':'Cady Chilensky','eugene andruczyk':'Eugene Andruczyk',
+    'lolita vaughan':'Lolita Vaughan','michael tomeo':'Michael Tomeo',
+    'joseph heether':'Joseph Heether','brian shaffer':'Brian Shaffer',
+    'taher modarressi':'Taher Modarressi'
+  };
+  function normName(n)   { return (n||'').trim().replace(/\s+/g,' '); }
+  function cleanCoord(n) { return COORD_MAP[normName(n).toLowerCase()] || normName(n); }
+  function isCoord(n)    { return !EXCL_COORD.has(normName(n).toLowerCase()); }
+
   // ── Audit Log Coordinator Resolution ──
   // Build lookup maps from audit log to resolve the actual clinical coordinator
   // when the upcoming report shows a scheduler/study coordinator instead.
@@ -13026,22 +13043,6 @@ function processLiveData(allRows, legacyCancels, auditLog) {
     if (isNaN(sk) || isNaN(pk)) return null;
     return `${BASE}/${siteSlug(sk, siteName)}/study/${sk}/subject/${pk}`;
   }
-
-  const EXCLUDE_STUDIES = new Set([]);
-  const isExcludedStudy = (name) => EXCLUDE_STUDIES.has(name) || /pre-screening/i.test(name);
-  const FIBRO = /fibroscan|fibrosan|fibro scan|scan only|scan visit/i;
-  const EXCL_COORD = new Set(['jana milankovic','ema gunic','gabrijela ateljevic','ana lambic','vlado draganic']);
-  const COORD_MAP = {
-    'stacey scott':'Stacey Scott','ruby pereira':'Ruby Pereira',
-    'mario castellanos':'Mario Castellanos','angelina mcmullen':'Angelina McMullen',
-    'cady chilensky':'Cady Chilensky','eugene andruczyk':'Eugene Andruczyk',
-    'lolita vaughan':'Lolita Vaughan','michael tomeo':'Michael Tomeo',
-    'joseph heether':'Joseph Heether','brian shaffer':'Brian Shaffer',
-    'taher modarressi':'Taher Modarressi'
-  };
-  function normName(n)   { return (n||'').trim().replace(/\s+/g,' '); }
-  function cleanCoord(n) { return COORD_MAP[normName(n).toLowerCase()] || normName(n); }
-  function isCoord(n)    { return !EXCL_COORD.has(normName(n).toLowerCase()); }
 
   function parseDate(s) {
     if (!s) return null;
