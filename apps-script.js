@@ -5,7 +5,9 @@
 // File 1:  "Upcoming scheduled appointments.csv"
 // File 2:  "No show and Canceled Visits in the last 2 months.csv"
 // File 3:  "Appointment Audit Log.csv"
-// v6:      Added Appointment Audit Log processing.
+// v7:      Column-pruning + row-filtering for Audit Log to avoid
+//          Google Sheets' 10M cell limit. Only keeps the 4 columns
+//          the dashboard actually uses, and only "User Added" rows.
 //          Content-based dedup — prevents duplicate rows even when
 //          multiple files (PHL + PNJ) are appended on the same day.
 //          Dedup keys:
@@ -205,9 +207,19 @@ function readFileRows(file, skipExclusions) {
       });
       if (!hasData) continue;
 
-      // Audit log rows: no study exclusions or visit categorization needed
+      // Audit log rows: prune to only columns the dashboard needs
+      // and pre-filter to "User Added" rows (the only change type used)
       if (skipExclusions) {
-        rows.push(row);
+        var changeType = (row["Appointment Change Type"] || "").trim();
+        if (changeType !== "User Added") continue; // dashboard only uses "User Added"
+        // Keep only the 4 columns the dashboard actually reads
+        var prunedRow = {
+          "Calendar Appointment Key (back end)": row["Calendar Appointment Key (back end)"] || "",
+          "Subject Key (Back End)": row["Subject Key (Back End)"] || "",
+          "Appointment For User": row["Appointment For User"] || "",
+          "Appointment Change Type": changeType
+        };
+        rows.push(prunedRow);
         continue;
       }
 
@@ -482,6 +494,65 @@ function _deduplicateSheet(sheetName, col1, col2, col3) {
 
 
 // ============================================================
+// MIGRATE AUDIT LOG — prune columns + filter to "User Added"
+// Run ONCE if the Audit Log sheet already has wide-format data.
+// ============================================================
+function migrateAuditLog() {
+  var ss    = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(AUDIT_SHEET_NAME);
+  if (!sheet || sheet.getLastRow() < 2) {
+    Logger.log("Audit log sheet not found or empty — nothing to migrate.");
+    return;
+  }
+
+  var data    = sheet.getDataRange().getValues();
+  var headers = data[0].map(String);
+
+  var KEEP_COLS = [
+    "snapshot_date",
+    "Calendar Appointment Key (back end)",
+    "Subject Key (Back End)",
+    "Appointment For User",
+    "Appointment Change Type"
+  ];
+
+  var colIdxs = KEEP_COLS.map(function(c) { return headers.indexOf(c); });
+  var changeTypeIdx = headers.indexOf("Appointment Change Type");
+
+  // If already migrated (only 5 columns), skip
+  if (headers.length <= 5) {
+    Logger.log("Audit log already has " + headers.length + " columns — appears migrated.");
+    return;
+  }
+
+  var keepRows = [KEEP_COLS]; // new header row
+  var filtered = 0;
+
+  for (var i = 1; i < data.length; i++) {
+    var changeType = (changeTypeIdx >= 0) ? String(data[i][changeTypeIdx]).trim() : "";
+    if (changeType !== "User Added") { filtered++; continue; }
+    var newRow = colIdxs.map(function(idx) {
+      return idx >= 0 ? data[i][idx] : "";
+    });
+    keepRows.push(newRow);
+  }
+
+  Logger.log("Audit migration: " + data.length + " → " + keepRows.length + " rows (" + filtered + " non-User-Added filtered out), " + headers.length + " → " + KEEP_COLS.length + " columns");
+
+  // Clear and rewrite
+  sheet.clearContents();
+  if (keepRows.length > 0) {
+    sheet.getRange(1, 1, keepRows.length, KEEP_COLS.length).setValues(keepRows);
+  }
+  sheet.getRange(1, 1, 1, KEEP_COLS.length)
+       .setFontWeight("bold").setBackground("#1e3a5f").setFontColor("#ffffff");
+  sheet.setFrozenRows(1);
+
+  Logger.log("Audit log migration complete.");
+}
+
+
+// ============================================================
 // DIAGNOSTIC
 // ============================================================
 function diagnose() {
@@ -549,6 +620,40 @@ function reprocessFile(fileId, type) {
     DriveApp.getFileById(fileId),
     sheetName
   );
+}
+
+// Reset audit log and re-import with pruned columns
+// Run this after updating the script to v7 to fix the 10M cell limit error.
+function resetAndReprocessAudit() {
+  var ui  = SpreadsheetApp.getUi();
+  var res = ui.alert("Reset Audit Log?",
+    "This will:\n1. Clear the Appointment Audit Log sheet\n2. Remove audit entries from the processed log\n3. Re-import all audit files with pruned columns (only 4 columns + snapshot_date)\n\nContinue?",
+    ui.ButtonSet.YES_NO);
+  if (res !== ui.Button.YES) return;
+
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // 1. Clear audit sheet
+  var auditSheet = ss.getSheetByName(AUDIT_SHEET_NAME);
+  if (auditSheet) { auditSheet.clearContents(); Logger.log("Cleared audit sheet"); }
+
+  // 2. Remove audit entries from processed log
+  var log = ss.getSheetByName(LOG_SHEET_NAME);
+  if (log && log.getLastRow() > 1) {
+    var logData = log.getRange(2, 1, log.getLastRow() - 1, 5).getValues();
+    // Delete from bottom up so row indices stay valid
+    for (var i = logData.length - 1; i >= 0; i--) {
+      var fileName = String(logData[i][1] || "");
+      if (fileName.indexOf(AUDIT_FILENAME) !== -1) {
+        log.deleteRow(i + 2);
+      }
+    }
+    Logger.log("Removed audit entries from processed log");
+  }
+
+  // 3. Re-run consolidateAll (will only pick up audit files now)
+  consolidateAll();
+  ui.alert("Done", "Audit log has been re-imported with pruned columns.", ui.ButtonSet.OK);
 }
 
 function DANGER_resetEverything() {

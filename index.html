@@ -2601,6 +2601,14 @@ const CRP_CONFIG = {
     EXTRA_LISTS: [],
     // Facebook CRM Google Sheet (published CSV — recruitment team comments + Delfa AI pre-screener)
     FACEBOOK_CRM_URL: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vR2y6TsaFLnVQcyskBntErNr5zl1WZRxZhWo-0cOIgMfEWvNm6NStcYatK9MF7U2tj4QDlnOCnopHri/pub?output=csv',
+    // Map FB campaign names → study protocol IDs (campaign keyword → [study1, study2])
+    // Keys are lowercased substrings matched against the 'Study Campaign' column
+    // More specific keys are checked first (longest match wins)
+    FB_CAMPAIGN_MAP: {
+      'high triglycerides_v2': ['J2A-MC-GZPS'],
+      'high triglycerides_v1': ['J2A-MC-GZPO'],
+      'high triglycerides':    ['J2A-MC-GZPS'],  // fallback for unversioned
+    },
     // Unified pipeline stage mapping (ClickUp status → dashboard stage)
     PIPELINE_MAP: {
       'pending provider outreach': 'New Lead',
@@ -16141,9 +16149,27 @@ function getStudyMedRecords(studyName) {
 function getStudyFBLeads(studyName) {
   if (!FB_CRM_DATA || FB_CRM_DATA.length === 0) return { count: 0, recent: 0 };
   var sn = (studyName || '').toLowerCase().trim();
+  // Use FB_CAMPAIGN_MAP to match campaign names to studies.
+  // For each lead, find the longest (most specific) matching keyword.
+  // The lead belongs to whichever study that keyword maps to.
+  var campaignMap = (CRP_CONFIG.CLICKUP || {}).FB_CAMPAIGN_MAP || {};
+  // Pre-sort all keywords longest-first for best-match priority
+  var allKeywords = Object.keys(campaignMap).map(function(k) { return k.toLowerCase(); });
+  allKeywords.sort(function(a, b) { return b.length - a.length; });
   var leads = FB_CRM_DATA.filter(function(f) {
     var campaign = (f['Study Campaign'] || f['Campaign'] || f['campaign'] || '').toLowerCase().trim();
-    return campaign && (campaign.includes(sn) || sn.includes(campaign));
+    if (!campaign) return false;
+    // Direct match (original fuzzy logic — protocol ID in campaign name)
+    if (campaign.includes(sn) || sn.includes(campaign)) return true;
+    // Campaign map: find longest matching keyword, check if it maps to this study
+    for (var i = 0; i < allKeywords.length; i++) {
+      if (campaign.includes(allKeywords[i])) {
+        // This is the best (most specific) match — does it map to our study?
+        var mapped = campaignMap[allKeywords[i]] || [];
+        return mapped.some(function(s) { return s.toLowerCase() === sn; });
+      }
+    }
+    return false;
   });
   var now = Date.now();
   var recent = leads.filter(function(f) {
