@@ -150,23 +150,23 @@ body {
 .nav {
   background: #fff;
   border-bottom: 1px solid var(--border);
-  padding: 0 28px;
-  display: flex; align-items: center; justify-content: space-between;
-  height: 58px;
+  padding: 0 16px;
+  display: flex; align-items: center; gap: 5px;
+  height: 50px;
   position: sticky; top: 0; z-index: 100;
   box-shadow: 0 1px 3px rgba(0,0,0,0.05);
 }
 .nav-brand {
-  display: flex; align-items: center; gap: 10px;
+  display: flex; align-items: center; gap: 8px; margin-right: 4px;
 }
-.nav-logo { width:40px; height:40px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
-.nav-title { font-size: 15px; font-weight: 700; color: var(--text); }
+.nav-logo { width:32px; height:32px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.nav-title { font-size: 14px; font-weight: 700; color: var(--text); }
 .nav-sub { font-size: 11px; color: var(--muted); }
-.nav-right { display: flex; align-items: center; gap: 12px; }
+.nav-right { display: flex; align-items: center; gap: 10px; }
 .nav-tab {
-  padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: 500;
+  padding: 5px 10px; border-radius: 6px; font-size: 12px; font-weight: 500;
   cursor: pointer; color: var(--muted); transition: all 0.15s;
-  border: 1px solid transparent;
+  border: 1px solid transparent; white-space: nowrap;
 }
 .nav-tab.active { background: #e8eeff; color: #072061; border-color: #1843ad; font-weight: 700; }
 .nav-tab:hover:not(.active) { background: var(--surface2); color: var(--text); }
@@ -757,13 +757,13 @@ body {
     <div class="tb-section">
       <div class="tb-label">⚡ Next 14 Days</div>
       <div class="tb-value blue" id="kpi-next14" class="kpi-clickable" title="Click to see next 14 days" onclick="showUpcoming(r=>{ const d=new Date(r.date_iso||'2026'); return (d-new Date('2026-03-07'))/86400000<=14; },'Next 14 Days')">78</div>
-      <div class="tb-sub">Confirmed visits</div>
+      <div class="tb-sub">Scheduled visits (CRIO)</div>
     </div>
     <div class="tb-divider">→</div>
     <div class="tb-section">
       <div class="tb-label">📆 Next 2 Months</div>
       <div class="tb-value green" id="kpi-upcoming" class="kpi-clickable" title="Click to see all upcoming visits" onclick="showUpcoming(null,'All Upcoming Visits')">75</div>
-      <div class="tb-sub">Upcoming active appts · through May 6</div>
+      <div class="tb-sub">Scheduled visits · through May 6</div>
     </div>
     <div class="tb-divider"></div>
     <div class="tb-section">
@@ -2619,7 +2619,7 @@ const CRP_CONFIG = {
   },
 
   // Version
-  VERSION: '2.9.0',
+  VERSION: '2.9.1',
   BUILD_DATE: '2026-03-10T22:00:00Z',
 };
 
@@ -14284,11 +14284,23 @@ async function refreshReferrals() {
 
     renderReferralDashboard();
 
+    // Refresh cross-source KPIs now that referral data is loaded
+    safe(buildRecruitmentKPIs, 'buildRecruitmentKPIs');
+    safe(buildInsights, 'buildInsights');
+
     // Also fetch additional ClickUp sources + Facebook CRM (non-blocking)
-    fetchFacebookCRM().catch(e => console.warn('FB CRM fetch failed:', e));
-    fetchMedicalRecords().catch(e => console.warn('Medical Records fetch failed:', e));
+    fetchFacebookCRM().then(function() {
+      safe(buildRecruitmentKPIs, 'buildRecruitmentKPIs');
+    }).catch(e => console.warn('FB CRM fetch failed:', e));
+    fetchMedicalRecords().then(function() {
+      safe(buildRecruitmentKPIs, 'buildRecruitmentKPIs');
+      safe(buildMedRecAlerts, 'buildMedRecAlerts');
+      safe(buildInsights, 'buildInsights');
+    }).catch(e => console.warn('Medical Records fetch failed:', e));
     fetchPatientTrackerNJ().catch(e => console.warn('Patient Tracker NJ fetch failed:', e));
-    fetchMarketingData().catch(e => console.warn('Marketing data fetch failed:', e));
+    fetchMarketingData().then(function() {
+      safe(buildRecruitmentKPIs, 'buildRecruitmentKPIs');
+    }).catch(e => console.warn('Marketing data fetch failed:', e));
   } catch(e) {
     console.error('CRP Referrals: Fetch failed', e);
     if (badge) badge.textContent = '❌ Fetch failed — check API token';
