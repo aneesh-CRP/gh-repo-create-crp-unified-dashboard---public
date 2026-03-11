@@ -128,7 +128,13 @@ function consolidateAll() {
 
   newUpcoming.forEach(function(file) { processFile(file, UPCOMING_SHEET_NAME); });
   newCancels.forEach(function(file)  { processFile(file, CANCEL_SHEET_NAME);   });
-  newAudit.forEach(function(file)    { processFile(file, AUDIT_SHEET_NAME);    });
+  // NOTE: Audit log is TOO LARGE for this spreadsheet (exceeds 10M cell limit).
+  // The dashboard reads the audit log directly from its own published CSV.
+  // Audit files are marked as processed so they don't re-appear each run.
+  newAudit.forEach(function(file) {
+    markFileProcessed(file.getId(), file.getName(), "skipped:audit-too-large-for-master",
+      Utilities.formatDate(file.getLastUpdated(), Session.getScriptTimeZone(), "yyyy-MM-dd"));
+  });
 
   Logger.log("=== Consolidation complete ===");
 }

@@ -13632,8 +13632,25 @@ function processLiveData(allRows, legacyCancels, auditLog) {
     admin_fixes: adminFixes
   };
 
+  // ── Build visitTypes from upcoming visits ──
+  const _vtCounts = {};
+  activeUpcoming.forEach(r => {
+    const visit = (r['Name'] || r['Appointment Type'] || '').trim();
+    let vType = 'Other';
+    const vl = visit.toLowerCase();
+    if (/screen|v1\/screen|main screen/i.test(vl)) vType = 'Screening';
+    else if (/treatment|cycle|week|v\d|visit\s*\d|infusion|injection|dose/i.test(vl)) vType = 'Treatment';
+    else if (/follow.?up|end.?of.?study|eos|final|completion|closeout/i.test(vl)) vType = 'Follow-Up';
+    else if (/random|baseline/i.test(vl)) vType = 'Randomization';
+    _vtCounts[vType] = (_vtCounts[vType] || 0) + 1;
+  });
+  const visitTypes = Object.entries(_vtCounts)
+    .map(([type, count]) => ({ type, count }))
+    .sort((a, b) => b.count - a.count);
+
   return {
     actionDetails,
+    visitTypes,
     today: today.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),
     upcomingTotal: activeUpcoming.length,
     cancelTotal: recentCancels.length,
@@ -16215,8 +16232,12 @@ function buildPipelineCell(studyName, safeStudy) {
 
 function buildMedRecCell(studyName, safeStudy) {
   var d = getStudyMedRecords(studyName);
-  // Check records received for scheduled visit patients
-  var upcoming = (DATA.allVisitDetail||[]).filter(function(v){ return v.study === studyName; });
+  // Check records received for upcoming SCREENING visits only
+  var upcoming = (DATA.allVisitDetail||[]).filter(function(v){
+    if (v.study !== studyName) return false;
+    var vl = (v.visit||'').toLowerCase();
+    return /screen|v1\/screen|main screen|v1$|visit\s*1$/i.test(vl);
+  });
   var schedPatients = [];
   var _seen = {};
   upcoming.forEach(function(v) {
@@ -16230,13 +16251,13 @@ function buildMedRecCell(studyName, safeStudy) {
       if (medMatch && (medMatch.records_received === 'Yes' || medMatch.status === 'Enrolled' || medMatch.status === 'Complete')) recvCount++;
     });
   }
-  // Show records received for scheduled patients
+  // Show records received for upcoming screening patients
   if (totalSched > 0) {
     var pct = Math.round(recvCount / totalSched * 100);
     var color = pct === 100 ? '#059669' : pct >= 50 ? '#d97706' : '#dc2626';
     return '<div style="cursor:pointer;text-align:center;" onclick="showMedRecDetailModal(\'' + safeStudy + '\')">' +
       '<div style="font-size:12px;font-weight:700;color:' + color + ';">' + recvCount + '/' + totalSched + '</div>' +
-      '<div style="font-size:9px;color:' + color + ';">' + pct + '% received</div>' +
+      '<div style="font-size:9px;color:' + color + ';">' + pct + '% screening</div>' +
       '</div>';
   }
   if (!d) return '<span style="font-size:10px;color:#cbd5e1;">\u2014</span>';
