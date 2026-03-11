@@ -13453,7 +13453,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
         patient: (r['Subject Full Name']||'').replace(/\s{2,}/g,' ').trim(),
         patient_url: `${base}/study/${+sk}/subject/${+subk}`,
         status: r['Subject Status']||'',
-        coord: normName(r['Full Name']),
+        coord: cleanCoord(r['Full Name']),
         site: r['Site Name']||'',
       };
     }),
@@ -13462,7 +13462,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
       url: (() => { try { const sk=r['Study Key'],subk=r['Subject Key (Back End)'],pnj=[161619,162446,167755,167794,172389,173164];const site=pnj.includes(+sk)?'clinical-research-philadelphia-pennington':'philadelphia-pa';return `https://app.clinicalresearch.io/clinical-research-philadelphia-crp/${site}/study/${+sk}/subject/${+subk}`;}catch(e){return '';}})(),
       study: (r['Study Name']||'').split(' - ').pop().trim(),
       study_url: (() => { try { const sk=r['Study Key'],pnj=[161619,162446,167755,167794,172389,173164];const site=pnj.includes(+sk)?'clinical-research-philadelphia-pennington':'philadelphia-pa';return `https://app.clinicalresearch.io/clinical-research-philadelphia-crp/${site}/study/${+sk}/subjects`;}catch(e){return '';}})(),
-      coord: normName(r['Staff Full Name']),
+      coord: cleanCoord(r['Staff Full Name'] || r['Full Name']),
       type: r['Appointment Cancellation Type']||'',
       reason: r['Cancel Reason']||'',
       category: r._category || categorizeReason(r['Cancel Reason'], r['Appointment Cancellation Type']),
