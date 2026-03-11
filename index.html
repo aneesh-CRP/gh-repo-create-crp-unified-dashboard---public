@@ -733,7 +733,7 @@ body {
   <span class="nav-tab fin-tab" onclick="switchTab('insights',this)" role="tab">🔒 Insights</span>
   <div class="nav-right" style="margin-left:auto;">
     <span class="data-badge" id="data-source-badge" style="display:none;"></span>
-    <span class="data-badge" id="last-refresh-badge">Updated: Mar 10, 2026</span>
+    <span class="data-badge" id="last-refresh-badge">Loading live data...</span>
     <button class="refresh-btn" onclick="refreshData()">↻ Refresh</button>
   </div>
 </nav>
@@ -12272,9 +12272,10 @@ function filterTable(filter, btn) {
 // GOOGLE SHEETS INTEGRATION
 // ═══════════════════════════════════════════════════
 async function fetchCSV(url) {
-  const proxyUrl = url; // Direct fetch — works if sheet is published publicly
-  const resp = await fetch(proxyUrl);
-  if (!resp.ok) throw new Error('HTTP ' + resp.status + ' fetching: ' + url);
+  // Cache-bust: append timestamp to prevent stale CDN/browser cache
+  const bustUrl = url + (url.includes('?') ? '&' : '?') + '_cb=' + Date.now();
+  const resp = await fetch(bustUrl, { cache: 'no-store' });
+  if (!resp.ok) throw new Error('HTTP ' + resp.status + ' fetching: ' + url.slice(0, 80));
   const text = await resp.text();
   // Guard: Google Sheets sometimes returns an HTML error/captcha page with 200 status
   const trimmed = text.trimStart();
@@ -16381,6 +16382,8 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     } catch(e) {
       console.warn('CRP: Auto-load live data failed:', e.message, '— retrying in 5s...');
+      document.getElementById('last-refresh-badge').textContent = '⚠️ Fetch failed — retrying...';
+      document.getElementById('last-refresh-badge').style.color = '#dc2626';
       // Retry once after 5 seconds (Google Sheets rate-limit is usually brief)
       setTimeout(async () => {
         try {
@@ -16398,9 +16401,11 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log('CRP: Retry succeeded — upcoming:', rows1b.length, 'audit:', auditB.length);
           } else {
             console.warn('CRP: Retry also returned low data — staying on SAMPLE');
+            document.getElementById('last-refresh-badge').textContent = '⚠️ Live data unavailable';
           }
         } catch(e2) {
           console.warn('CRP: Retry also failed:', e2.message, '— using SAMPLE data');
+          document.getElementById('last-refresh-badge').textContent = '⚠️ Live data unavailable — click Refresh';
         }
       }, 5000);
     }
