@@ -1059,6 +1059,14 @@ body {
   </div>
 </div></div>
     </div>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Investigator Workload</span>
+      </div>
+      <div id="sched-inv-list" style="padding:12px 16px;">
+        <p style="color:#94a3b8;font-size:12px">Loading investigator data...</p>
+      </div>
+    </div>
   </div>
 
   <!-- Recruiter Performance -->
@@ -11750,6 +11758,52 @@ function buildCoordList() {
   }).join('');
 }
 
+function buildInvestigatorList() {
+  const el = document.getElementById('sched-inv-list');
+  if (!el) return;
+  const invs = DATA.investigators || [];
+  if (!invs.length) { el.innerHTML = '<p style="color:#94a3b8;font-size:12px">No investigator data</p>'; return; }
+  const maxUp = Math.max(...invs.map(i => i.upcoming || 0), 1);
+  el.innerHTML = invs.map(inv => {
+    const pct = Math.round((inv.upcoming||0) / maxUp * 100);
+    const color = '#7c3aed';
+    return `<div style="padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer"
+                 onclick="showInvDetail('${inv.name.replace(/'/g,"\\'")}')">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+        <span style="font-size:13px;font-weight:600;color:var(--text)">${inv.name}</span>
+        <div style="text-align:right">
+          <span style="font-size:13px;font-weight:700;color:${color}">${inv.upcoming}</span>
+          <span style="font-size:10px;color:var(--muted)"> visits</span>
+          <span style="font-size:10px;color:#94a3b8;margin-left:6px">${inv.studyCount} studies</span>
+        </div>
+      </div>
+      <div style="height:5px;background:#e2e8f0;border-radius:3px;overflow:hidden">
+        <div style="height:100%;width:${pct}%;background:${color};border-radius:3px;transition:width .4s"></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function showInvDetail(invName) {
+  const upcoming = (DATA.allVisitDetail||[]).filter(r => r.investigator === invName);
+  let body = '';
+  if (upcoming.length) {
+    body += `<h4 style="font-size:12px;font-weight:700;color:#475569;margin:0 0 8px;text-transform:uppercase;letter-spacing:.5px;">📆 Upcoming Visits (${upcoming.length})</h4>
+    <table class="detail-table" style="margin-bottom:20px"><thead><tr>
+      <th>Date</th><th>Patient</th><th>Study</th><th>Visit</th><th>Coordinator</th>
+    </tr></thead><tbody>` +
+    upcoming.map(r=>`<tr>
+      <td style="font-weight:600;color:#1843ad;white-space:nowrap">${r.date}</td>
+      <td>${extLink(r.patient,r.patient_url)}</td>
+      <td style="font-size:11px">${extLink(r.study,r.study_url)}</td>
+      <td style="font-size:11px;color:#64748b">${r.visit}</td>
+      <td style="font-size:11px">${r.coord}</td>
+    </tr>`).join('') + `</tbody></table>`;
+  }
+  if (!body) body = '<p style="color:#94a3b8;padding:20px;text-align:center">No upcoming visits found</p>';
+  openModal(invName, upcoming.length + ' upcoming visits', body);
+}
+
 // ══════════ COORDINATOR DAILY GOALS ══════════
 /** Convert a Date to local YYYY-MM-DD (avoids UTC shift from toISOString) */
 function localISO(d) {
@@ -13069,12 +13123,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
       _invBySubjKey[subjKey].add(apptFor);
     }
   });
-  console.log('CRP: Audit log rows:', (auditLog||[]).length);
-  if ((auditLog||[]).length > 0) console.log('CRP: Audit log column names:', Object.keys(auditLog[0]).join(' | '));
-  console.log('CRP: Audit log — all unique users:', [..._allAuditUsers].join(', '));
-  console.log('CRP: Audit log — investigator apptKeys:', Object.keys(_invByApptKey).length, 'subjKeys:', Object.keys(_invBySubjKey).length);
-  console.log('CRP: Audit log loaded — coord apptKey entries:', Object.keys(_auditByApptKey).length, 'subjKey entries:', Object.keys(_auditBySubjKey).length);
-  if ((allRows||[]).length > 0) console.log('CRP: Upcoming row column names:', Object.keys(allRows[0]).join(' | '));
+  console.log('CRP: Audit log —', (auditLog||[]).length, 'rows, coord keys:', Object.keys(_auditByApptKey).length, ', inv keys:', Object.keys(_invByApptKey).length, ', inv subjKeys:', Object.keys(_invBySubjKey).length);
 
   // Resolve investigator for a row from the audit log
   function resolveInvestigator(row) {
@@ -13385,6 +13434,18 @@ function processLiveData(allRows, legacyCancels, auditLog) {
   });
   const coordinators = Object.values(coordMap2).sort((a,b) => b.upcoming - a.upcoming);
 
+  // ── investigators (from resolved investigator field) ──
+  const invMap2 = {};
+  activeUpcoming.forEach(r => {
+    const inv = resolveInvestigator(r);
+    if (!inv) return;
+    const cn = cleanCoord(inv);
+    if (!invMap2[cn]) invMap2[cn] = {name:cn, upcoming:0, cancels:0, studies: new Set()};
+    invMap2[cn].upcoming++;
+    invMap2[cn].studies.add((r['Study Name']||'').split(' - ').pop().trim());
+  });
+  const investigators = Object.values(invMap2).map(v => ({...v, studyCount: v.studies.size, studies: [...v.studies]})).sort((a,b) => b.upcoming - a.upcoming);
+
   // ── coordinator daily goals (weekdays only) ──
   // Use upcomingAllSnapshots (all daily CRIO snapshots) so past visits are included.
   // The seenCoordVisits set deduplicates by coord+date+subjectId across snapshots.
@@ -13549,6 +13610,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
     riskMatrix,
     subjectStatus,
     coordinators,
+    investigators,
     coordGoals,
     next14Detail,
     riskFlags,
@@ -14020,6 +14082,7 @@ function renderAll() {
   safe(buildSiteChart,       'buildSiteChart');
   safe(buildCancelStudyBars, 'buildCancelStudyBars');
   safe(buildCoordList,       'buildCoordList');
+  safe(buildInvestigatorList, 'buildInvestigatorList');
   safe(renderCoordinatorGoals, 'renderCoordinatorGoals');
   safe(buildActionSteps,     'buildActionSteps');
   safe(buildInsights,        'buildInsights');
