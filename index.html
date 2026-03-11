@@ -12905,8 +12905,9 @@ function processLiveData(upcoming, cancels) {
     'mario castellanos':'Mario Castellanos','angelina mcmullen':'Angelina McMullen',
     'cady chilensky':'Cady Chilensky'
   };
-  function cleanCoord(n) { return COORD_MAP[(n||'').toLowerCase().trim()] || (n||'').trim(); }
-  function isCoord(n)    { return !EXCL_COORD.has((n||'').toLowerCase().trim()); }
+  function normName(n)   { return (n||'').trim().replace(/\s+/g,' '); }
+  function cleanCoord(n) { return COORD_MAP[normName(n).toLowerCase()] || normName(n); }
+  function isCoord(n)    { return !EXCL_COORD.has(normName(n).toLowerCase()); }
 
   function parseDate(s) {
     if (!s) return null;
@@ -13135,7 +13136,7 @@ function processLiveData(upcoming, cancels) {
   const _cgYY = _cgNow.getFullYear();
   const _cgMonthStart = `${_cgYY}-${_cgMM}-01`;
   upcomingAllSnapshots.forEach(r => {
-    const rawName = (r['Full Name']||'').trim();
+    const rawName = normName(r['Full Name']);
     const date = (r['Scheduled Date']||'').trim();
     const subjectId = (r['Subject ID']||'').trim();
     if (!date || date < _cgMonthStart) return; // only this month onward
@@ -13312,7 +13313,7 @@ function processLiveData(upcoming, cancels) {
         patient: (r['Subject Full Name']||'').replace(/\s{2,}/g,' ').trim(),
         patient_url: `${base}/study/${+sk}/subject/${+subk}`,
         status: r['Subject Status']||'',
-        coord: r['Full Name']||'',
+        coord: normName(r['Full Name']),
         site: r['Site Name']||'',
       };
     }),
@@ -13321,7 +13322,7 @@ function processLiveData(upcoming, cancels) {
       url: (() => { try { const sk=r['Study Key'],subk=r['Subject Key (Back End)'],pnj=[161619,162446,167755,167794,172389,173164];const site=pnj.includes(+sk)?'clinical-research-philadelphia-pennington':'philadelphia-pa';return `https://app.clinicalresearch.io/clinical-research-philadelphia-crp/${site}/study/${+sk}/subject/${+subk}`;}catch(e){return '';}})(),
       study: (r['Study Name']||'').split(' - ').pop().trim(),
       study_url: (() => { try { const sk=r['Study Key'],pnj=[161619,162446,167755,167794,172389,173164];const site=pnj.includes(+sk)?'clinical-research-philadelphia-pennington':'philadelphia-pa';return `https://app.clinicalresearch.io/clinical-research-philadelphia-crp/${site}/study/${+sk}/subjects`;}catch(e){return '';}})(),
-      coord: r['Staff Full Name']||'',
+      coord: normName(r['Staff Full Name']),
       type: r['Appointment Cancellation Type']||'',
       reason: r['Cancel Reason']||'',
       category: r._category || categorizeReason(r['Cancel Reason'], r['Appointment Cancellation Type']),
