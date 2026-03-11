@@ -13116,18 +13116,25 @@ function processLiveData(upcoming, cancels) {
   const coordinators = Object.values(coordMap2).sort((a,b) => b.upcoming - a.upcoming);
 
   // ── coordinator daily goals (weekdays only) ──
+  // Use full upcoming list (not activeUpcoming) so past visits this week/month are included
   const COORD_NAMES = CRP_CONFIG.COORDINATORS || [];
   const COORD_LOWER = COORD_NAMES.map(c => c.toLowerCase());
   const coordGoals = { byDay: {}, byMonth: {} };
   const seenCoordVisits = new Set();
   COORD_NAMES.forEach(c => { coordGoals.byDay[c] = {}; coordGoals.byMonth[c] = 0; });
-  activeUpcoming.forEach(r => {
+  const _cgNow = new Date();
+  const _cgMM = String(_cgNow.getMonth()+1).padStart(2,'0');
+  const _cgYY = _cgNow.getFullYear();
+  const _cgMonthStart = `${_cgYY}-${_cgMM}-01`;
+  upcoming.forEach(r => {
     const rawName = (r['Full Name']||'').trim();
     const date = (r['Scheduled Date']||'').trim();
     const subjectId = (r['Subject ID']||'').trim();
+    if (!date || date < _cgMonthStart) return; // only this month onward
     // Skip weekend visits (Sat=6, Sun=0)
     const dayOfWeek = new Date(date + 'T12:00:00').getDay();
     if (dayOfWeek === 0 || dayOfWeek === 6) return;
+    if (EXCLUDE_STUDIES.has(r['Study Name'])) return;
     const idx = COORD_LOWER.indexOf(rawName.toLowerCase());
     if (idx === -1) return;
     const name = COORD_NAMES[idx]; // use canonical name
@@ -13135,8 +13142,7 @@ function processLiveData(upcoming, cancels) {
     if (seenCoordVisits.has(key)) return;
     seenCoordVisits.add(key);
     coordGoals.byDay[name][date] = (coordGoals.byDay[name][date]||0) + 1;
-    const now = new Date(); const mm = String(now.getMonth()+1).padStart(2,'0'); const yy = now.getFullYear();
-    if (date >= `${yy}-${mm}-01` && date <= `${yy}-${mm}-31`) coordGoals.byMonth[name]++;
+    if (date >= _cgMonthStart && date <= `${_cgYY}-${_cgMM}-31`) coordGoals.byMonth[name]++;
   });
 
   // ── cancelReasons (only true cancellations — excludes rescheduled, completed, admin error, fibroscan, study closed) ──
