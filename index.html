@@ -12311,10 +12311,15 @@ function parseCSV(text) {
 // LIVE FINANCE DATA — Auto-fetch from CRP Finance Master Sheet
 // ═══════════════════════════════════════════════════
 async function fetchFinanceTab(pubKey, gid) {
-  const url = `https://docs.google.com/spreadsheets/d/e/${pubKey}/pub?gid=${gid}&single=true&output=csv`;
-  const resp = await fetch(url);
+  const url = `https://docs.google.com/spreadsheets/d/e/${pubKey}/pub?gid=${gid}&single=true&output=csv&_cb=${Date.now()}`;
+  const resp = await fetch(url, { cache: 'no-store' });
   if (!resp.ok) throw new Error('Failed to fetch finance tab gid=' + gid);
   const text = await resp.text();
+  // Guard: reject HTML error pages from Google Sheets rate-limiting
+  const trimmed = text.trimStart();
+  if (trimmed.startsWith('<!') || trimmed.startsWith('<html') || trimmed.startsWith('<HTML')) {
+    throw new Error('Received HTML instead of CSV for finance tab gid=' + gid);
+  }
   return parseCSV(text);
 }
 
@@ -13716,8 +13721,10 @@ function processLiveData(allRows, legacyCancels, auditLog) {
 }
 
 async function refreshData() {
-  document.getElementById('last-refresh-badge').textContent = 'Refreshing...';
+  const badge = document.getElementById('last-refresh-badge');
+  if (badge) badge.textContent = 'Refreshing...';
   try {
+    // Phase 1: CRIO data
     const [rows1, legacyCancels, auditRows] = await Promise.all([
       fetchCSV(LIVE_URL1),
       fetchCSV(LIVE_URL2_LEGACY).catch(() => []),
@@ -13726,16 +13733,26 @@ async function refreshData() {
     const newData = processLiveData(rows1, legacyCancels, auditRows);
     if ((newData.upcomingTotal || 0) < 5 && (DATA.upcomingTotal || 0) > 5) {
       console.warn('CRP Refresh: new data looks empty — keeping previous data');
-      document.getElementById('last-refresh-badge').textContent = 'Refresh returned empty data';
+      if (badge) badge.textContent = 'Refresh returned empty data';
     } else {
       DATA = newData;
       renderAll();
+      if (badge) badge.textContent = 'Updated: ' + new Date().toLocaleTimeString();
     }
-    // Also refresh patient DB cross-reference
-    fetchPatientDB().catch(e => console.warn('Patient DB refresh failed:', e));
-    document.getElementById('last-refresh-badge').textContent = 'Updated: ' + new Date().toLocaleTimeString();
+    // Phase 2: Finance (staggered)
+    fetchFinanceLive().then(ok => {
+      if (ok) {
+        if (typeof renderForecast === 'function') try { renderForecast(); } catch(e) {}
+        if (typeof drawPayChartOverview === 'function') try { drawPayChartOverview(); } catch(e) {}
+      }
+    }).catch(() => {});
+    // Phase 3: Supplemental (staggered)
+    setTimeout(() => {
+      fetchPatientDB().catch(e => console.warn('Patient DB refresh failed:', e));
+      fetchFacebookCRM().catch(() => {});
+    }, 1500);
   } catch(e) {
-    document.getElementById('last-refresh-badge').textContent = 'Refresh failed';
+    if (badge) badge.textContent = 'Refresh failed — click to retry';
     console.error(e);
   }
 }
@@ -16347,22 +16364,18 @@ document.addEventListener('DOMContentLoaded', () => {
   CRP.emit('init', { version: CRP_CONFIG.VERSION, timestamp: new Date() });
   console.log(`CRP Dashboard v${CRP_CONFIG.VERSION} initialized`);
 
-  // Fetch live finance data from Master Sheet (non-blocking)
-  fetchFinanceLive().then(ok => {
-    if (ok) {
-      console.log('CRP Finance: Live data applied — re-rendering finance views');
-      // Re-render any finance views that might be visible
-      if (typeof renderForecast === 'function') try { renderForecast(); } catch(e) {}
-      if (typeof drawPayChartOverview === 'function') try { drawPayChartOverview(); } catch(e) {}
-      if (typeof drawRevChart === 'function') try { drawRevChart(); } catch(e) {}
-      if (typeof drawAgingChart === 'function') try { drawAgingChart(); } catch(e) {}
-      if (typeof renderAccruals === 'function') try { renderAccruals(); } catch(e) {}
-      if (typeof renderStudiesTable === 'function') try { renderStudiesTable(); } catch(e) {}
-    }
-  }).catch(e => console.warn('CRP Finance fetch failed:', e));
+  // ═══ STAGGERED DATA LOADING ═══
+  // Google Sheets rate-limits when 12+ CSV requests fire simultaneously.
+  // Phase 1: Critical CRIO data (upcoming + cancels + audit) — loads first, renders immediately
+  // Phase 2: Finance data — loads after Phase 1 completes (or after 2s timeout)
+  // Phase 3: Supplemental data (Patient DB, Facebook CRM) — loads last, non-blocking
+  async function loadAllData() {
+    const badge = document.getElementById('last-refresh-badge');
+    const srcBadge = document.getElementById('data-source-badge');
 
-  // Auto-load live CRIO data (upcoming visits + cancellations) from published Sheets
-  (async () => {
+    // ── Phase 1: CRIO data (most critical — drives Overview, Studies, Schedule, Actions) ──
+    console.log('CRP: Phase 1 — loading CRIO data...');
+    let crioOk = false;
     try {
       const [rows1, legacyCancels, auditRows] = await Promise.all([
         fetchCSV(LIVE_URL1),
@@ -16370,54 +16383,74 @@ document.addEventListener('DOMContentLoaded', () => {
         fetchCSV(AUDIT_LOG_URL).catch(e => { console.warn('CRP: Audit log fetch failed, continuing without:', e.message); return []; })
       ]);
       const newData = processLiveData(rows1, legacyCancels, auditRows);
-      // Guard: don't replace good data with empty results (Google Sheets rate-limit)
       if ((newData.upcomingTotal || 0) < 5 && rows1.length > 10) {
         console.warn('CRP: processLiveData returned suspiciously low upcomingTotal (' + (newData.upcomingTotal||0) + ') from ' + rows1.length + ' rows — skipping');
       } else {
         DATA = newData;
-        document.getElementById('data-source-badge').textContent = '🔗 Live Google Sheets';
-        document.getElementById('last-refresh-badge').textContent = 'Updated: ' + new Date().toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'});
+        if (srcBadge) srcBadge.textContent = '🔗 Live Google Sheets';
+        if (badge) { badge.textContent = 'Updated: ' + new Date().toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'}); badge.style.color = ''; }
         renderAll();
-        console.log('CRP: Live data loaded — upcoming:', rows1.length, 'audit:', auditRows.length);
+        console.log('CRP: Phase 1 complete — upcoming:', rows1.length, 'audit:', auditRows.length);
+        crioOk = true;
       }
     } catch(e) {
-      console.warn('CRP: Auto-load live data failed:', e.message, '— retrying in 5s...');
-      document.getElementById('last-refresh-badge').textContent = '⚠️ Fetch failed — retrying...';
-      document.getElementById('last-refresh-badge').style.color = '#dc2626';
-      // Retry once after 5 seconds (Google Sheets rate-limit is usually brief)
-      setTimeout(async () => {
-        try {
-          const [rows1b, legacyB, auditB] = await Promise.all([
-            fetchCSV(LIVE_URL1),
-            fetchCSV(LIVE_URL2_LEGACY).catch(() => []),
-            fetchCSV(AUDIT_LOG_URL).catch(() => [])
-          ]);
-          const retryData = processLiveData(rows1b, legacyB, auditB);
-          if ((retryData.upcomingTotal || 0) >= 5) {
-            DATA = retryData;
-            document.getElementById('data-source-badge').textContent = '🔗 Live Google Sheets';
-            document.getElementById('last-refresh-badge').textContent = 'Updated: ' + new Date().toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'});
-            renderAll();
-            console.log('CRP: Retry succeeded — upcoming:', rows1b.length, 'audit:', auditB.length);
-          } else {
-            console.warn('CRP: Retry also returned low data — staying on SAMPLE');
-            document.getElementById('last-refresh-badge').textContent = '⚠️ Live data unavailable';
-          }
-        } catch(e2) {
-          console.warn('CRP: Retry also failed:', e2.message, '— using SAMPLE data');
-          document.getElementById('last-refresh-badge').textContent = '⚠️ Live data unavailable — click Refresh';
+      console.warn('CRP: Phase 1 failed:', e.message, '— retrying in 5s...');
+      if (badge) { badge.textContent = '⚠️ Fetch failed — retrying...'; badge.style.color = '#dc2626'; }
+      // Retry once after delay
+      await new Promise(r => setTimeout(r, 5000));
+      try {
+        const [rows1b, legacyB, auditB] = await Promise.all([
+          fetchCSV(LIVE_URL1),
+          fetchCSV(LIVE_URL2_LEGACY).catch(() => []),
+          fetchCSV(AUDIT_LOG_URL).catch(() => [])
+        ]);
+        const retryData = processLiveData(rows1b, legacyB, auditB);
+        if ((retryData.upcomingTotal || 0) >= 5) {
+          DATA = retryData;
+          if (srcBadge) srcBadge.textContent = '🔗 Live Google Sheets';
+          if (badge) { badge.textContent = 'Updated: ' + new Date().toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'}); badge.style.color = ''; }
+          renderAll();
+          console.log('CRP: Phase 1 retry succeeded — upcoming:', rows1b.length);
+          crioOk = true;
+        } else {
+          console.warn('CRP: Phase 1 retry also returned low data — staying on SAMPLE');
+          if (badge) badge.textContent = '⚠️ Live data unavailable';
         }
-      }, 5000);
+      } catch(e2) {
+        console.warn('CRP: Phase 1 retry failed:', e2.message);
+        if (badge) badge.textContent = '⚠️ Live data unavailable — click Refresh';
+      }
     }
-  })();
 
-  // Fetch patient database for contact quality cross-reference (non-blocking)
-  fetchPatientDB().then(ok => {
-    if (ok) console.log('CRP: Patient DB cross-reference complete');
-  }).catch(e => console.warn('CRP: Patient DB fetch failed:', e));
+    // ── Phase 2: Finance data (staggered — waits for Phase 1 to finish) ──
+    console.log('CRP: Phase 2 — loading finance data...');
+    try {
+      const ok = await fetchFinanceLive();
+      if (ok) {
+        console.log('CRP Finance: Live data applied — re-rendering finance views');
+        if (typeof renderForecast === 'function') try { renderForecast(); } catch(e) {}
+        if (typeof drawPayChartOverview === 'function') try { drawPayChartOverview(); } catch(e) {}
+        if (typeof drawRevChart === 'function') try { drawRevChart(); } catch(e) {}
+        if (typeof drawAgingChart === 'function') try { drawAgingChart(); } catch(e) {}
+        if (typeof renderAccruals === 'function') try { renderAccruals(); } catch(e) {}
+        if (typeof renderStudiesTable === 'function') try { renderStudiesTable(); } catch(e) {}
+      }
+    } catch(e) { console.warn('CRP Finance fetch failed:', e); }
 
-  // Fetch Facebook CRM on page load (non-blocking)
-  fetchFacebookCRM().catch(e => console.warn('CRP: Facebook CRM initial load failed:', e));
+    // ── Phase 3: Supplemental data (Patient DB + Facebook CRM — lowest priority) ──
+    console.log('CRP: Phase 3 — loading supplemental data...');
+    fetchPatientDB().then(ok => {
+      if (ok) console.log('CRP: Patient DB cross-reference complete');
+    }).catch(e => console.warn('CRP: Patient DB fetch failed:', e));
+
+    // Small delay before FB CRM to further spread out requests
+    setTimeout(() => {
+      fetchFacebookCRM().catch(e => console.warn('CRP: Facebook CRM initial load failed:', e));
+    }, 1500);
+  }
+
+  // Kick off staggered loading
+  loadAllData();
 
   // Self-heal: if insights are still empty after render, retry once
   setTimeout(() => {
@@ -16441,51 +16474,44 @@ document.addEventListener('DOMContentLoaded', () => {
   const AUTO_REFRESH_MS = 15 * 60 * 1000; // 15 minutes
   let _autoRefreshId = null;
 
-  function autoRefreshAll() {
+  async function autoRefreshAll() {
     const badge = document.getElementById('last-refresh-badge');
     const now = new Date();
     console.log(`CRP Auto-Refresh: triggered at ${now.toLocaleTimeString()}`);
 
-    // 0. Refresh live CRIO data (visits + cancels)
-    (async () => {
-      try {
-        const [rows1, legacyCancels, auditRows] = await Promise.all([
-          fetchCSV(LIVE_URL1),
-          fetchCSV(LIVE_URL2_LEGACY).catch(() => []),
-          fetchCSV(AUDIT_LOG_URL).catch(() => [])
-        ]);
-        const newData = processLiveData(rows1, legacyCancels, auditRows);
-        // Guard: don't replace good data with empty/bad results
-        if ((newData.upcomingTotal || 0) < 5 && (DATA.upcomingTotal || 0) > 5) {
-          console.warn('CRP Auto-Refresh: new data looks empty (' + (newData.upcomingTotal||0) + ' upcoming) — keeping previous data');
-        } else {
-          DATA = newData;
-          renderAll();
-          console.log('CRP Auto-Refresh: refreshed — upcoming:', rows1.length, 'audit:', auditRows.length);
-        }
-      } catch(e) { console.warn('CRP Auto-Refresh: CRIO refresh failed:', e.message); }
-    })();
+    // Phase 1: CRIO data (critical)
+    try {
+      const [rows1, legacyCancels, auditRows] = await Promise.all([
+        fetchCSV(LIVE_URL1),
+        fetchCSV(LIVE_URL2_LEGACY).catch(() => []),
+        fetchCSV(AUDIT_LOG_URL).catch(() => [])
+      ]);
+      const newData = processLiveData(rows1, legacyCancels, auditRows);
+      if ((newData.upcomingTotal || 0) < 5 && (DATA.upcomingTotal || 0) > 5) {
+        console.warn('CRP Auto-Refresh: new data looks empty (' + (newData.upcomingTotal||0) + ' upcoming) — keeping previous data');
+      } else {
+        DATA = newData;
+        renderAll();
+        console.log('CRP Auto-Refresh: CRIO refreshed — upcoming:', rows1.length, 'audit:', auditRows.length);
+      }
+    } catch(e) { console.warn('CRP Auto-Refresh: CRIO refresh failed:', e.message); }
 
-    // 1. Refresh finance data
-    fetchFinanceLive().then(ok => {
+    // Phase 2: Finance (staggered after CRIO)
+    try {
+      const ok = await fetchFinanceLive();
       if (ok) {
         if (typeof renderForecast === 'function') try { renderForecast(); } catch(e) {}
         if (typeof drawPayChartOverview === 'function') try { drawPayChartOverview(); } catch(e) {}
       }
-    }).catch(() => {});
+    } catch(e) { /* silent */ }
 
-    // 2. Refresh patient database cross-reference
+    // Phase 3: Supplemental (staggered after finance)
     fetchPatientDB().catch(() => {});
+    setTimeout(() => {
+      if (getClickUpToken() && _referralsLoaded) refreshReferrals().catch(() => {});
+      fetchFacebookCRM().catch(() => {});
+    }, 2000);
 
-    // 3. Refresh ClickUp referrals (if token exists)
-    if (getClickUpToken() && _referralsLoaded) {
-      refreshReferrals().catch(() => {});
-    }
-
-    // 4. Refresh Facebook CRM
-    fetchFacebookCRM().catch(() => {});
-
-    // Update badge
     if (badge) badge.textContent = `Auto-updated: ${now.toLocaleTimeString()}`;
   }
 
