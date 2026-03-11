@@ -13069,9 +13069,12 @@ function processLiveData(allRows, legacyCancels, auditLog) {
       _invBySubjKey[subjKey].add(apptFor);
     }
   });
+  console.log('CRP: Audit log rows:', (auditLog||[]).length);
+  if ((auditLog||[]).length > 0) console.log('CRP: Audit log column names:', Object.keys(auditLog[0]).join(' | '));
   console.log('CRP: Audit log — all unique users:', [..._allAuditUsers].join(', '));
   console.log('CRP: Audit log — investigator apptKeys:', Object.keys(_invByApptKey).length, 'subjKeys:', Object.keys(_invBySubjKey).length);
   console.log('CRP: Audit log loaded — coord apptKey entries:', Object.keys(_auditByApptKey).length, 'subjKey entries:', Object.keys(_auditBySubjKey).length);
+  if ((allRows||[]).length > 0) console.log('CRP: Upcoming row column names:', Object.keys(allRows[0]).join(' | '));
 
   // Resolve investigator for a row from the audit log
   function resolveInvestigator(row) {
@@ -13085,6 +13088,15 @@ function processLiveData(allRows, legacyCancels, auditLog) {
     }
     return '';
   }
+
+  // Debug: log first 3 rows' investigator resolution
+  let _invDebugCount = 0;
+  activeUpcoming.slice(0, 5).forEach(r => {
+    const ak = (r['Calendar Appointment Key (back end)'] || r['Calendar Appointment Key'] || '').toString().trim();
+    const sk = (r['Subject Key (Back End)'] || '').toString().trim();
+    const inv = resolveInvestigator(r);
+    console.log(`CRP INV DEBUG row ${_invDebugCount++}: apptKey="${ak}" subjKey="${sk}" → inv="${inv}" | row keys: ${Object.keys(r).filter(k=>k.toLowerCase().includes('key')||k.toLowerCase().includes('subject')).join(', ')}`);
+  });
 
   // Resolve actual coordinator for a row: if Full Name is an excluded coordinator,
   // look up the real coordinator from the audit log.
