@@ -738,6 +738,23 @@ body {
   </div>
 </nav>
 
+<!-- Data Health Strip — shows data source status + freshness -->
+<div id="data-health-strip" style="display:none;background:#F7FAFC;border-bottom:1px solid #E2E8F0;padding:6px 24px;font-size:11px;font-family:inherit;color:#718096;align-items:center;gap:12px;flex-wrap:wrap;">
+  <span style="font-weight:700;color:#4A5568;letter-spacing:0.3px;">DATA HEALTH</span>
+  <span id="dh-crio" class="dh-chip">⏳ CRIO</span>
+  <span id="dh-finance" class="dh-chip">⏳ Finance</span>
+  <span id="dh-audit" class="dh-chip">⏳ Audit Log</span>
+  <span id="dh-patientdb" class="dh-chip">⏳ Patient DB</span>
+  <span id="dh-fbcrm" class="dh-chip">⏳ FB CRM</span>
+  <span style="margin-left:auto;font-size:10px;color:#A0AEC0;" id="dh-freshness"></span>
+</div>
+<style>
+.dh-chip { padding:2px 8px; border-radius:4px; font-weight:600; font-size:10px; letter-spacing:0.3px; background:#EDF2F7; color:#718096; transition: all 0.3s; }
+.dh-chip.ok { background:#F0FDF4; color:#065F46; }
+.dh-chip.warn { background:#FFFBEB; color:#92400E; }
+.dh-chip.fail { background:#FEF2F2; color:#991B1B; }
+</style>
+
 <!-- ═══════════════════════════════════════
      MAIN
 ════════════════════════════════════════ -->
@@ -16369,22 +16386,69 @@ document.addEventListener('DOMContentLoaded', () => {
   // Phase 1: Critical CRIO data (upcoming + cancels + audit) — loads first, renders immediately
   // Phase 2: Finance data — loads after Phase 1 completes (or after 2s timeout)
   // Phase 3: Supplemental data (Patient DB, Facebook CRM) — loads last, non-blocking
+  // ═══ DATA HEALTH MONITORING ═══
+  function setHealthChip(id, status, label) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.className = 'dh-chip ' + status;
+    const icon = status === 'ok' ? '✓' : status === 'warn' ? '⚠' : status === 'fail' ? '✗' : '⏳';
+    el.textContent = icon + ' ' + label;
+  }
+
+  function showHealthStrip() {
+    const strip = document.getElementById('data-health-strip');
+    if (strip) strip.style.display = 'flex';
+  }
+
+  function checkDataFreshness(rows) {
+    // Check snapshot_date from CRIO data to detect stale Looker exports
+    const freshEl = document.getElementById('dh-freshness');
+    if (!freshEl || !rows || rows.length === 0) return;
+    const snapDates = rows.map(r => (r['snapshot_date'] || r['Scheduled Date'] || '').trim()).filter(Boolean).sort();
+    if (snapDates.length === 0) return;
+    // Find the most recent snapshot_date
+    const latestSnap = snapDates[snapDates.length - 1];
+    const today = new Date(); today.setHours(0,0,0,0);
+    const snapDate = new Date(latestSnap); snapDate.setHours(0,0,0,0);
+    const ageMs = today - snapDate;
+    const ageDays = Math.floor(ageMs / 86400000);
+    if (ageDays <= 0) {
+      freshEl.textContent = 'Data from today';
+      freshEl.style.color = '#065F46';
+    } else if (ageDays === 1) {
+      freshEl.textContent = 'Data from yesterday';
+      freshEl.style.color = '#92400E';
+    } else if (ageDays <= 3) {
+      freshEl.textContent = 'Data is ' + ageDays + ' days old';
+      freshEl.style.color = '#92400E';
+    } else {
+      freshEl.textContent = '⚠ Data is ' + ageDays + ' days old — Looker may have stopped pushing';
+      freshEl.style.color = '#991B1B';
+    }
+  }
+
   async function loadAllData() {
     const badge = document.getElementById('last-refresh-badge');
     const srcBadge = document.getElementById('data-source-badge');
+    showHealthStrip();
 
     // ── Phase 1: CRIO data (most critical — drives Overview, Studies, Schedule, Actions) ──
     console.log('CRP: Phase 1 — loading CRIO data...');
     let crioOk = false;
+    let _lastCrioRows = [];
+    let _lastAuditRows = [];
     try {
       const [rows1, legacyCancels, auditRows] = await Promise.all([
         fetchCSV(LIVE_URL1),
         fetchCSV(LIVE_URL2_LEGACY).catch(() => []),
-        fetchCSV(AUDIT_LOG_URL).catch(e => { console.warn('CRP: Audit log fetch failed, continuing without:', e.message); return []; })
+        fetchCSV(AUDIT_LOG_URL).catch(e => { console.warn('CRP: Audit log fetch failed, continuing without:', e.message); setHealthChip('dh-audit','fail','Audit Log'); return []; })
       ]);
+      _lastCrioRows = rows1;
+      _lastAuditRows = auditRows;
       const newData = processLiveData(rows1, legacyCancels, auditRows);
       if ((newData.upcomingTotal || 0) < 5 && rows1.length > 10) {
         console.warn('CRP: processLiveData returned suspiciously low upcomingTotal (' + (newData.upcomingTotal||0) + ') from ' + rows1.length + ' rows — skipping');
+        setHealthChip('dh-crio','warn','CRIO (' + rows1.length + ' rows, low upcoming)');
       } else {
         DATA = newData;
         if (srcBadge) srcBadge.textContent = '🔗 Live Google Sheets';
@@ -16392,11 +16456,14 @@ document.addEventListener('DOMContentLoaded', () => {
         renderAll();
         console.log('CRP: Phase 1 complete — upcoming:', rows1.length, 'audit:', auditRows.length);
         crioOk = true;
+        setHealthChip('dh-crio','ok','CRIO (' + rows1.length + ')');
+        setHealthChip('dh-audit', auditRows.length > 0 ? 'ok' : 'warn', 'Audit Log (' + auditRows.length + ')');
+        checkDataFreshness(rows1);
       }
     } catch(e) {
       console.warn('CRP: Phase 1 failed:', e.message, '— retrying in 5s...');
+      setHealthChip('dh-crio','warn','CRIO (retrying...)');
       if (badge) { badge.textContent = '⚠️ Fetch failed — retrying...'; badge.style.color = '#dc2626'; }
-      // Retry once after delay
       await new Promise(r => setTimeout(r, 5000));
       try {
         const [rows1b, legacyB, auditB] = await Promise.all([
@@ -16404,6 +16471,8 @@ document.addEventListener('DOMContentLoaded', () => {
           fetchCSV(LIVE_URL2_LEGACY).catch(() => []),
           fetchCSV(AUDIT_LOG_URL).catch(() => [])
         ]);
+        _lastCrioRows = rows1b;
+        _lastAuditRows = auditB;
         const retryData = processLiveData(rows1b, legacyB, auditB);
         if ((retryData.upcomingTotal || 0) >= 5) {
           DATA = retryData;
@@ -16412,13 +16481,20 @@ document.addEventListener('DOMContentLoaded', () => {
           renderAll();
           console.log('CRP: Phase 1 retry succeeded — upcoming:', rows1b.length);
           crioOk = true;
+          setHealthChip('dh-crio','ok','CRIO (' + rows1b.length + ')');
+          setHealthChip('dh-audit', auditB.length > 0 ? 'ok' : 'warn', 'Audit Log (' + auditB.length + ')');
+          checkDataFreshness(rows1b);
         } else {
           console.warn('CRP: Phase 1 retry also returned low data — staying on SAMPLE');
           if (badge) badge.textContent = '⚠️ Live data unavailable';
+          setHealthChip('dh-crio','fail','CRIO (failed)');
+          setHealthChip('dh-audit','fail','Audit Log');
         }
       } catch(e2) {
         console.warn('CRP: Phase 1 retry failed:', e2.message);
         if (badge) badge.textContent = '⚠️ Live data unavailable — click Refresh';
+        setHealthChip('dh-crio','fail','CRIO (failed)');
+        setHealthChip('dh-audit','fail','Audit Log');
       }
     }
 
@@ -16428,24 +16504,31 @@ document.addEventListener('DOMContentLoaded', () => {
       const ok = await fetchFinanceLive();
       if (ok) {
         console.log('CRP Finance: Live data applied — re-rendering finance views');
+        setHealthChip('dh-finance','ok','Finance');
         if (typeof renderForecast === 'function') try { renderForecast(); } catch(e) {}
         if (typeof drawPayChartOverview === 'function') try { drawPayChartOverview(); } catch(e) {}
         if (typeof drawRevChart === 'function') try { drawRevChart(); } catch(e) {}
         if (typeof drawAgingChart === 'function') try { drawAgingChart(); } catch(e) {}
         if (typeof renderAccruals === 'function') try { renderAccruals(); } catch(e) {}
         if (typeof renderStudiesTable === 'function') try { renderStudiesTable(); } catch(e) {}
+      } else {
+        setHealthChip('dh-finance','warn','Finance (no data)');
       }
-    } catch(e) { console.warn('CRP Finance fetch failed:', e); }
+    } catch(e) {
+      console.warn('CRP Finance fetch failed:', e);
+      setHealthChip('dh-finance','fail','Finance (failed)');
+    }
 
     // ── Phase 3: Supplemental data (Patient DB + Facebook CRM — lowest priority) ──
     console.log('CRP: Phase 3 — loading supplemental data...');
     fetchPatientDB().then(ok => {
-      if (ok) console.log('CRP: Patient DB cross-reference complete');
-    }).catch(e => console.warn('CRP: Patient DB fetch failed:', e));
+      if (ok) { console.log('CRP: Patient DB cross-reference complete'); setHealthChip('dh-patientdb','ok','Patient DB'); }
+      else setHealthChip('dh-patientdb','warn','Patient DB (empty)');
+    }).catch(e => { console.warn('CRP: Patient DB fetch failed:', e); setHealthChip('dh-patientdb','fail','Patient DB (failed)'); });
 
-    // Small delay before FB CRM to further spread out requests
     setTimeout(() => {
-      fetchFacebookCRM().catch(e => console.warn('CRP: Facebook CRM initial load failed:', e));
+      fetchFacebookCRM().then(() => { setHealthChip('dh-fbcrm','ok','FB CRM (' + (FB_CRM_DATA||[]).length + ')'); })
+        .catch(e => { console.warn('CRP: Facebook CRM initial load failed:', e); setHealthChip('dh-fbcrm','fail','FB CRM (failed)'); });
     }, 1500);
   }
 
