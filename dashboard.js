@@ -169,7 +169,7 @@ const CRP_CONFIG = {
   COORD_DAILY_GOAL: 2,
 
   // Auto-refresh interval (ms) — 0 to disable
-  REFRESH_INTERVAL: 0,
+  REFRESH_INTERVAL: 900000,
 
   // Finance auth (SHA-256 hash of PIN)
   AUTH_HASH: '78e370b587b145920213731b7c7c725e512b3b6577c51c800218a7c764c532ae',
@@ -211,6 +211,24 @@ const CRP = {
     console.log(`CRP: Plugin registered — ${plugin.name || 'unnamed'}`);
     if (plugin.init) plugin.init(CRP_CONFIG);
   },
+};
+
+// ════════════════════════════════════════
+// STAGE COLORS — unified color map for all pipeline/funnel stages
+// ════════════════════════════════════════
+const STAGE_COLORS = {
+  'New Lead': '#3b82f6',
+  'Contacted': '#f59e0b',
+  'Pre-Screening': '#8b5cf6',
+  'Screening': '#06b6d4',
+  'Screened': '#10b981',
+  'Enrolled': '#059669',
+  'Randomization': '#8b5cf6',
+  'Treatment': '#1843ad',
+  'Follow-Up': '#6366f1',
+  'DNQ': '#ef4444',
+  'Screen Fail': '#f97316',
+  'Lost': '#94a3b8',
 };
 
 // ════════════════════════════════════════
@@ -399,6 +417,7 @@ let REVENUE_ITEMS_TOP = [];    // [{item:'Visit 3 - Week 1...',amount:X,count:N}
 
 // ══════════ PATIENT DATABASE (populated by live fetch) ══════════
 let PATIENT_DB = [];           // [{name,status,email,phone,record_number},...]
+let PATIENT_DB_MAP = new Map(); // name_lower → patient object (O(1) lookup)
 let CONTACT_ALERTS = [];       // [{patient,study,alert_type,severity,detail,patient_url,study_url},...]
 
 // ══════════ HELPERS ══════════
@@ -10535,6 +10554,7 @@ async function fetchPatientDB() {
       city: (r['City']||'').trim(),
       state: (r['State']||'').trim(),
     }));
+    PATIENT_DB_MAP = new Map(PATIENT_DB.map(p => [p.name_lower, p]));
     console.log(`CRP: Patient DB loaded — ${PATIENT_DB.length} records`);
 
     // Run cross-reference against active patients
@@ -11905,7 +11925,6 @@ function buildPatientPipelineBySite() {
 
   var patients = Object.values(patientMap);
   var stages = ['Screening', 'Enrolled', 'Randomization', 'Treatment', 'Follow-Up'];
-  var stageColors = { 'Screening': '#f59e0b', 'Enrolled': '#059669', 'Randomization': '#8b5cf6', 'Treatment': '#1843ad', 'Follow-Up': '#6366f1' };
 
   function classifyStage(status) {
     var s = (status || '').toLowerCase();
@@ -11937,7 +11956,7 @@ function buildPatientPipelineBySite() {
     stages.forEach(function(stage) {
       var count = counts[stage] || 0;
       var pct = total > 0 ? Math.round(count / total * 100) : 0;
-      var barColor = stageColors[stage] || '#94a3b8';
+      var barColor = STAGE_COLORS[stage] || '#94a3b8';
       html += '<div style="margin-bottom:8px;">';
       html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;">';
       html += '<span style="font-size:11px;font-weight:600;color:var(--text);">' + stage + '</span>';
@@ -12282,9 +12301,8 @@ function showStudyUnifiedModal(studyName) {
     var stages = {};
     refs.forEach(function(r) { var s = r.stage || 'Unknown'; stages[s] = (stages[s]||0) + 1; });
     body += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">';
-    var stageColors = {'New Lead':'#94a3b8','Contacted':'#3b82f6','Pre-Screening':'#8b5cf6','Screening':'#d97706','Screened':'#06b6d4','Enrolled':'#059669','DNQ':'#dc2626','Screen Fail':'#ef4444','Lost':'#6b7280'};
     Object.keys(stages).forEach(function(stage) {
-      var sc = stageColors[stage] || '#94a3b8';
+      var sc = STAGE_COLORS[stage] || '#94a3b8';
       body += '<span style="font-size:10px;padding:3px 8px;border-radius:4px;background:' + sc + '20;color:' + sc + ';font-weight:600;">' + stage + ': ' + stages[stage] + '</span>';
     });
     body += '</div>';
@@ -12292,7 +12310,7 @@ function showStudyUnifiedModal(studyName) {
     if (activeRefs.length > 0) {
       body += '<table class="detail-table" style="margin-bottom:12px;"><thead><tr><th>Patient</th><th>Stage</th><th>Source</th><th>Days</th></tr></thead><tbody>';
       activeRefs.slice(0,8).forEach(function(r) {
-        var sc = stageColors[r.stage] || '#94a3b8';
+        var sc = STAGE_COLORS[r.stage] || '#94a3b8';
         body += '<tr><td><a href="' + r.url + '" target="_blank" style="color:#1e293b;text-decoration:none;font-weight:600;">' + maskPHI(r.name) + '</a></td>';
         body += '<td><span style="font-size:10px;padding:2px 6px;border-radius:4px;background:' + sc + '20;color:' + sc + ';font-weight:600;">' + r.stage + '</span></td>';
         body += '<td style="font-size:11px;color:#64748b">' + (r.source||'—') + '</td>';
@@ -12645,16 +12663,11 @@ function renderReferralDashboard() {
   // ── Pipeline Funnel ──
   const funnelEl = el('ref-funnel-chart');
   const maxCount = Math.max(...CU.PIPELINE_ORDER.map(s => stageCounts[s] || 0), 1);
-  const stageColors = {
-    'New Lead':'#3b82f6','Contacted':'#f59e0b','Pre-Screening':'#8b5cf6',
-    'Screening':'#06b6d4','Screened':'#10b981','Enrolled':'#059669'
-  };
-  const closedColors = {'DNQ':'#ef4444','Screen Fail':'#f97316','Lost':'#94a3b8'};
 
   let funnelHtml = CU.PIPELINE_ORDER.map(stage => {
     const count = stageCounts[stage] || 0;
     const pct = maxCount ? Math.max(count / maxCount * 100, 4) : 4;
-    const color = stageColors[stage] || '#94a3b8';
+    const color = STAGE_COLORS[stage] || '#94a3b8';
     const safeStage = stage.replace(/'/g,"\\'");
     return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;cursor:pointer;" onclick="showReferralDetailModal(r=>r.stage==='${safeStage}','${safeStage} Referrals','${count} referrals in this stage')">
       <div style="width:100px;font-size:11px;font-weight:600;color:#475569;text-align:right;">${stage}</div>
@@ -12670,7 +12683,7 @@ function renderReferralDashboard() {
   const closedHtml = CU.CLOSED_STAGES.filter(s => stageCounts[s] > 0).map(stage => {
     const count = stageCounts[stage] || 0;
     const pct = maxCount ? Math.max(count / maxCount * 100, 4) : 4;
-    const color = closedColors[stage] || '#94a3b8';
+    const color = STAGE_COLORS[stage] || '#94a3b8';
     return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
       <div style="width:100px;font-size:10px;color:#94a3b8;text-align:right;">${stage}</div>
       <div style="flex:1;background:#f8fafc;border-radius:3px;height:20px;position:relative;overflow:hidden;">
@@ -12825,7 +12838,7 @@ function renderReferralDashboard() {
       const convRate = c.new_referrals > 0 ? Math.round(scheduledCount / c.new_referrals * 100) : (scheduledCount > 0 ? 100 : 0);
       let flagged = 0;
       referrals.forEach(r => {
-        const dbMatch = PATIENT_DB.find(p => p.name_lower === r.name.toLowerCase().trim());
+        const dbMatch = PATIENT_DB_MAP.get(r.name.toLowerCase().trim());
         if (dbMatch && dbMatch.status !== 'Available') flagged++;
       });
       return { ...c, scheduledCount, convRate, pipeline: referrals.length, active: referrals.filter(r=>!r.is_closed).length, upcomingVisits: upcoming.length, flagged };
@@ -12973,7 +12986,6 @@ function showStudyPipelineModal(studyName) {
   if (!ref) { openModal(studyName + ' — Referral Pipeline', '', '<div style="text-align:center;padding:30px;color:#94a3b8;">No referral data found for this study</div>'); return; }
 
   const CU = CRP_CONFIG.CLICKUP;
-  const stageColors = {'New Lead':'#3b82f6','Contacted':'#f59e0b','Pre-Screening':'#8b5cf6','Screening':'#06b6d4','Screened':'#10b981','Enrolled':'#059669','DNQ':'#ef4444','Screen Fail':'#f97316','Lost':'#94a3b8'};
 
   // Funnel bars
   let funnel = '<div style="margin-bottom:16px;">';
@@ -12981,7 +12993,7 @@ function showStudyPipelineModal(studyName) {
     const count = ref.stages[stage] || 0;
     if (count === 0) return;
     const pct = Math.max(count / ref.total * 100, 5);
-    const color = stageColors[stage] || '#94a3b8';
+    const color = STAGE_COLORS[stage] || '#94a3b8';
     funnel += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
       <div style="width:90px;font-size:11px;font-weight:600;color:#475569;text-align:right;">${stage}</div>
       <div style="flex:1;background:#f1f5f9;border-radius:3px;height:22px;overflow:hidden;">
@@ -13004,7 +13016,7 @@ function showStudyPipelineModal(studyName) {
   rows.forEach(r => {
     // Cross-reference with patient DB
     const nameKey = r.name.toLowerCase().trim();
-    const dbMatch = PATIENT_DB.find(p => p.name_lower === nameKey);
+    const dbMatch = PATIENT_DB_MAP.get(nameKey);
     const dbStatus = dbMatch ? `<span style="padding:2px 6px;border-radius:3px;font-size:10px;font-weight:600;background:${dbMatch.status==='Available'?'#dcfce7':'#fef2f2'};color:${dbMatch.status==='Available'?'#059669':'#dc2626'}">${dbMatch.status}</span>` : '<span style="color:#cbd5e1;font-size:10px;">Not found</span>';
 
     // Check upcoming appointments
@@ -13016,7 +13028,7 @@ function showStudyPipelineModal(studyName) {
     const staleColor = r.days_since_update >= 14 ? '#dc2626' : r.days_since_update >= 7 ? '#d97706' : '#059669';
     table += `<tr>
       <td style="padding:6px 8px;"><a href="${r.url}" target="_blank" style="font-weight:600;color:#1e293b;text-decoration:none;">${maskPHI(r.name)}</a></td>
-      <td style="padding:6px 8px;text-align:center;"><span style="padding:2px 6px;border-radius:3px;font-size:10px;font-weight:600;background:${(stageColors[r.stage]||'#94a3b8')}22;color:${stageColors[r.stage]||'#94a3b8'}">${r.stage}</span></td>
+      <td style="padding:6px 8px;text-align:center;"><span style="padding:2px 6px;border-radius:3px;font-size:10px;font-weight:600;background:${(STAGE_COLORS[r.stage]||'#94a3b8')}22;color:${STAGE_COLORS[r.stage]||'#94a3b8'}">${r.stage}</span></td>
       <td style="padding:6px 8px;font-size:10px;color:#475569;">${r.source}</td>
       <td style="padding:6px 8px;">${nextApptDisplay}</td>
       <td style="padding:6px 8px;text-align:center;"><span style="font-weight:600;color:${staleColor};">${r.days_since_update}d</span></td>
@@ -13066,14 +13078,13 @@ function showCampaignDetailModal(studyName) {
 
   // Referral Pipeline Participants with cross-reference
   if (referrals.length > 0) {
-    const stageColors = {'New Lead':'#3b82f6','Contacted':'#f59e0b','Pre-Screening':'#8b5cf6','Screening':'#06b6d4','Screened':'#10b981','Enrolled':'#059669','DNQ':'#ef4444','Screen Fail':'#f97316','Lost':'#94a3b8'};
     html += `<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px;">📋 Referral Pipeline Participants</div>`;
     html += `<table class="detail-table" style="width:100%;font-size:11px;margin-bottom:16px;"><thead><tr>
       <th>Participant</th><th>Stage</th><th>Source</th><th>Appt Booked</th><th>Patient Status</th><th>Last Updated</th>
     </tr></thead><tbody>`;
     referrals.sort((a,b) => a.days_since_update - b.days_since_update).forEach(r => {
       const nameKey = r.name.toLowerCase().trim();
-      const dbMatch = PATIENT_DB.find(p => p.name_lower === nameKey);
+      const dbMatch = PATIENT_DB_MAP.get(nameKey);
       const pVisits = (DATA.allVisitDetail || []).filter(v => v.patient.toLowerCase().trim() === nameKey);
       const apptBooked = pVisits.length > 0
         ? `<span style="color:#059669;font-weight:700;">✓ ${pVisits[0].date}</span><div style="font-size:9px;color:#94a3b8;">${pVisits[0].visit}</div>`
@@ -13084,7 +13095,7 @@ function showCampaignDetailModal(studyName) {
       const staleColor = r.days_since_update >= 14 ? '#dc2626' : r.days_since_update >= 7 ? '#d97706' : '#059669';
       html += `<tr>
         <td style="padding:6px 8px;"><a href="${r.url}" target="_blank" style="font-weight:600;color:#1e293b;text-decoration:none;">${maskPHI(r.name)}</a></td>
-        <td style="padding:6px 8px;text-align:center;"><span style="padding:2px 6px;border-radius:3px;font-size:10px;font-weight:600;background:${(stageColors[r.stage]||'#94a3b8')}22;color:${stageColors[r.stage]||'#94a3b8'}">${r.stage}</span></td>
+        <td style="padding:6px 8px;text-align:center;"><span style="padding:2px 6px;border-radius:3px;font-size:10px;font-weight:600;background:${(STAGE_COLORS[r.stage]||'#94a3b8')}22;color:${STAGE_COLORS[r.stage]||'#94a3b8'}">${r.stage}</span></td>
         <td style="padding:6px 8px;font-size:10px;color:#475569;">${r.source}</td>
         <td style="padding:6px 8px;">${apptBooked}</td>
         <td style="padding:6px 8px;">${pStatus}</td>
@@ -13140,7 +13151,7 @@ function renderCampaignXRef() {
       return rs === sn || rs.includes(sn) || sn.includes(rs);
     }).forEach(r => {
       const nameKey = r.name.toLowerCase().trim();
-      const dbMatch = PATIENT_DB.find(p => p.name_lower === nameKey);
+      const dbMatch = PATIENT_DB_MAP.get(nameKey);
       const pVisits = (DATA.allVisitDetail || []).filter(v => v.patient.toLowerCase().trim() === nameKey);
       allParticipants.push({ ...r, campaign: c.study, dbMatch, pVisits });
     });
@@ -13153,8 +13164,6 @@ function renderCampaignXRef() {
     <div style="text-align:center;padding:16px;color:#94a3b8;font-size:12px;">No individual participants to cross-reference — click any campaign row above for details</div>`;
     return;
   }
-
-  const stageColors = {'New Lead':'#3b82f6','Contacted':'#f59e0b','Pre-Screening':'#8b5cf6','Screening':'#06b6d4','Screened':'#10b981','Enrolled':'#059669','DNQ':'#ef4444','Screen Fail':'#f97316','Lost':'#94a3b8'};
 
   // Show participants needing attention first (no appt, flagged, stale)
   const sorted = allParticipants.sort((a,b) => {
@@ -13184,7 +13193,7 @@ function renderCampaignXRef() {
       return `<tr>
         <td style="padding:5px 10px;"><a href="${r.url}" target="_blank" style="font-weight:600;color:#1e293b;text-decoration:none;">${maskPHI(r.name)}</a></td>
         <td style="padding:5px 8px;font-size:10px;color:#475569;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${r.campaign}">${r.campaign}</td>
-        <td style="padding:5px 8px;text-align:center;"><span style="padding:2px 5px;border-radius:3px;font-size:10px;font-weight:600;background:${(stageColors[r.stage]||'#94a3b8')}22;color:${stageColors[r.stage]||'#94a3b8'}">${r.stage}</span></td>
+        <td style="padding:5px 8px;text-align:center;"><span style="padding:2px 5px;border-radius:3px;font-size:10px;font-weight:600;background:${(STAGE_COLORS[r.stage]||'#94a3b8')}22;color:${STAGE_COLORS[r.stage]||'#94a3b8'}">${r.stage}</span></td>
         <td style="padding:5px 8px;">${apptCell}</td>
         <td style="padding:5px 8px;">${pStatus}</td>
         <td style="padding:5px 8px;text-align:center;font-weight:600;color:${staleColor};">${r.days_since_update}d</td>
@@ -13199,14 +13208,13 @@ function renderCampaignXRef() {
 // ── Referral detail modal (click from funnel, tracker rows, stale leads) ──
 function showReferralDetailModal(filterFn, title, subtitle) {
   const refs = REFERRAL_DATA.filter(filterFn);
-  const stageColors = {'New Lead':'#3b82f6','Contacted':'#f59e0b','Pre-Screening':'#8b5cf6','Screening':'#06b6d4','Screened':'#10b981','Enrolled':'#059669','DNQ':'#ef4444','Screen Fail':'#f97316','Lost':'#94a3b8'};
 
   let html = `<table class="detail-table" style="width:100%;font-size:11px;"><thead><tr>
     <th>Name</th><th>Study</th><th>Stage</th><th>Source</th><th>Appt</th><th>Patient Status</th><th>Updated</th>
   </tr></thead><tbody>`;
   refs.slice(0, 50).forEach(r => {
     const nameKey = r.name.toLowerCase().trim();
-    const dbMatch = PATIENT_DB.find(p => p.name_lower === nameKey);
+    const dbMatch = PATIENT_DB_MAP.get(nameKey);
     const pVisits = (DATA.allVisitDetail || []).filter(v => v.patient.toLowerCase().trim() === nameKey);
     const apptCell = pVisits.length > 0 ? `<span style="color:#059669;font-weight:600;">${pVisits[0].date}</span>` : r.next_appt || '<span style="color:#cbd5e1;">—</span>';
     const dbCell = dbMatch ? `<span style="font-size:10px;font-weight:600;color:${dbMatch.status==='Available'?'#059669':'#dc2626'}">${dbMatch.status}</span>` : '<span style="color:#cbd5e1;font-size:10px;">—</span>';
@@ -13214,7 +13222,7 @@ function showReferralDetailModal(filterFn, title, subtitle) {
     html += `<tr>
       <td style="padding:5px 8px;"><a href="${r.url}" target="_blank" style="font-weight:600;color:#1e293b;text-decoration:none;">${maskPHI(r.name)}</a></td>
       <td style="padding:5px 8px;font-size:10px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.study||'—'}</td>
-      <td style="padding:5px 8px;text-align:center;"><span style="padding:2px 6px;border-radius:3px;font-size:10px;font-weight:600;background:${(stageColors[r.stage]||'#94a3b8')}22;color:${stageColors[r.stage]||'#94a3b8'}">${r.stage}</span></td>
+      <td style="padding:5px 8px;text-align:center;"><span style="padding:2px 6px;border-radius:3px;font-size:10px;font-weight:600;background:${(STAGE_COLORS[r.stage]||'#94a3b8')}22;color:${STAGE_COLORS[r.stage]||'#94a3b8'}">${r.stage}</span></td>
       <td style="padding:5px 8px;font-size:10px;color:#475569;">${r.source}</td>
       <td style="padding:5px 8px;">${apptCell}</td>
       <td style="padding:5px 8px;">${dbCell}</td>
@@ -14050,9 +14058,10 @@ function _crpInit() {
     }
   }, 300);
 
-  // ══════════ AUTO-REFRESH TIMER (every 15 minutes) ══════════
-  const AUTO_REFRESH_MS = 15 * 60 * 1000; // 15 minutes
+  // ══════════ AUTO-REFRESH TIMER ══════════
+  const AUTO_REFRESH_MS = CRP_CONFIG.REFRESH_INTERVAL || 0;
   let _autoRefreshId = null;
+  let _lastRefreshTime = Date.now();
 
   async function autoRefreshAll() {
     const badge = document.getElementById('last-refresh-badge');
@@ -14093,21 +14102,28 @@ function _crpInit() {
     }, 2000);
 
     if (badge) badge.textContent = `Auto-updated: ${now.toLocaleTimeString()}`;
+    _lastRefreshTime = Date.now();
   }
 
-  // Start auto-refresh cycle
-  _autoRefreshId = setInterval(autoRefreshAll, AUTO_REFRESH_MS);
-  console.log(`CRP: Auto-refresh enabled — every ${AUTO_REFRESH_MS / 60000} minutes`);
+  // Start auto-refresh cycle (only if REFRESH_INTERVAL > 0)
+  if (AUTO_REFRESH_MS > 0) {
+    _autoRefreshId = setInterval(autoRefreshAll, AUTO_REFRESH_MS);
+    console.log(`CRP: Auto-refresh enabled — every ${AUTO_REFRESH_MS / 60000} minutes`);
+  } else {
+    console.log('CRP: Auto-refresh disabled (REFRESH_INTERVAL is 0)');
+  }
 
   // Also refresh when tab becomes visible again (user returns to browser)
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) {
-      // Only auto-refresh if it's been more than 5 minutes since page was hidden
-      const badge = document.getElementById('last-refresh-badge');
-      const lastText = badge ? badge.textContent : '';
-      console.log('CRP: Tab visible again — checking if refresh needed');
-      // Simple approach: just refresh on return
-      setTimeout(autoRefreshAll, 1000);
+      const FIVE_MINUTES = 5 * 60 * 1000;
+      const elapsed = Date.now() - _lastRefreshTime;
+      if (elapsed >= FIVE_MINUTES) {
+        console.log(`CRP: Tab visible again — ${Math.round(elapsed / 60000)}m since last refresh, refreshing`);
+        setTimeout(autoRefreshAll, 1000);
+      } else {
+        console.log(`CRP: Tab visible again — only ${Math.round(elapsed / 60000)}m since last refresh, skipping`);
+      }
     }
   });
 }
