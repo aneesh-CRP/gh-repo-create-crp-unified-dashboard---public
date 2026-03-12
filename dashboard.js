@@ -6822,7 +6822,7 @@ function toggleDarkMode() {
       item.addEventListener('mousedown', function(e) {
         e.preventDefault();
         var tab = item.getAttribute('data-tab');
-        var tabEl = document.querySelector('.nav-tab[onclick*="\\'' + tab + '\\'"]');
+        var tabEl = document.querySelector(".nav-tab[onclick*='" + tab + "']");
         switchTab(tab, tabEl || null);
         searchResults.style.display = 'none';
         searchInput.value = '';
@@ -6901,7 +6901,7 @@ setInterval(_updateFreshnessBadge, 60000);
 window.addEventListener('hashchange', function() {
   var hash = location.hash.replace('#', '');
   if (!hash) return;
-  var tab = document.querySelector('.nav-tab[onclick*="\\'' + hash + '\\'"]');
+  var tab = document.querySelector(".nav-tab[onclick*='" + hash + "']");
   switchTab(hash, tab || null);
 });
 
@@ -6934,7 +6934,7 @@ async function _crpInit() {
     var _allTabs = ['overview','studies','schedule','actions','referrals','admin','fin-overview','fin-collections','fin-aging','fin-revenue','fin-accruals','insights'];
     if (_allTabs.indexOf(_hashTab) !== -1) _initTab = _hashTab;
   }
-  var _initTabEl = document.querySelector('.nav-tab[onclick*="\\'' + _initTab + '\\'"]');
+  var _initTabEl = document.querySelector(".nav-tab[onclick*='" + _initTab + "']");
   switchTab(_initTab, _initTabEl || null);
   CRP.emit('init', { version: CRP_CONFIG.VERSION, timestamp: new Date() });
   console.log(`CRP Dashboard v${CRP_CONFIG.VERSION} initialized`);
