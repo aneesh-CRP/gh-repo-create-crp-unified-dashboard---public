@@ -1,0 +1,42 @@
+name: Deploy to Apps Script
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'appscript/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install clasp
+        run: npm install -g @google/clasp
+
+      - name: Write clasp credentials
+        run: echo '${{ secrets.CLASPRC_JSON }}' > ~/.clasprc.json
+
+      - name: Write clasp project config
+        run: |
+          cat > .clasp.json << 'EOF'
+          {
+            "scriptId": "15ZDwJzbYqFVtVc5e4TGl7yEWZFVKq2pQl-RyOKw8vsVnAGBqWrkSO19K",
+            "rootDir": "appscript"
+          }
+          EOF
+
+      - name: Copy dashboard to Apps Script
+        run: cp index.html appscript/Dashboard.html
+
+      - name: Push to Apps Script
+        run: clasp push --force
+
+      - name: Deploy new version
+        run: clasp deploy -d "Auto-deploy from commit ${{ github.sha }}"
