@@ -7,6 +7,8 @@ on:
       - 'index.html'
       - 'dashboard.js'
       - 'appscript/**'
+      - 'scripts/**'
+      - '.github/workflows/deploy-appscript.yml'
 
 jobs:
   deploy:
@@ -26,12 +28,7 @@ jobs:
 
       - name: Write clasp project config
         run: |
-          cat > .clasp.json << 'EOF'
-          {
-            "scriptId": "15ZDwJzbYqFVtVc5e4TGl7yEWZFVKq2pQl-RyOKw8vsVnAGBqWrkSO19K",
-            "rootDir": "appscript"
-          }
-          EOF
+          echo '{"scriptId":"15ZDwJzbYqFVtVc5e4TGl7yEWZFVKq2pQl-RyOKw8vsVnAGBqWrkSO19K","rootDir":"appscript"}' > .clasp.json
 
       - name: Build Apps Script Dashboard (HTML shell + external JS)
         run: python3 scripts/build-appscript.py
