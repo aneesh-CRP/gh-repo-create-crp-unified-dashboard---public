@@ -1241,24 +1241,24 @@ body {
   </div>
 
   <!-- ── COORDINATOR DAILY GOALS ── -->
-  <div class="section-title" style="margin-top:24px">Coordinator Visit Goals</div>
+  <div class="section-title" style="margin-top:24px">Coordinator Visit Tracker</div>
   <div class="card fade-in">
     <div style="padding:16px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <div style="font-size:14px;font-weight:700;color:var(--navy)">Daily Goal: <span style="color:#059669">2 visits</span> per coordinator</div>
+        <div style="font-size:14px;font-weight:700;color:var(--navy)">Coordinator Visit Snapshot</div>
         <div style="font-size:11px;color:var(--muted)" id="coord-week-label">This Week</div>
       </div>
       <div id="coordGoalsGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px"></div>
       <div style="margin-top:16px">
-        <div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">Monthly Summary — <span id="coord-month-label">March 2026</span></div>
+        <div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">Monthly Snapshot — <span id="coord-month-label">March 2026</span></div>
         <div style="overflow-x:auto">
           <table style="width:100%;border-collapse:collapse;font-size:12px" id="coordMonthTable">
             <thead><tr style="background:var(--surface2);border-bottom:2px solid var(--border)">
               <th style="padding:8px 12px;text-align:left;font-weight:700">Coordinator</th>
               <th style="padding:8px 8px;text-align:center;font-weight:700">Visits</th>
-              <th style="padding:8px 8px;text-align:center;font-weight:700">Goal</th>
-              <th style="padding:8px 8px;text-align:center;font-weight:700">Progress</th>
-              <th style="padding:8px 8px;text-align:center;font-weight:700">Status</th>
+              <th style="padding:8px 8px;text-align:center;font-weight:700">Avg/Day</th>
+              <th style="padding:8px 8px;text-align:center;font-weight:700">Volume</th>
+              <th style="padding:8px 8px;text-align:center;font-weight:700">Period</th>
             </tr></thead>
             <tbody id="coordMonthBody"></tbody>
           </table>
@@ -11962,22 +11962,25 @@ function renderCoordinatorGoals() {
     }
   }
 
-  // Build coordinator cards
+  // Build coordinator cards — snapshot of actual visit counts
+  // Find the max daily visits across all coordinators this week for relative bar scaling
+  var weekMax = 1;
+  COORDS.forEach(function(name) {
+    var byDay = goals.byDay[name] || {};
+    weekDays.forEach(function(d) { var v = byDay[d] || 0; if (v > weekMax) weekMax = v; });
+  });
+
   grid.innerHTML = COORDS.map(name => {
     const byDay = goals.byDay[name] || {};
     const weekTotal = weekDays.reduce((s,d) => s + (byDay[d]||0), 0);
-    const weekGoal = 5 * DAILY_GOAL;
-    const weekPct = Math.min(100, Math.round(weekTotal / weekGoal * 100));
-    const weekColor = weekPct >= 80 ? '#059669' : weekPct >= 50 ? '#D97706' : '#DC2626';
 
     const detail = goals.byDayDetail ? (goals.byDayDetail[name] || {}) : {};
     const dayBars = weekDays.map((d,i) => {
       const visits = byDay[d] || 0;
-      const met = visits >= DAILY_GOAL;
       const isToday = d === todayISO;
       const isPast = d < todayISO;
-      const barColor = !isPast && !isToday ? '#E5E7EB' : met ? '#059669' : visits > 0 ? '#D97706' : '#EF4444';
-      const barH = Math.min(100, Math.round((visits / (DAILY_GOAL * 1.5)) * 100));
+      const barColor = !isPast && !isToday ? '#E5E7EB' : visits > 0 ? '#1843AD' : '#E5E7EB';
+      const barH = Math.min(100, Math.round((visits / (weekMax * 1.2)) * 100));
       const hasVisits = visits > 0 && (isPast || isToday);
       const cursor = hasVisits ? 'cursor:pointer;' : '';
       const clickAttr = hasVisits ? `onclick="toggleCoordDayDetail('${name}','${d}',this)"` : '';
@@ -11986,7 +11989,7 @@ function renderCoordinatorGoals() {
           <div style="width:18px;height:${isPast || isToday ? Math.max(4,barH) : 4}%;background:${barColor};border-radius:3px 3px 0 0;transition:height 0.3s"></div>
         </div>
         <div style="font-size:10px;font-weight:${isToday?'700':'500'};color:${isToday?'#1843AD':'#9CA3AF'};margin-top:2px">${dayLabels[i]}</div>
-        <div style="font-size:11px;font-weight:700;color:${isPast || isToday ? barColor : '#D1D5DB'}">${visits}</div>
+        <div style="font-size:11px;font-weight:700;color:${isPast || isToday && visits > 0 ? '#1a202c' : '#D1D5DB'}">${visits}</div>
       </div>`;
     }).join('');
 
@@ -11994,33 +11997,30 @@ function renderCoordinatorGoals() {
     return `<div style="background:#F9FAFB;border-radius:10px;padding:14px;border:1px solid #E5E7EB">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <span style="font-weight:700;font-size:13px;color:#1a202c">${firstName}</span>
-        <span style="font-size:12px;font-weight:700;color:${weekColor}">${weekTotal}/${weekGoal}</span>
+        <span style="font-size:12px;font-weight:700;color:#1843AD">${weekTotal} this week</span>
       </div>
       <div style="display:flex;gap:4px;margin-bottom:8px">${dayBars}</div>
       <div class="coord-day-detail" data-coord="${name}" style="display:none;margin-bottom:8px;background:#fff;border:1px solid #E5E7EB;border-radius:6px;padding:8px;font-size:11px"></div>
-      <div style="background:#E5E7EB;border-radius:6px;height:6px;overflow:hidden">
-        <div style="background:${weekColor};height:100%;width:${weekPct}%;border-radius:6px;transition:width 0.5s"></div>
-      </div>
-      <div style="font-size:10px;color:#9CA3AF;margin-top:4px;text-align:right">${weekPct}% of weekly goal</div>
     </div>`;
   }).join('');
 
-  // Monthly summary table
+  // Monthly summary table — snapshot of actual counts
   if (!monthBody) return;
-  const monthGoal = workDaysElapsed * DAILY_GOAL;
-  const monthGoalFull = workDaysTotal * DAILY_GOAL;
+  var monthMax = 1;
+  COORDS.forEach(function(name) { var v = goals.byMonth[name] || 0; if (v > monthMax) monthMax = v; });
+  var avgPerDay = {};
+  COORDS.forEach(function(name) { avgPerDay[name] = workDaysElapsed > 0 ? (goals.byMonth[name] || 0) / workDaysElapsed : 0; });
+
   monthBody.innerHTML = COORDS.map(name => {
     const monthVisits = goals.byMonth[name] || 0;
-    const pct = monthGoal > 0 ? Math.round(monthVisits / monthGoal * 100) : 0;
-    const statusColor = pct >= 80 ? '#059669' : pct >= 50 ? '#D97706' : '#DC2626';
-    const statusLabel = pct >= 80 ? 'On Track' : pct >= 50 ? 'Behind' : 'At Risk';
-    const barPct = Math.min(100, Math.round(monthVisits / monthGoalFull * 100));
+    const barPct = Math.min(100, Math.round(monthVisits / (monthMax * 1.1) * 100));
+    const avg = avgPerDay[name].toFixed(1);
     return `<tr style="border-bottom:1px solid var(--border)">
       <td style="padding:8px 12px;font-weight:600">${name}</td>
       <td style="padding:8px 8px;text-align:center;font-weight:700">${monthVisits}</td>
-      <td style="padding:8px 8px;text-align:center;color:#6B7280">${monthGoal} (of ${monthGoalFull})</td>
-      <td style="padding:8px 12px"><div style="background:#E5E7EB;border-radius:6px;height:8px;overflow:hidden"><div style="background:${statusColor};height:100%;width:${barPct}%;border-radius:6px"></div></div></td>
-      <td style="padding:8px 8px;text-align:center"><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:${statusColor}20;color:${statusColor}">${statusLabel}</span></td>
+      <td style="padding:8px 8px;text-align:center;color:#6B7280">${avg}/day</td>
+      <td style="padding:8px 12px"><div style="background:#E5E7EB;border-radius:6px;height:8px;overflow:hidden"><div style="background:#1843AD;height:100%;width:${barPct}%;border-radius:6px"></div></div></td>
+      <td style="padding:8px 8px;text-align:center;color:#6B7280;font-size:11px">${workDaysElapsed} days tracked</td>
     </tr>`;
   }).join('');
 }
