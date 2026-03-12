@@ -24,7 +24,9 @@ jobs:
         run: npm install -g @google/clasp
 
       - name: Write clasp credentials
-        run: echo '${{ secrets.CLASPRC_JSON }}' > ~/.clasprc.json
+        env:
+          CLASPRC: ${{ secrets.CLASPRC_JSON }}
+        run: printenv CLASPRC > ~/.clasprc.json
 
       - name: Write clasp project config
         run: |
@@ -32,6 +34,9 @@ jobs:
 
       - name: Build Apps Script Dashboard (HTML shell + external JS)
         run: python3 scripts/build-appscript.py
+
+      - name: Verify clasp credentials
+        run: node -e "JSON.parse(require('fs').readFileSync(require('os').homedir()+'/.clasprc.json','utf8')); console.log('clasprc.json is valid JSON')"
 
       - name: Push to Apps Script
         run: clasp push --force
