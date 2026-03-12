@@ -824,9 +824,9 @@ body {
     </div>
     <div class="tb-divider"></div>
     <div class="tb-section">
-      <div class="tb-label">🏥 Med Records Active</div>
-      <div class="tb-value" style="color:#8b5cf6" id="ov-kpi-medrec">—</div>
-      <div class="tb-sub">Patients in records pipeline</div>
+      <div class="tb-label">🏥 Site Active Patients</div>
+      <div class="tb-value" style="color:#8b5cf6" id="ov-kpi-sites">—</div>
+      <div class="tb-sub">PHL + PNJ combined</div>
     </div>
     <div class="tb-divider"></div>
     <div class="tb-section">
@@ -944,7 +944,6 @@ body {
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;" onclick="sortMergedTable(this,7)">SF Rate ↕</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Site</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Referrals</th>
-            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Med Rec</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">FB Leads</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Total Leads</th>
           </tr>
@@ -2236,29 +2235,19 @@ body {
       </div>
     </div>
 
-    <!-- Medical Records & Patient's Path -->
-    <div class="card fade-in" style="margin-bottom:16px;">
-      <div class="card-header">
-        <span class="card-title">🏥 Medical Records &amp; Patient's Path</span>
-        <span class="badge badge-blue" id="ref-medrec-badge">Loading...</span>
-      </div>
-      <div style="padding:0;" id="ref-medrec-content">
-        <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Loading medical records data...</div>
-      </div>
-    </div>
-
-    <!-- Patient Tracker NJ (Pennington) -->
-    <div class="card fade-in" style="margin-bottom:16px;">
-      <div class="card-header">
-        <span class="card-title">📋 Patient Tracker — Pennington NJ</span>
-        <span class="badge badge-blue" id="ref-nj-badge">Loading...</span>
-      </div>
-      <div style="padding:0;" id="ref-nj-content">
-        <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Loading NJ patient tracker...</div>
-      </div>
-    </div>
 
     <!-- Facebook CRM -->
+    <!-- Patient Pipeline by Site -->
+    <div class="card fade-in" style="margin-bottom:16px;">
+      <div class="card-header">
+        <span class="card-title">🏥 Patient Pipeline by Office</span>
+        <span class="badge badge-blue" id="pipeline-site-badge">Loading...</span>
+      </div>
+      <div id="pipeline-site-content" style="padding:16px;">
+        <div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">Loading patient pipeline data...</div>
+      </div>
+    </div>
+
     <div class="card fade-in" style="margin-bottom:16px;">
       <div class="card-header">
         <span class="card-title">📘 Facebook / Meta Lead Referrals</span>
@@ -2667,9 +2656,6 @@ const CRP_CONFIG = {
     },
     MED_RECORDS_ACTIVE: ['Pending Release','Under Review','Ready to Schedule','Visit Scheduled','In Screening','Enrolled'],
     MED_RECORDS_CLOSED: ['DNQ','Screen Fail','Not Interested','Unable to Reach','No Show','Complete'],
-
-    // Patient tracker NJ (Pennington site)
-    PATIENT_TRACKER_NJ: '901413875382',
 
   },
 
@@ -11651,22 +11637,7 @@ function buildUpcomingDetailTable(rows) {
     const patientCell = r.patient_url
       ? `<a href="${r.patient_url}" target="_blank" rel="noopener" style="text-decoration:none;color:var(--navy);font-weight:600;">${maskPHI(r.patient)}${extIcon}</a>`
       : `<strong>${maskPHI(r.patient)}</strong>`;
-    // Med records context dot
-    const isMaintenance = (r.visit||'').toLowerCase().includes('maintenance') || (r.visit||'').toLowerCase().includes('follow');
     let medDot = '';
-    if (!isMaintenance && typeof MED_RECORDS_DATA !== 'undefined' && MED_RECORDS_DATA.length > 0) {
-      const pName = (r.patient||'').toLowerCase().trim();
-      const medMatch = MED_RECORDS_DATA.find(m => m.name.toLowerCase().trim() === pName);
-      if (medMatch) {
-        if (medMatch.records_received === 'Yes' || medMatch.status === 'Enrolled' || medMatch.status === 'Complete') {
-          medDot = '<span title="Records complete" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#059669;margin-left:5px;vertical-align:middle;"></span>';
-        } else {
-          medDot = '<span title="Records pending" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#f59e0b;margin-left:5px;vertical-align:middle;"></span>';
-        }
-      } else {
-        medDot = '<span title="No med records entry" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#dc2626;margin-left:5px;vertical-align:middle;"></span>';
-      }
-    }
     return `<tr>
       <td style="font-weight:600;color:var(--blue);white-space:nowrap">${r.date}</td>
       <td>${studyCell}</td>
@@ -14135,6 +14106,91 @@ function safe(fn, name) {
 }
 
 // ══════════════════════════════════════════════════════════════
+// PATIENT PIPELINE BY SITE (PHL vs PNJ)
+// ══════════════════════════════════════════════════════════════
+function buildPatientPipelineBySite() {
+  var container = document.getElementById('pipeline-site-content');
+  var badge = document.getElementById('pipeline-site-badge');
+  var kpiEl = document.getElementById('ov-kpi-sites');
+
+  // Use allVisitDetail for active patient data
+  var visits = (DATA && DATA.allVisitDetail) ? DATA.allVisitDetail : [];
+  if (!visits.length) {
+    if (container) container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">No visit data loaded yet</div>';
+    return;
+  }
+
+  // Get unique patients with their latest status, grouped by site
+  var patientMap = {}; // key: patientName -> {status, site, study, date}
+  visits.forEach(function(v) {
+    var key = (v.patient || '').toLowerCase().trim();
+    if (!key) return;
+    var isPNJ = (v.site || '').includes('Penn');
+    var siteLabel = isPNJ ? 'PNJ' : 'PHL';
+    // Keep the latest visit per patient
+    if (!patientMap[key] || (v.date_iso && v.date_iso > (patientMap[key].date_iso || ''))) {
+      patientMap[key] = { name: v.patient, status: v.status || 'Unknown', site: siteLabel, study: v.study, date_iso: v.date_iso, url: v.patient_url };
+    }
+  });
+
+  var patients = Object.values(patientMap);
+  var stages = ['Screening', 'Enrolled', 'Randomization', 'Treatment', 'Follow-Up'];
+  var stageColors = { 'Screening': '#f59e0b', 'Enrolled': '#059669', 'Randomization': '#8b5cf6', 'Treatment': '#1843ad', 'Follow-Up': '#6366f1' };
+
+  function classifyStage(status) {
+    var s = (status || '').toLowerCase();
+    if (s.includes('screen') && !s.includes('fail')) return 'Screening';
+    if (s.includes('enrolled') || s.includes('active')) return 'Enrolled';
+    if (s.includes('random')) return 'Randomization';
+    if (s.includes('treatment') || s.includes('dosing') || s.includes('cycle') || s.includes('week')) return 'Treatment';
+    if (s.includes('follow') || s.includes('maintenance') || s.includes('complete')) return 'Follow-Up';
+    if (s.includes('schedule')) return 'Enrolled';
+    return 'Enrolled'; // default
+  }
+
+  // Count by site and stage
+  var phl = {}, pnj = {}, phlTotal = 0, pnjTotal = 0;
+  stages.forEach(function(st) { phl[st] = 0; pnj[st] = 0; });
+  patients.forEach(function(p) {
+    var stage = classifyStage(p.status);
+    if (p.site === 'PNJ') { pnj[stage]++; pnjTotal++; }
+    else { phl[stage]++; phlTotal++; }
+  });
+
+  // Update Overview KPI
+  if (kpiEl) kpiEl.textContent = phlTotal + ' + ' + pnjTotal;
+
+  // Build pipeline bars for a site
+  function buildSitePipeline(siteName, counts, total, color) {
+    var html = '<div style="flex:1;min-width:280px;">';
+    html += '<div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:10px;">' + siteName + ' <span style="font-size:12px;font-weight:400;color:var(--muted);">' + total + ' patients</span></div>';
+    stages.forEach(function(stage) {
+      var count = counts[stage] || 0;
+      var pct = total > 0 ? Math.round(count / total * 100) : 0;
+      var barColor = stageColors[stage] || '#94a3b8';
+      html += '<div style="margin-bottom:8px;">';
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px;">';
+      html += '<span style="font-size:11px;font-weight:600;color:var(--text);">' + stage + '</span>';
+      html += '<span style="font-size:12px;font-weight:700;color:' + barColor + ';">' + count + '</span>';
+      html += '</div>';
+      html += '<div style="height:8px;background:#f1f5f9;border-radius:4px;overflow:hidden;">';
+      html += '<div style="height:100%;width:' + pct + '%;background:' + barColor + ';border-radius:4px;transition:width 0.5s;"></div>';
+      html += '</div></div>';
+    });
+    html += '</div>';
+    return html;
+  }
+
+  var html = '<div style="display:flex;gap:24px;flex-wrap:wrap;">';
+  html += buildSitePipeline('📍 Philadelphia (PHL)', phl, phlTotal, '#1843ad');
+  html += buildSitePipeline('🌿 Pennington (PNJ)', pnj, pnjTotal, '#059669');
+  html += '</div>';
+
+  if (container) container.innerHTML = html;
+  if (badge) badge.textContent = (phlTotal + pnjTotal) + ' patients';
+}
+
+// ══════════════════════════════════════════════════════════════
 // CROSS-SOURCE: OVERVIEW RECRUITMENT KPIs
 // ══════════════════════════════════════════════════════════════
 function buildRecruitmentKPIs() {
@@ -14143,10 +14199,6 @@ function buildRecruitmentKPIs() {
   var hasRefData = REFERRAL_DATA && REFERRAL_DATA.length > 0;
   var activeRefs = hasRefData ? REFERRAL_DATA.filter(function(r){ return !r.is_closed; }).length : null;
   if (el('ov-kpi-refs')) el('ov-kpi-refs').textContent = activeRefs !== null ? activeRefs : '--';
-  // Med records active
-  var hasMedData = MED_RECORDS_DATA && MED_RECORDS_DATA.length > 0;
-  var medActive = hasMedData ? MED_RECORDS_DATA.filter(function(r){ return r.is_active; }).length : null;
-  if (el('ov-kpi-medrec')) el('ov-kpi-medrec').textContent = medActive !== null ? medActive : '--';
   // FB leads (30 days)
   var now = Date.now();
   var hasFBData = FB_CRM_DATA && FB_CRM_DATA.length > 0;
@@ -14167,65 +14219,7 @@ function buildRecruitmentKPIs() {
 // CROSS-SOURCE: MEDICAL RECORDS ALERTS (Actions Tab)
 // ══════════════════════════════════════════════════════════════
 function buildMedRecAlerts() {
-  var container = document.getElementById('medrec-alerts-content');
-  if (!container) return;
-  if (!MED_RECORDS_DATA || MED_RECORDS_DATA.length === 0) {
-    container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">Connect ClickUp to see medical records alerts</div>';
-    return;
-  }
-
-  var alerts = [];
-
-  // 1. Patients in screening with records NOT received
-  MED_RECORDS_DATA.filter(function(r) {
-    return r.status === 'In Screening' && r.records_received !== 'Yes';
-  }).forEach(function(r) {
-    alerts.push({ priority: 1, icon: '🔴', title: r.name + ' — records not received', desc: r.study + ' · In Screening · Medical records need follow-up', url: r.url });
-  });
-
-  // 2. Ready to Schedule but no upcoming visit
-  var readyNoVisit = findReadyNoVisit();
-  readyNoVisit.forEach(function(r) {
-    alerts.push({ priority: 2, icon: '🟡', title: r.name + ' — ready but no visit scheduled', desc: r.study + ' · Ready to Schedule · Needs appointment', url: r.url });
-  });
-
-  // 3. Pending investigator approval
-  MED_RECORDS_DATA.filter(function(r) {
-    return r.is_active && r.investigator_approval && r.investigator_approval !== 'Approved' && r.investigator_approval !== '';
-  }).forEach(function(r) {
-    alerts.push({ priority: 3, icon: '🟠', title: r.name + ' — pending investigator approval', desc: r.study + ' · ' + r.investigator_approval + ' · Follow up with PI', url: r.url });
-  });
-
-  // 4. Referrals with no medical records entry
-  var refsNoMedRec = findReferralsWithoutMedRecords();
-  if (refsNoMedRec.length > 0) {
-    alerts.push({ priority: 4, icon: '📋', title: refsNoMedRec.length + ' referrals have no medical records entry', desc: 'Active referrals not yet in the medical records system — create entries', url: '' });
-  }
-
-  alerts.sort(function(a,b){ return a.priority - b.priority; });
-
-  var badge = document.getElementById('medrec-alerts-badge');
-  if (badge) badge.textContent = alerts.length > 0 ? alerts.length + ' items' : '✓ Clear';
-
-  if (alerts.length === 0) {
-    container.innerHTML = '<div style="text-align:center;padding:20px;color:#059669;font-size:13px;">✅ No medical records follow-ups needed</div>';
-    return;
-  }
-
-  var html = '';
-  alerts.slice(0, 20).forEach(function(a) {
-    html += '<div style="display:flex;gap:10px;align-items:flex-start;padding:10px 16px;border-bottom:1px solid #f1f5f9;">';
-    html += '<span style="font-size:14px;flex-shrink:0;margin-top:2px;">' + a.icon + '</span>';
-    html += '<div style="flex:1;">';
-    if (a.url) {
-      html += '<div style="font-size:12px;font-weight:600;color:#1e293b;"><a href="' + a.url + '" target="_blank" style="color:#1e293b;text-decoration:none;">' + a.title + '</a></div>';
-    } else {
-      html += '<div style="font-size:12px;font-weight:600;color:#1e293b;">' + a.title + '</div>';
-    }
-    html += '<div style="font-size:11px;color:#64748b;">' + a.desc + '</div>';
-    html += '</div></div>';
-  });
-  container.innerHTML = html;
+  return;
 }
 
 function renderAll() {
@@ -14250,6 +14244,7 @@ function renderAll() {
   safe(buildActionSteps,     'buildActionSteps');
   safe(buildInsights,        'buildInsights');
   safe(buildRecruitmentKPIs, 'buildRecruitmentKPIs');
+  safe(buildPatientPipelineBySite, 'buildPatientPipelineBySite');
   safe(buildMedRecAlerts,    'buildMedRecAlerts');
   // Note: buildRiskTable/buildStudyCards removed — Studies tab now uses buildStudiesView (lazy-loaded on tab click)
   if (typeof buildRiskFlagCards === 'function')     safe(buildRiskFlagCards,     'buildRiskFlagCards');
@@ -14848,13 +14843,6 @@ async function refreshReferrals() {
       safe(buildRecruitmentKPIs, 'buildRecruitmentKPIs');
       if (typeof renderStudiesTable === 'function') try { renderStudiesTable(); } catch(e) {}
     }).catch(e => console.warn('FB CRM fetch failed:', e));
-    fetchMedicalRecords().then(function() {
-      safe(buildRecruitmentKPIs, 'buildRecruitmentKPIs');
-      safe(buildMedRecAlerts, 'buildMedRecAlerts');
-      safe(buildInsights, 'buildInsights');
-      if (typeof renderStudiesTable === 'function') try { renderStudiesTable(); } catch(e) {}
-    }).catch(e => console.warn('Medical Records fetch failed:', e));
-    fetchPatientTrackerNJ().catch(e => console.warn('Patient Tracker NJ fetch failed:', e));
     safe(buildRecruitmentKPIs, 'buildRecruitmentKPIs');
   } catch(e) {
     console.error('CRP Referrals: Fetch failed', e);
@@ -15142,7 +15130,6 @@ function buildPatientJourneyFunnel() {
   var medRecsCreated = MED_RECORDS_DATA ? MED_RECORDS_DATA.length : 0;
   var inScreening = (MED_RECORDS_DATA ? MED_RECORDS_DATA.filter(function(r){ return r.status === 'In Screening' || r.status === 'Visit Scheduled'; }).length : 0);
   var enrolled = (MED_RECORDS_DATA ? MED_RECORDS_DATA.filter(function(r){ return r.status === 'Enrolled' || r.status === 'Complete'; }).length : 0);
-  var njPatients = PATIENT_NJ_DATA ? PATIENT_NJ_DATA.length : 0;
 
   if (totalLeads === 0 && medRecsCreated === 0) {
     container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">No cross-source data available yet</div>';
@@ -15178,14 +15165,6 @@ function buildPatientJourneyFunnel() {
     }
     html += '</div>';
   });
-
-  // NJ tracker callout
-  if (njPatients > 0) {
-    html += '<div style="margin-top:12px;padding:8px 16px;background:#f0fdf4;border-radius:8px;border:1px solid #a7f3d0;display:flex;align-items:center;gap:8px;">';
-    html += '<span style="font-size:14px;">🌿</span>';
-    html += '<div><span style="font-size:12px;font-weight:600;color:#059669;">Pennington NJ:</span> <span style="font-size:12px;color:#475569;">' + njPatients + ' patients tracked separately</span></div>';
-    html += '</div>';
-  }
 
   // Overall conversion
   if (totalLeads > 0 && enrolled > 0) {
@@ -15483,289 +15462,17 @@ function showReferralDetailModal(filterFn, title, subtitle) {
 // MEDICAL RECORDS & PATIENT'S PATH
 // ══════════════════════════════════════════════════════════════
 async function fetchMedicalRecords() {
-  const token = getClickUpToken();
-  if (!token) return;
-  const CU = CRP_CONFIG.CLICKUP;
-  const API = 'https://api.clickup.com/api/v2';
-  const H = { 'Authorization': token };
-
-  try {
-    // 1. Get all lists in the Medical Records folder
-    const folderResp = await fetch(`${API}/folder/${CU.MED_RECORDS_FOLDER}/list`, { headers: H });
-    if (!folderResp.ok) throw new Error('Failed to fetch Medical Records folder');
-    const folderData = await folderResp.json();
-    const lists = folderData.lists || [];
-
-    // 2. Fetch tasks from each list in parallel (each list = one study)
-    const taskPromises = lists.map(async (list) => {
-      const tasks = [];
-      let page = 0, hasMore = true;
-      while (hasMore) {
-        const resp = await fetch(`${API}/list/${list.id}/task?page=${page}&subtasks=false&include_closed=true&limit=100`, { headers: H });
-        if (!resp.ok) { hasMore = false; break; }
-        const data = await resp.json();
-        if (data.tasks && data.tasks.length > 0) {
-          tasks.push(...data.tasks);
-          page++;
-          if (data.tasks.length < 100) hasMore = false;
-        } else { hasMore = false; }
-      }
-      return { study: list.name, listId: list.id, tasks };
-    });
-
-    const listResults = await Promise.all(taskPromises);
-
-    // 3. Normalize
-    MED_RECORDS_DATA = [];
-    listResults.forEach(({ study, listId, tasks }) => {
-      tasks.forEach(t => {
-        const fields = {};
-        (t.custom_fields || []).forEach(f => {
-          if (f.value === null || f.value === undefined) return;
-          if (f.type === 'drop_down') {
-            const opt = (f.type_config?.options || []).find(o => o.orderindex === f.value);
-            fields[f.name] = opt ? opt.name : String(f.value);
-          } else if (f.type === 'date') {
-            fields[f.name] = f.value ? new Date(parseInt(f.value)).toISOString().split('T')[0] : null;
-          } else if (f.type === 'url') {
-            fields[f.name] = typeof f.value === 'object' ? (f.value.url || '') : String(f.value);
-          } else if (f.type === 'checkbox') {
-            fields[f.name] = f.value === true || f.value === 'true' ? 'Yes' : 'No';
-          } else {
-            fields[f.name] = String(f.value);
-          }
-        });
-
-        const rawStatus = (t.status?.status || '').toLowerCase();
-        const mappedStatus = CU.MED_RECORDS_STATUS_MAP[rawStatus] || rawStatus || 'Unknown';
-        const isActive = CU.MED_RECORDS_ACTIVE.includes(mappedStatus);
-
-        MED_RECORDS_DATA.push({
-          id: t.id,
-          name: t.name,
-          study,
-          listId,
-          status: mappedStatus,
-          status_raw: t.status?.status || '',
-          is_active: isActive,
-          is_closed: CU.MED_RECORDS_CLOSED.includes(mappedStatus),
-          next_visit: fields['Next Visit'] || fields['Next visit date'] || fields['Next Appointment Date'] || '',
-          screening_date: fields['Screening Visit Date'] || fields['Pre-Screening Visit Date'] || '',
-          randomization_date: fields['Randomization Visit Date'] || '',
-          crio_link: fields['CRIO Link'] || '',
-          med_release: fields['Medical release Jotform'] || '',
-          records_received: fields['Medical records received?'] || '',
-          records_portal: fields['Medical Records Portal'] || '',
-          investigator_approval: fields['Investigator Approval'] || '',
-          same_day_cancel: fields['Same day cancellation?'] || '',
-          notes: fields['Notes'] || fields['Operations Team Notes'] || '',
-          screen_fail_reason: fields['Reason - Screen Fail'] || '',
-          date_created: t.date_created ? new Date(parseInt(t.date_created)).toISOString().split('T')[0] : '',
-          date_updated: t.date_updated ? new Date(parseInt(t.date_updated)).toISOString().split('T')[0] : '',
-          url: t.url || 'https://app.clickup.com/t/' + t.id,
-        });
-      });
-    });
-
-    console.log('CRP: Medical Records loaded —', MED_RECORDS_DATA.length, 'patients across', lists.length, 'studies');
-    renderMedicalRecords();
-  } catch(e) {
-    console.error('CRP: Medical Records fetch failed:', e);
-    const el = document.getElementById('ref-medrec-badge');
-    if (el) el.textContent = '❌ Failed';
-  }
+  return;
 }
 
 let _medRecFilter = 'upcoming'; // 'upcoming' or 'all'
 
 function renderMedicalRecords() {
-  const container = document.getElementById('ref-medrec-content');
-  const badge = document.getElementById('ref-medrec-badge');
-  if (!container) return;
-
-  if (MED_RECORDS_DATA.length === 0) {
-    container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">No medical records data</div>';
-    if (badge) badge.textContent = '—';
-    return;
-  }
-
-  // ── Cross-reference with CRIO upcoming visits ──
-  const upcomingByName = {};
-  (DATA.allVisitDetail || []).forEach(v => {
-    const key = v.patient.toLowerCase().trim();
-    if (!upcomingByName[key]) upcomingByName[key] = [];
-    upcomingByName[key].push({ date_iso: v.date_iso, date: v.date, study: v.study, visit: v.visit });
-  });
-
-  // Tag each med record with upcoming visit info
-  const tagged = MED_RECORDS_DATA.map(r => {
-    const visits = upcomingByName[r.name.toLowerCase().trim()] || [];
-    const soonest = visits.sort((a,b) => (a.date_iso||'').localeCompare(b.date_iso||''))[0];
-    return { ...r, _hasUpcoming: visits.length > 0, _nextVisitDate: soonest?.date_iso || '', _nextVisitLabel: soonest?.date || '', _nextVisitType: soonest?.visit || '' };
-  });
-
-  const withUpcoming = tagged.filter(r => r._hasUpcoming);
-  const isUpcomingView = _medRecFilter === 'upcoming';
-  const displayData = isUpcomingView ? withUpcoming : tagged;
-
-  const CU = CRP_CONFIG.CLICKUP;
-  const total = MED_RECORDS_DATA.length;
-  const activeCount = displayData.filter(r => r.is_active).length;
-  const enrolled = displayData.filter(r => r.status === 'Enrolled' || r.status === 'Complete').length;
-  const screening = displayData.filter(r => r.status === 'In Screening').length;
-  const readySched = displayData.filter(r => r.status === 'Ready to Schedule').length;
-  const visitSched = displayData.filter(r => r.status === 'Visit Scheduled').length;
-  const dnq = displayData.filter(r => r.status === 'DNQ' || r.status === 'Screen Fail').length;
-  const pending = displayData.filter(r => r.status === 'Pending Release' || r.status === 'Under Review').length;
-  const needsRecords = displayData.filter(r => r._hasUpcoming && r.records_received !== 'Yes').length;
-
-  if (badge) badge.textContent = (isUpcomingView ? withUpcoming.length + ' with visits' : total + ' patients') + ' · ' + displayData.reduce((acc, r) => { acc.add(r.study); return acc; }, new Set()).size + ' studies';
-
-  // Toggle bar
-  let html = '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid #f1f5f9;background:#fafbfc;">';
-  html += '<div style="display:flex;gap:6px;">';
-  html += '<button onclick="_medRecFilter=\'upcoming\';renderMedicalRecords()" style="padding:4px 12px;border-radius:14px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid ' + (isUpcomingView ? '#1843ad' : 'var(--border)') + ';background:' + (isUpcomingView ? '#e8eeff' : 'var(--surface)') + ';color:' + (isUpcomingView ? '#1843ad' : 'var(--muted)') + '">⚡ Upcoming Visits (' + withUpcoming.length + ')</button>';
-  html += '<button onclick="_medRecFilter=\'all\';renderMedicalRecords()" style="padding:4px 12px;border-radius:14px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid ' + (!isUpcomingView ? '#1843ad' : 'var(--border)') + ';background:' + (!isUpcomingView ? '#e8eeff' : 'var(--surface)') + ';color:' + (!isUpcomingView ? '#1843ad' : 'var(--muted)') + '">All Patients (' + total + ')</button>';
-  html += '</div>';
-  if (isUpcomingView && needsRecords > 0) {
-    html += '<span style="font-size:11px;font-weight:700;color:#dc2626;background:#fef2f2;padding:3px 8px;border-radius:4px;">' + needsRecords + ' missing records before visit</span>';
-  }
-  html += '</div>';
-
-  // KPI row
-  html += '<div style="display:flex;gap:12px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid #f1f5f9;">';
-  const kpis = isUpcomingView ? [
-    { label: 'With Visits', val: withUpcoming.length, color: '#1e293b' },
-    { label: 'Active', val: activeCount, color: '#3b82f6' },
-    { label: 'Needs Records', val: needsRecords, color: '#dc2626' },
-    { label: 'Enrolled', val: enrolled, color: '#059669' },
-    { label: 'In Screening', val: screening, color: '#8b5cf6' },
-    { label: 'Pending Records', val: pending, color: '#94a3b8' },
-  ] : [
-    { label: 'Total Patients', val: total, color: '#1e293b' },
-    { label: 'Active', val: activeCount, color: '#3b82f6' },
-    { label: 'Enrolled/Complete', val: enrolled, color: '#059669' },
-    { label: 'In Screening', val: screening, color: '#8b5cf6' },
-    { label: 'Visit Scheduled', val: visitSched, color: '#06b6d4' },
-    { label: 'Ready to Schedule', val: readySched, color: '#f59e0b' },
-    { label: 'Pending Records', val: pending, color: '#94a3b8' },
-    { label: 'DNQ / Screen Fail', val: dnq, color: '#dc2626' },
-  ];
-  kpis.forEach(k => {
-    html += '<div style="text-align:center;min-width:70px;"><div style="font-size:18px;font-weight:800;color:' + k.color + ';">' + k.val + '</div><div style="font-size:10px;color:#94a3b8;">' + k.label + '</div></div>';
-  });
-  html += '</div>';
-
-  // Status breakdown bar
-  const statusOrder = ['Enrolled','Complete','In Screening','Visit Scheduled','Ready to Schedule','Pending Release','Under Review','Unable to Reach','Not Interested','DNQ','Screen Fail','No Show'];
-  const statusColors = {'Enrolled':'#059669','Complete':'#047857','In Screening':'#8b5cf6','Visit Scheduled':'#06b6d4','Ready to Schedule':'#f59e0b','Pending Release':'#94a3b8','Under Review':'#64748b','Unable to Reach':'#f97316','Not Interested':'#9ca3af','DNQ':'#dc2626','Screen Fail':'#ef4444','No Show':'#b91c1c'};
-  const statusCounts = {};
-  displayData.forEach(r => { statusCounts[r.status] = (statusCounts[r.status] || 0) + 1; });
-
-  html += '<div style="padding:12px 16px;border-bottom:1px solid #f1f5f9;">';
-  html += '<div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:6px;">STATUS DISTRIBUTION</div>';
-  html += '<div style="display:flex;height:24px;border-radius:6px;overflow:hidden;background:#f1f5f9;">';
-  const barTotal = displayData.length || 1;
-  statusOrder.forEach(function(st) {
-    var c = statusCounts[st] || 0;
-    if (c > 0) {
-      var pct = (c / barTotal * 100).toFixed(1);
-      html += '<div style="width:' + pct + '%;background:' + (statusColors[st]||'#94a3b8') + ';display:flex;align-items:center;justify-content:center;" title="' + st + ': ' + c + ' (' + pct + '%)"><span style="font-size:9px;font-weight:700;color:#fff;text-shadow:0 1px 1px rgba(0,0,0,.3);">' + (c >= 5 ? c : '') + '</span></div>';
-    }
-  });
-  html += '</div>';
-  html += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;">';
-  statusOrder.forEach(function(st) {
-    var c = statusCounts[st] || 0;
-    if (c > 0) html += '<span style="font-size:10px;color:#475569;"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + (statusColors[st]||'#94a3b8') + ';margin-right:3px;"></span>' + st + ' (' + c + ')</span>';
-  });
-  html += '</div></div>';
-
-  // By-study table — in upcoming view, show patient-level detail sorted by visit date
-  if (isUpcomingView && withUpcoming.length > 0) {
-    const sorted = withUpcoming.sort((a,b) => (a._nextVisitDate||'z').localeCompare(b._nextVisitDate||'z'));
-    html += '<div style="overflow-x:auto;"><table class="fin-table" style="width:100%;font-size:11px;">';
-    html += '<thead><tr><th style="text-align:left;padding:8px 12px;">Patient</th><th style="text-align:left;">Study</th><th style="text-align:center;">Next Visit</th><th style="text-align:center;">Status</th><th style="text-align:center;">Records</th><th style="text-align:center;">Inv. Appr.</th></tr></thead>';
-    html += '<tbody>';
-    sorted.forEach(p => {
-      const sc = statusColors[p.status] || '#94a3b8';
-      const recBadge = p.records_received === 'Yes' ? '<span style="color:#059669;font-weight:700;">✓ Yes</span>' : '<span style="color:#dc2626;font-weight:700;">✗ Missing</span>';
-      const appBadge = p.investigator_approval === 'Approved' ? '<span style="color:#059669;">✓</span>' : (p.investigator_approval ? '<span style="color:#f59e0b;">' + p.investigator_approval + '</span>' : '—');
-      const visitDate = p._nextVisitLabel || '—';
-      const daysOut = p._nextVisitDate ? Math.round((new Date(p._nextVisitDate) - new Date()) / 86400000) : 999;
-      const urgency = daysOut <= 3 ? 'color:#dc2626;font-weight:700;' : daysOut <= 7 ? 'color:#d97706;font-weight:600;' : '';
-      html += '<tr onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'\'">';
-      html += '<td style="padding:7px 12px;font-weight:600;"><a href="' + (p.url||'#') + '" target="_blank" style="color:#1e293b;text-decoration:none;">' + p.name + '</a></td>';
-      html += '<td style="padding:7px 8px;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + p.study + '">' + p.study + '</td>';
-      html += '<td style="padding:7px 8px;text-align:center;' + urgency + '">' + visitDate + '</td>';
-      html += '<td style="padding:7px 8px;text-align:center;"><span style="font-size:10px;font-weight:600;padding:2px 6px;border-radius:4px;background:' + sc + '20;color:' + sc + ';">' + (p.status||'—') + '</span></td>';
-      html += '<td style="padding:7px 8px;text-align:center;">' + recBadge + '</td>';
-      html += '<td style="padding:7px 8px;text-align:center;">' + appBadge + '</td>';
-      html += '</tr>';
-    });
-    html += '</tbody></table></div>';
-  } else {
-    // All patients view — by-study summary table (original)
-    var studyMap = {};
-    displayData.forEach(function(r) {
-      if (!studyMap[r.study]) studyMap[r.study] = { total: 0, active: 0, enrolled: 0, screening: 0, scheduled: 0, dnq: 0 };
-      studyMap[r.study].total++;
-      if (r.is_active) studyMap[r.study].active++;
-      if (r.status === 'Enrolled' || r.status === 'Complete') studyMap[r.study].enrolled++;
-      if (r.status === 'In Screening') studyMap[r.study].screening++;
-      if (r.status === 'Visit Scheduled' || r.status === 'Ready to Schedule') studyMap[r.study].scheduled++;
-      if (r.status === 'DNQ' || r.status === 'Screen Fail') studyMap[r.study].dnq++;
-    });
-    var studyRows = Object.entries(studyMap).sort(function(a,b){ return b[1].total - a[1].total; });
-
-    html += '<div style="overflow-x:auto;"><table class="fin-table" style="width:100%;font-size:11px;">';
-    html += '<thead><tr><th style="text-align:left;padding:8px 12px;">Study</th><th style="text-align:center;">Total</th><th style="text-align:center;">Active</th><th style="text-align:center;">Screening</th><th style="text-align:center;">Scheduled</th><th style="text-align:center;">Enrolled</th><th style="text-align:center;">DNQ/SF</th></tr></thead>';
-    html += '<tbody>';
-    studyRows.forEach(function(row) {
-      var name = row[0], d = row[1];
-      var safeName = name.replace(/'/g, "\\'");
-      html += '<tr style="cursor:pointer;" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'\'" onclick="showMedRecDetailModal(\'' + safeName + '\')">';
-      html += '<td style="padding:7px 12px;font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + name + '">' + name + '</td>';
-      html += '<td style="text-align:center;font-weight:700;">' + d.total + '</td>';
-      html += '<td style="text-align:center;color:#3b82f6;">' + d.active + '</td>';
-      html += '<td style="text-align:center;color:#8b5cf6;">' + d.screening + '</td>';
-      html += '<td style="text-align:center;color:#06b6d4;">' + d.scheduled + '</td>';
-      html += '<td style="text-align:center;color:#059669;font-weight:700;">' + d.enrolled + '</td>';
-      html += '<td style="text-align:center;color:#dc2626;">' + d.dnq + '</td>';
-      html += '</tr>';
-    });
-    html += '</tbody></table></div>';
-  }
-
-  container.innerHTML = html;
+  return;
 }
 
 function showMedRecDetailModal(studyName) {
-  var patients = MED_RECORDS_DATA.filter(function(r) { return r.study === studyName; });
-  if (patients.length === 0) return;
-
-  var statusColors = {'Enrolled':'#059669','Complete':'#047857','In Screening':'#8b5cf6','Visit Scheduled':'#06b6d4','Ready to Schedule':'#f59e0b','Pending Release':'#94a3b8','Under Review':'#64748b','Unable to Reach':'#f97316','Not Interested':'#9ca3af','DNQ':'#dc2626','Screen Fail':'#ef4444','No Show':'#b91c1c'};
-
-  var body = '<table class="detail-table" style="width:100%;font-size:11px;"><thead><tr>';
-  body += '<th style="text-align:left;">Patient</th><th>Status</th><th>Next Visit</th><th>Med Records</th><th>Inv. Approval</th><th>Updated</th>';
-  body += '</tr></thead><tbody>';
-  patients.sort(function(a,b){ return (a.is_active === b.is_active) ? 0 : a.is_active ? -1 : 1; });
-  patients.forEach(function(p) {
-    var sc = statusColors[p.status] || '#94a3b8';
-    var recBadge = p.records_received === 'Yes' ? '<span style="color:#059669;font-weight:700;">✓</span>' : (p.records_received === 'No' || !p.records_received ? '<span style="color:#dc2626;">✗</span>' : '<span style="color:#f59e0b;">⏳</span>');
-    var appBadge = p.investigator_approval === 'Approved' ? '<span style="color:#059669;font-weight:700;">✓</span>' : (p.investigator_approval ? '<span style="color:#f59e0b;">' + p.investigator_approval + '</span>' : '—');
-    body += '<tr>';
-    body += '<td style="font-weight:600;"><a href="' + p.url + '" target="_blank" style="color:#1e293b;text-decoration:none;">' + p.name + '</a></td>';
-    body += '<td><span style="font-size:10px;padding:2px 8px;border-radius:4px;background:' + sc + '22;color:' + sc + ';font-weight:600;">' + p.status + '</span></td>';
-    body += '<td style="font-size:11px;color:#475569;">' + (p.next_visit || '—') + '</td>';
-    body += '<td style="text-align:center;">' + recBadge + '</td>';
-    body += '<td style="text-align:center;">' + appBadge + '</td>';
-    body += '<td style="font-size:10px;color:#94a3b8;">' + (p.date_updated || '—') + '</td>';
-    body += '</tr>';
-  });
-  body += '</tbody></table>';
-
-  openModal('🏥 ' + studyName + ' — Medical Records', patients.length + ' patients', body);
+  return;
 }
 
 
@@ -15773,124 +15480,11 @@ function showMedRecDetailModal(studyName) {
 // PATIENT TRACKER NJ (PENNINGTON)
 // ══════════════════════════════════════════════════════════════
 async function fetchPatientTrackerNJ() {
-  var token = getClickUpToken();
-  if (!token) return;
-  var CU = CRP_CONFIG.CLICKUP;
-  var API = 'https://api.clickup.com/api/v2';
-  var H = { 'Authorization': token };
-
-  try {
-    var tasks = [];
-    var page = 0, hasMore = true;
-    while (hasMore) {
-      var resp = await fetch(API + '/list/' + CU.PATIENT_TRACKER_NJ + '/task?page=' + page + '&subtasks=false&include_closed=true&limit=100', { headers: H });
-      if (!resp.ok) { hasMore = false; break; }
-      var data = await resp.json();
-      if (data.tasks && data.tasks.length > 0) {
-        tasks.push.apply(tasks, data.tasks);
-        page++;
-        if (data.tasks.length < 100) hasMore = false;
-      } else { hasMore = false; }
-    }
-
-    PATIENT_NJ_DATA = tasks.map(function(t) {
-      var fields = {};
-      (t.custom_fields || []).forEach(function(f) {
-        if (f.value === null || f.value === undefined) return;
-        if (f.type === 'drop_down') {
-          var opt = (f.type_config?.options || []).find(function(o){ return o.orderindex === f.value; });
-          fields[f.name] = opt ? opt.name : String(f.value);
-        } else if (f.type === 'date') {
-          fields[f.name] = f.value ? new Date(parseInt(f.value)).toISOString().split('T')[0] : null;
-        } else {
-          fields[f.name] = String(f.value);
-        }
-      });
-
-      // Determine study from the task's list (group_id) or from the status group name
-      var study = '';
-      if (t.list && t.list.name) study = t.list.name;
-      // Tasks are grouped by study in the UI via status groups
-      var group = (t.status?.status || '').trim();
-
-      return {
-        id: t.id,
-        name: t.name,
-        study: fields['Study'] || study,
-        status: group || 'Unknown',
-        next_visit: fields['Next Visit'] || '',
-        screening_start: fields['Screening Start'] || fields['Status'] || '',
-        date_created: t.date_created ? new Date(parseInt(t.date_created)).toISOString().split('T')[0] : '',
-        date_updated: t.date_updated ? new Date(parseInt(t.date_updated)).toISOString().split('T')[0] : '',
-        url: t.url || 'https://app.clickup.com/t/' + t.id,
-      };
-    });
-
-    console.log('CRP: Patient Tracker NJ loaded —', PATIENT_NJ_DATA.length, 'patients');
-    renderPatientTrackerNJ();
-  } catch(e) {
-    console.error('CRP: Patient Tracker NJ fetch failed:', e);
-    var el = document.getElementById('ref-nj-badge');
-    if (el) el.textContent = '❌ Failed';
-  }
+  return;
 }
 
 function renderPatientTrackerNJ() {
-  var container = document.getElementById('ref-nj-content');
-  var badge = document.getElementById('ref-nj-badge');
-  if (!container) return;
-
-  // Filter out junk/placeholder entries (e.g. "Window", "Screen Fails", single-word non-names)
-  var JUNK_RE = /^(window|screen fails?|test|template|example|sample|new task|untitled)/i;
-  var cleanData = PATIENT_NJ_DATA.filter(function(r) {
-    var n = (r.name || '').trim();
-    if (n.length < 3) return false;
-    if (JUNK_RE.test(n)) return false;
-    if (/^\d+$/.test(n)) return false;
-    return true;
-  });
-
-  if (cleanData.length === 0) {
-    container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">No NJ patient data</div>';
-    if (badge) badge.textContent = '—';
-    return;
-  }
-
-  var filtered = PATIENT_NJ_DATA.length - cleanData.length;
-  if (badge) badge.textContent = cleanData.length + ' patients' + (filtered > 0 ? ' (' + filtered + ' junk filtered)' : '');
-
-  var statusCounts = {};
-  cleanData.forEach(function(r) {
-    var s = r.status || 'Unknown';
-    statusCounts[s] = (statusCounts[s] || 0) + 1;
-  });
-
-  // Status summary
-  var html = '<div style="display:flex;gap:12px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid #f1f5f9;">';
-  var statusColors2 = {'Scheduled':'#06b6d4','Screen Fail':'#dc2626','open':'#3b82f6','closed':'#94a3b8'};
-  Object.entries(statusCounts).sort(function(a,b){ return b[1]-a[1]; }).forEach(function(entry) {
-    var st = entry[0], ct = entry[1];
-    var clr = statusColors2[st] || '#475569';
-    html += '<div style="text-align:center;min-width:60px;"><div style="font-size:18px;font-weight:800;color:' + clr + ';">' + ct + '</div><div style="font-size:10px;color:#94a3b8;">' + st + '</div></div>';
-  });
-  html += '</div>';
-
-  // Patient table
-  html += '<div style="overflow-x:auto;"><table class="fin-table" style="width:100%;font-size:11px;">';
-  html += '<thead><tr><th style="text-align:left;padding:8px 12px;">Patient</th><th>Status</th><th>Next Visit</th><th>Updated</th></tr></thead>';
-  html += '<tbody>';
-  cleanData.forEach(function(p) {
-    var sc = statusColors2[p.status] || '#475569';
-    html += '<tr>';
-    html += '<td style="padding:7px 12px;font-weight:600;"><a href="' + p.url + '" target="_blank" style="color:#1e293b;text-decoration:none;">' + p.name + '</a></td>';
-    html += '<td><span style="font-size:10px;padding:2px 8px;border-radius:4px;background:' + sc + '22;color:' + sc + ';font-weight:600;">' + p.status + '</span></td>';
-    html += '<td style="font-size:11px;color:#475569;">' + (p.next_visit || '—') + '</td>';
-    html += '<td style="font-size:10px;color:#94a3b8;">' + (p.date_updated || '—') + '</td>';
-    html += '</tr>';
-  });
-  html += '</tbody></table></div>';
-
-  container.innerHTML = html;
+  return;
 }
 
 
@@ -16326,41 +15920,7 @@ function buildPipelineCell(studyName, safeStudy) {
 }
 
 function buildMedRecCell(studyName, safeStudy) {
-  var d = getStudyMedRecords(studyName);
-  // Check records received for upcoming SCREENING visits only
-  var upcoming = (DATA.allVisitDetail||[]).filter(function(v){
-    if (v.study !== studyName) return false;
-    var vl = (v.visit||'').toLowerCase();
-    return /screen|v1\/screen|main screen|v1$|visit\s*1$/i.test(vl);
-  });
-  var schedPatients = [];
-  var _seen = {};
-  upcoming.forEach(function(v) {
-    var key = (v.patient||'').toLowerCase().trim();
-    if (!_seen[key]) { _seen[key] = true; schedPatients.push(key); }
-  });
-  var recvCount = 0, totalSched = schedPatients.length;
-  if (typeof MED_RECORDS_DATA !== 'undefined' && MED_RECORDS_DATA.length > 0 && totalSched > 0) {
-    schedPatients.forEach(function(pName) {
-      var medMatch = MED_RECORDS_DATA.find(function(m){ return m.name.toLowerCase().trim() === pName; });
-      if (medMatch && (medMatch.records_received === 'Yes' || medMatch.status === 'Enrolled' || medMatch.status === 'Complete')) recvCount++;
-    });
-  }
-  // Show records received for upcoming screening patients
-  if (totalSched > 0) {
-    var pct = Math.round(recvCount / totalSched * 100);
-    var color = pct === 100 ? '#059669' : pct >= 50 ? '#d97706' : '#dc2626';
-    return '<div style="cursor:pointer;text-align:center;" onclick="showMedRecDetailModal(\'' + safeStudy + '\')">' +
-      '<div style="font-size:12px;font-weight:700;color:' + color + ';">' + recvCount + '/' + totalSched + '</div>' +
-      '<div style="font-size:9px;color:' + color + ';">' + pct + '% screening</div>' +
-      '</div>';
-  }
-  if (!d) return '<span style="font-size:10px;color:#cbd5e1;">\u2014</span>';
-  var color2 = d.active > 0 ? (d.readySched > 0 ? '#f59e0b' : '#8b5cf6') : (d.enrolled > 0 ? '#059669' : '#94a3b8');
-  return '<div style="cursor:pointer;text-align:center;" onclick="showMedRecDetailModal(\'' + safeStudy + '\')">' +
-    '<div style="font-size:11px;font-weight:700;color:' + color2 + ';">' + d.active + '</div>' +
-    '<div style="font-size:9px;color:#94a3b8;">' + d.total + ' total</div>' +
-    '</div>';
+  return '';
 }
 
 function buildFBLeadCell(studyName) {
@@ -16480,7 +16040,6 @@ function renderStudiesTable() {
       <td style="padding:10px 8px;text-align:center;font-size:11px;color:${sfColor};font-weight:600">${s.screen_fail_pct > 0 ? s.screen_fail_pct+'%' : '—'}</td>
       <td style="padding:10px 8px;text-align:center">${siteTags}</td>
       <td style="padding:10px 8px;text-align:center">${buildPipelineCell(s.study, safeStudy)}</td>
-      <td style="padding:10px 8px;text-align:center">${buildMedRecCell(s.study, safeStudy)}</td>
       <td style="padding:10px 8px;text-align:center">${buildFBLeadCell(s.study)}</td>
       <td style="padding:10px 8px;text-align:center">${buildTotalLeadsCell(s.study, safeStudy)}</td>
     </tr>`;
