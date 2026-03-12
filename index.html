@@ -734,7 +734,8 @@ body {
   <div class="nav-right" style="margin-left:auto;">
     <span class="data-badge" id="data-source-badge" style="display:none;"></span>
     <span class="data-badge" id="last-refresh-badge">Loading live data...</span>
-    <button class="refresh-btn" onclick="refreshData()">↻ Refresh</button>
+    <button id="phi-toggle-btn" onclick="togglePHIMask()" title="Click to reveal patient names" style="padding:4px 10px;background:#059669;color:white;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;letter-spacing:0.3px;">&#x1f512; PHI Masked</button>
+    <button class="refresh-btn" onclick="refreshData()">&#x21bb; Refresh</button>
   </div>
 </nav>
 
@@ -2914,7 +2915,7 @@ let PATIENT_DB = [];           // [{name,status,email,phone,record_number},...]
 let CONTACT_ALERTS = [];       // [{patient,study,alert_type,severity,detail,patient_url,study_url},...]
 
 // ══════════ HELPERS ══════════
-const fmt=v=>'$'+Math.abs(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmt=v=>{const a=Math.abs(v);return a%1===0?'$'+a.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0}):'$'+a.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});};
 const fmtK=v=>'$'+(v/1000).toFixed(0)+'K';
 function pid(s){const m=s.match(/- ([A-Z0-9][A-Za-z0-9\-]+ ?(\(.+?\))?)/);return m?m[1].replace(/ \(.*/,''):null;}
 function slink(s){const p=pid(s);if(p&&CRIO_LINKS[p])return'<a href="'+CRIO_LINKS[p]+'" target="_blank" class="study-link">'+s+'</a>';return s;}
@@ -3422,6 +3423,32 @@ async function verifyPin() {
     document.getElementById('authPinInput').value = '';
     document.getElementById('authPinInput').focus();
   }
+}
+
+// ═══ PHI DE-IDENTIFICATION (HIPAA Minimum Necessary) ═══
+let PHI_MASKED = true; // default: patient names masked
+
+function maskPHI(fullName) {
+  if (!PHI_MASKED) return fullName || '';
+  if (!fullName || typeof fullName !== 'string') return '--';
+  var parts = fullName.trim().split(/\s+/);
+  if (parts.length === 0) return '--';
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase() + '.';
+  return parts[0].charAt(0).toUpperCase() + '.' + parts[parts.length-1].charAt(0).toUpperCase() + '.';
+}
+
+function togglePHIMask() {
+  PHI_MASKED = !PHI_MASKED;
+  var btn = document.getElementById('phi-toggle-btn');
+  if (btn) {
+    btn.innerHTML = PHI_MASKED ? '&#x1f512; PHI Masked' : '&#x1f513; PHI Visible';
+    btn.title = PHI_MASKED ? 'Click to reveal patient names' : 'Click to mask patient names';
+    btn.style.background = PHI_MASKED ? '#059669' : '#dc2626';
+  }
+  // Re-render active views to apply mask/unmask
+  try { if (typeof renderAll === 'function') renderAll(); } catch(e) {}
+  try { if (typeof renderStudiesTable === 'function') renderStudiesTable(); } catch(e) {}
+  try { if (typeof renderReferralDashboard === 'function' && _referralsLoaded) renderReferralDashboard(); } catch(e) {}
 }
 
 let finInitDone = false;
@@ -11564,8 +11591,8 @@ function buildUpcomingDetailTable(rows) {
       ? `<a href="${r.study_url}" target="_blank" rel="noopener" style="text-decoration:none;font-size:11px;color:var(--blue);">${r.study}${extIcon}</a>`
       : `<span style="font-size:11px">${r.study}</span>`;
     const patientCell = r.patient_url
-      ? `<a href="${r.patient_url}" target="_blank" rel="noopener" style="text-decoration:none;color:var(--navy);font-weight:600;">${r.patient}${extIcon}</a>`
-      : `<strong>${r.patient}</strong>`;
+      ? `<a href="${r.patient_url}" target="_blank" rel="noopener" style="text-decoration:none;color:var(--navy);font-weight:600;">${maskPHI(r.patient)}${extIcon}</a>`
+      : `<strong>${maskPHI(r.patient)}</strong>`;
     // Med records context dot
     const isMaintenance = (r.visit||'').toLowerCase().includes('maintenance') || (r.visit||'').toLowerCase().includes('follow');
     let medDot = '';
@@ -11686,7 +11713,7 @@ function showHorizonDetail(type, weekLabel) {
         <th style="padding:8px;text-align:left">Patient</th><th style="padding:8px;text-align:left">Study</th>
         <th style="padding:8px;text-align:left">Reason</th><th style="padding:8px;text-align:left">Date</th>
       </tr></thead><tbody>${rows.map(r => `<tr style="border-bottom:1px solid #f1f5f9">
-        <td style="padding:6px 8px"><a href="${r.url}" target="_blank" style="text-decoration:none;color:var(--navy);font-weight:600">${r.name}${linkIcon}</a></td>
+        <td style="padding:6px 8px"><a href="${r.url}" target="_blank" style="text-decoration:none;color:var(--navy);font-weight:600">${maskPHI(r.name)}${linkIcon}</a></td>
         <td style="padding:6px 8px;font-size:11px">${r.study}</td>
         <td style="padding:6px 8px;font-size:11px;color:var(--muted)">${(r.reason||'').substring(0,50)}</td>
         <td style="padding:6px 8px;font-size:11px">${r.cancel_date}</td>
@@ -11699,7 +11726,7 @@ function showHorizonDetail(type, weekLabel) {
         <th style="padding:8px;text-align:left">Coordinator</th><th style="padding:8px;text-align:left">Investigator</th>
       </tr></thead><tbody>${rows.map(r => `<tr style="border-bottom:1px solid #f1f5f9">
         <td style="padding:6px 8px;font-weight:600;color:var(--blue)">${r.date}</td>
-        <td style="padding:6px 8px"><a href="${r.patient_url}" target="_blank" style="text-decoration:none;color:var(--navy);font-weight:600">${r.patient}${linkIcon}</a></td>
+        <td style="padding:6px 8px"><a href="${r.patient_url}" target="_blank" style="text-decoration:none;color:var(--navy);font-weight:600">${maskPHI(r.patient)}${linkIcon}</a></td>
         <td style="padding:6px 8px;font-size:11px">${r.study}</td>
         <td style="padding:6px 8px;font-size:11px;color:var(--muted)">${r.visit}</td>
         <td style="padding:6px 8px;font-size:11px">${r.coord}</td>
@@ -11819,7 +11846,7 @@ function showInvDetail(invName) {
     </tr></thead><tbody>` +
     upcoming.map(r=>`<tr>
       <td style="font-weight:600;color:#1843ad;white-space:nowrap">${r.date}</td>
-      <td>${extLink(r.patient,r.patient_url)}</td>
+      <td>${patientLink(r.patient,r.patient_url)}</td>
       <td style="font-size:11px">${extLink(r.study,r.study_url)}</td>
       <td style="font-size:11px;color:#64748b">${r.visit}</td>
       <td style="font-size:11px">${r.coord}</td>
@@ -11985,7 +12012,7 @@ function toggleCoordDayDetail(coordName, date, el) {
   if (!visits || visits.length === 0) { detailDiv.style.display = 'none'; return; }
   const dayLabel = new Date(date + 'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
   const rows = visits.map(v => {
-    const pLink = v.url ? `<a href="${v.url}" target="_blank" style="color:#1843AD;text-decoration:none;font-weight:600">${v.patient}</a>` : `<span style="font-weight:600">${v.patient}</span>`;
+    const pLink = v.url ? `<a href="${v.url}" target="_blank" style="color:#1843AD;text-decoration:none;font-weight:600">${maskPHI(v.patient)}</a>` : `<span style="font-weight:600">${maskPHI(v.patient)}</span>`;
     return `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid #F3F4F6">
       ${pLink}<span style="color:#6B7280;font-size:10px;max-width:50%;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${v.study}</span>
     </div>`;
@@ -12016,8 +12043,8 @@ function buildInsights() {
     const daysOut = Math.round((visitDate - today) / 86400000);
     const urgent = daysOut <= 14;
     const pLink = f.patient_url
-      ? `<a href="${f.patient_url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:inherit;font-weight:700;text-decoration:underline;text-decoration-style:dotted;">${f.patient}</a>`
-      : `<strong>${f.patient}</strong>`;
+      ? `<a href="${f.patient_url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:inherit;font-weight:700;text-decoration:underline;text-decoration-style:dotted;">${maskPHI(f.patient)}</a>`
+      : `<strong>${maskPHI(f.patient)}</strong>`;
     const sLink = f.study_url
       ? `<a href="${f.study_url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:inherit;text-decoration:underline;text-decoration-style:dotted;">${f.study}</a>`
       : f.study;
@@ -12101,7 +12128,7 @@ function buildInsights() {
       urgent: readyNV.length >= 3,
       html: `<div class="insight-item ${readyNV.length >= 3 ? 'danger' : 'warning'}"><span class="insight-icon">📅</span><div>
         <div class="insight-title">${readyNV.length} patient${readyNV.length>1?'s':''} ready to schedule but no upcoming visit</div>
-        <div class="insight-desc">${readyNV.slice(0,3).map(r => r.name).join(', ')}${readyNV.length>3 ? ' +' + (readyNV.length-3) + ' more' : ''} — schedule appointments now</div>
+        <div class="insight-desc">${readyNV.slice(0,3).map(r => maskPHI(r.name)).join(', ')}${readyNV.length>3 ? ' +' + (readyNV.length-3) + ' more' : ''} — schedule appointments now</div>
       </div></div>`
     });
   }
@@ -12946,8 +12973,8 @@ function renderContactAlerts() {
     const typeLabel = a.alert_type;
     const typeBg = isRed ? '#dc2626' : '#d97706';
     const pLink = a.patient_url
-      ? `<a href="${a.patient_url}" target="_blank" rel="noopener" style="text-decoration:none;color:#1e293b;font-weight:700;">${a.patient}<svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-left:2px;opacity:0.4;vertical-align:middle"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>`
-      : `<strong style="color:#1e293b">${a.patient}</strong>`;
+      ? `<a href="${a.patient_url}" target="_blank" rel="noopener" style="text-decoration:none;color:#1e293b;font-weight:700;">${maskPHI(a.patient)}<svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-left:2px;opacity:0.4;vertical-align:middle"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>`
+      : `<strong style="color:#1e293b">${maskPHI(a.patient)}</strong>`;
     const studyList = (a.studies||[a.study]).join(', ');
     const contactLine = [];
     if (a.email) contactLine.push(`📧 ${a.email}`);
@@ -13818,7 +13845,8 @@ function buildActionSteps() {
   }
   function pLink(name,url,color){
     color=color||'#072061';
-    return url?`<a href="${url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:${color};font-weight:700;text-decoration:underline;text-decoration-style:dotted;">${name}</a>`:`<strong style="color:${color}">${name}</strong>`;
+    var masked = maskPHI(name);
+    return url?`<a href="${url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:${color};font-weight:700;text-decoration:underline;text-decoration-style:dotted;">${masked}</a>`:`<strong style="color:${color}">${masked}</strong>`;
   }
   function sLink(name,url){
     return url?`<a href="${url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:inherit;font-weight:600;text-decoration:underline;text-decoration-style:dotted;">${name}</a>`:`<span style="font-weight:600">${name}</span>`;
@@ -14264,6 +14292,9 @@ function extLink(text, url, style) {
   style = style || '';
   return url ? `<a href="${url}" target="_blank" rel="noopener" style="color:#1843ad;font-weight:600;text-decoration:none;${style}">${text}${EXT_ICO}</a>` : `<span>${text}</span>`;
 }
+function patientLink(name, url, style) {
+  return extLink(maskPHI(name), url, style);
+}
 function siteBadge(site){
   const pnj = (site||'').includes('Penn');
   return `<span style="font-size:9px;font-weight:700;padding:2px 5px;border-radius:3px;background:${pnj?'#059669':'#072061'}20;color:${pnj?'#059669':'#072061'}">${pnj?'PNJ':'PHL'}</span>`;
@@ -14310,7 +14341,7 @@ function showUpcoming(filterFn, title, sub) {
   </tr></thead><tbody>` +
   rows.map(r=>`<tr>
     <td style="font-weight:600;color:#1843ad;white-space:nowrap">${r.date}</td>
-    <td>${extLink(r.patient,r.patient_url)}</td>
+    <td>${patientLink(r.patient,r.patient_url)}</td>
     <td style="font-size:11px">${extLink(r.study,r.study_url)}</td>
     <td style="font-size:11px;color:#64748b">${r.visit||'—'}</td>
     <td>${statusBadge(r.status)}</td>
@@ -14328,7 +14359,7 @@ function showRiskFlags(title) {
     <th>Patient</th><th>Study</th><th>Cancel Events</th><th>Next Visit</th><th>Last Cancel</th>
   </tr></thead><tbody>` +
   flags.map(f=>`<tr>
-    <td>${extLink(f.patient,f.patient_url,'color:#dc2626;')}</td>
+    <td>${patientLink(f.patient,f.patient_url,'color:#dc2626;')}</td>
     <td>${extLink(f.study,f.study_url)}</td>
     <td style="text-align:center"><span style="background:#fef2f2;color:#dc2626;font-weight:700;padding:2px 8px;border-radius:4px">${f.cancels}×</span></td>
     <td style="font-weight:600;color:#dc2626">${f.next_visit}</td>
@@ -14351,7 +14382,7 @@ function showStudyDetail(studyName, studyUrl) {
     </tr></thead><tbody>` +
     upcoming.map(r=>`<tr>
       <td style="font-weight:600;color:#1843ad">${r.date}</td>
-      <td>${extLink(r.patient,r.patient_url)}</td>
+      <td>${patientLink(r.patient,r.patient_url)}</td>
       <td style="font-size:11px;color:#64748b">${r.visit}</td>
       <td>${statusBadge(r.status)}</td>
       <td style="font-size:11px">${r.coord}</td>
@@ -14401,7 +14432,7 @@ function showStudyUnifiedModal(studyName) {
     body += '<table class="detail-table" style="margin-bottom:12px;"><thead><tr><th>Date</th><th>Patient</th><th>Visit</th><th>Status</th><th>Coordinator</th></tr></thead><tbody>';
     upcoming.slice(0,10).forEach(function(r) {
       body += '<tr><td style="font-weight:600;color:#1843ad">' + r.date + '</td>';
-      body += '<td>' + extLink(r.patient, r.patient_url) + '</td>';
+      body += '<td>' + patientLink(r.patient, r.patient_url) + '</td>';
       body += '<td style="font-size:11px;color:#64748b">' + r.visit + '</td>';
       body += '<td>' + statusBadge(r.status) + '</td>';
       body += '<td style="font-size:11px">' + r.coord + '</td></tr>';
@@ -14572,7 +14603,7 @@ function showCoordDetail(coordName) {
     </tr></thead><tbody>` +
     upcoming.map(r=>`<tr>
       <td style="font-weight:600;color:#1843ad;white-space:nowrap">${r.date}</td>
-      <td>${extLink(r.patient,r.patient_url)}</td>
+      <td>${patientLink(r.patient,r.patient_url)}</td>
       <td style="font-size:11px">${extLink(r.study,r.study_url)}</td>
       <td style="font-size:11px;color:#64748b">${r.visit}</td>
       <td>${statusBadge(r.status)}</td>
@@ -15266,7 +15297,7 @@ function showCampaignDetailModal(studyName) {
     upcoming.slice(0, 20).forEach(v => {
       html += `<tr>
         <td style="padding:5px 8px;font-weight:600;color:#1843ad;">${v.date}</td>
-        <td style="padding:5px 8px;"><a href="${v.patient_url}" target="_blank" style="color:#1e293b;text-decoration:none;font-weight:600;">${v.patient}</a></td>
+        <td style="padding:5px 8px;"><a href="${v.patient_url}" target="_blank" style="color:#1e293b;text-decoration:none;font-weight:600;">${maskPHI(v.patient)}</a></td>
         <td style="padding:5px 8px;font-size:10px;color:#475569;">${v.visit}</td>
         <td style="padding:5px 8px;font-size:10px;">${v.status}</td>
         <td style="padding:5px 8px;font-size:10px;color:#475569;">${v.coord}</td>
