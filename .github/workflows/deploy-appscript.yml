@@ -42,4 +42,4 @@ jobs:
         run: clasp push --force
 
       - name: Update web app deployment
-        run: clasp deploy -i AKfycbzS_oGaTWaXlfhWHAaQR5QE5nxw8Gm9sx4Q7pjZXoBMPGqWybUDKjFK7GB2ya9h96-f -d "Auto-deploy from commit ${{ github.sha }}"
+        run: clasp deploy -i AKfycbw1xcyJDv4f2BIaGoFxLgRM86RvWffMyW4QKPbTk8PPEd73cWP8zr9njDooGlNLtWoP -d "Auto-deploy from commit ${{ github.sha }}"

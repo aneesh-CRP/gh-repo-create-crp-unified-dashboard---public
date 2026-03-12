@@ -24,15 +24,24 @@ function doGet(e) {
 
 /**
  * Returns a specific chunk of the dashboard JavaScript.
- * JS is split into multiple chunks (<200KB each) to stay under
- * google.script.run's return value size limit (~256KB).
- * Called from client-side async loader to reassemble and execute.
+ * JS chunks are stored as string constants in DashboardJS_N.gs files,
+ * bypassing HtmlService entirely (which corrupts JS containing HTML patterns).
+ * Each chunk is <200KB, safely under google.script.run's ~256KB return limit.
  */
 function getDashboardJSChunk(index) {
-  var filename = 'DashboardJS_' + index;
-  var html = HtmlService.createHtmlOutputFromFile(filename).getContent();
-  // Strip the <script> wrapper added by the build script
-  return html.replace(/^<script>\n?/, '').replace(/\n?<\/script>$/, '');
+  // _JS_CHUNK_N variables are defined in DashboardJS_N.gs files
+  var chunks = [
+    typeof _JS_CHUNK_0 !== 'undefined' ? _JS_CHUNK_0 : null,
+    typeof _JS_CHUNK_1 !== 'undefined' ? _JS_CHUNK_1 : null,
+    typeof _JS_CHUNK_2 !== 'undefined' ? _JS_CHUNK_2 : null,
+    typeof _JS_CHUNK_3 !== 'undefined' ? _JS_CHUNK_3 : null,
+    typeof _JS_CHUNK_4 !== 'undefined' ? _JS_CHUNK_4 : null,
+    typeof _JS_CHUNK_5 !== 'undefined' ? _JS_CHUNK_5 : null
+  ];
+  if (index < 0 || index >= chunks.length || chunks[index] === null) {
+    throw new Error('JS chunk ' + index + ' not found');
+  }
+  return chunks[index];
 }
 
 /**
