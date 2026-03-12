@@ -41,5 +41,5 @@ jobs:
       - name: Push to Apps Script
         run: clasp push --force
 
-      - name: Deploy new version
-        run: clasp deploy -d "Auto-deploy from commit ${{ github.sha }}"
+      - name: Update web app deployment
+        run: clasp deploy -i AKfycbzS_oGaTWaXlfhWHAaQR5QE5nxw8Gm9sx4Q7pjZXoBMPGqWybUDKjFK7GB2ya9h96-f -d "Auto-deploy from commit ${{ github.sha }}"
