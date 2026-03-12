@@ -24,6 +24,9 @@ jobs:
           cp index.html _site/
           cp dashboard.js _site/
           cp coord-history.json _site/
+          cp fallback-data.json _site/
+          cp sw.js _site/
+          [ -f styles.css ] && cp styles.css _site/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: '_site'

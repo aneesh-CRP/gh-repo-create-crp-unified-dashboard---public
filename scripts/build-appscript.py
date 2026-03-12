@@ -6,6 +6,10 @@ Splits the large index.html into:
   - Dashboard.html: HTML/CSS shell with async JS chunk loader
   - DashboardJS_0.gs, DashboardJS_1.gs, ...: JS chunks as string constants in .gs files
   - dashboard.js: full extracted JS for GitHub Pages
+  - styles.css: extracted CSS for external stylesheet
+
+Uses BUILD marker comments (<!-- BUILD:JS_START -->, <!-- BUILD:JS_END -->,
+<!-- BUILD:CSS_START -->, <!-- BUILD:CSS_END -->) instead of line-number heuristics.
 
 The .gs approach stores JS as escaped string variables, avoiding HtmlService
 processing entirely (which corrupts JS content containing HTML-like patterns).
@@ -22,6 +26,7 @@ import glob
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 INDEX = os.path.join(ROOT, 'index.html')
 JS_OUT = os.path.join(ROOT, 'dashboard.js')
+CSS_OUT = os.path.join(ROOT, 'styles.css')
 APPSCRIPT_DIR = os.path.join(ROOT, 'appscript')
 DASH_OUT = os.path.join(APPSCRIPT_DIR, 'Dashboard.html')
 
@@ -30,17 +35,41 @@ CHUNK_MAX = 180000  # ~180KB per chunk, safely under 256KB limit
 with open(INDEX, 'r') as f:
     lines = f.readlines()
 
-# Find the main script block (the big one after the HTML body, not the CDN imports)
-main_script_start = None
-main_script_end = None
+# ── Find marker comments ──
+def find_marker(lines, marker):
+    for i, line in enumerate(lines):
+        if marker in line:
+            return i
+    return None
 
-for i, line in enumerate(lines):
-    if '<script>' in line and i > 2000:
-        if main_script_start is None:
+js_start_marker = find_marker(lines, '<!-- BUILD:JS_START -->')
+js_end_marker = find_marker(lines, '<!-- BUILD:JS_END -->')
+css_start_marker = find_marker(lines, '<!-- BUILD:CSS_START -->')
+css_end_marker = find_marker(lines, '<!-- BUILD:CSS_END -->')
+
+# Fallback: use legacy heuristic if markers not found
+if js_start_marker is not None and js_end_marker is not None:
+    # Find <script> tag after JS_START marker
+    main_script_start = None
+    main_script_end = None
+    for i in range(js_start_marker, js_end_marker + 1):
+        if '<script>' in lines[i] and main_script_start is None:
             main_script_start = i
-    if '</script>' in line and i > 2000 and main_script_start is not None:
-        main_script_end = i
-        break
+        if '</script>' in lines[i] and main_script_start is not None:
+            main_script_end = i
+            break
+    print(f"Using BUILD:JS markers (lines {js_start_marker+1}-{js_end_marker+1})")
+else:
+    print("BUILD:JS markers not found, falling back to line-number heuristic")
+    main_script_start = None
+    main_script_end = None
+    for i, line in enumerate(lines):
+        if '<script>' in line and i > 2000:
+            if main_script_start is None:
+                main_script_start = i
+        if '</script>' in line and i > 2000 and main_script_start is not None:
+            main_script_end = i
+            break
 
 if main_script_start is None or main_script_end is None:
     print("ERROR: Could not find main script block", file=sys.stderr)
@@ -52,6 +81,23 @@ js_content = ''.join(lines[main_script_start + 1 : main_script_end])
 # Write dashboard.js for GitHub Pages (unminified)
 with open(JS_OUT, 'w') as f:
     f.write(js_content)
+
+# ── Extract CSS to styles.css ──
+if css_start_marker is not None and css_end_marker is not None:
+    css_content = ''
+    in_style = False
+    for line in lines[css_start_marker:css_end_marker+1]:
+        if '<style>' in line:
+            in_style = True
+            continue
+        if '</style>' in line:
+            in_style = False
+            continue
+        if in_style:
+            css_content += line
+    with open(CSS_OUT, 'w') as f:
+        f.write(css_content)
+    print(f"  styles.css:       {len(css_content):,} bytes (extracted CSS)")
 
 # ── Minify JS ──
 def minify_js(js_text):
