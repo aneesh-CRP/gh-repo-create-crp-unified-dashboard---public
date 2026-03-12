@@ -1246,7 +1246,10 @@ body {
     <div style="padding:16px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
         <div style="font-size:14px;font-weight:700;color:var(--navy)">Coordinator Visit Snapshot</div>
-        <div style="font-size:11px;color:var(--muted)" id="coord-week-label">This Week</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <button onclick="exportCoordHistory()" title="Export coordinator history as JSON" style="background:none;border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:11px;color:var(--muted);cursor:pointer">&#x2B07; Export</button>
+          <div style="font-size:11px;color:var(--muted)" id="coord-week-label">This Week</div>
+        </div>
       </div>
       <div id="coordGoalsGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px"></div>
       <div style="margin-top:16px">
@@ -11937,6 +11940,7 @@ function localISO(d) {
  * and never overwritten with a lower value (handles partial data loads).
  */
 var COORD_SNAPSHOT_KEY = 'crp_coord_snapshot_v1';
+var COORD_FILE_HISTORY = {};  // loaded from coord-history.json
 
 function loadCoordSnapshot() {
   try {
@@ -11947,6 +11951,75 @@ function loadCoordSnapshot() {
 
 function saveCoordSnapshot(snapshot) {
   try { localStorage.setItem(COORD_SNAPSHOT_KEY, JSON.stringify(snapshot)); } catch(e) {}
+}
+
+/**
+ * Fetch coord-history.json (permanent historical record in the repo).
+ * Runs once on load. Data is merged into COORD_FILE_HISTORY global.
+ */
+function fetchCoordHistory() {
+  var url = (window.location.protocol === 'file:' ? '' : '') + 'coord-history.json?t=' + Date.now();
+  return fetch(url).then(function(r) {
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.json();
+  }).then(function(json) {
+    COORD_FILE_HISTORY = (json && json.data) ? json.data : {};
+    console.log('[CoordHistory] Loaded ' + Object.keys(COORD_FILE_HISTORY).length + ' coordinators from file');
+  }).catch(function(e) {
+    console.warn('[CoordHistory] Could not load coord-history.json:', e.message);
+    COORD_FILE_HISTORY = {};
+  });
+}
+
+/**
+ * Export current coordinator history as a downloadable JSON file.
+ * The user can then commit this file to the repo to update the permanent record.
+ */
+function exportCoordHistory() {
+  var snapshot = loadCoordSnapshot();
+  var COORDS = CRP_CONFIG.COORDINATORS || [];
+  var today = localISO(new Date());
+
+  // Merge: file history + localStorage snapshot + live data → combined
+  var combined = {};
+  COORDS.forEach(function(name) {
+    combined[name] = {};
+    // Layer 1: file history baseline
+    var fileData = COORD_FILE_HISTORY[name] || {};
+    Object.keys(fileData).forEach(function(d) {
+      if (d <= today) combined[name][d] = fileData[d];
+    });
+    // Layer 2: localStorage snapshot
+    var snapData = snapshot[name] || {};
+    Object.keys(snapData).forEach(function(d) {
+      if (d <= today) combined[name][d] = Math.max(combined[name][d] || 0, snapData[d]);
+    });
+    // Layer 3: live data
+    var goals = computeCoordGoals();
+    var liveData = (goals.byDay && goals.byDay[name]) ? goals.byDay[name] : {};
+    Object.keys(liveData).forEach(function(d) {
+      if (d <= today && liveData[d] > 0) {
+        combined[name][d] = Math.max(combined[name][d] || 0, liveData[d]);
+      }
+    });
+    // Sort keys chronologically
+    var sorted = {};
+    Object.keys(combined[name]).sort().forEach(function(d) { sorted[d] = combined[name][d]; });
+    combined[name] = sorted;
+  });
+
+  var output = {
+    description: 'Coordinator visit history — persistent record updated periodically',
+    lastUpdated: today,
+    data: combined
+  };
+
+  var blob = new Blob([JSON.stringify(output, null, 2)], { type: 'application/json' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'coord-history.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 /**
@@ -11969,7 +12042,17 @@ function mergeCoordGoalsWithSnapshot(goals) {
     });
   });
 
-  // Merge: snapshot ← max(snapshot, live) for each coord+date
+  // Layer 1: Start with file-based history (coord-history.json) as baseline
+  COORDS.forEach(function(name) {
+    if (!snapshot[name]) snapshot[name] = {};
+    var fileData = COORD_FILE_HISTORY[name] || {};
+    Object.keys(fileData).forEach(function(d) {
+      if (d < cutoffISO) return; // skip very old entries
+      snapshot[name][d] = Math.max(snapshot[name][d] || 0, fileData[d] || 0);
+    });
+  });
+
+  // Layer 2: Merge live data on top (keep higher count)
   COORDS.forEach(function(name) {
     if (!snapshot[name]) snapshot[name] = {};
     var liveByDay = (goals.byDay && goals.byDay[name]) ? goals.byDay[name] : {};
@@ -16243,6 +16326,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const badge = document.getElementById('last-refresh-badge');
     const srcBadge = document.getElementById('data-source-badge');
     showHealthStrip();
+
+    // Fire-and-forget: load coordinator history baseline (fast, non-blocking)
+    fetchCoordHistory();
 
     // ── Phase 1: CRIO data (most critical — drives Overview, Studies, Schedule, Actions) ──
     console.log('CRP: Phase 1 — loading CRIO data...');
