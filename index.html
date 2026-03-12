@@ -3479,6 +3479,43 @@ function maskStaticPHI() {
   });
 }
 
+// Backfill investigator names from DATA.allVisitDetail into pre-rendered Schedule table
+function backfillInvestigators() {
+  var tbody = document.getElementById('upcoming-tbody');
+  if (!tbody || !DATA || !DATA.allVisitDetail || !DATA.allVisitDetail.length) return;
+  // Build lookup: "date|study" -> investigator
+  var invMap = {};
+  DATA.allVisitDetail.forEach(function(v) {
+    if (!v.investigator) return;
+    var key = (v.date||'') + '|' + (v.study||'');
+    invMap[key] = v.investigator;
+    // Also map by patient for more precise matching
+    var key2 = (v.date||'') + '|' + (v.patient||'').toLowerCase().trim();
+    invMap[key2] = v.investigator;
+  });
+  var rows = tbody.querySelectorAll('tr');
+  rows.forEach(function(row) {
+    if (row.cells.length < 7) return;
+    var dateCell = row.cells[0], studyCell = row.cells[1], patientCell = row.cells[3], invCell = row.cells[6];
+    // Only backfill if cell is empty or shows —
+    if (invCell.textContent.trim() !== '—' && invCell.textContent.trim() !== '') return;
+    var dateText = (dateCell.textContent||'').trim();
+    var studyText = (studyCell.textContent||'').trim();
+    // Get original patient name (may be masked)
+    var patientText = patientCell.dataset && patientCell.dataset.phiOriginal ? patientCell.dataset.phiOriginal : '';
+    if (!patientText) {
+      var link = patientCell.querySelector('a');
+      patientText = link ? (link.dataset.phiOriginal || link.textContent) : patientCell.textContent;
+    }
+    var inv = invMap[dateText + '|' + studyText] || invMap[dateText + '|' + (patientText||'').toLowerCase().trim()];
+    if (inv) {
+      invCell.textContent = inv;
+      invCell.style.color = '#7c3aed';
+      invCell.style.fontSize = '11px';
+    }
+  });
+}
+
 function togglePHIMask() {
   PHI_MASKED = !PHI_MASKED;
   var btn = document.getElementById('phi-toggle-btn');
@@ -14260,6 +14297,7 @@ function renderAll() {
   safe(buildSchedStudyBars,      'buildSchedStudyBars');
   safe(buildSchedCoordList,      'buildSchedCoordList');
   safe(() => filterSchedTable('all', null), 'buildUpcomingDetailTable');
+  safe(backfillInvestigators, 'backfillInvestigators');
 }
 
 function closeSetup() {
