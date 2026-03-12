@@ -16623,6 +16623,15 @@ document.addEventListener('DOMContentLoaded', () => {
         if (typeof renderStudiesTable === 'function') try { renderStudiesTable(); } catch(e) {}
       }).catch(e => { console.warn('CRP: Facebook CRM initial load failed:', e); setHealthChip('dh-fbcrm','fail','FB CRM (failed)'); });
     }, 1500);
+
+    // ── Phase 4: ClickUp Referral data (if token exists) — populates Overview KPIs ──
+    var _cuToken = typeof getClickUpToken === 'function' ? getClickUpToken() : '';
+    if (_cuToken && !_referralsLoaded) {
+      setTimeout(() => {
+        console.log('CRP: Phase 4 — auto-loading ClickUp referrals (token detected)...');
+        try { initReferrals(); } catch(e) { console.warn('CRP: Auto-init referrals failed:', e); }
+      }, 3000);
+    }
   }
 
   // Kick off staggered loading
