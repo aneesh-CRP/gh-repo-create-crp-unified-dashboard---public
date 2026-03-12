@@ -12129,9 +12129,10 @@ function buildInsights() {
         <div>
           <div class="insight-title">${thisWeek.length} visits scheduled this week (${uniqueThisWeek.length} patients)</div>
           <div class="insight-desc">Confirm attendance — ${uniqueThisWeek.slice(0, 15).map(d => {
+            var label = PHI_MASKED ? maskPHI(d.patient) : d.patient.split(' ')[0];
             return d.patient_url
-              ? `<a href="${d.patient_url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:inherit;text-decoration:underline;text-decoration-style:dotted;">${d.patient.split(' ')[0]}</a>`
-              : d.patient.split(' ')[0];
+              ? `<a href="${d.patient_url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:inherit;text-decoration:underline;text-decoration-style:dotted;">${label}</a>`
+              : label;
           }).join(', ')}${uniqueThisWeek.length > 15 ? ' +' + (uniqueThisWeek.length - 15) + ' more' : ''}</div>
         </div>
       </div>`
