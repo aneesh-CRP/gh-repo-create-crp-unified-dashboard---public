@@ -3437,6 +3437,62 @@ function maskPHI(fullName) {
   return parts[0].charAt(0).toUpperCase() + '.' + parts[parts.length-1].charAt(0).toUpperCase() + '.';
 }
 
+/**
+ * Mask/unmask patient names in pre-rendered (static) HTML tables.
+ * Stores original name in data-phi-original, replaces visible text with initials.
+ * Targets: Schedule upcoming visits (col 4), cancellation horizon tables,
+ * and any table cell with data-phi="patient".
+ */
+function maskStaticPHI() {
+  // Schedule: upcoming-tbody patient column (index 3 = 4th column)
+  var tables = [
+    { tbody: 'upcoming-tbody', col: 3 }
+  ];
+  tables.forEach(function(t) {
+    var tbody = document.getElementById(t.tbody);
+    if (!tbody) return;
+    var rows = tbody.querySelectorAll('tr');
+    rows.forEach(function(row) {
+      var cell = row.cells[t.col];
+      if (!cell) return;
+      // Find the <a> tag or use cell directly
+      var link = cell.querySelector('a');
+      var target = link || cell;
+      // Store original name on first call
+      if (!target.dataset.phiOriginal) {
+        // Extract just the text (not SVG)
+        var txt = '';
+        target.childNodes.forEach(function(n) { if (n.nodeType === 3) txt += n.textContent; });
+        target.dataset.phiOriginal = txt.trim();
+      }
+      var orig = target.dataset.phiOriginal;
+      if (PHI_MASKED) {
+        // Replace text nodes with masked version
+        var masked = maskPHI(orig);
+        target.childNodes.forEach(function(n) { if (n.nodeType === 3) n.textContent = ''; });
+        if (target.firstChild && target.firstChild.nodeType === 3) {
+          target.firstChild.textContent = masked;
+        } else {
+          target.insertBefore(document.createTextNode(masked), target.firstChild);
+        }
+      } else {
+        // Restore original
+        target.childNodes.forEach(function(n) { if (n.nodeType === 3) n.textContent = ''; });
+        if (target.firstChild && target.firstChild.nodeType === 3) {
+          target.firstChild.textContent = orig;
+        } else {
+          target.insertBefore(document.createTextNode(orig), target.firstChild);
+        }
+      }
+    });
+  });
+  // Also handle any element with data-phi="patient"
+  document.querySelectorAll('[data-phi="patient"]').forEach(function(el) {
+    if (!el.dataset.phiOriginal) el.dataset.phiOriginal = el.textContent.trim();
+    el.textContent = PHI_MASKED ? maskPHI(el.dataset.phiOriginal) : el.dataset.phiOriginal;
+  });
+}
+
 function togglePHIMask() {
   PHI_MASKED = !PHI_MASKED;
   var btn = document.getElementById('phi-toggle-btn');
@@ -3445,10 +3501,12 @@ function togglePHIMask() {
     btn.title = PHI_MASKED ? 'Click to reveal patient names' : 'Click to mask patient names';
     btn.style.background = PHI_MASKED ? '#059669' : '#dc2626';
   }
-  // Re-render active views to apply mask/unmask
+  // Re-render dynamic views
   try { if (typeof renderAll === 'function') renderAll(); } catch(e) {}
   try { if (typeof renderStudiesTable === 'function') renderStudiesTable(); } catch(e) {}
   try { if (typeof renderReferralDashboard === 'function' && _referralsLoaded) renderReferralDashboard(); } catch(e) {}
+  // Mask/unmask pre-rendered static tables
+  try { maskStaticPHI(); } catch(e) { console.warn('maskStaticPHI:', e); }
 }
 
 let finInitDone = false;
@@ -16636,6 +16694,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Kick off staggered loading
   loadAllData();
+
+  // Apply PHI masking to pre-rendered static tables on page load
+  if (PHI_MASKED && typeof maskStaticPHI === 'function') {
+    setTimeout(() => { try { maskStaticPHI(); } catch(e) {} }, 100);
+  }
 
   // Self-heal: if insights are still empty after render, retry once
   setTimeout(() => {
