@@ -34,11 +34,11 @@ if [ ! -f "$APPSCRIPT_DIR/.clasp.json" ]; then
     exit 1
 fi
 
-# Sync index.html → Dashboard.html
+# Build Dashboard.html (split JS to external file for size limits)
 echo ""
-echo "📄 Copying index.html → appscript/Dashboard.html"
-cp "$SCRIPT_DIR/index.html" "$APPSCRIPT_DIR/Dashboard.html"
-echo "   ✓ Dashboard.html updated ($(wc -l < "$APPSCRIPT_DIR/Dashboard.html") lines)"
+echo "📄 Building appscript/Dashboard.html (HTML shell + external JS)..."
+python3 "$SCRIPT_DIR/scripts/build-appscript.py"
+echo "   ✓ Dashboard.html updated ($(wc -c < "$APPSCRIPT_DIR/Dashboard.html") bytes)"
 
 # Push to Apps Script
 echo ""
