@@ -1,5 +1,5 @@
 {
-  "date": "2026-03-11",
+  "date": "2026-03-12",
   "performance": {
     "active_studies": 0
   },
@@ -11,6 +11,7 @@
     "Google Sheets CSV endpoints blocked by network egress proxy (403 Forbidden)",
     "WebFetch tool: docs.google.com blocked by EGRESS_BLOCKED policy",
     "Chrome browser MCP tools: all calls timed out after 60s",
-    "Google Drive API: no matching spreadsheets found (account mismatch)"
+    "Google Drive API: no matching spreadsheets found (account mismatch)",
+    "Local .gsheet files: resource deadlock (Google Drive stream files unreadable in VM)"
   ]
 }
