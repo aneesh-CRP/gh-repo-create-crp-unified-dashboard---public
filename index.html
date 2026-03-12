@@ -11289,8 +11289,10 @@ function chartDefaults() {
 }
 
 function mkChart(id, config) {
+  var el = document.getElementById(id);
+  if (!el) return;
   if (charts[id]) charts[id].destroy();
-  charts[id] = new Chart(document.getElementById(id), config);
+  charts[id] = new Chart(el, config);
 }
 
 function buildCancelTrend() {
@@ -11502,6 +11504,7 @@ function buildRiskFlagCards() {
 
 function buildWeeklyBySiteChart() {
   const d = DATA.weeklyBySite || [];
+  if (!document.getElementById('weeklyBySiteChart')) return;
   mkChart('weeklyBySiteChart', {
     type: 'bar',
     data: {
