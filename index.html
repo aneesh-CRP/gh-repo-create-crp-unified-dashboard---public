@@ -14051,11 +14051,38 @@ async function refreshData() {
 // ═══════════════════════════════════════════════════
 // RENDER ALL
 // ═══════════════════════════════════════════════════
+// ── Dismissed actions persistence ──
+var DISMISSED_ACTIONS_KEY = 'crp_dismissed_actions_v1';
+
+function loadDismissedActions() {
+  try { return JSON.parse(localStorage.getItem(DISMISSED_ACTIONS_KEY) || '{}'); } catch(e) { return {}; }
+}
+function saveDismissedActions(map) {
+  try { localStorage.setItem(DISMISSED_ACTIONS_KEY, JSON.stringify(map)); } catch(e) {}
+}
+function dismissAction(actionId, reason) {
+  var map = loadDismissedActions();
+  map[actionId] = { reason: reason || 'dismissed', date: localISO(new Date()) };
+  // Auto-prune entries older than 60 days
+  var cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 60);
+  var cutISO = localISO(cutoff);
+  Object.keys(map).forEach(function(k) { if (map[k].date < cutISO) delete map[k]; });
+  saveDismissedActions(map);
+  buildActionSteps(); // re-render
+}
+function undismissAction(actionId) {
+  var map = loadDismissedActions();
+  delete map[actionId];
+  saveDismissedActions(map);
+  buildActionSteps();
+}
+
 function buildActionSteps() {
   const el     = document.getElementById('action-steps');
   const dormEl = document.getElementById('dormant-list');
   if (!el) return;
 
+  const dismissed = loadDismissedActions();
   const flags  = DATA.riskFlags || [];
   const ad     = DATA.actionDetails || {};
   const today  = new Date('2026-03-07'); today.setHours(0,0,0,0);
@@ -14125,7 +14152,7 @@ function buildActionSteps() {
   flags.filter(f=>daysUntil(f.next_visit)<=14).forEach(f=>{
     const d=daysUntil(f.next_visit);
     const urgency=d===0?'🔴 TODAY':d===1?'🔴 TOMORROW':`🔴 in ${d} days`;
-    steps.push({pri:1,icon:'📞',tag:'URGENT CALL',tagBg:'#fef2f2',tagColor:'#dc2626',
+    steps.push({pri:1,id:'urgent-'+(f.patient||'').replace(/\s+/g,'-').toLowerCase(),icon:'📞',tag:'URGENT CALL',tagBg:'#fef2f2',tagColor:'#dc2626',
       title:`Call ${pLink(f.patient,f.patient_url,'#dc2626')} — next visit ${f.next_visit} <strong style="color:#dc2626">${urgency}</strong>`,
       body:`<div style="display:flex;gap:8px;align-items:center;margin-top:4px;flex-wrap:wrap;">
         ${sLink(f.study,f.study_url)}
@@ -14139,7 +14166,7 @@ function buildActionSteps() {
   // ═══ 2. UNDOCUMENTED ════════════════════════════════
   const undoc=ad.undocumented||[];
   if(undoc.length>0){
-    steps.push({pri:2,icon:'📝',tag:'DOCUMENTATION REQUIRED',tagBg:'#fef3c7',tagColor:'#92400e',
+    steps.push({pri:2,id:'undoc-'+undoc.length,icon:'📝',tag:'DOCUMENTATION REQUIRED',tagBg:'#fef3c7',tagColor:'#92400e',
       title:`${undoc.length} cancellations missing a reason — CRIO records incomplete`,
       body:`<div style="margin-top:8px;">${undocTable(undoc)}</div>`,
       action:'Each coordinator must log into CRIO and add the cancellation reason for their patients above. Undocumented visits skew all reporting and risk scoring.'
@@ -14150,7 +14177,7 @@ function buildActionSteps() {
   const pu=ad.protocol_updates||{};
   Object.entries(pu).forEach(([study,v])=>{
     const pts=v.patients||[];
-    steps.push({pri:3,icon:'📋',tag:'PRE-SCREENER UPDATE',tagBg:'#fef3c7',tagColor:'#b45309',
+    steps.push({pri:3,id:'prescr-'+study.replace(/\s+/g,'-').toLowerCase(),icon:'📋',tag:'PRE-SCREENER UPDATE',tagBg:'#fef3c7',tagColor:'#b45309',
       title:`Protocol criteria changed · ${sLink(study,v.study_url)}`,
       body:`<div style="padding:8px 10px;background:#fef3c7;border-radius:6px;border-left:3px solid #f59e0b;font-size:11px;margin:6px 0;">
         ➤ Revise pre-screening script to reflect updated inclusion/exclusion criteria before booking new patients
@@ -14178,7 +14205,7 @@ function buildActionSteps() {
     if(subs.includes('condition'))     fixes.push('Add targeted medical history questions for this study\'s key exclusion conditions');
     if(subs.includes('generic'))       fixes.push('Review full eligibility checklist — multiple DNQs suggest a pre-screening gap');
     const fixHTML=fixes.length?`<div style="padding:8px 10px;background:#fff7ed;border-radius:6px;border-left:3px solid #f97316;font-size:11px;line-height:1.9;margin:6px 0;">${fixes.map(f=>'➤ '+f).join('<br>')}</div>`:'';
-    steps.push({pri:4,icon:'🔍',tag:'SCREEN FAIL',tagBg:'#fff7ed',tagColor:'#c2410c',
+    steps.push({pri:4,id:'sf-'+study.replace(/\s+/g,'-').toLowerCase(),icon:'🔍',tag:'SCREEN FAIL',tagBg:'#fff7ed',tagColor:'#c2410c',
       title:`${allPts.length} screen fail${allPts.length>1?'s':''} · ${sLink(study,data.url)}`,
       body:fixHTML+`<div style="margin-top:4px;">${allPts.map(p=>patRow(p,true)).join('')}</div>`,
       action:''
@@ -14187,7 +14214,7 @@ function buildActionSteps() {
 
   // ═══ 5. RESCHEDULE PROMISES ═════════════════════════
   const rp=ad.open_reschedule_promises||[];
-  if(rp.length>0) steps.push({pri:5,icon:'📅',tag:'FOLLOW UP',tagBg:'#eff6ff',tagColor:'#1843ad',
+  if(rp.length>0) steps.push({pri:5,id:'followup-'+rp.length,icon:'📅',tag:'FOLLOW UP',tagBg:'#eff6ff',tagColor:'#1843ad',
     title:`${rp.length} patient${rp.length>1?'s':''} said they'd call back — no confirmed date yet`,
     body:`<div style="margin-top:6px;">${rp.map(p=>patRow(p,true)).join('')}</div>`,
     action:'Do not wait for them to call. Reach out today — patients who say they\'ll call back rarely do without a prompt.'
@@ -14195,7 +14222,7 @@ function buildActionSteps() {
 
   // ═══ 6. UNREACHABLE ═════════════════════════════════
   const nsu=ad.no_show_unreachable||[];
-  if(nsu.length>0) steps.push({pri:6,icon:'🔇',tag:'UNREACHABLE',tagBg:'#fef2f2',tagColor:'#dc2626',
+  if(nsu.length>0) steps.push({pri:6,id:'unreach-'+nsu.length,icon:'🔇',tag:'UNREACHABLE',tagBg:'#fef2f2',tagColor:'#dc2626',
     title:`${nsu.length} patient${nsu.length>1?'s':''} — voicemail full or no response to multiple attempts`,
     body:`<div style="margin-top:6px;">${nsu.map(p=>patRow(p,true)).join('')}</div>`,
     action:'Try one alternate contact method (email, alternate number). If still no response in 5 business days: document as Lost to Follow-Up in CRIO and remove from active pipeline.'
@@ -14205,14 +14232,14 @@ function buildActionSteps() {
   const ns=(ad.reschedule_needed||[]);
   const nsWithUpcoming=ns.filter(p=>p.still_upcoming);
   const nsNoUpcoming=ns.filter(p=>!p.still_upcoming);
-  if(nsWithUpcoming.length>0) steps.push({pri:7,icon:'📱',tag:'NO SHOW — UPCOMING VISIT',tagBg:'#fdf4ff',tagColor:'#7e22ce',
+  if(nsWithUpcoming.length>0) steps.push({pri:7,id:'ns-upcoming-'+nsWithUpcoming.length,icon:'📱',tag:'NO SHOW — UPCOMING VISIT',tagBg:'#fdf4ff',tagColor:'#7e22ce',
     title:`${nsWithUpcoming.length} patients no-showed but still have visits on the books`,
     body:`<div style="padding:6px 10px;background:#fdf4ff;border-radius:6px;border-left:3px solid #a855f7;font-size:11px;margin:6px 0;">
       ⚠️ These patients did not show — but future visits are still scheduled. Confirm attendance now or reschedule.
     </div><div style="margin-top:4px;">${nsWithUpcoming.map(p=>patRow(p,true)).join('')}</div>`,
     action:'Text + call each patient today. Confirm the upcoming visit explicitly. Log all contact attempts in CRIO.'
   });
-  if(nsNoUpcoming.length>0) steps.push({pri:8,icon:'📋',tag:'NO SHOW — RESCHEDULE',tagBg:'#f5f3ff','tagColor':'#5b21b6',
+  if(nsNoUpcoming.length>0) steps.push({pri:8,id:'ns-resched-'+nsNoUpcoming.length,icon:'📋',tag:'NO SHOW — RESCHEDULE',tagBg:'#f5f3ff','tagColor':'#5b21b6',
     title:`${nsNoUpcoming.length} no-shows with no future visit scheduled`,
     body:`<div style="margin-top:6px;">${nsNoUpcoming.slice(0,6).map(p=>patRow(p,true)).join('')}${nsNoUpcoming.length>6?`<div style="padding:4px 0;color:#94a3b8;font-size:11px;">+${nsNoUpcoming.length-6} more</div>`:''}</div>`,
     action:'Reach out to reschedule. If no response in 5 days: document as LTF.'
@@ -14224,7 +14251,7 @@ function buildActionSteps() {
     const action=p.sub==='privacy'?'Patient concerned about releasing medical records — call to clarify what is actually needed. Often resolvable.'
       :p.sub==='compensation'?'Patient withdrew over compensation — review how it is communicated during consent. May be a realistic expectation mismatch.'
       :'Follow up to understand the barrier and attempt recovery.';
-    steps.push({pri:9,icon:'💬',tag:'RETENTION CALL',tagBg:'#f0fdf4',tagColor:'#15803d',
+    steps.push({pri:9,id:'retain-'+(p.name||'').replace(/\s+/g,'-').toLowerCase(),icon:'💬',tag:'RETENTION CALL',tagBg:'#f0fdf4',tagColor:'#15803d',
       title:`Recovery call · ${pLink(p.name,p.url)} · ${sLink(p.study,p.study_url)}`,
       body:`<div style="margin-top:4px;">${patRow(p,true)}</div>`,action
     });
@@ -14232,7 +14259,7 @@ function buildActionSteps() {
 
   // ═══ 9. PROACTIVE (risk flags >14d) ═════════════════
   flags.filter(f=>daysUntil(f.next_visit)>14).forEach(f=>{
-    steps.push({pri:10,icon:'⚠️',tag:'PROACTIVE OUTREACH',tagBg:'#fffbeb',tagColor:'#d97706',
+    steps.push({pri:10,id:'proactive-'+(f.patient||'').replace(/\s+/g,'-').toLowerCase(),icon:'⚠️',tag:'PROACTIVE OUTREACH',tagBg:'#fffbeb',tagColor:'#d97706',
       title:`Pre-call ${pLink(f.patient,f.patient_url)} — ${f.cancels}× cancelled, next visit ${f.next_visit} (${daysUntil(f.next_visit)} days)`,
       body:`${sLink(f.study,f.study_url)}`,
       action:"Don't wait for another no-show. Call now — confirm intent, ask about barriers, lock in the date."
@@ -14241,7 +14268,7 @@ function buildActionSteps() {
 
   // ═══ 10. ADMIN FIXES ════════════════════════════════
   const ae=ad.admin_fixes||[];
-  if(ae.length>0) steps.push({pri:11,icon:'🛠',tag:'ADMIN FIX',tagBg:'#f8fafc',tagColor:'#475569',
+  if(ae.length>0) steps.push({pri:11,id:'admin-'+ae.length,icon:'🛠',tag:'ADMIN FIX',tagBg:'#f8fafc',tagColor:'#475569',
     title:`${ae.length} scheduling error${ae.length>1?'s':''} — correct in CRIO`,
     body:`<div style="margin-top:6px;">${ae.map(p=>patRow(p,true)).join('')}</div>`,
     action:'Entries logged in error, wrong study, or duplicate records. Fix now to keep downstream reporting clean.'
@@ -14249,7 +14276,7 @@ function buildActionSteps() {
 
   // ═══ 11. CLOSE RECORDS ══════════════════════════════
   const wf=ad.withdrew_final||[];
-  if(wf.length>0) steps.push({pri:12,icon:'📁',tag:'CLOSE RECORDS',tagBg:'#f8fafc',tagColor:'#64748b',
+  if(wf.length>0) steps.push({pri:12,id:'close-'+wf.length,icon:'📁',tag:'CLOSE RECORDS',tagBg:'#f8fafc',tagColor:'#64748b',
     title:`${wf.length} final withdrawal${wf.length>1?'s':''} — ensure CRIO updated`,
     body:`<div style="margin-top:6px;">${wf.map(p=>patRow(p,true)).join('')}</div>`,
     action:'Update subject status to Withdrawn in CRIO. Add withdrawal reason if missing. Remove from active pipeline and close any future visits.'
