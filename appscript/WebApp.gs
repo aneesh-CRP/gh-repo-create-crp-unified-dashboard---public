@@ -12,7 +12,9 @@ function doGet(e) {
   var html = HtmlService.createHtmlOutputFromFile('Dashboard')
     .setTitle('CRP · Unified Intelligence Dashboard')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+    .setWidth(1600)
+    .setHeight(10000);
   return html;
 }
 
