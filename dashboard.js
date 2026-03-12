@@ -13837,7 +13837,7 @@ function switchAdmin(section, btn) {
   }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+function _crpInit() {
   renderAll();
   // Set schedule KPIs immediately
   const d = SAMPLE;
@@ -14110,4 +14110,12 @@ document.addEventListener('DOMContentLoaded', () => {
       setTimeout(autoRefreshAll, 1000);
     }
   });
-});
+}
+
+// Run init immediately if DOM is already loaded (Apps Script async chunk injection),
+// otherwise wait for DOMContentLoaded (GitHub Pages normal load)
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', _crpInit);
+} else {
+  _crpInit();
+}
