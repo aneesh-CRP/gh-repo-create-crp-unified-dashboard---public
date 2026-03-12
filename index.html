@@ -14284,12 +14284,23 @@ function buildActionSteps() {
 
   // ── Render ──
   steps.sort((a,b)=>a.pri-b.pri);
-  el.innerHTML=steps.map(s=>`
-    <div style="display:flex;gap:14px;padding:20px 0;border-bottom:1px solid #f1f5f9;align-items:flex-start;">
+
+  // Split into active vs dismissed
+  var activeSteps = steps.filter(s => !dismissed[s.id]);
+  var dismissedSteps = steps.filter(s => dismissed[s.id]);
+
+  var dismissBtnStyle = 'background:none;border:1px solid #e2e8f0;border-radius:5px;padding:3px 10px;font-size:10px;cursor:pointer;color:#94a3b8;transition:all .15s;';
+
+  el.innerHTML = activeSteps.map(s=>`
+    <div style="display:flex;gap:14px;padding:20px 0;border-bottom:1px solid #f1f5f9;align-items:flex-start;" id="action-${s.id}">
       <div style="font-size:22px;flex-shrink:0;width:32px;text-align:center;padding-top:2px;">${s.icon}</div>
       <div style="flex:1;min-width:0;">
-        <div style="margin-bottom:7px;">
+        <div style="margin-bottom:7px;display:flex;justify-content:space-between;align-items:center;">
           <span style="font-size:10px;font-weight:800;letter-spacing:.5px;padding:3px 10px;border-radius:4px;background:${s.tagBg};color:${s.tagColor};">${s.tag}</span>
+          <div style="display:flex;gap:6px;flex-shrink:0;">
+            <button onclick="dismissAction('${s.id}','done')" style="${dismissBtnStyle}" onmouseover="this.style.borderColor='#16a34a';this.style.color='#16a34a'" onmouseout="this.style.borderColor='#e2e8f0';this.style.color='#94a3b8'" title="Mark as done">&#x2713; Done</button>
+            <button onclick="dismissAction('${s.id}','skip')" style="${dismissBtnStyle}" onmouseover="this.style.borderColor='#94a3b8';this.style.color='#64748b'" onmouseout="this.style.borderColor='#e2e8f0';this.style.color='#94a3b8'" title="Dismiss / not applicable">&#x2715; Skip</button>
+          </div>
         </div>
         <div style="font-size:13px;font-weight:700;color:#1e293b;margin-bottom:6px;line-height:1.4;">${s.title}</div>
         <div style="font-size:12px;color:#475569;line-height:1.5;">${s.body}</div>
@@ -14297,6 +14308,25 @@ function buildActionSteps() {
           <strong style="color:#475569;">What to do:</strong> ${s.action}</div>`:''}
       </div>
     </div>`).join('');
+
+  // Show dismissed count with undo option
+  if (dismissedSteps.length > 0) {
+    el.innerHTML += `<div style="padding:16px 0;text-align:center;">
+      <button onclick="document.getElementById('dismissed-actions-list').style.display=document.getElementById('dismissed-actions-list').style.display==='none'?'block':'none'" style="background:none;border:none;font-size:12px;color:#94a3b8;cursor:pointer;text-decoration:underline;text-decoration-style:dotted;">
+        ${dismissedSteps.length} cleared action${dismissedSteps.length>1?'s':''} — click to show
+      </button>
+      <div id="dismissed-actions-list" style="display:none;margin-top:12px;text-align:left;">
+        ${dismissedSteps.map(s=>`<div style="display:flex;gap:10px;padding:10px 0;border-bottom:1px solid #f8fafc;align-items:center;opacity:0.5;">
+          <span style="font-size:16px;width:24px;text-align:center;">${s.icon}</span>
+          <div style="flex:1;min-width:0;">
+            <span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:3px;background:${s.tagBg};color:${s.tagColor};">${s.tag}</span>
+            <span style="font-size:12px;color:#94a3b8;margin-left:6px;text-decoration:line-through;">${s.title.replace(/<[^>]*>/g,'').substring(0,80)}</span>
+          </div>
+          <button onclick="undismissAction('${s.id}')" style="background:none;border:1px solid #e2e8f0;border-radius:4px;padding:2px 8px;font-size:10px;color:#94a3b8;cursor:pointer;" title="Restore this action">Undo</button>
+        </div>`).join('')}
+      </div>
+    </div>`;
+  }
 
   // ── Dormant ──
   if(dormEl){
