@@ -11925,45 +11925,114 @@ function showInvDetail(invName) {
   openModal(invName, upcoming.length + ' upcoming visits', body);
 }
 
-// ══════════ COORDINATOR DAILY GOALS ══════════
+// ══════════ COORDINATOR VISIT TRACKER ══════════
 /** Convert a Date to local YYYY-MM-DD (avoids UTC shift from toISOString) */
 function localISO(d) {
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
 }
 
+/**
+ * Persist coordinator visit counts to localStorage so past days survive
+ * after the CRIO feed drops them. Each day's count is snapshotted once
+ * and never overwritten with a lower value (handles partial data loads).
+ */
+var COORD_SNAPSHOT_KEY = 'crp_coord_snapshot_v1';
+
+function loadCoordSnapshot() {
+  try {
+    var raw = localStorage.getItem(COORD_SNAPSHOT_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch(e) { return {}; }
+}
+
+function saveCoordSnapshot(snapshot) {
+  try { localStorage.setItem(COORD_SNAPSHOT_KEY, JSON.stringify(snapshot)); } catch(e) {}
+}
+
+/**
+ * Merge live coordinator goals data with persisted snapshot.
+ * For each coordinator+date: keep the HIGHER count (handles partial loads).
+ * Returns merged goals object and saves snapshot.
+ */
+function mergeCoordGoalsWithSnapshot(goals) {
+  var snapshot = loadCoordSnapshot();
+  var COORDS = CRP_CONFIG.COORDINATORS || [];
+  var now = new Date();
+  var monthStart = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-01';
+
+  // Prune snapshot entries older than 45 days
+  var cutoff = new Date(now); cutoff.setDate(cutoff.getDate() - 45);
+  var cutoffISO = localISO(cutoff);
+  Object.keys(snapshot).forEach(function(name) {
+    Object.keys(snapshot[name] || {}).forEach(function(d) {
+      if (d < cutoffISO) delete snapshot[name][d];
+    });
+  });
+
+  // Merge: snapshot ← max(snapshot, live) for each coord+date
+  COORDS.forEach(function(name) {
+    if (!snapshot[name]) snapshot[name] = {};
+    var liveByDay = (goals.byDay && goals.byDay[name]) ? goals.byDay[name] : {};
+    Object.keys(liveByDay).forEach(function(d) {
+      var liveCount = liveByDay[d] || 0;
+      var snapCount = snapshot[name][d] || 0;
+      snapshot[name][d] = Math.max(liveCount, snapCount);
+    });
+    // Write merged snapshot back into goals.byDay
+    if (!goals.byDay) goals.byDay = {};
+    if (!goals.byDay[name]) goals.byDay[name] = {};
+    Object.keys(snapshot[name]).forEach(function(d) {
+      if (!goals.byDay[name][d] || snapshot[name][d] > goals.byDay[name][d]) {
+        goals.byDay[name][d] = snapshot[name][d];
+      }
+    });
+    // Recompute monthly total from merged byDay
+    var monthTotal = 0;
+    Object.keys(goals.byDay[name]).forEach(function(d) {
+      if (d >= monthStart && d <= monthStart.substring(0,7) + '-31') {
+        monthTotal += goals.byDay[name][d];
+      }
+    });
+    goals.byMonth[name] = monthTotal;
+  });
+
+  saveCoordSnapshot(snapshot);
+  return goals;
+}
+
 function computeCoordGoals() {
   // Compute from allVisitDetail if coordGoals not pre-computed
-  // Only counts weekday (Mon-Fri) visits toward goals
-  const COORDS = CRP_CONFIG.COORDINATORS || [];
-  const COORD_LOWER = COORDS.map(c => c.toLowerCase());
-  const goals = { byDay: {}, byMonth: {} };
-  COORDS.forEach(c => { goals.byDay[c] = {}; goals.byMonth[c] = 0; });
-  const seen = new Set();
-  const visits = DATA.allVisitDetail || [];
-  const now = new Date();
-  const mm = String(now.getMonth()+1).padStart(2,'0');
-  const yy = now.getFullYear();
-  visits.forEach(r => {
-    const rawName = r.coord || '';
-    const date = r.date_iso || '';
-    const patient = r.patient || '';
-    // Skip weekend visits (Sat=6, Sun=0)
-    const dayOfWeek = new Date(date + 'T12:00:00').getDay();
+  var COORDS = CRP_CONFIG.COORDINATORS || [];
+  var COORD_LOWER = COORDS.map(function(c) { return c.toLowerCase(); });
+  var goals = { byDay: {}, byMonth: {} };
+  COORDS.forEach(function(c) { goals.byDay[c] = {}; goals.byMonth[c] = 0; });
+  var seen = new Set();
+  var visits = DATA.allVisitDetail || [];
+  var now = new Date();
+  var mm = String(now.getMonth()+1).padStart(2,'0');
+  var yy = now.getFullYear();
+  visits.forEach(function(r) {
+    var rawName = r.coord || '';
+    var date = r.date_iso || '';
+    var patient = r.patient || '';
+    var dayOfWeek = new Date(date + 'T12:00:00').getDay();
     if (dayOfWeek === 0 || dayOfWeek === 6) return;
-    const idx = COORD_LOWER.indexOf(rawName.toLowerCase());
+    var idx = COORD_LOWER.indexOf(rawName.toLowerCase());
     if (idx === -1) return;
-    const name = COORDS[idx];
-    const key = name + '|' + date + '|' + patient;
+    var name = COORDS[idx];
+    var key = name + '|' + date + '|' + patient;
     if (seen.has(key)) return;
     seen.add(key);
     goals.byDay[name][date] = (goals.byDay[name][date]||0) + 1;
-    if (date >= `${yy}-${mm}-01` && date <= `${yy}-${mm}-31`) goals.byMonth[name]++;
+    if (date >= yy+'-'+mm+'-01' && date <= yy+'-'+mm+'-31') goals.byMonth[name]++;
   });
   return goals;
 }
 
 function renderCoordinatorGoals() {
-  const goals = DATA.coordGoals || computeCoordGoals();
+  var goals = DATA.coordGoals || computeCoordGoals();
+  // Merge with localStorage snapshot so past days are preserved
+  goals = mergeCoordGoalsWithSnapshot(goals);
   if (!goals) return;
   const COORDS = CRP_CONFIG.COORDINATORS || [];
   const DAILY_GOAL = CRP_CONFIG.COORD_DAILY_GOAL || 2;
