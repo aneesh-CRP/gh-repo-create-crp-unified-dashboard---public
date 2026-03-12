@@ -9137,7 +9137,7 @@ function buildStatusLegend() {
 function schedFilter(btn, filter) {
   document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
-  const today = new Date('2026-03-07');
+  const today = new Date(); today.setHours(0,0,0,0);
   const rows = document.querySelectorAll('#upcoming-tbody .vis-row');
   let shown = 0;
   rows.forEach(row => {
@@ -11089,7 +11089,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
       b[k] = (b[k]||0) + 1;
     });
     return Object.entries(b).map(([week,count])=>({week,count}))
-      .sort((a,b) => new Date('2026 '+a.week) - new Date('2026 '+b.week));
+      .sort((a,b) => new Date(new Date().getFullYear()+' '+a.week) - new Date(new Date().getFullYear()+' '+b.week));
   }
 
   function groupBy(rows, field) {
@@ -11224,7 +11224,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
         patient_url: up.patient_url || meta.patient_url,
         study_url:   up.study_url   || meta.study_url,
         cancels: c, next_visit: up.date_str, last_cancel: meta.last_cancel||'' };
-    }).sort((a,b) => new Date('2026 '+a.next_visit) - new Date('2026 '+b.next_visit));
+    }).sort((a,b) => new Date(new Date().getFullYear()+' '+a.next_visit) - new Date(new Date().getFullYear()+' '+b.next_visit));
 
   // ── coordinators ──
   const coordMap2 = {};
@@ -11605,7 +11605,7 @@ function buildActionSteps() {
   const dismissed = loadDismissedActions();
   const flags  = DATA.riskFlags || [];
   const ad     = DATA.actionDetails || {};
-  const today  = new Date('2026-03-07'); today.setHours(0,0,0,0);
+  const today  = new Date(); today.setHours(0,0,0,0);
 
   function daysUntil(dateStr) {
     const m={Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
