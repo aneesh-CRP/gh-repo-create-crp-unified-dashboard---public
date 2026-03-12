@@ -6816,19 +6816,19 @@ function toggleDarkMode() {
       }).join('');
     }
     searchResults.style.display = 'block';
-
-    // Click handler for results
-    searchResults.querySelectorAll('.search-result-item').forEach(function(item) {
-      item.addEventListener('mousedown', function(e) {
-        e.preventDefault();
-        var tab = item.getAttribute('data-tab');
-        var tabEl = document.querySelector(".nav-tab[onclick*='" + tab + "']");
-        switchTab(tab, tabEl || null);
-        searchResults.style.display = 'none';
-        searchInput.value = '';
-      });
-    });
   }
+
+  // Event delegation: single listener handles all result clicks
+  searchResults.addEventListener('mousedown', function(e) {
+    var item = e.target.closest('.search-result-item');
+    if (!item) return;
+    e.preventDefault();
+    var tab = item.getAttribute('data-tab');
+    var tabEl = document.querySelector(".nav-tab[onclick*='" + tab + "']");
+    switchTab(tab, tabEl || null);
+    searchResults.style.display = 'none';
+    searchInput.value = '';
+  });
 })();
 
 // ═══ EXPORT FUNCTIONS ═══
@@ -6895,7 +6895,11 @@ function _updateFreshnessBadge() {
   else if (mins < 15) { badge.style.color = '#d97706'; }
   else { badge.style.color = '#dc2626'; }
 }
-setInterval(_updateFreshnessBadge, 60000);
+var _freshnessIntervalId = setInterval(_updateFreshnessBadge, 60000);
+document.addEventListener('visibilitychange', function() {
+  if (document.hidden) { clearInterval(_freshnessIntervalId); }
+  else { _freshnessIntervalId = setInterval(_updateFreshnessBadge, 60000); _updateFreshnessBadge(); }
+});
 
 // ═══ DEEP-LINK: HASHCHANGE LISTENER ═══
 window.addEventListener('hashchange', function() {
@@ -7193,6 +7197,7 @@ async function _crpInit() {
 
   // Start auto-refresh cycle (only if REFRESH_INTERVAL > 0)
   if (AUTO_REFRESH_MS > 0) {
+    if (_autoRefreshId) clearInterval(_autoRefreshId);
     _autoRefreshId = setInterval(autoRefreshAll, AUTO_REFRESH_MS);
     console.log(`CRP: Auto-refresh enabled — every ${AUTO_REFRESH_MS / 60000} minutes`);
   } else {
