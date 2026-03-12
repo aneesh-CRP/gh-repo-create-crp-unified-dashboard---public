@@ -210,7 +210,7 @@ body {
   border-bottom: 1px solid var(--border);
   padding: 0 16px;
   display: flex; align-items: center; gap: 5px;
-  height: 50px;
+  min-height: 50px; height: auto;
   position: sticky; top: 0; z-index: 100;
   box-shadow: 0 1px 3px rgba(0,0,0,0.05);
 }
@@ -220,7 +220,7 @@ body {
 .nav-logo { width:32px; height:32px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
 .nav-title { font-size: 14px; font-weight: 700; color: var(--text); }
 .nav-sub { font-size: 11px; color: var(--muted); }
-.nav-right { display: flex; align-items: center; gap: 10px; }
+.nav-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .nav-tab {
   padding: 5px 10px; border-radius: 6px; font-size: 12px; font-weight: 500;
   cursor: pointer; color: var(--muted); transition: all 0.15s;
@@ -546,7 +546,6 @@ body {
 }
 @media (max-width: 800px) {
   .grid-2, .grid-3 { grid-template-columns: 1fr; }
-  .nav-tab { display: none; }
 }
 
 /* Sortable tables */
@@ -859,7 +858,7 @@ body {
   </div>
   <div class="nav-right" style="margin-left:auto;">
     <div id="search-container" style="position:relative;">
-      <input type="text" id="global-search" placeholder="Search patients, studies..." autocomplete="off" style="padding:4px 10px;border:1px solid var(--border);border-radius:6px;font-size:11px;width:180px;background:var(--surface);color:var(--text);">
+      <input type="text" id="global-search" placeholder="Search..." autocomplete="off" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:11px;width:130px;background:var(--surface);color:var(--text);">
       <div id="search-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:6px;margin-top:4px;max-height:300px;overflow-y:auto;z-index:1000;box-shadow:0 4px 12px rgba(0,0,0,0.15);font-size:12px;"></div>
     </div>
     <span class="data-badge" id="data-source-badge" style="display:none;"></span>
