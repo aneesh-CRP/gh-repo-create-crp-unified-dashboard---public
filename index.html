@@ -12545,12 +12545,36 @@ function filterTable(filter, btn) {
 // ═══════════════════════════════════════════════════
 // GOOGLE SHEETS INTEGRATION
 // ═══════════════════════════════════════════════════
+
+// Detect Apps Script environment (google.script.run available)
+var IS_APPS_SCRIPT = (typeof google !== 'undefined' && google.script && google.script.run);
+
+/**
+ * Fetch text from a URL. In Apps Script, uses server-side proxy to bypass
+ * iframe CSP restrictions. On GitHub Pages, uses native fetch.
+ */
+async function fetchText(url) {
+  if (IS_APPS_SCRIPT) {
+    return new Promise(function(resolve, reject) {
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.error) reject(new Error(result.error));
+          else if (result.status !== 200) reject(new Error('HTTP ' + result.status));
+          else resolve(result.text);
+        })
+        .withFailureHandler(function(err) { reject(err); })
+        .proxyFetch(url);
+    });
+  } else {
+    const bustUrl = url + (url.includes('?') ? '&' : '?') + '_cb=' + Date.now();
+    const resp = await fetch(bustUrl, { cache: 'no-store' });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status + ' fetching: ' + url.slice(0, 80));
+    return resp.text();
+  }
+}
+
 async function fetchCSV(url) {
-  // Cache-bust: append timestamp to prevent stale CDN/browser cache
-  const bustUrl = url + (url.includes('?') ? '&' : '?') + '_cb=' + Date.now();
-  const resp = await fetch(bustUrl, { cache: 'no-store' });
-  if (!resp.ok) throw new Error('HTTP ' + resp.status + ' fetching: ' + url.slice(0, 80));
-  const text = await resp.text();
+  const text = await fetchText(url);
   // Guard: Google Sheets sometimes returns an HTML error/captcha page with 200 status
   const trimmed = text.trimStart();
   if (trimmed.startsWith('<!') || trimmed.startsWith('<html') || trimmed.startsWith('<HTML')) {
@@ -12586,9 +12610,7 @@ function parseCSV(text) {
 // ═══════════════════════════════════════════════════
 async function fetchFinanceTab(pubKey, gid) {
   const url = `https://docs.google.com/spreadsheets/d/e/${pubKey}/pub?gid=${gid}&single=true&output=csv&_cb=${Date.now()}`;
-  const resp = await fetch(url, { cache: 'no-store' });
-  if (!resp.ok) throw new Error('Failed to fetch finance tab gid=' + gid);
-  const text = await resp.text();
+  const text = await fetchText(url);
   // Guard: reject HTML error pages from Google Sheets rate-limiting
   const trimmed = text.trimStart();
   if (trimmed.startsWith('<!') || trimmed.startsWith('<html') || trimmed.startsWith('<HTML')) {
@@ -15747,8 +15769,7 @@ async function fetchFacebookCRM() {
   if (!url) return;
   try {
     // Fetch raw CSV text (may not have headers)
-    const resp = await fetch(url);
-    const text = await resp.text();
+    const text = await fetchText(url);
     const lines = text.split('\n').filter(l => l.trim());
 
     // Detect if first row is headers or data

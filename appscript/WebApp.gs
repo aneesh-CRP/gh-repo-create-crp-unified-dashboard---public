@@ -19,6 +19,36 @@ function doGet(e) {
 }
 
 /**
+ * Server-side URL fetch proxy.
+ * Called from client-side via google.script.run to bypass iframe CSP restrictions.
+ * Fetches a URL using UrlFetchApp and returns the text content.
+ */
+function proxyFetch(url) {
+  try {
+    var response = UrlFetchApp.fetch(url, {
+      muteHttpExceptions: true,
+      followRedirects: true
+    });
+    return {
+      status: response.getResponseCode(),
+      text: response.getContentText()
+    };
+  } catch (e) {
+    return { status: 0, text: '', error: e.message };
+  }
+}
+
+/**
+ * Batch fetch multiple URLs at once (reduces round-trips).
+ * Returns an array of {status, text} in the same order as input URLs.
+ */
+function proxyFetchBatch(urls) {
+  return urls.map(function(url) {
+    return proxyFetch(url);
+  });
+}
+
+/**
  * Returns the email of the currently authenticated user.
  * Can be called from client-side JS via google.script.run
  * to display who is logged in or for audit logging.
