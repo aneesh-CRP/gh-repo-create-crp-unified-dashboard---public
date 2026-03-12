@@ -17005,5 +17005,22 @@ document.addEventListener('DOMContentLoaded', () => {
   </div>
 </div>
 
+<!-- Apps Script iframe auto-resize: when served via HtmlService, the outer
+     iframe defaults to a tiny height. This detects the Apps Script environment
+     and continuously resizes the iframe to match the document height. -->
+<script>
+(function() {
+  if (typeof google !== 'undefined' && google.script && google.script.host) {
+    function resizeFrame() {
+      var h = document.documentElement.scrollHeight || document.body.scrollHeight;
+      google.script.host.setHeight(h + 40);
+    }
+    // Resize on load, after data renders, and on window resize
+    window.addEventListener('load', function() { setTimeout(resizeFrame, 500); });
+    window.addEventListener('resize', resizeFrame);
+    setInterval(resizeFrame, 2000);
+  }
+})();
+</script>
 </body>
 </html>
