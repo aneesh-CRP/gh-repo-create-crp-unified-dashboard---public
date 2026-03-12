@@ -3,12 +3,13 @@
 Build Apps Script files from index.html.
 
 Splits the large index.html into:
-  - Dashboard.html: HTML/CSS shell with async JS loader (~240KB, under HtmlService limit)
-  - DashboardJS.html: <script> block stored as Apps Script file, loaded via google.script.run
-  - dashboard.js: extracted JS for GitHub Pages <script src> usage
+  - Dashboard.html: HTML/CSS shell with async JS chunk loader (~240KB)
+  - DashboardJS_0.html, DashboardJS_1.html, ...: JS chunks (<200KB each)
+  - dashboard.js: full extracted JS for GitHub Pages
 
-The async loading pattern avoids Apps Script's HtmlService output size limit (~500KB)
-by keeping Dashboard.html small and loading the JS separately via google.script.run.
+The async chunk-loading pattern avoids:
+  1. HtmlService output size limit (~500KB) — Dashboard.html is only the HTML shell
+  2. google.script.run return value limit (~256KB) — JS split into <200KB chunks
 """
 
 import sys
@@ -20,7 +21,8 @@ INDEX = os.path.join(ROOT, 'index.html')
 JS_OUT = os.path.join(ROOT, 'dashboard.js')
 APPSCRIPT_DIR = os.path.join(ROOT, 'appscript')
 DASH_OUT = os.path.join(APPSCRIPT_DIR, 'Dashboard.html')
-DASHJS_OUT = os.path.join(APPSCRIPT_DIR, 'DashboardJS.html')
+
+CHUNK_MAX = 180000  # ~180KB per chunk, safely under 256KB limit
 
 with open(INDEX, 'r') as f:
     lines = f.readlines()
@@ -41,20 +43,19 @@ if main_script_start is None or main_script_end is None:
     print("ERROR: Could not find main script block", file=sys.stderr)
     sys.exit(1)
 
-# Extract JS content (no <script> tags) for GitHub Pages dashboard.js
+# Extract JS content (no <script> tags)
 js_content = ''.join(lines[main_script_start + 1 : main_script_end])
 
-# Write dashboard.js for GitHub Pages
+# Write dashboard.js for GitHub Pages (unminified)
 with open(JS_OUT, 'w') as f:
     f.write(js_content)
 
-# ── Minify JS for Apps Script (strip comments, blank lines, leading whitespace) ──
+# ── Minify JS ──
 def minify_js(js_text):
     """Basic JS minification: strip comments, collapse whitespace, remove blank lines."""
     out_lines = []
     in_block_comment = False
     for line in js_text.split('\n'):
-        # Handle block comments
         if in_block_comment:
             if '*/' in line:
                 in_block_comment = False
@@ -65,9 +66,7 @@ def minify_js(js_text):
                 continue
 
         if '/*' in line and '*/' not in line:
-            # Check it's not inside a string
             before = line[:line.index('/*')]
-            # Simple heuristic: if quotes are balanced before /*, it's a real comment
             if before.count("'") % 2 == 0 and before.count('"') % 2 == 0:
                 line = before
                 in_block_comment = True
@@ -75,66 +74,103 @@ def minify_js(js_text):
                     continue
 
         stripped = line.strip()
-
-        # Skip blank lines
         if not stripped:
             continue
-
-        # Skip full-line single-line comments
         if stripped.startswith('//'):
             continue
 
-        # Remove trailing single-line comments (but not URLs like http://)
-        # Only strip if // is preceded by whitespace or certain chars, not inside strings
-        result = stripped
-        out_lines.append(result)
+        out_lines.append(stripped)
 
     return '\n'.join(out_lines)
 
 minified_js = minify_js(js_content)
 
-# Write DashboardJS.html for Apps Script — just the raw JS, NO <script> tags
-# (it will be injected via eval() on the client side)
-with open(DASHJS_OUT, 'w') as f:
-    f.write(minified_js)
+# ── Split JS into chunks at line boundaries ──
+chunks = []
+current_chunk = []
+current_size = 0
+
+for line in minified_js.split('\n'):
+    line_size = len(line) + 1  # +1 for newline
+    if current_size + line_size > CHUNK_MAX and current_chunk:
+        chunks.append('\n'.join(current_chunk))
+        current_chunk = []
+        current_size = 0
+    current_chunk.append(line)
+    current_size += line_size
+
+if current_chunk:
+    chunks.append('\n'.join(current_chunk))
+
+num_chunks = len(chunks)
+print(f"Split minified JS ({len(minified_js):,} bytes) into {num_chunks} chunks:")
+
+# Clean up old chunk files
+import glob
+for old_file in glob.glob(os.path.join(APPSCRIPT_DIR, 'DashboardJS*.html')):
+    os.remove(old_file)
+
+# Write chunk files
+for i, chunk in enumerate(chunks):
+    chunk_path = os.path.join(APPSCRIPT_DIR, f'DashboardJS_{i}.html')
+    with open(chunk_path, 'w') as f:
+        f.write(chunk)
+    print(f"  DashboardJS_{i}.html: {len(chunk):,} bytes")
 
 # ── Build Dashboard.html ──
-# HTML before the main script block
 html_before = ''.join(lines[:main_script_start])
-# HTML after the main script block (includes the iframe resize script etc.)
 html_after = ''.join(lines[main_script_end + 1:])
 
-# Replace the main script block with an async loader that fetches JS via google.script.run
-async_loader = """<script>
-(function() {
-  // Show loading indicator
-  var loadEl = document.getElementById('loading-overlay');
-  if (loadEl) loadEl.style.display = 'flex';
+# Async loader that fetches JS chunks via google.script.run and concatenates them
+async_loader = f"""<script>
+(function() {{
+  var NUM_CHUNKS = {num_chunks};
+  var loadedChunks = new Array(NUM_CHUNKS);
+  var loadedCount = 0;
+  var hadError = false;
 
-  console.log('[AppScript] Loading dashboard JS asynchronously via google.script.run...');
+  console.log('[AppScript] Loading dashboard JS in ' + NUM_CHUNKS + ' chunks...');
 
-  google.script.run
-    .withSuccessHandler(function(jsHtml) {
-      console.log('[AppScript] Received JS payload: ' + (jsHtml ? jsHtml.length : 0) + ' chars');
-      try {
-        // The payload is raw JS text — execute it
-        var scriptEl = document.createElement('script');
-        scriptEl.textContent = jsHtml;
-        document.body.appendChild(scriptEl);
-        console.log('[AppScript] Dashboard JS loaded and executed successfully');
-      } catch (e) {
-        console.error('[AppScript] Error executing JS:', e);
-        document.body.innerHTML = '<div style="padding:40px;color:red;font-size:18px">'
-          + 'Error loading dashboard: ' + e.message + '</div>';
-      }
-    })
-    .withFailureHandler(function(err) {
-      console.error('[AppScript] Failed to load JS:', err);
+  function onAllLoaded() {{
+    var fullJS = loadedChunks.join('\\n');
+    console.log('[AppScript] All chunks loaded, total: ' + fullJS.length + ' chars. Executing...');
+    try {{
+      var scriptEl = document.createElement('script');
+      scriptEl.textContent = fullJS;
+      document.body.appendChild(scriptEl);
+      console.log('[AppScript] Dashboard JS executed successfully');
+    }} catch (e) {{
+      console.error('[AppScript] Error executing JS:', e);
       document.body.innerHTML = '<div style="padding:40px;color:red;font-size:18px">'
-        + 'Failed to load dashboard JavaScript: ' + (err.message || err) + '</div>';
-    })
-    .getDashboardJS();
-})();
+        + 'Error loading dashboard: ' + e.message + '</div>';
+    }}
+  }}
+
+  function loadChunk(index) {{
+    google.script.run
+      .withSuccessHandler(function(content) {{
+        if (hadError) return;
+        loadedChunks[index] = content;
+        loadedCount++;
+        console.log('[AppScript] Chunk ' + index + '/' + NUM_CHUNKS + ' loaded (' + (content ? content.length : 0) + ' chars)');
+        if (loadedCount === NUM_CHUNKS) {{
+          onAllLoaded();
+        }}
+      }})
+      .withFailureHandler(function(err) {{
+        hadError = true;
+        console.error('[AppScript] Failed to load chunk ' + index + ':', err);
+        document.body.innerHTML = '<div style="padding:40px;color:red;font-size:18px">'
+          + 'Failed to load dashboard JS chunk ' + index + ': ' + (err.message || err) + '</div>';
+      }})
+      .getDashboardJSChunk(index);
+  }}
+
+  // Load all chunks in parallel
+  for (var i = 0; i < NUM_CHUNKS; i++) {{
+    loadChunk(i);
+  }}
+}})();
 </script>
 """
 
@@ -143,8 +179,7 @@ appscript_html = html_before + async_loader + html_after
 with open(DASH_OUT, 'w') as f:
     f.write(appscript_html)
 
-print(f"Built for Apps Script (async loading pattern):")
-print(f"  Dashboard.html:   {len(appscript_html):,} bytes (HTML shell + async loader)")
-print(f"  DashboardJS.html: {len(minified_js):,} bytes (minified JS, loaded via google.script.run)")
+print(f"\nBuilt for Apps Script (async chunk-loading):")
+print(f"  Dashboard.html:   {len(appscript_html):,} bytes (HTML shell + chunk loader)")
 print(f"  dashboard.js:     {len(js_content):,} bytes (GitHub Pages, unminified)")
 print(f"  Main script: lines {main_script_start + 1}-{main_script_end + 1}")

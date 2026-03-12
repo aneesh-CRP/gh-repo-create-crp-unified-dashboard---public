@@ -23,12 +23,14 @@ function doGet(e) {
 }
 
 /**
- * Returns the dashboard JavaScript as a string.
- * Called from client-side via google.script.run to load JS asynchronously,
- * keeping the initial HTML payload under HtmlService size limits.
+ * Returns a specific chunk of the dashboard JavaScript.
+ * JS is split into multiple chunks (<200KB each) to stay under
+ * google.script.run's return value size limit (~256KB).
+ * Called from client-side async loader to reassemble and execute.
  */
-function getDashboardJS() {
-  return HtmlService.createHtmlOutputFromFile('DashboardJS').getContent();
+function getDashboardJSChunk(index) {
+  var filename = 'DashboardJS_' + index;
+  return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }
 
 /**

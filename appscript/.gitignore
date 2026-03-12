@@ -3,4 +3,4 @@
 
 # Don't commit generated files (built from index.html by build-appscript.py)
 Dashboard.html
-DashboardJS.html
+DashboardJS*.html
