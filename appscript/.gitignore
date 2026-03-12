@@ -1,5 +1,6 @@
 # Don't commit the actual clasp config (contains script ID)
 .clasp.json
 
-# Don't commit the synced Dashboard.html (generated from index.html)
+# Don't commit generated files (built from index.html by build-appscript.py)
 Dashboard.html
+DashboardJS.html

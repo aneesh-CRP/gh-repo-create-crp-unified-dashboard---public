@@ -8,6 +8,10 @@
  * restricting access to your organization's domain only.
  */
 
+function include(filename) {
+  return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
+
 function doGet(e) {
   var html = HtmlService.createHtmlOutputFromFile('Dashboard')
     .setTitle('CRP · Unified Intelligence Dashboard')
@@ -16,6 +20,15 @@ function doGet(e) {
     .setWidth(1600)
     .setHeight(10000);
   return html;
+}
+
+/**
+ * Returns the dashboard JavaScript as a string.
+ * Called from client-side via google.script.run to load JS asynchronously,
+ * keeping the initial HTML payload under HtmlService size limits.
+ */
+function getDashboardJS() {
+  return HtmlService.createHtmlOutputFromFile('DashboardJS').getContent();
 }
 
 /**
