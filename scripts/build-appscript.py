@@ -110,12 +110,13 @@ import glob
 for old_file in glob.glob(os.path.join(APPSCRIPT_DIR, 'DashboardJS*.html')):
     os.remove(old_file)
 
-# Write chunk files
+# Write chunk files — wrapped in <script> tags so HtmlService treats them as valid HTML
 for i, chunk in enumerate(chunks):
     chunk_path = os.path.join(APPSCRIPT_DIR, f'DashboardJS_{i}.html')
+    wrapped = '<script>\n' + chunk + '\n</script>'
     with open(chunk_path, 'w') as f:
-        f.write(chunk)
-    print(f"  DashboardJS_{i}.html: {len(chunk):,} bytes")
+        f.write(wrapped)
+    print(f"  DashboardJS_{i}.html: {len(wrapped):,} bytes")
 
 # ── Build Dashboard.html ──
 html_before = ''.join(lines[:main_script_start])

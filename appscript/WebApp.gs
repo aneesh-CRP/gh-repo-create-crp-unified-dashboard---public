@@ -30,7 +30,9 @@ function doGet(e) {
  */
 function getDashboardJSChunk(index) {
   var filename = 'DashboardJS_' + index;
-  return HtmlService.createHtmlOutputFromFile(filename).getContent();
+  var html = HtmlService.createHtmlOutputFromFile(filename).getContent();
+  // Strip the <script> wrapper added by the build script
+  return html.replace(/^<script>\n?/, '').replace(/\n?<\/script>$/, '');
 }
 
 /**
