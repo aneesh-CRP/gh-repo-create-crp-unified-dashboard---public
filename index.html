@@ -14125,7 +14125,7 @@ function buildPatientPipelineBySite() {
   visits.forEach(function(v) {
     var key = (v.patient || '').toLowerCase().trim();
     if (!key) return;
-    var isPNJ = (v.site || '').includes('Penn');
+    var isPNJ = (v.patient_url || '').includes('pennington');
     var siteLabel = isPNJ ? 'PNJ' : 'PHL';
     // Keep the latest visit per patient
     if (!patientMap[key] || (v.date_iso && v.date_iso > (patientMap[key].date_iso || ''))) {
@@ -14497,7 +14497,7 @@ function showStudyUnifiedModal(studyName) {
     body += '<details style="margin-bottom:12px;"><summary style="font-size:11px;cursor:pointer;color:#dc2626;font-weight:600;">' + allCancelRows.length + ' Recent Cancellations</summary>';
     body += '<table class="detail-table" style="margin-top:6px;"><thead><tr><th>Patient</th><th>Type</th><th>Date</th><th>Reason</th></tr></thead><tbody>';
     allCancelRows.slice(0,10).forEach(function(r) {
-      body += '<tr><td>' + extLink(r.name, r.url) + '</td><td>' + typeBadge2(r.type) + '</td>';
+      body += '<tr><td>' + patientLink(r.name, r.url) + '</td><td>' + typeBadge2(r.type) + '</td>';
       body += '<td style="font-size:11px;color:#64748b">' + (r.cancel_date||'—') + '</td>';
       body += '<td style="font-size:11px;color:#64748b;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + (r.reason||'').replace(/"/g,"'") + '">' + (r.reason||'—') + '</td></tr>';
     });
@@ -14522,7 +14522,7 @@ function showStudyUnifiedModal(studyName) {
       body += '<table class="detail-table" style="margin-bottom:12px;"><thead><tr><th>Patient</th><th>Stage</th><th>Source</th><th>Days</th></tr></thead><tbody>';
       activeRefs.slice(0,8).forEach(function(r) {
         var sc = stageColors[r.stage] || '#94a3b8';
-        body += '<tr><td><a href="' + r.url + '" target="_blank" style="color:#1e293b;text-decoration:none;font-weight:600;">' + r.name + '</a></td>';
+        body += '<tr><td><a href="' + r.url + '" target="_blank" style="color:#1e293b;text-decoration:none;font-weight:600;">' + maskPHI(r.name) + '</a></td>';
         body += '<td><span style="font-size:10px;padding:2px 6px;border-radius:4px;background:' + sc + '20;color:' + sc + ';font-weight:600;">' + r.stage + '</span></td>';
         body += '<td style="font-size:11px;color:#64748b">' + (r.source||'—') + '</td>';
         body += '<td style="font-size:11px;color:' + (r.days_since_update > 14 ? '#dc2626' : '#64748b') + ';">' + (r.days_since_update||'—') + 'd</td></tr>';
@@ -14982,7 +14982,7 @@ function renderReferralDashboard() {
       const urgency = r.days_since_update >= 14 ? '#dc2626' : '#d97706';
       return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f1f5f9;">
         <div>
-          <a href="${r.url}" target="_blank" style="font-size:12px;font-weight:600;color:#1e293b;text-decoration:none;">${r.name}</a>
+          <a href="${r.url}" target="_blank" style="font-size:12px;font-weight:600;color:#1e293b;text-decoration:none;">${maskPHI(r.name)}</a>
           <div style="font-size:10px;color:#94a3b8;">${r.study || 'No study'} · ${r.tracker} · ${r.stage}</div>
         </div>
         <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:${urgency}22;color:${urgency};">${r.days_since_update}d ago</span>
@@ -15244,7 +15244,7 @@ function showStudyPipelineModal(studyName) {
 
     const staleColor = r.days_since_update >= 14 ? '#dc2626' : r.days_since_update >= 7 ? '#d97706' : '#059669';
     table += `<tr>
-      <td style="padding:6px 8px;"><a href="${r.url}" target="_blank" style="font-weight:600;color:#1e293b;text-decoration:none;">${r.name}</a></td>
+      <td style="padding:6px 8px;"><a href="${r.url}" target="_blank" style="font-weight:600;color:#1e293b;text-decoration:none;">${maskPHI(r.name)}</a></td>
       <td style="padding:6px 8px;text-align:center;"><span style="padding:2px 6px;border-radius:3px;font-size:10px;font-weight:600;background:${(stageColors[r.stage]||'#94a3b8')}22;color:${stageColors[r.stage]||'#94a3b8'}">${r.stage}</span></td>
       <td style="padding:6px 8px;font-size:10px;color:#475569;">${r.source}</td>
       <td style="padding:6px 8px;">${nextApptDisplay}</td>
@@ -15312,7 +15312,7 @@ function showCampaignDetailModal(studyName) {
         : '<span style="color:#94a3b8;font-size:10px;">Not in DB</span>';
       const staleColor = r.days_since_update >= 14 ? '#dc2626' : r.days_since_update >= 7 ? '#d97706' : '#059669';
       html += `<tr>
-        <td style="padding:6px 8px;"><a href="${r.url}" target="_blank" style="font-weight:600;color:#1e293b;text-decoration:none;">${r.name}</a></td>
+        <td style="padding:6px 8px;"><a href="${r.url}" target="_blank" style="font-weight:600;color:#1e293b;text-decoration:none;">${maskPHI(r.name)}</a></td>
         <td style="padding:6px 8px;text-align:center;"><span style="padding:2px 6px;border-radius:3px;font-size:10px;font-weight:600;background:${(stageColors[r.stage]||'#94a3b8')}22;color:${stageColors[r.stage]||'#94a3b8'}">${r.stage}</span></td>
         <td style="padding:6px 8px;font-size:10px;color:#475569;">${r.source}</td>
         <td style="padding:6px 8px;">${apptBooked}</td>
@@ -15411,7 +15411,7 @@ function renderCampaignXRef() {
         : '<span style="color:#94a3b8;font-size:10px;">Not in DB</span>';
       const staleColor = r.days_since_update >= 14 ? '#dc2626' : r.days_since_update >= 7 ? '#d97706' : '#059669';
       return `<tr>
-        <td style="padding:5px 10px;"><a href="${r.url}" target="_blank" style="font-weight:600;color:#1e293b;text-decoration:none;">${r.name}</a></td>
+        <td style="padding:5px 10px;"><a href="${r.url}" target="_blank" style="font-weight:600;color:#1e293b;text-decoration:none;">${maskPHI(r.name)}</a></td>
         <td style="padding:5px 8px;font-size:10px;color:#475569;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${r.campaign}">${r.campaign}</td>
         <td style="padding:5px 8px;text-align:center;"><span style="padding:2px 5px;border-radius:3px;font-size:10px;font-weight:600;background:${(stageColors[r.stage]||'#94a3b8')}22;color:${stageColors[r.stage]||'#94a3b8'}">${r.stage}</span></td>
         <td style="padding:5px 8px;">${apptCell}</td>
@@ -15441,7 +15441,7 @@ function showReferralDetailModal(filterFn, title, subtitle) {
     const dbCell = dbMatch ? `<span style="font-size:10px;font-weight:600;color:${dbMatch.status==='Available'?'#059669':'#dc2626'}">${dbMatch.status}</span>` : '<span style="color:#cbd5e1;font-size:10px;">—</span>';
     const staleColor = r.days_since_update >= 14 ? '#dc2626' : r.days_since_update >= 7 ? '#d97706' : '#059669';
     html += `<tr>
-      <td style="padding:5px 8px;"><a href="${r.url}" target="_blank" style="font-weight:600;color:#1e293b;text-decoration:none;">${r.name}</a></td>
+      <td style="padding:5px 8px;"><a href="${r.url}" target="_blank" style="font-weight:600;color:#1e293b;text-decoration:none;">${maskPHI(r.name)}</a></td>
       <td style="padding:5px 8px;font-size:10px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.study||'—'}</td>
       <td style="padding:5px 8px;text-align:center;"><span style="padding:2px 6px;border-radius:3px;font-size:10px;font-weight:600;background:${(stageColors[r.stage]||'#94a3b8')}22;color:${stageColors[r.stage]||'#94a3b8'}">${r.stage}</span></td>
       <td style="padding:5px 8px;font-size:10px;color:#475569;">${r.source}</td>
