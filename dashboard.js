@@ -90,6 +90,10 @@ const CRP_CONFIG = {
   DATA_FEEDS: {
     UPCOMING: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRUXJxTDsr5IRByMfuLF0P3hVq_QuEw6M1MPNDwd1CaV2UZ9tnFflUwsmUKAd3xeX3_esn0c4YlrV0q/pub?gid=0&single=true&output=csv',
     CANCELLATIONS: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRUXJxTDsr5IRByMfuLF0P3hVq_QuEw6M1MPNDwd1CaV2UZ9tnFflUwsmUKAd3xeX3_esn0c4YlrV0q/pub?gid=1487298034&single=true&output=csv',
+    // ClickUp Referral Pipeline — synced to Google Sheets every 15 min by clickup-sync/Code.gs
+    // To set up: create a Google Sheet, publish each tab as CSV, paste URLs here
+    REFERRALS_CSV: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTPrFpOKckIDKYtnV30EBkL9ryI4q4HHKXDLxzgu6ZqVzrALoGU0Tpf_MNYHzg2UxcPajaJWpOONBbP/pub?gid=1264328878&single=true&output=csv',
+    CAMPAIGNS_CSV: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTPrFpOKckIDKYtnV30EBkL9ryI4q4HHKXDLxzgu6ZqVzrALoGU0Tpf_MNYHzg2UxcPajaJWpOONBbP/pub?gid=44963051&single=true&output=csv',
     // Finance Master Sheet — published key + tab GIDs for CSV access
     FINANCE_PUB_KEY: '2PACX-1vQXxreb6lrZHej3luMOSI07ditFm6mmGHIHrxWu9BkTfsvk0OLk_gx7o_JIY34UIgroGIKgEYbVdC_V',
   },
@@ -5615,128 +5619,61 @@ function disconnectClickUp() {
 }
 
 function initReferrals() {
-  const token = getClickUpToken();
-  if (!token) {
-    document.getElementById('referral-setup').style.display = 'block';
-    document.getElementById('referral-dashboard').style.display = 'none';
-    // Still load Facebook CRM even without ClickUp token
-    if (FB_CRM_DATA.length === 0) fetchFacebookCRM().catch(e => console.warn('FB CRM:', e));
-    return;
-  }
+  // Data comes from Google Sheets CSV (synced from ClickUp every 15 min) — no token needed
   document.getElementById('referral-setup').style.display = 'none';
   document.getElementById('referral-dashboard').style.display = 'block';
   if (!_referralsLoaded) refreshReferrals();
+  if (FB_CRM_DATA.length === 0) fetchFacebookCRM().catch(e => console.warn('FB CRM:', e));
 }
 
 async function refreshReferrals() {
-  const token = getClickUpToken();
-  if (!token) return;
   const badge = document.getElementById('ref-status-badge');
   if (badge) badge.textContent = '⏳ Fetching...';
 
-  const CU = CRP_CONFIG.CLICKUP;
-  const H = { 'Authorization': token };
-  const API = 'https://api.clickup.com/api/v2';
-
   try {
-    // 1. Fetch all referral tracker lists in parallel
-    const allLists = [...CU.REFERRAL_LISTS, ...CU.EXTRA_LISTS];
-    const taskPromises = allLists.map(async (list) => {
-      const tasks = [];
-      let page = 0;
-      let hasMore = true;
-      while (hasMore) {
-        const resp = await fetch(`${API}/list/${list.id}/task?page=${page}&subtasks=false&include_closed=true&limit=100`, { headers: H });
-        if (!resp.ok) { hasMore = false; break; }
-        const data = await resp.json();
-        if (data.tasks && data.tasks.length > 0) {
-          tasks.push(...data.tasks);
-          page++;
-          if (data.tasks.length < 100) hasMore = false;
-        } else { hasMore = false; }
-      }
-      return { list, tasks };
-    });
-
-    // 2. Fetch Central Campaigns
-    const campaignPromise = (async () => {
-      const resp = await fetch(`${API}/list/${CU.CAMPAIGN_LIST}/task?page=0&subtasks=false&include_closed=true&limit=100`, { headers: H });
-      if (!resp.ok) return [];
-      const data = await resp.json();
-      return data.tasks || [];
-    })();
-
-    const [listResults, campaignTasks] = await Promise.all([
-      Promise.all(taskPromises),
-      campaignPromise
+    // Fetch referral + campaign data from Google Sheets CSV (synced from ClickUp)
+    const [refRows, campRows] = await Promise.all([
+      fetchCSV(CRP_CONFIG.DATA_FEEDS.REFERRALS_CSV),
+      fetchCSV(CRP_CONFIG.DATA_FEEDS.CAMPAIGNS_CSV),
     ]);
 
-    // 3. Normalize referral data
-    REFERRAL_DATA = [];
-    listResults.forEach(({ list, tasks }) => {
-      tasks.forEach(t => {
-        const fields = {};
-        (t.custom_fields || []).forEach(f => {
-          if (f.value === null || f.value === undefined) return;
-          if (f.type === 'drop_down') {
-            const opt = (f.type_config?.options || []).find(o => o.orderindex === f.value);
-            fields[f.name] = opt ? opt.name : String(f.value);
-          } else if (f.type === 'date') {
-            fields[f.name] = f.value ? new Date(parseInt(f.value)).toISOString().split('T')[0] : null;
-          } else if (f.type === 'phone') {
-            fields[f.name] = typeof f.value === 'object' ? f.value.phone_number || '' : String(f.value);
-          } else {
-            fields[f.name] = String(f.value);
-          }
-        });
+    // Parse referral rows — CSV columns match REFERRAL_DATA fields
+    REFERRAL_DATA = refRows.map(r => ({
+      id: r.id || '',
+      name: r.name || '',
+      tracker: r.tracker || '',
+      source_type: r.source_type || '',
+      source: r.source || '',
+      study: r.study || '',
+      status_raw: r.status_raw || '',
+      stage: r.stage || '',
+      phone: r.phone || '',
+      dob: r.dob || '',
+      referring_physician: r.referring_physician || '',
+      next_appt: r.next_appt || '',
+      date_created: r.date_created || '',
+      date_updated: r.date_updated || '',
+      // Compute days_since_update client-side for accuracy
+      days_since_update: r.date_updated ? Math.floor((Date.now() - new Date(r.date_updated).getTime()) / 86400000) : 999,
+      url: r.url || '',
+      is_closed: r.is_closed === 'TRUE' || r.is_closed === 'true',
+    }));
 
-        const status = (t.status?.status || '').toLowerCase();
-        const stage = CU.PIPELINE_MAP[status] || 'Other';
-
-        REFERRAL_DATA.push({
-          id: t.id,
-          name: t.name,
-          tracker: list.name,
-          source_type: list.source_type,
-          source: CU.SOURCE_RENAME[fields['Source']] || fields['Source'] || list.name,
-          study: fields['Study'] || '',
-          status_raw: t.status?.status || '',
-          stage,
-          phone: fields['Phone #'] || '',
-          dob: fields['Patient DOB'] || '',
-          referring_physician: fields['Referring Physician'] || '',
-          next_appt: fields['Next Appointment Date'] || '',
-          date_created: t.date_created ? new Date(parseInt(t.date_created)).toISOString().split('T')[0] : '',
-          date_updated: t.date_updated ? new Date(parseInt(t.date_updated)).toISOString().split('T')[0] : '',
-          days_since_update: t.date_updated ? Math.floor((Date.now() - parseInt(t.date_updated)) / 86400000) : 999,
-          url: t.url || `https://app.clickup.com/t/${t.id}`,
-          is_closed: CU.CLOSED_STAGES.includes(stage) || t.status?.type === 'closed' || t.status?.type === 'done',
-        });
-      });
-    });
-
-    // 4. Normalize campaign data
-    CAMPAIGN_DATA = campaignTasks.map(t => {
-      const fields = {};
-      (t.custom_fields || []).forEach(f => {
-        if (f.value === null || f.value === undefined) return;
-        fields[f.name] = String(f.value);
-      });
-      return {
-        study: t.name,
-        vendor: (t.status?.status || '').trim(),
-        first_contact: parseInt(fields['FIRST CONTACT'] || '0') || 0,
-        second_contact: parseInt(fields['SECOND CONTACT'] || '0') || 0,
-        third_contact: parseInt(fields['THIRD CONTACT'] || '0') || 0,
-        new_referrals: parseInt(fields['New Referrals'] || '0') || 0,
-        scheduled: parseInt(fields['Scheduled'] || fields['SCHEDULED'] || '0') || 0,
-        url: t.url || `https://app.clickup.com/t/${t.id}`,
-      };
-    });
+    // Parse campaign rows
+    CAMPAIGN_DATA = campRows.map(r => ({
+      study: r.study || '',
+      vendor: r.vendor || '',
+      first_contact: parseInt(r.first_contact) || 0,
+      second_contact: parseInt(r.second_contact) || 0,
+      third_contact: parseInt(r.third_contact) || 0,
+      new_referrals: parseInt(r.new_referrals) || 0,
+      scheduled: parseInt(r.scheduled) || 0,
+      url: r.url || '',
+    }));
 
     _referralsLoaded = true;
     if (badge) badge.textContent = `✅ ${REFERRAL_DATA.length} referrals · ${new Date().toLocaleTimeString()}`;
-    console.log(`CRP Referrals: Loaded ${REFERRAL_DATA.length} referrals from ${allLists.length} lists, ${CAMPAIGN_DATA.length} campaigns`);
+    console.log(`CRP Referrals: Loaded ${REFERRAL_DATA.length} referrals, ${CAMPAIGN_DATA.length} campaigns from Google Sheets`);
 
     renderReferralDashboard();
 
@@ -5745,15 +5682,15 @@ async function refreshReferrals() {
     safe(buildInsights, 'buildInsights');
     if (typeof renderStudiesTable === 'function') try { renderStudiesTable(); } catch(e) {}
 
-    // Also fetch additional ClickUp sources + Facebook CRM (non-blocking)
+    // Also fetch Facebook CRM (non-blocking)
     fetchFacebookCRM().then(function() {
       safe(buildRecruitmentKPIs, 'buildRecruitmentKPIs');
       if (typeof renderStudiesTable === 'function') try { renderStudiesTable(); } catch(e) {}
     }).catch(e => console.warn('FB CRM fetch failed:', e));
     safe(buildRecruitmentKPIs, 'buildRecruitmentKPIs');
   } catch(e) {
-    console.error('CRP Referrals: Fetch failed', e);
-    if (badge) badge.textContent = '❌ Fetch failed — check API token';
+    console.error('CRP Referrals: CSV fetch failed', e);
+    if (badge) badge.textContent = '❌ Fetch failed';
   }
 }
 
@@ -7408,14 +7345,11 @@ async function _crpInit() {
       }).catch(e => { console.warn('CRP: Facebook CRM initial load failed:', e); setHealthChip('dh-fbcrm','fail','FB CRM (failed)'); });
     }, 1500);
 
-    // ── Phase 4: ClickUp Referral data (if token exists) — populates Overview KPIs ──
-    var _cuToken = typeof getClickUpToken === 'function' ? getClickUpToken() : '';
-    if (_cuToken && !_referralsLoaded) {
-      setTimeout(() => {
-        console.log('CRP: Phase 4 — auto-loading ClickUp referrals (token detected)...');
-        try { initReferrals(); } catch(e) { console.warn('CRP: Auto-init referrals failed:', e); }
-      }, 3000);
-    }
+    // ── Phase 4: Referral data from Google Sheets CSV — populates Overview KPIs ──
+    setTimeout(() => {
+      console.log('CRP: Phase 4 — loading referral data from Google Sheets...');
+      try { initReferrals(); } catch(e) { console.warn('CRP: Auto-init referrals failed:', e); }
+    }, 3000);
   }
 
   // Kick off staggered loading
@@ -7483,7 +7417,7 @@ async function _crpInit() {
     // Phase 3: Supplemental (staggered after finance)
     fetchPatientDB().catch(() => {});
     setTimeout(() => {
-      if (getClickUpToken() && _referralsLoaded) refreshReferrals().catch(() => {});
+      if (_referralsLoaded) refreshReferrals().catch(() => {});
       fetchFacebookCRM().catch(() => {});
     }, 2000);
 
