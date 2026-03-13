@@ -3925,12 +3925,17 @@ function processLiveData(allRows, legacyCancels, auditLog) {
 
   // recentCancels = only TRUE cancellations (excludes rescheduled, completed, admin error, fibroscan, study closed)
   // Also excludes cancels where the same patient+study has a future appointment (they rescheduled)
+  const rescheduledVisits = [];
   const recentCancels = allCategorized.filter(r => {
-    if (EXCLUDED_CANCEL_CATS.has(r._category)) return false;
+    if (EXCLUDED_CANCEL_CATS.has(r._category)) {
+      if (r._category === 'Rescheduled') rescheduledVisits.push(r);
+      return false;
+    }
     const name = (r['Subject Full Name']||'').replace(/\s{2,}/g,' ').trim().toLowerCase();
     const study = (r['Study Name']||'').trim().toLowerCase();
     if (name && study && rescheduledPatientStudy.has(name + '||' + study)) {
       r._category = 'Rescheduled';
+      rescheduledVisits.push(r);
       return false;
     }
     return true;
@@ -4343,6 +4348,31 @@ function processLiveData(allRows, legacyCancels, auditLog) {
       category: r._category || categorizeReason(r['Cancel Reason'], r['Appointment Cancellation Type']),
       cancel_date: (() => { try { const d=new Date(r['Cancel Date']);return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});}catch(e){return '';}})()
     })),
+    rescheduledVisits: rescheduledVisits.map(r => {
+      const sk=r['Study Key'], subk=r['Subject Key (Back End)'], pnj=[161619,162446,167755,167794,172389,173164];
+      const site = pnj.includes(+sk) ? 'clinical-research-philadelphia-pennington' : 'philadelphia-pa';
+      const base = `https://app.clinicalresearch.io/clinical-research-philadelphia-crp/${site}`;
+      // Find the matching upcoming visit for this patient+study
+      const nameKey = (r['Subject Full Name']||'').replace(/\s{2,}/g,' ').trim().toLowerCase();
+      const studyKey = (r['Study Name']||'').trim().toLowerCase();
+      const upcoming = activeUpcoming.find(u => {
+        return (u['Subject Full Name']||'').replace(/\s{2,}/g,' ').trim().toLowerCase() === nameKey
+            && (u['Study Name']||'').trim().toLowerCase() === studyKey;
+      });
+      const newDate = upcoming ? parseDate(upcoming['Scheduled Date']) : null;
+      return {
+        name: (r['Subject Full Name']||'').replace(/\s{2,}/g,' ').trim(),
+        url: `${base}/study/${+sk}/subject/${+subk}`,
+        study: (r['Study Name']||'').split(' - ').pop().trim(),
+        study_url: `${base}/study/${+sk}/subjects`,
+        coord: cleanCoord(r['Staff Full Name'] || r['Full Name']),
+        type: r['Appointment Cancellation Type']||'',
+        reason: r['Cancel Reason']||'',
+        cancel_date: (() => { try { const d=new Date(r['Cancel Date']);return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});}catch(e){return '';}})(),
+        new_date: newDate ? newDate.toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '—',
+        site: r['Site Name']||'',
+      };
+    }),
     // ── Preserve enrollmentData from SAMPLE and rebuild mergedStudies with live counts ──
     enrollmentData: (typeof DATA !== 'undefined' ? DATA.enrollmentData : null) || SAMPLE.enrollmentData || [],
     mergedStudies: (() => {
@@ -4853,6 +4883,8 @@ function buildMedRecAlerts() {
 
 function renderAll() {
   document.getElementById('kpi-cancels').textContent  = DATA.cancelTotal  || 0;
+  var reschEl = document.getElementById('kpi-rescheduled');
+  if (reschEl) reschEl.textContent = (DATA.rescheduledVisits||[]).length;
   document.getElementById('kpi-upcoming').textContent = DATA.upcomingTotal || 0;
   document.getElementById('kpi-next14').textContent   = DATA.next14        || 0;
   document.getElementById('kpi-risk').textContent     = (DATA.riskMatrix||[]).filter(r=>r.level==='critical').length;
@@ -5050,6 +5082,31 @@ function showRiskFlags(title) {
   </tr>`).join('') +
   `</tbody></table>`;
   openModal(title||'At-Risk Patients', flags.length + ' patients with 2+ cancel events & upcoming visit', body);
+}
+
+/* ── KPI Popup: Rescheduled Visits ────────────────────── */
+function showRescheduled() {
+  var rows = DATA.rescheduledVisits || [];
+  if (!rows.length) {
+    openModal('Rescheduled Visits', 'None found', '<div style="text-align:center;padding:30px;color:#94a3b8;">No rescheduled visits detected</div>');
+    return;
+  }
+  var body = '<div style="margin-bottom:12px;font-size:12px;color:#64748b">These patients had a visit cancelled but have a new appointment booked in the same study.</div>' +
+    '<table class="detail-table"><thead><tr>' +
+    '<th>Patient</th><th>Study</th><th>Cancelled Date</th><th>New Date</th><th>Original Reason</th><th>Coordinator</th><th>Site</th>' +
+    '</tr></thead><tbody>' +
+    rows.map(function(r) {
+      return '<tr>' +
+        '<td>' + patientLink(r.name, r.url) + '</td>' +
+        '<td style="font-size:11px">' + extLink(r.study, r.study_url) + '</td>' +
+        '<td style="font-size:11px;color:#dc2626">' + escapeHTML(r.cancel_date||'—') + '</td>' +
+        '<td style="font-size:11px;font-weight:600;color:#059669">' + escapeHTML(r.new_date||'—') + '</td>' +
+        '<td style="font-size:11px;color:#64748b;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHTML(r.reason||'') + '">' + escapeHTML(r.reason||'Not documented') + '</td>' +
+        '<td style="font-size:11px">' + escapeHTML(r.coord||'—') + '</td>' +
+        '<td style="font-size:11px">' + escapeHTML(r.site||'—') + '</td>' +
+        '</tr>';
+    }).join('') + '</tbody></table>';
+  openModal('Rescheduled Visits', rows.length + ' patients rebooked', body);
 }
 
 /* ── KPI Popup: Risk Studies ────────────────────── */
