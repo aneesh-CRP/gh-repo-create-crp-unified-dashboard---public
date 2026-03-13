@@ -902,33 +902,33 @@ body {
 
   <!-- Time Banner -->
   <div class="time-banner fade-in">
-    <div class="tb-section">
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showCancels(null,'All Cancellations')" title="Click to see all cancellations">
       <div class="tb-label">📅 Past 2 Months</div>
-      <div class="tb-value red" id="kpi-cancels" class="kpi-clickable" title="Click to see all cancellations" onclick="showCancels(null,'All Cancellations')">112</div>
+      <div class="tb-value red" id="kpi-cancels">112</div>
       <div class="tb-sub">Clinical visit cancellations · Jan 4 – Mar 6</div>
     </div>
     <div class="tb-divider">TODAY<br>Mar 6</div>
-    <div class="tb-section">
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showUpcoming(r=>{ const d=new Date(r.date_iso||''); const now=new Date(); now.setHours(0,0,0,0); return (d-now)/86400000<=14; },'Next 14 Days')" title="Click to see next 14 days">
       <div class="tb-label">⚡ Next 14 Days</div>
-      <div class="tb-value blue" id="kpi-next14" class="kpi-clickable" title="Click to see next 14 days" onclick="showUpcoming(r=>{ const d=new Date(r.date_iso||''); const now=new Date(); now.setHours(0,0,0,0); return (d-now)/86400000<=14; },'Next 14 Days')">78</div>
+      <div class="tb-value blue" id="kpi-next14">78</div>
       <div class="tb-sub">Scheduled visits (CRIO)</div>
     </div>
     <div class="tb-divider">→</div>
-    <div class="tb-section">
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showUpcoming(null,'All Upcoming Visits')" title="Click to see all upcoming visits">
       <div class="tb-label">📆 Next 2 Months</div>
-      <div class="tb-value green" id="kpi-upcoming" class="kpi-clickable" title="Click to see all upcoming visits" onclick="showUpcoming(null,'All Upcoming Visits')">75</div>
+      <div class="tb-value green" id="kpi-upcoming">75</div>
       <div class="tb-sub">Scheduled visits · through May 6</div>
     </div>
     <div class="tb-divider"></div>
-    <div class="tb-section">
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showRiskFlags('At-Risk Patients')" title="Click to see at-risk patients">
       <div class="tb-label">⚠ At-Risk Studies</div>
-      <div class="tb-value" style="color:var(--purple);" id="kpi-risk" class="kpi-clickable" title="Click to see at-risk patients" onclick="showRiskFlags('At-Risk Patients')">2</div>
+      <div class="tb-value" style="color:var(--purple);" id="kpi-risk">2</div>
       <div class="tb-sub">High cancel : upcoming ratio</div>
     </div>
     <div class="tb-divider"></div>
-    <div class="tb-section">
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showUpcoming(null,'All Upcoming Visits')" title="Click to see active studies">
       <div class="tb-label">🏥 Active Studies</div>
-      <div class="tb-value" id="kpi-studies" class="kpi-clickable" title="Click to see active studies" onclick="showUpcoming(null,'All Upcoming Visits')">26</div>
+      <div class="tb-value" id="kpi-studies">26</div>
       <div class="tb-sub">Across 2 sites</div>
     </div>
   </div>
@@ -959,19 +959,19 @@ body {
       <div class="tb-sub">In referral pipeline</div>
     </div>
     <div class="tb-divider"></div>
-    <div class="tb-section">
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showSitePatients()" title="Click to see patients by site">
       <div class="tb-label">🏥 Site Active Patients</div>
       <div class="tb-value" style="color:#8b5cf6" id="ov-kpi-sites">—</div>
       <div class="tb-sub">PHL + PNJ combined</div>
     </div>
     <div class="tb-divider"></div>
-    <div class="tb-section">
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showFBLeads()" title="Click to see Facebook leads">
       <div class="tb-label">📱 FB Leads (30d)</div>
       <div class="tb-value" style="color:#3b82f6" id="ov-kpi-fb">—</div>
       <div class="tb-sub">New Meta/Facebook leads</div>
     </div>
     <div class="tb-divider"></div>
-    <div class="tb-section">
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showReferralDetailModal(r=>r.stage==='Enrolled'||r.stage==='Screened','Enrolled Referrals','Conversion breakdown')" title="Click to see enrolled referrals">
       <div class="tb-label">🎯 Lead→Enrolled</div>
       <div class="tb-value" style="color:#059669" id="ov-kpi-conv">—</div>
       <div class="tb-sub">Referral conversion rate</div>
@@ -1097,33 +1097,33 @@ body {
 
   <!-- KPI Row -->
   <div class="time-banner fade-in" style="margin-bottom:16px;">
-    <div class="tb-section">
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showUpcoming(null,'All Upcoming Visits')" title="Click to see all upcoming visits">
       <div class="tb-label">📆 Total Upcoming</div>
-      <div class="tb-value green" id="sched-kpi-total" class="kpi-clickable" onclick="showUpcoming(null,'All Upcoming Visits')">71</div>
+      <div class="tb-value green" id="sched-kpi-total">71</div>
       <div class="tb-sub">Active scheduled visits</div>
     </div>
     <div class="tb-divider"></div>
-    <div class="tb-section">
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showUpcoming(r=>!r.site.includes('Penn'),'Philadelphia Visits')" title="Click to see Philadelphia visits">
       <div class="tb-label">🏙 Philadelphia</div>
-      <div class="tb-value blue" id="sched-kpi-philly" class="kpi-clickable" onclick="showUpcoming(r=>!r.site.includes('Penn'),'Philadelphia Visits')">52</div>
+      <div class="tb-value blue" id="sched-kpi-philly">52</div>
       <div class="tb-sub">76% of scheduled visits</div>
     </div>
     <div class="tb-divider"></div>
-    <div class="tb-section">
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showUpcoming(r=>r.site.includes('Penn'),'Pennington Visits')" title="Click to see Pennington visits">
       <div class="tb-label">🌿 Pennington</div>
-      <div class="tb-value" style="color:var(--green)" id="sched-kpi-penn" class="kpi-clickable" onclick="showUpcoming(r=>r.site.includes('Penn'),'Pennington Visits')">19</div>
+      <div class="tb-value" style="color:var(--green)" id="sched-kpi-penn">19</div>
       <div class="tb-sub">24% of scheduled visits</div>
     </div>
     <div class="tb-divider"></div>
-    <div class="tb-section">
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showUpcoming(r=>r.date_iso&&r.date_iso.startsWith('2026-03'),'March Visits')" title="Click to see March visits">
       <div class="tb-label">📅 March</div>
-      <div class="tb-value" style="color:var(--purple)" id="sched-kpi-march" class="kpi-clickable" onclick="showUpcoming(r=>r.date_iso&&r.date_iso.startsWith('2026-03'),'March Visits')">44</div>
+      <div class="tb-value" style="color:var(--purple)" id="sched-kpi-march">44</div>
       <div class="tb-sub">Visits this month</div>
     </div>
     <div class="tb-divider"></div>
-    <div class="tb-section">
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showUpcoming(r=>r.date_iso&&r.date_iso.startsWith('2026-04'),'April Visits')" title="Click to see April visits">
       <div class="tb-label">📅 April</div>
-      <div class="tb-value" style="color:var(--yellow)" id="sched-kpi-april" class="kpi-clickable" onclick="showUpcoming(r=>r.date_iso&&r.date_iso.startsWith('2026-04'),'April Visits')">14</div>
+      <div class="tb-value" style="color:var(--yellow)" id="sched-kpi-april">14</div>
       <div class="tb-sub">Visits next month</div>
     </div>
   </div>
@@ -2088,13 +2088,13 @@ body {
       <div class="tb-sub">Cancelled 2× with upcoming visit</div>
     </div>
     <div class="tb-divider"></div>
-    <div class="tb-section">
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showRiskFlags('Urgent — Next Visit Within 14 Days')" title="Click to see urgent risk patients">
       <div class="tb-label">📞 Call This Week</div>
       <div class="tb-value yellow" id="risk-kpi-urgent">2</div>
       <div class="tb-sub">Next visit within 14 days</div>
     </div>
     <div class="tb-divider"></div>
-    <div class="tb-section">
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showRiskStudies()" title="Click to see affected studies">
       <div class="tb-label">🏥 Studies Affected</div>
       <div class="tb-value blue" id="risk-kpi-studies">2</div>
       <div class="tb-sub">Unique studies with risk flags</div>
@@ -2143,25 +2143,25 @@ body {
   <div class="section-title">📇 Contact Quality Alerts</div>
 
   <div class="time-banner fade-in" style="margin-bottom:16px;">
-    <div class="tb-section">
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showContactAlerts('red')" title="Click to see red flag patients">
       <div class="tb-label">🔴 Red Flags</div>
       <div class="tb-value red" id="cq-kpi-red">0</div>
       <div class="tb-sub">Do Not Solicit / Enroll / Deceased</div>
     </div>
     <div class="tb-divider"></div>
-    <div class="tb-section">
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showContactAlerts('yellow')" title="Click to see yellow flag patients">
       <div class="tb-label">🟡 Yellow Flags</div>
       <div class="tb-value yellow" id="cq-kpi-yellow">0</div>
       <div class="tb-sub">Bad contact info or missing email/phone</div>
     </div>
     <div class="tb-divider"></div>
-    <div class="tb-section">
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showContactAlerts('clean')" title="Click to see clean contact patients">
       <div class="tb-label">✅ Clean</div>
       <div class="tb-value green" id="cq-kpi-clean">0</div>
       <div class="tb-sub">Active patients with good contact data</div>
     </div>
     <div class="tb-divider"></div>
-    <div class="tb-section">
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showPatientDB()" title="Click to see patient database summary">
       <div class="tb-label">📇 Patient DB</div>
       <div class="tb-value blue" id="cq-kpi-db-total">—</div>
       <div class="tb-sub" id="cq-kpi-db-sub">Loading...</div>
@@ -2265,31 +2265,31 @@ body {
 
     <!-- Pipeline KPI Banner -->
     <div class="time-banner fade-in" style="margin-bottom:16px;">
-      <div class="tb-section">
+      <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showReferralDetailModal(r=>r.stage==='New Lead','New Leads','Pending outreach + to contact')" title="Click to see new leads">
         <div class="tb-label">📥 New Leads</div>
         <div class="tb-value blue" id="ref-kpi-leads">—</div>
         <div class="tb-sub">Pending outreach + to contact</div>
       </div>
       <div class="tb-divider"></div>
-      <div class="tb-section">
+      <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showReferralDetailModal(r=>r.stage==='Contacted','In Contact','Interested + actively engaged')" title="Click to see contacted referrals">
         <div class="tb-label">📞 In Contact</div>
         <div class="tb-value yellow" id="ref-kpi-contact">—</div>
         <div class="tb-sub">Interested + actively engaged</div>
       </div>
       <div class="tb-divider"></div>
-      <div class="tb-section">
+      <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showReferralDetailModal(r=>r.stage==='Pre-Screening'||r.stage==='Screening','Screening Referrals','Pre-screening + screening')" title="Click to see screening referrals">
         <div class="tb-label">🩺 Screening</div>
         <div class="tb-value green" id="ref-kpi-screening">—</div>
         <div class="tb-sub">Pre-screening + screening</div>
       </div>
       <div class="tb-divider"></div>
-      <div class="tb-section">
+      <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showReferralDetailModal(r=>r.stage==='Enrolled'||r.stage==='Screened','Enrolled Referrals','Randomized + completed')" title="Click to see enrolled referrals">
         <div class="tb-label">✅ Enrolled</div>
         <div class="tb-value" style="color:#059669" id="ref-kpi-enrolled">—</div>
         <div class="tb-sub">Randomized + completed</div>
       </div>
       <div class="tb-divider"></div>
-      <div class="tb-section">
+      <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showReferralDetailModal(r=>!r.is_closed,'All Active Referrals','Full pipeline breakdown')" title="Click to see conversion details">
         <div class="tb-label">📊 Conversion</div>
         <div class="tb-value" style="color:#7C3AED" id="ref-kpi-conversion">—</div>
         <div class="tb-sub">Lead → Enrolled rate</div>
@@ -2431,25 +2431,25 @@ body {
 
   <!-- Header banner -->
   <div class="time-banner fade-in" style="margin-bottom:16px;">
-    <div class="tb-section">
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showTrendsSummary()" title="Click to see trends summary">
       <div class="tb-label">📅 Data Snapshots</div>
       <div class="tb-value blue" id="trends-snapshot-count">—</div>
       <div class="tb-sub">Days of historical data loaded</div>
     </div>
     <div class="tb-divider"></div>
-    <div class="tb-section">
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showCancels(null,'All Recent Cancellations')" title="Click to see cancel rate details">
       <div class="tb-label">📉 Cancel Rate Trend</div>
       <div class="tb-value" id="trends-rate-dir" style="color:var(--green)">—</div>
       <div class="tb-sub" id="trends-rate-sub">vs. 4 weeks ago</div>
     </div>
     <div class="tb-divider"></div>
-    <div class="tb-section">
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showCancels(null,'All Cancellations — Weekly Average')" title="Click to see cancellation details">
       <div class="tb-label">📊 Avg Weekly Cancels</div>
       <div class="tb-value red" id="trends-avg-cancel">—</div>
       <div class="tb-sub">Rolling 4-week average</div>
     </div>
     <div class="tb-divider"></div>
-    <div class="tb-section">
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showUpcoming(null,'All Upcoming Visits — Weekly Average')" title="Click to see upcoming visit details">
       <div class="tb-label">📆 Avg Weekly Upcoming</div>
       <div class="tb-value green" id="trends-avg-upcoming">—</div>
       <div class="tb-sub">Rolling 4-week average</div>
@@ -7688,6 +7688,172 @@ function showRiskFlags(title) {
   </tr>`).join('') +
   `</tbody></table>`;
   openModal(title||'At-Risk Patients', flags.length + ' patients with 2+ cancel events & upcoming visit', body);
+}
+
+/* ── KPI Popup: Risk Studies ────────────────────── */
+function showRiskStudies() {
+  var flags = DATA.riskFlags||[];
+  var studyMap = {};
+  flags.forEach(function(f) {
+    if (!studyMap[f.study]) studyMap[f.study] = { study: f.study, study_url: f.study_url, patients: [], totalCancels: 0 };
+    studyMap[f.study].patients.push(f);
+    studyMap[f.study].totalCancels += f.cancels;
+  });
+  var studies = Object.values(studyMap).sort(function(a,b){ return b.totalCancels - a.totalCancels; });
+  var body = '<table class="detail-table"><thead><tr><th>Study</th><th>At-Risk Patients</th><th>Total Cancel Events</th></tr></thead><tbody>' +
+    studies.map(function(s) {
+      return '<tr><td>' + extLink(s.study, s.study_url) + '</td>' +
+        '<td style="text-align:center;font-weight:700;color:#dc2626">' + s.patients.length + '</td>' +
+        '<td style="text-align:center"><span style="background:#fef2f2;color:#dc2626;font-weight:700;padding:2px 8px;border-radius:4px">' + s.totalCancels + '</span></td></tr>';
+    }).join('') + '</tbody></table>';
+  openModal('Studies With Risk Flags', studies.length + ' studies affected', body);
+}
+
+/* ── KPI Popup: Site Active Patients ────────────────────── */
+function showSitePatients() {
+  var visits = (DATA && DATA.allVisitDetail) ? DATA.allVisitDetail : [];
+  var patientMap = {};
+  visits.forEach(function(v) {
+    var key = (v.patient||'').toLowerCase().trim();
+    if (!key) return;
+    if (!patientMap[key] || (v.date_iso && v.date_iso > (patientMap[key].date_iso||''))) {
+      patientMap[key] = { name: v.patient, site: v.site, study: v.study, date: v.date, status: v.status||'Scheduled', url: v.patient_url, date_iso: v.date_iso };
+    }
+  });
+  var patients = Object.values(patientMap).sort(function(a,b){ return (a.site||'').localeCompare(b.site||'') || (a.name||'').localeCompare(b.name||''); });
+  var body = '<table class="detail-table"><thead><tr><th>Patient</th><th>Site</th><th>Study</th><th>Next Visit</th><th>Status</th></tr></thead><tbody>' +
+    patients.map(function(p) {
+      var siteLabel = (p.site||'').includes('Penn') ? '<span style="color:#059669;font-weight:600">PNJ</span>' : '<span style="color:#1843ad;font-weight:600">PHL</span>';
+      return '<tr><td>' + patientLink(p.name, p.url) + '</td><td style="text-align:center">' + siteLabel + '</td>' +
+        '<td style="font-size:11px">' + escapeHTML(p.study||'') + '</td>' +
+        '<td style="font-size:11px;font-weight:600;color:#1843ad">' + escapeHTML(p.date||'') + '</td>' +
+        '<td>' + statusBadge(p.status) + '</td></tr>';
+    }).join('') + '</tbody></table>';
+  openModal('Site Active Patients', patients.length + ' unique patients across sites', body);
+}
+
+/* ── KPI Popup: FB Leads ────────────────────── */
+function showFBLeads() {
+  var now = Date.now();
+  var leads = (FB_CRM_DATA||[]).filter(function(f) {
+    var d = f['Date Created']||'';
+    if (!d) return false;
+    try { return (now - new Date(d).getTime()) < 30*86400000; } catch(e) { return false; }
+  });
+  if (!leads.length) {
+    openModal('Facebook Leads (30 Days)', 'No leads found', '<div style="text-align:center;padding:30px;color:#94a3b8;">No Facebook/Meta leads in the last 30 days</div>');
+    return;
+  }
+  var body = '<table class="detail-table"><thead><tr><th>Name</th><th>Date Created</th><th>Study</th><th>Source</th><th>Status</th></tr></thead><tbody>' +
+    leads.map(function(f) {
+      return '<tr><td style="font-weight:600">' + escapeHTML(maskPHI(f['Full Name']||f['Name']||'—')) + '</td>' +
+        '<td style="font-size:11px;color:#64748b">' + escapeHTML(f['Date Created']||'') + '</td>' +
+        '<td style="font-size:11px">' + escapeHTML(f['Study']||f['Campaign']||'—') + '</td>' +
+        '<td style="font-size:11px;color:#475569">' + escapeHTML(f['Source']||'Meta') + '</td>' +
+        '<td style="font-size:11px">' + escapeHTML(f['Status']||'New') + '</td></tr>';
+    }).join('') + '</tbody></table>';
+  openModal('Facebook Leads (30 Days)', leads.length + ' leads', body);
+}
+
+/* ── KPI Popup: Contact Alerts ────────────────────── */
+function showContactAlerts(severity) {
+  if (severity === 'clean') {
+    // Show clean patients from PATIENT_DB
+    var visits = DATA.allVisitDetail||[];
+    var activeNames = new Set();
+    visits.forEach(function(v) { activeNames.add((v.patient||'').toLowerCase().trim()); });
+    var cleanPatients = PATIENT_DB.filter(function(p) {
+      if (!activeNames.has(p.name_lower)) return false;
+      if (p.status === 'Do Not Solicit' || p.status === 'Do Not Enroll' || p.status === 'Deceased') return false;
+      return (p.email || p.mobile || p.home_phone || p.work_phone);
+    });
+    var body = '<table class="detail-table"><thead><tr><th>Patient</th><th>Status</th><th>Email</th><th>Phone</th><th>Site</th></tr></thead><tbody>' +
+      cleanPatients.slice(0,100).map(function(p) {
+        return '<tr><td style="font-weight:600">' + escapeHTML(maskPHI(p.name)) + '</td>' +
+          '<td><span style="color:#059669;font-weight:600;font-size:11px">' + escapeHTML(p.status) + '</span></td>' +
+          '<td style="font-size:11px;color:#475569">' + escapeHTML(p.email||'—') + '</td>' +
+          '<td style="font-size:11px;color:#475569">' + escapeHTML(p.mobile||p.home_phone||p.work_phone||'—') + '</td>' +
+          '<td style="font-size:11px">' + escapeHTML(p.site||'—') + '</td></tr>';
+      }).join('') + '</tbody></table>';
+    if (cleanPatients.length > 100) body += '<div style="text-align:center;padding:8px;font-size:11px;color:#94a3b8;">Showing 100 of ' + cleanPatients.length + '</div>';
+    openModal('Clean Contact Data', cleanPatients.length + ' patients with good contact info', body);
+    return;
+  }
+  var alerts = (CONTACT_ALERTS||[]).filter(function(a) { return a.severity === severity; });
+  if (!alerts.length) {
+    openModal(severity === 'red' ? 'Red Flag Patients' : 'Yellow Flag Patients', 'No flags found',
+      '<div style="text-align:center;padding:30px;color:#94a3b8;">No ' + severity + ' flag patients found</div>');
+    return;
+  }
+  var body = '<table class="detail-table"><thead><tr><th>Patient</th><th>Alert Type</th><th>Detail</th><th>Studies</th><th>Contact</th></tr></thead><tbody>' +
+    alerts.map(function(a) {
+      var color = severity === 'red' ? '#dc2626' : '#d97706';
+      var studies = (a.studies||[a.study]).join(', ');
+      var contact = [];
+      if (a.email) contact.push(a.email);
+      if (a.phone) contact.push(a.phone);
+      return '<tr><td>' + patientLink(a.patient, a.patient_url, 'color:'+color+';') + '</td>' +
+        '<td><span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:' + color + '22;color:' + color + '">' + escapeHTML(a.alert_type) + '</span></td>' +
+        '<td style="font-size:11px;color:#475569;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHTML(a.detail||'') + '">' + escapeHTML(a.detail||'') + '</td>' +
+        '<td style="font-size:11px">' + escapeHTML(studies) + '</td>' +
+        '<td style="font-size:11px;color:#64748b">' + escapeHTML(contact.join(' / ')||'None') + '</td></tr>';
+    }).join('') + '</tbody></table>';
+  openModal(severity === 'red' ? 'Red Flag Patients' : 'Yellow Flag Patients', alerts.length + ' patients flagged', body);
+}
+
+/* ── KPI Popup: Patient DB Summary ────────────────────── */
+function showPatientDB() {
+  if (!PATIENT_DB.length) {
+    openModal('Patient Database', 'Not loaded', '<div style="text-align:center;padding:30px;color:#94a3b8;">Patient database has not loaded yet</div>');
+    return;
+  }
+  var statusCounts = {};
+  PATIENT_DB.forEach(function(p) {
+    var s = p.status || 'Unknown';
+    statusCounts[s] = (statusCounts[s]||0) + 1;
+  });
+  var statuses = Object.entries(statusCounts).sort(function(a,b){ return b[1]-a[1]; });
+  var maxCount = statuses[0] ? statuses[0][1] : 1;
+  var body = '<div style="max-width:500px;margin:0 auto;">';
+  statuses.forEach(function(s) {
+    var pct = Math.max(Math.round(s[1]/maxCount*100), 4);
+    var color = s[0]==='Available'?'#059669':s[0]==='Do Not Solicit'||s[0]==='Do Not Enroll'||s[0]==='Deceased'?'#dc2626':'#3b82f6';
+    body += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">' +
+      '<div style="width:140px;font-size:12px;font-weight:600;color:#475569;text-align:right">' + escapeHTML(s[0]) + '</div>' +
+      '<div style="flex:1;background:#f1f5f9;border-radius:4px;height:24px;position:relative;overflow:hidden;">' +
+      '<div style="width:' + pct + '%;background:' + color + ';height:100%;border-radius:4px;display:flex;align-items:center;justify-content:center;">' +
+      '<span style="font-size:11px;font-weight:700;color:#fff;">' + s[1] + '</span></div></div></div>';
+  });
+  body += '</div>';
+  openModal('Patient Database Summary', PATIENT_DB.length + ' total records', body);
+}
+
+/* ── KPI Popup: Trends Summary ────────────────────── */
+function showTrendsSummary() {
+  var cancels = DATA.allCancels||[];
+  var upcoming = DATA.allVisitDetail||[];
+  var body = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:8px;">';
+  body += '<div style="background:#fef2f2;border-radius:10px;padding:16px;text-align:center;">' +
+    '<div style="font-size:28px;font-weight:800;color:#dc2626">' + cancels.length + '</div>' +
+    '<div style="font-size:12px;color:#64748b;margin-top:4px">Total Cancellations</div></div>';
+  body += '<div style="background:#f0fdf4;border-radius:10px;padding:16px;text-align:center;">' +
+    '<div style="font-size:28px;font-weight:800;color:#059669">' + upcoming.length + '</div>' +
+    '<div style="font-size:12px;color:#64748b;margin-top:4px">Total Upcoming Visits</div></div>';
+  // Cancel reasons breakdown
+  var reasons = {};
+  cancels.forEach(function(c) { var r = c.reason||'Unknown'; reasons[r] = (reasons[r]||0)+1; });
+  var topReasons = Object.entries(reasons).sort(function(a,b){return b[1]-a[1];}).slice(0,8);
+  if (topReasons.length) {
+    body += '<div style="grid-column:1/-1;"><div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:8px;">Top Cancel Reasons</div>';
+    body += '<table class="detail-table"><thead><tr><th>Reason</th><th style="text-align:center">Count</th><th style="text-align:center">%</th></tr></thead><tbody>';
+    topReasons.forEach(function(r) {
+      body += '<tr><td style="font-size:12px">' + escapeHTML(r[0]) + '</td><td style="text-align:center;font-weight:700;color:#dc2626">' + r[1] + '</td>' +
+        '<td style="text-align:center;font-size:11px;color:#64748b">' + Math.round(r[1]/cancels.length*100) + '%</td></tr>';
+    });
+    body += '</tbody></table></div>';
+  }
+  body += '</div>';
+  openModal('Trends Summary', 'Data snapshot overview', body);
 }
 
 function showStudyDetail(studyName, studyUrl) {

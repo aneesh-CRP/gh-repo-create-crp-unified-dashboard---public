@@ -5034,6 +5034,172 @@ function showRiskFlags(title) {
   openModal(title||'At-Risk Patients', flags.length + ' patients with 2+ cancel events & upcoming visit', body);
 }
 
+/* ── KPI Popup: Risk Studies ────────────────────── */
+function showRiskStudies() {
+  var flags = DATA.riskFlags||[];
+  var studyMap = {};
+  flags.forEach(function(f) {
+    if (!studyMap[f.study]) studyMap[f.study] = { study: f.study, study_url: f.study_url, patients: [], totalCancels: 0 };
+    studyMap[f.study].patients.push(f);
+    studyMap[f.study].totalCancels += f.cancels;
+  });
+  var studies = Object.values(studyMap).sort(function(a,b){ return b.totalCancels - a.totalCancels; });
+  var body = '<table class="detail-table"><thead><tr><th>Study</th><th>At-Risk Patients</th><th>Total Cancel Events</th></tr></thead><tbody>' +
+    studies.map(function(s) {
+      return '<tr><td>' + extLink(s.study, s.study_url) + '</td>' +
+        '<td style="text-align:center;font-weight:700;color:#dc2626">' + s.patients.length + '</td>' +
+        '<td style="text-align:center"><span style="background:#fef2f2;color:#dc2626;font-weight:700;padding:2px 8px;border-radius:4px">' + s.totalCancels + '</span></td></tr>';
+    }).join('') + '</tbody></table>';
+  openModal('Studies With Risk Flags', studies.length + ' studies affected', body);
+}
+
+/* ── KPI Popup: Site Active Patients ────────────────────── */
+function showSitePatients() {
+  var visits = (DATA && DATA.allVisitDetail) ? DATA.allVisitDetail : [];
+  var patientMap = {};
+  visits.forEach(function(v) {
+    var key = (v.patient||'').toLowerCase().trim();
+    if (!key) return;
+    if (!patientMap[key] || (v.date_iso && v.date_iso > (patientMap[key].date_iso||''))) {
+      patientMap[key] = { name: v.patient, site: v.site, study: v.study, date: v.date, status: v.status||'Scheduled', url: v.patient_url, date_iso: v.date_iso };
+    }
+  });
+  var patients = Object.values(patientMap).sort(function(a,b){ return (a.site||'').localeCompare(b.site||'') || (a.name||'').localeCompare(b.name||''); });
+  var body = '<table class="detail-table"><thead><tr><th>Patient</th><th>Site</th><th>Study</th><th>Next Visit</th><th>Status</th></tr></thead><tbody>' +
+    patients.map(function(p) {
+      var siteLabel = (p.site||'').includes('Penn') ? '<span style="color:#059669;font-weight:600">PNJ</span>' : '<span style="color:#1843ad;font-weight:600">PHL</span>';
+      return '<tr><td>' + patientLink(p.name, p.url) + '</td><td style="text-align:center">' + siteLabel + '</td>' +
+        '<td style="font-size:11px">' + escapeHTML(p.study||'') + '</td>' +
+        '<td style="font-size:11px;font-weight:600;color:#1843ad">' + escapeHTML(p.date||'') + '</td>' +
+        '<td>' + statusBadge(p.status) + '</td></tr>';
+    }).join('') + '</tbody></table>';
+  openModal('Site Active Patients', patients.length + ' unique patients across sites', body);
+}
+
+/* ── KPI Popup: FB Leads ────────────────────── */
+function showFBLeads() {
+  var now = Date.now();
+  var leads = (FB_CRM_DATA||[]).filter(function(f) {
+    var d = f['Date Created']||'';
+    if (!d) return false;
+    try { return (now - new Date(d).getTime()) < 30*86400000; } catch(e) { return false; }
+  });
+  if (!leads.length) {
+    openModal('Facebook Leads (30 Days)', 'No leads found', '<div style="text-align:center;padding:30px;color:#94a3b8;">No Facebook/Meta leads in the last 30 days</div>');
+    return;
+  }
+  var body = '<table class="detail-table"><thead><tr><th>Name</th><th>Date Created</th><th>Study</th><th>Source</th><th>Status</th></tr></thead><tbody>' +
+    leads.map(function(f) {
+      return '<tr><td style="font-weight:600">' + escapeHTML(maskPHI(f['Full Name']||f['Name']||'—')) + '</td>' +
+        '<td style="font-size:11px;color:#64748b">' + escapeHTML(f['Date Created']||'') + '</td>' +
+        '<td style="font-size:11px">' + escapeHTML(f['Study']||f['Campaign']||'—') + '</td>' +
+        '<td style="font-size:11px;color:#475569">' + escapeHTML(f['Source']||'Meta') + '</td>' +
+        '<td style="font-size:11px">' + escapeHTML(f['Status']||'New') + '</td></tr>';
+    }).join('') + '</tbody></table>';
+  openModal('Facebook Leads (30 Days)', leads.length + ' leads', body);
+}
+
+/* ── KPI Popup: Contact Alerts ────────────────────── */
+function showContactAlerts(severity) {
+  if (severity === 'clean') {
+    // Show clean patients from PATIENT_DB
+    var visits = DATA.allVisitDetail||[];
+    var activeNames = new Set();
+    visits.forEach(function(v) { activeNames.add((v.patient||'').toLowerCase().trim()); });
+    var cleanPatients = PATIENT_DB.filter(function(p) {
+      if (!activeNames.has(p.name_lower)) return false;
+      if (p.status === 'Do Not Solicit' || p.status === 'Do Not Enroll' || p.status === 'Deceased') return false;
+      return (p.email || p.mobile || p.home_phone || p.work_phone);
+    });
+    var body = '<table class="detail-table"><thead><tr><th>Patient</th><th>Status</th><th>Email</th><th>Phone</th><th>Site</th></tr></thead><tbody>' +
+      cleanPatients.slice(0,100).map(function(p) {
+        return '<tr><td style="font-weight:600">' + escapeHTML(maskPHI(p.name)) + '</td>' +
+          '<td><span style="color:#059669;font-weight:600;font-size:11px">' + escapeHTML(p.status) + '</span></td>' +
+          '<td style="font-size:11px;color:#475569">' + escapeHTML(p.email||'—') + '</td>' +
+          '<td style="font-size:11px;color:#475569">' + escapeHTML(p.mobile||p.home_phone||p.work_phone||'—') + '</td>' +
+          '<td style="font-size:11px">' + escapeHTML(p.site||'—') + '</td></tr>';
+      }).join('') + '</tbody></table>';
+    if (cleanPatients.length > 100) body += '<div style="text-align:center;padding:8px;font-size:11px;color:#94a3b8;">Showing 100 of ' + cleanPatients.length + '</div>';
+    openModal('Clean Contact Data', cleanPatients.length + ' patients with good contact info', body);
+    return;
+  }
+  var alerts = (CONTACT_ALERTS||[]).filter(function(a) { return a.severity === severity; });
+  if (!alerts.length) {
+    openModal(severity === 'red' ? 'Red Flag Patients' : 'Yellow Flag Patients', 'No flags found',
+      '<div style="text-align:center;padding:30px;color:#94a3b8;">No ' + severity + ' flag patients found</div>');
+    return;
+  }
+  var body = '<table class="detail-table"><thead><tr><th>Patient</th><th>Alert Type</th><th>Detail</th><th>Studies</th><th>Contact</th></tr></thead><tbody>' +
+    alerts.map(function(a) {
+      var color = severity === 'red' ? '#dc2626' : '#d97706';
+      var studies = (a.studies||[a.study]).join(', ');
+      var contact = [];
+      if (a.email) contact.push(a.email);
+      if (a.phone) contact.push(a.phone);
+      return '<tr><td>' + patientLink(a.patient, a.patient_url, 'color:'+color+';') + '</td>' +
+        '<td><span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:' + color + '22;color:' + color + '">' + escapeHTML(a.alert_type) + '</span></td>' +
+        '<td style="font-size:11px;color:#475569;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHTML(a.detail||'') + '">' + escapeHTML(a.detail||'') + '</td>' +
+        '<td style="font-size:11px">' + escapeHTML(studies) + '</td>' +
+        '<td style="font-size:11px;color:#64748b">' + escapeHTML(contact.join(' / ')||'None') + '</td></tr>';
+    }).join('') + '</tbody></table>';
+  openModal(severity === 'red' ? 'Red Flag Patients' : 'Yellow Flag Patients', alerts.length + ' patients flagged', body);
+}
+
+/* ── KPI Popup: Patient DB Summary ────────────────────── */
+function showPatientDB() {
+  if (!PATIENT_DB.length) {
+    openModal('Patient Database', 'Not loaded', '<div style="text-align:center;padding:30px;color:#94a3b8;">Patient database has not loaded yet</div>');
+    return;
+  }
+  var statusCounts = {};
+  PATIENT_DB.forEach(function(p) {
+    var s = p.status || 'Unknown';
+    statusCounts[s] = (statusCounts[s]||0) + 1;
+  });
+  var statuses = Object.entries(statusCounts).sort(function(a,b){ return b[1]-a[1]; });
+  var maxCount = statuses[0] ? statuses[0][1] : 1;
+  var body = '<div style="max-width:500px;margin:0 auto;">';
+  statuses.forEach(function(s) {
+    var pct = Math.max(Math.round(s[1]/maxCount*100), 4);
+    var color = s[0]==='Available'?'#059669':s[0]==='Do Not Solicit'||s[0]==='Do Not Enroll'||s[0]==='Deceased'?'#dc2626':'#3b82f6';
+    body += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">' +
+      '<div style="width:140px;font-size:12px;font-weight:600;color:#475569;text-align:right">' + escapeHTML(s[0]) + '</div>' +
+      '<div style="flex:1;background:#f1f5f9;border-radius:4px;height:24px;position:relative;overflow:hidden;">' +
+      '<div style="width:' + pct + '%;background:' + color + ';height:100%;border-radius:4px;display:flex;align-items:center;justify-content:center;">' +
+      '<span style="font-size:11px;font-weight:700;color:#fff;">' + s[1] + '</span></div></div></div>';
+  });
+  body += '</div>';
+  openModal('Patient Database Summary', PATIENT_DB.length + ' total records', body);
+}
+
+/* ── KPI Popup: Trends Summary ────────────────────── */
+function showTrendsSummary() {
+  var cancels = DATA.allCancels||[];
+  var upcoming = DATA.allVisitDetail||[];
+  var body = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:8px;">';
+  body += '<div style="background:#fef2f2;border-radius:10px;padding:16px;text-align:center;">' +
+    '<div style="font-size:28px;font-weight:800;color:#dc2626">' + cancels.length + '</div>' +
+    '<div style="font-size:12px;color:#64748b;margin-top:4px">Total Cancellations</div></div>';
+  body += '<div style="background:#f0fdf4;border-radius:10px;padding:16px;text-align:center;">' +
+    '<div style="font-size:28px;font-weight:800;color:#059669">' + upcoming.length + '</div>' +
+    '<div style="font-size:12px;color:#64748b;margin-top:4px">Total Upcoming Visits</div></div>';
+  // Cancel reasons breakdown
+  var reasons = {};
+  cancels.forEach(function(c) { var r = c.reason||'Unknown'; reasons[r] = (reasons[r]||0)+1; });
+  var topReasons = Object.entries(reasons).sort(function(a,b){return b[1]-a[1];}).slice(0,8);
+  if (topReasons.length) {
+    body += '<div style="grid-column:1/-1;"><div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:8px;">Top Cancel Reasons</div>';
+    body += '<table class="detail-table"><thead><tr><th>Reason</th><th style="text-align:center">Count</th><th style="text-align:center">%</th></tr></thead><tbody>';
+    topReasons.forEach(function(r) {
+      body += '<tr><td style="font-size:12px">' + escapeHTML(r[0]) + '</td><td style="text-align:center;font-weight:700;color:#dc2626">' + r[1] + '</td>' +
+        '<td style="text-align:center;font-size:11px;color:#64748b">' + Math.round(r[1]/cancels.length*100) + '%</td></tr>';
+    });
+    body += '</tbody></table></div>';
+  }
+  body += '</div>';
+  openModal('Trends Summary', 'Data snapshot overview', body);
+}
+
 function showStudyDetail(studyName, studyUrl) {
   const cancels = (DATA.cancelByStudy||[]).find(s=>s.name===studyName||s.full===studyName);
   const upcoming = (DATA.allVisitDetail||[]).filter(r=>r.study===studyName);
