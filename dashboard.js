@@ -3915,8 +3915,26 @@ function processLiveData(allRows, legacyCancels, auditLog) {
     return r;
   });
 
+  // Build lookup of patients who have a future appointment (i.e. they rescheduled)
+  const rescheduledPatientStudy = new Set();
+  activeUpcoming.forEach(r => {
+    const name = (r['Subject Full Name']||'').replace(/\s{2,}/g,' ').trim().toLowerCase();
+    const study = (r['Study Name']||'').trim().toLowerCase();
+    if (name && study) rescheduledPatientStudy.add(name + '||' + study);
+  });
+
   // recentCancels = only TRUE cancellations (excludes rescheduled, completed, admin error, fibroscan, study closed)
-  const recentCancels = allCategorized.filter(r => !EXCLUDED_CANCEL_CATS.has(r._category));
+  // Also excludes cancels where the same patient+study has a future appointment (they rescheduled)
+  const recentCancels = allCategorized.filter(r => {
+    if (EXCLUDED_CANCEL_CATS.has(r._category)) return false;
+    const name = (r['Subject Full Name']||'').replace(/\s{2,}/g,' ').trim().toLowerCase();
+    const study = (r['Study Name']||'').trim().toLowerCase();
+    if (name && study && rescheduledPatientStudy.has(name + '||' + study)) {
+      r._category = 'Rescheduled';
+      return false;
+    }
+    return true;
+  });
 
   // Keep all categorized for the full allCancels detail view (including excluded categories, marked as such)
   const allCategorizedForDetail = allCategorized;
