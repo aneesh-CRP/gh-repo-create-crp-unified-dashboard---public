@@ -925,6 +925,7 @@ body {
     <button class="refresh-btn" onclick="refreshData()">&#x21bb; Refresh</button>
   </div>
 </nav>
+<div id="fallback-banner" style="display:none;background:#fef2f2;border-bottom:2px solid #fecaca;padding:6px 16px;font-size:12px;color:#991b1b;text-align:center;font-weight:600;">⚠ Showing sample data — live data unavailable. <button onclick="refreshData()" style="background:#dc2626;color:white;border:none;border-radius:4px;padding:2px 10px;font-size:11px;cursor:pointer;margin-left:8px;">Retry</button></div>
 
 <!-- Data Health Strip — shows data source status + freshness -->
 <div id="data-health-strip" style="display:none;background:#F7FAFC;border-bottom:1px solid #E2E8F0;padding:6px 24px;font-size:11px;font-family:inherit;color:#718096;align-items:center;gap:12px;flex-wrap:wrap;">
@@ -1034,7 +1035,7 @@ body {
       <div class="tb-sub">New Meta/Facebook leads</div>
     </div>
     <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showReferralDetailModal(r=>r.stage==='Enrolled'||r.stage==='Screened','Enrolled Referrals','Conversion breakdown')" title="Click to see enrolled referrals">
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showReferralDetailModal(r=>CRP_CONFIG.CLICKUP.STAGE_GROUPS.ENROLLED.has(r.stage),'Enrolled Referrals','Conversion breakdown')" title="Click to see enrolled referrals">
       <div class="tb-label">🎯 Lead→Enrolled</div>
       <div class="tb-value" style="color:#059669" id="ov-kpi-conv">—</div>
       <div class="tb-sub">Referral conversion rate</div>
@@ -2334,13 +2335,13 @@ body {
         <div class="tb-sub">Interested + actively engaged</div>
       </div>
       <div class="tb-divider"></div>
-      <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showReferralDetailModal(r=>r.stage==='Pre-Screening'||r.stage==='Screening','Screening Referrals','Pre-screening + screening')" title="Click to see screening referrals">
+      <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showReferralDetailModal(r=>CRP_CONFIG.CLICKUP.STAGE_GROUPS.SCREENING.has(r.stage),'Screening Referrals','Pre-screening + screening')" title="Click to see screening referrals">
         <div class="tb-label">🩺 Screening</div>
         <div class="tb-value green" id="ref-kpi-screening">—</div>
         <div class="tb-sub">Pre-screening + screening</div>
       </div>
       <div class="tb-divider"></div>
-      <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showReferralDetailModal(r=>r.stage==='Enrolled'||r.stage==='Screened','Enrolled Referrals','Randomized + completed')" title="Click to see enrolled referrals">
+      <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showReferralDetailModal(r=>CRP_CONFIG.CLICKUP.STAGE_GROUPS.ENROLLED.has(r.stage),'Enrolled Referrals','Randomized + completed')" title="Click to see enrolled referrals">
         <div class="tb-label">✅ Enrolled</div>
         <div class="tb-value" style="color:#059669" id="ref-kpi-enrolled">—</div>
         <div class="tb-sub">Randomized + completed</div>
@@ -2821,6 +2822,13 @@ const CRP_CONFIG = {
   },
 
   // Finance tab GIDs in the published Master Sheet
+  // ── To add a new finance data source: ──
+  // 1. Add GID here
+  // 2. Add fetch call in fetchFinanceLive() using fetchFinanceTab(pk, tabs.YOUR_TAB)
+  // 3. Create parseYourTabCSV(rows) function returning structured data
+  // 4. Assign result to a global variable (let YOUR_DATA = [])
+  // 5. Create renderYourTab() function and call it in the finance render chain
+  // 6. Add expected columns to EXPECTED_COLUMNS below for schema validation
   FINANCE_TABS: {
     AGING_INV:     '1436743094',
     AGING_AP:      '1893853669',
@@ -2889,6 +2897,14 @@ const CRP_CONFIG = {
     PIPELINE_ORDER: ['New Lead', 'Contacted', 'Pre-Screening', 'Screening', 'Screened', 'Enrolled'],
     // Closed/terminal stages (not in funnel)
     CLOSED_STAGES: ['DNQ', 'Screen Fail', 'Lost'],
+    // Stage groups — use these instead of hardcoding stage names in logic
+    // To add a stage: add it to the appropriate group + PIPELINE_ORDER or CLOSED_STAGES above
+    STAGE_GROUPS: {
+      ENROLLED:  new Set(['Screened', 'Enrolled']),         // count as "enrolled" for conversion
+      SCREENING: new Set(['Pre-Screening', 'Screening']),   // in active screening process
+      SCHEDULED: new Set(['Pre-Screening', 'Screening', 'Screened', 'Enrolled']),  // had a scheduled visit
+      CLOSED:    new Set(['DNQ', 'Screen Fail', 'Lost']),   // terminal / closed
+    },
     SOURCE_RENAME: { 'Practice': 'Princeton CardioMetabolic' },
 
     // Medical Records & Patient's Path folder (per-study patient tracking)
@@ -2947,9 +2963,23 @@ const CRP_CONFIG = {
     PNJ: { name: 'Pennington, NJ', coordinators: ['Angelina McMullen', 'Cady Chilensky'] },
   },
 
+  // Expected CSV columns per data source — used by validateColumns() to warn on schema drift
+  EXPECTED_COLUMNS: {
+    CRIO: ['Study Name','Study Key','Site Name','Scheduled Date','Subject Full Name',
+           'Subject Key (Back End)','Full Name','Appointment Status','Name','Subject Status','Subject ID'],
+    CANCELLATIONS: ['Study Name','Study Key','Site Name','Cancel Date','Scheduled Date',
+                    'Subject Full Name','Subject Key (Back End)','Staff Full Name',
+                    'Cancel Reason','Appointment Cancellation Type'],
+    AUDIT_LOG: ['Appointment For User','Appointment Change Type',
+                'Calendar Appointment Key (back end)','Subject Key (Back End)'],
+    AGING: ['Age Tier','1. Current','2. 30-60','3. 61-90','4. 91-120','5. 121-150','6. 150+'],
+    UNPAID_INV: ['Study Name','Invoice Number','Due Date','Days Overdue','Amount'],
+    REVENUE: ['Study Name','Amount','Amount Upfront','Amount Remaining','Revenue Type','Pay Type'],
+  },
+
   // Version
-  VERSION: '2.9.5',
-  BUILD_DATE: '2026-03-11T12:00:00Z',
+  VERSION: '2.9.6',
+  BUILD_DATE: '2026-03-13T12:00:00Z',
 };
 
 // ═══ EVENT BUS (for plugin extensibility) ═══
@@ -5470,7 +5500,8 @@ function buildInsights() {
   });
 
   // Cross-source: referral pipeline enrolled
-  var enrolledRefs = REFERRAL_DATA ? REFERRAL_DATA.filter(function(r){ return r.stage === 'Enrolled' || r.stage === 'Screened'; }).length : 0;
+  var _sgE = (CRP_CONFIG.CLICKUP||{}).STAGE_GROUPS||{};
+  var enrolledRefs = REFERRAL_DATA ? REFERRAL_DATA.filter(function(r){ return _sgE.ENROLLED && _sgE.ENROLLED.has(r.stage); }).length : 0;
   if (enrolledRefs > 0) {
     posItems.push(`<div class="insight-item positive"><span class="insight-icon">🎯</span><div>
       <div class="insight-title">${enrolledRefs} patients enrolled via referral pipeline</div>
@@ -5677,6 +5708,25 @@ function parseCSV(text) {
     headers.forEach((h, i) => obj[h] = vals[i] || '');
     return obj;
   });
+}
+
+/**
+ * Validate that parsed CSV rows contain the expected columns.
+ * Logs a warning for each missing column — helps catch silent schema drift
+ * when columns are renamed in Google Sheets.
+ * @param {Object[]} rows - Parsed CSV rows
+ * @param {string} sourceName - Key in CRP_CONFIG.EXPECTED_COLUMNS (e.g. 'CRIO')
+ */
+function validateColumns(rows, sourceName) {
+  if (!rows || !rows.length) return;
+  var expected = (CRP_CONFIG.EXPECTED_COLUMNS || {})[sourceName];
+  if (!expected) return;
+  var actual = Object.keys(rows[0]);
+  var missing = expected.filter(function(col) { return actual.indexOf(col) === -1; });
+  if (missing.length) {
+    console.warn('CRP Schema: ' + sourceName + ' is missing expected columns: ' + missing.join(', '));
+    showToast(sourceName + ' data missing columns: ' + missing.slice(0,3).join(', ') + (missing.length > 3 ? '...' : ''), 'warning', 6000);
+  }
 }
 
 // ═══════════════════════════════════════════════════
@@ -6691,15 +6741,15 @@ function processLiveData(allRows, legacyCancels, auditLog) {
 
   // ── Helpers ──
   function weekBucket(rows, dateField) {
-    const b = {};
+    const b = {};   // iso → { label, count }
     rows.forEach(r => {
       const d = parseDate(r[dateField]); if (!d) return;
       const mon = new Date(d); mon.setDate(d.getDate() - ((d.getDay()+6)%7));
-      const k = mon.toLocaleDateString('en-US',{month:'short',day:'numeric'});
-      b[k] = (b[k]||0) + 1;
+      const iso = localISO(mon);
+      if (!b[iso]) b[iso] = { week: mon.toLocaleDateString('en-US',{month:'short',day:'numeric'}), count: 0 };
+      b[iso].count++;
     });
-    return Object.entries(b).map(([week,count])=>({week,count}))
-      .sort((a,b) => new Date(new Date().getFullYear()+' '+a.week) - new Date(new Date().getFullYear()+' '+b.week));
+    return Object.keys(b).sort().map(iso => b[iso]);
   }
 
   function groupBy(rows, field) {
@@ -6725,58 +6775,54 @@ function processLiveData(allRows, legacyCancels, auditLog) {
     return 'Other';
   }
 
-  // ── cancelByStudy with CRIO links ──
-  const cancelStudyMap = {};
-  recentCancels.forEach(r => {
-    const sn = r['Study Name'];
-    if (!cancelStudyMap[sn]) cancelStudyMap[sn] = {count:0, study_url: studyUrl(r['Study Key'], r['Site Name'])};
-    cancelStudyMap[sn].count++;
-    if (!cancelStudyMap[sn].study_url) cancelStudyMap[sn].study_url = studyUrl(r['Study Key'], r['Site Name']);
-  });
-  const cancelByStudy = Object.entries(cancelStudyMap)
-    .map(([full,v]) => ({name: full.split(' - ').pop(), full, count: v.count, study_url: v.study_url}))
-    .sort((a,b) => b.count - a.count);
+  // ── Extracted helpers: study-level aggregations ──
+  // To add a new study-level KPI: add a new buildXxxByStudy() function following this pattern.
 
-  // ── upcomingByStudy with CRIO links ──
-  const upStudyMap = {};
-  activeUpcoming.forEach(r => {
-    const sn = r['Study Name'];
-    if (!upStudyMap[sn]) upStudyMap[sn] = {count:0, study_url: studyUrl(r['Study Key'], r['Site Name']),
-      site: siteSlug(r['Study Key'], r['Site Name'])===PNJ ? 'Pennington, NJ' : 'Philadelphia, PA'};
-    upStudyMap[sn].count++;
-    if (!upStudyMap[sn].study_url) upStudyMap[sn].study_url = studyUrl(r['Study Key'], r['Site Name']);
-  });
-  const upcomingByStudy = Object.entries(upStudyMap)
-    .map(([full,v]) => ({name: full.split(' - ').pop(), full, count: v.count, site: v.site, study_url: v.study_url}))
-    .sort((a,b) => b.count - a.count);
+  function buildByStudy(rows, nameField, keyField, siteField) {
+    const m = {};
+    rows.forEach(r => {
+      const sn = r[nameField];
+      if (!m[sn]) m[sn] = { count: 0, study_url: studyUrl(r[keyField], r[siteField]),
+        site: siteSlug(r[keyField], r[siteField])===PNJ ? 'Pennington, NJ' : 'Philadelphia, PA' };
+      m[sn].count++;
+      if (!m[sn].study_url) m[sn].study_url = studyUrl(r[keyField], r[siteField]);
+    });
+    return Object.entries(m)
+      .map(([full,v]) => ({name: full.split(' - ').pop(), full, count: v.count, site: v.site, study_url: v.study_url}))
+      .sort((a,b) => b.count - a.count);
+  }
 
-  // ── riskMatrix with CRIO links ──
-  const riskMap = {};
-  recentCancels.forEach(r => {
-    const s=r['Study Name']; if (!riskMap[s]) riskMap[s]={study:s.split(' - ').pop(),full:s,cancel:0,upcoming:0,study_url:studyUrl(r['Study Key'],r['Site Name'])};
-    riskMap[s].cancel++;
-  });
-  activeUpcoming.forEach(r => {
-    const s=r['Study Name']; if (!riskMap[s]) riskMap[s]={study:s.split(' - ').pop(),full:s,cancel:0,upcoming:0,study_url:studyUrl(r['Study Key'],r['Site Name'])};
-    riskMap[s].upcoming++;
-  });
-  const riskMatrix = Object.values(riskMap).map(r => {
-    // Only apply risk scoring to actively enrolling studies
-    const enrollStatus = (() => {
-      const ed = (DATA.enrollmentData||[]).find(e=>e.study===r.study);
-      return ed ? ed.status : 'Enrolling';
-    })();
-    if (enrollStatus !== 'Enrolling') {
-      const lvl = enrollStatus === 'Maintenance' ? 'maintenance' : 'closed';
-      return { study: r.study, full: r.full, study_url: r.study_url,
-               cancels: r.cancel, upcoming: r.upcoming,
-               score: 0, level: 'n/a', action: '—' };
-    }
-    const score = r.cancel * 0.6 + (1/(r.upcoming+1)) * 3;
-    const level = score > 4 ? 'critical' : score > 2.5 ? 'high' : score > 1 ? 'medium' : 'low';
-    return {...r, score: Math.round(score*100)/100, level,
-      action: level==='critical'?'Immediate review':level==='high'?'Monitor closely':level==='medium'?'Watch':'On track'};
-  }).sort((a,b) => b.score - a.score);
+  const cancelByStudy  = buildByStudy(recentCancels, 'Study Name', 'Study Key', 'Site Name');
+  const upcomingByStudy = buildByStudy(activeUpcoming, 'Study Name', 'Study Key', 'Site Name');
+
+  function buildRiskMatrix(cancels, upcoming) {
+    const riskMap = {};
+    cancels.forEach(r => {
+      const s=r['Study Name']; if (!riskMap[s]) riskMap[s]={study:s.split(' - ').pop(),full:s,cancel:0,upcoming:0,study_url:studyUrl(r['Study Key'],r['Site Name'])};
+      riskMap[s].cancel++;
+    });
+    upcoming.forEach(r => {
+      const s=r['Study Name']; if (!riskMap[s]) riskMap[s]={study:s.split(' - ').pop(),full:s,cancel:0,upcoming:0,study_url:studyUrl(r['Study Key'],r['Site Name'])};
+      riskMap[s].upcoming++;
+    });
+    return Object.values(riskMap).map(r => {
+      const enrollStatus = (() => {
+        const ed = (DATA.enrollmentData||[]).find(e=>e.study===r.study);
+        return ed ? ed.status : 'Enrolling';
+      })();
+      if (enrollStatus !== 'Enrolling') {
+        return { study: r.study, full: r.full, study_url: r.study_url,
+                 cancels: r.cancel, upcoming: r.upcoming,
+                 score: 0, level: 'n/a', action: '—' };
+      }
+      const score = r.cancel * 0.6 + (1/(r.upcoming+1)) * 3;
+      const level = score > 4 ? 'critical' : score > 2.5 ? 'high' : score > 1 ? 'medium' : 'low';
+      return {...r, score: Math.round(score*100)/100, level,
+        action: level==='critical'?'Immediate review':level==='high'?'Monitor closely':level==='medium'?'Watch':'On track'};
+    }).sort((a,b) => b.score - a.score);
+  }
+
+  const riskMatrix = buildRiskMatrix(recentCancels, activeUpcoming);
 
   // ── next14Detail with full patient links ──
   const next14Detail = activeUpcoming
@@ -6836,37 +6882,43 @@ function processLiveData(allRows, legacyCancels, auditLog) {
       return { patient, study: study.split(' - ').pop(),
         patient_url: up.patient_url || meta.patient_url,
         study_url:   up.study_url   || meta.study_url,
-        cancels: c, next_visit: up.date_str, last_cancel: meta.last_cancel||'' };
-    }).sort((a,b) => new Date(new Date().getFullYear()+' '+a.next_visit) - new Date(new Date().getFullYear()+' '+b.next_visit));
+        cancels: c, next_visit: up.date_str, _sort_date: up.date, last_cancel: meta.last_cancel||'' };
+    }).sort((a,b) => (a._sort_date||0) - (b._sort_date||0));
 
-  // ── coordinators ──
-  const coordMap2 = {};
-  activeUpcoming.forEach(r => {
-    const cn = cleanCoord(r['Full Name']); if (!isCoord(r['Full Name'])) return;
-    if (!coordMap2[cn]) coordMap2[cn] = {name:cn, upcoming:0, cancels:0, undoc:0,
-      site: siteSlug(r['Study Key'],r['Site Name'])===PNJ?'Pennington, NJ':'Philadelphia, PA'};
-    coordMap2[cn].upcoming++;
-  });
-  recentCancels.forEach(r => {
-    const cn = cleanCoord(r['Staff Full Name']); if (!isCoord(r['Staff Full Name'])) return;
-    if (!coordMap2[cn]) coordMap2[cn] = {name:cn, upcoming:0, cancels:0, undoc:0,
-      site: siteSlug(r['Study Key'],r['Site Name'])===PNJ?'Pennington, NJ':'Philadelphia, PA'};
-    coordMap2[cn].cancels++;
-    if (!(r['Cancel Reason']||'').trim()) coordMap2[cn].undoc++;
-  });
-  const coordinators = Object.values(coordMap2).sort((a,b) => b.upcoming - a.upcoming);
+  // ── Extracted helper: coordinator stats ──
+  function buildCoordinatorStats(upcoming, cancels) {
+    const m = {};
+    upcoming.forEach(r => {
+      const cn = cleanCoord(r['Full Name']); if (!isCoord(r['Full Name'])) return;
+      if (!m[cn]) m[cn] = {name:cn, upcoming:0, cancels:0, undoc:0,
+        site: siteSlug(r['Study Key'],r['Site Name'])===PNJ?'Pennington, NJ':'Philadelphia, PA'};
+      m[cn].upcoming++;
+    });
+    cancels.forEach(r => {
+      const cn = cleanCoord(r['Staff Full Name']); if (!isCoord(r['Staff Full Name'])) return;
+      if (!m[cn]) m[cn] = {name:cn, upcoming:0, cancels:0, undoc:0,
+        site: siteSlug(r['Study Key'],r['Site Name'])===PNJ?'Pennington, NJ':'Philadelphia, PA'};
+      m[cn].cancels++;
+      if (!(r['Cancel Reason']||'').trim()) m[cn].undoc++;
+    });
+    return Object.values(m).sort((a,b) => b.upcoming - a.upcoming);
+  }
+  const coordinators = buildCoordinatorStats(activeUpcoming, recentCancels);
 
-  // ── investigators (from resolved investigator field) ──
-  const invMap2 = {};
-  activeUpcoming.forEach(r => {
-    const inv = resolveInvestigator(r);
-    if (!inv) return;
-    const cn = cleanCoord(inv);
-    if (!invMap2[cn]) invMap2[cn] = {name:cn, upcoming:0, cancels:0, studies: new Set()};
-    invMap2[cn].upcoming++;
-    invMap2[cn].studies.add((r['Study Name']||'').split(' - ').pop().trim());
-  });
-  const investigators = Object.values(invMap2).map(v => ({...v, studyCount: v.studies.size, studies: [...v.studies]})).sort((a,b) => b.upcoming - a.upcoming);
+  // ── Extracted helper: investigator stats ──
+  function buildInvestigatorStats(upcoming) {
+    const m = {};
+    upcoming.forEach(r => {
+      const inv = resolveInvestigator(r);
+      if (!inv) return;
+      const cn = cleanCoord(inv);
+      if (!m[cn]) m[cn] = {name:cn, upcoming:0, cancels:0, studies: new Set()};
+      m[cn].upcoming++;
+      m[cn].studies.add((r['Study Name']||'').split(' - ').pop().trim());
+    });
+    return Object.values(m).map(v => ({...v, studyCount: v.studies.size, studies: [...v.studies]})).sort((a,b) => b.upcoming - a.upcoming);
+  }
+  const investigators = buildInvestigatorStats(activeUpcoming);
 
   // ── coordinator daily goals (weekdays only) ──
   // Use upcomingAllSnapshots (all daily CRIO snapshots) so past visits are included.
@@ -7015,21 +7067,22 @@ function processLiveData(allRows, legacyCancels, auditLog) {
     admin_fixes: adminFixes
   };
 
-  // ── Build visitTypes from upcoming visits ──
-  const _vtCounts = {};
-  activeUpcoming.forEach(r => {
-    const visit = (r['Name'] || r['Appointment Type'] || '').trim();
-    let vType = 'Other';
-    const vl = visit.toLowerCase();
-    if (/screen|v1\/screen|main screen/i.test(vl)) vType = 'Screening';
-    else if (/treatment|cycle|week|v\d|visit\s*\d|infusion|injection|dose/i.test(vl)) vType = 'Treatment';
-    else if (/follow.?up|end.?of.?study|eos|final|completion|closeout/i.test(vl)) vType = 'Follow-Up';
-    else if (/random|baseline/i.test(vl)) vType = 'Randomization';
-    _vtCounts[vType] = (_vtCounts[vType] || 0) + 1;
-  });
-  const visitTypes = Object.entries(_vtCounts)
-    .map(([type, count]) => ({ type, count }))
-    .sort((a, b) => b.count - a.count);
+  // ── Extracted helper: visit type classification ──
+  // To add a new visit type: add a regex pattern below.
+  function classifyVisitTypes(upcoming) {
+    const counts = {};
+    upcoming.forEach(r => {
+      const vl = (r['Name'] || r['Appointment Type'] || '').trim().toLowerCase();
+      let vType = 'Other';
+      if (/screen|v1\/screen|main screen/.test(vl)) vType = 'Screening';
+      else if (/treatment|cycle|week|v\d|visit\s*\d|infusion|injection|dose/.test(vl)) vType = 'Treatment';
+      else if (/follow.?up|end.?of.?study|eos|final|completion|closeout/.test(vl)) vType = 'Follow-Up';
+      else if (/random|baseline/.test(vl)) vType = 'Randomization';
+      counts[vType] = (counts[vType] || 0) + 1;
+    });
+    return Object.entries(counts).map(([type, count]) => ({ type, count })).sort((a, b) => b.count - a.count);
+  }
+  const visitTypes = classifyVisitTypes(activeUpcoming);
 
   return {
     actionDetails,
@@ -7629,7 +7682,8 @@ function buildRecruitmentKPIs() {
   if (el('ov-kpi-fb')) el('ov-kpi-fb').textContent = fbRecent !== null ? fbRecent : '--';
   // Conversion rate
   var totalRefs = REFERRAL_DATA ? REFERRAL_DATA.length : 0;
-  var enrolledRefs = REFERRAL_DATA ? REFERRAL_DATA.filter(function(r){ return r.stage === 'Enrolled' || r.stage === 'Screened'; }).length : 0;
+  var _sgE2 = (CRP_CONFIG.CLICKUP||{}).STAGE_GROUPS||{};
+  var enrolledRefs = REFERRAL_DATA ? REFERRAL_DATA.filter(function(r){ return _sgE2.ENROLLED && _sgE2.ENROLLED.has(r.stage); }).length : 0;
   var convRate = totalRefs > 0 ? Math.round(enrolledRefs / totalRefs * 100) + '%' : '--';
   if (el('ov-kpi-conv')) el('ov-kpi-conv').textContent = convRate;
 }
@@ -8433,17 +8487,20 @@ function renderReferralDashboard() {
 
   // ── KPIs ──
   const stageCounts = {};
+  const SG = CU.STAGE_GROUPS || {};
   CU.PIPELINE_ORDER.forEach(s => stageCounts[s] = 0);
   CU.CLOSED_STAGES.forEach(s => stageCounts[s] = 0);
   all.forEach(r => { stageCounts[r.stage] = (stageCounts[r.stage] || 0) + 1; });
+  // Sum counts for a stage group Set
+  function sgCount(group) { var t=0; if(group) group.forEach(function(s){t+=(stageCounts[s]||0);}); return t; }
 
   const el = id => document.getElementById(id);
   el('ref-kpi-leads').textContent = stageCounts['New Lead'] || 0;
   el('ref-kpi-contact').textContent = stageCounts['Contacted'] || 0;
-  el('ref-kpi-screening').textContent = (stageCounts['Pre-Screening'] || 0) + (stageCounts['Screening'] || 0);
-  el('ref-kpi-enrolled').textContent = (stageCounts['Screened'] || 0) + (stageCounts['Enrolled'] || 0);
+  el('ref-kpi-screening').textContent = sgCount(SG.SCREENING);
+  el('ref-kpi-enrolled').textContent = sgCount(SG.ENROLLED);
   const totalIn = all.length;
-  const totalEnrolled = (stageCounts['Screened'] || 0) + (stageCounts['Enrolled'] || 0);
+  const totalEnrolled = sgCount(SG.ENROLLED);
   el('ref-kpi-conversion').textContent = totalIn ? Math.round(totalEnrolled / totalIn * 100) + '%' : '—';
   el('ref-total-badge').textContent = all.length + ' total referrals';
 
@@ -8509,8 +8566,8 @@ function renderReferralDashboard() {
     if (!studyMap[s]) studyMap[s] = { total: 0, active: 0, enrolled: 0, dnq: 0, stages: {} };
     studyMap[s].total++;
     if (!r.is_closed) studyMap[s].active++;
-    if (r.stage === 'Enrolled' || r.stage === 'Screened') studyMap[s].enrolled++;
-    if (r.stage === 'DNQ' || r.stage === 'Screen Fail') studyMap[s].dnq++;
+    if (SG.ENROLLED && SG.ENROLLED.has(r.stage)) studyMap[s].enrolled++;
+    if (SG.CLOSED && SG.CLOSED.has(r.stage)) studyMap[s].dnq++;
     studyMap[s].stages[r.stage] = (studyMap[s].stages[r.stage] || 0) + 1;
   });
   const studyRows = Object.entries(studyMap).sort((a,b) => b[1].total - a[1].total);
@@ -8588,8 +8645,8 @@ function renderReferralDashboard() {
         <td style="text-align:center;">${sc['Contacted']||0}</td>
         <td style="text-align:center;">${sc['Pre-Screening']||0}</td>
         <td style="text-align:center;">${sc['Screening']||0}</td>
-        <td style="text-align:center;color:#059669;font-weight:700;">${(sc['Screened']||0)+(sc['Enrolled']||0)}</td>
-        <td style="text-align:center;color:#dc2626;">${(sc['DNQ']||0)+(sc['Screen Fail']||0)+(sc['Lost']||0)}</td>
+        <td style="text-align:center;color:#059669;font-weight:700;">${Array.from(SG.ENROLLED||[]).reduce((s,st)=>s+(sc[st]||0),0)}</td>
+        <td style="text-align:center;color:#dc2626;">${Array.from(SG.CLOSED||[]).reduce((s,st)=>s+(sc[st]||0),0)}</td>
       </tr>`;
     }).join('')}</tbody>
   </table>`;
@@ -8617,7 +8674,7 @@ function renderReferralDashboard() {
       );
       // Count scheduled from referral pipeline (Pre-Screening + Screening + Screened stages) OR from ClickUp field
       const pipelineScheduled = referrals.filter(r =>
-        ['Pre-Screening','Screening','Screened','Enrolled'].includes(r.stage)
+        SG.SCHEDULED && SG.SCHEDULED.has(r.stage)
       ).length;
       const scheduledCount = c.scheduled > 0 ? c.scheduled : pipelineScheduled;
       const convRate = c.new_referrals > 0 ? Math.round(scheduledCount / c.new_referrals * 100) : (scheduledCount > 0 ? 100 : 0);
@@ -8694,7 +8751,9 @@ function buildPatientJourneyFunnel() {
 
   // Cross-source funnel stages
   var totalLeads = (REFERRAL_DATA ? REFERRAL_DATA.length : 0) + (FB_CRM_DATA ? FB_CRM_DATA.length : 0);
-  var contacted = REFERRAL_DATA ? REFERRAL_DATA.filter(function(r){ return r.stage === 'Contacted' || r.stage === 'Pre-Screening'; }).length : 0;
+  var _jSG = (CRP_CONFIG.CLICKUP||{}).STAGE_GROUPS||{};
+  var _contactSet = new Set(['Contacted']); if(_jSG.SCREENING) _jSG.SCREENING.forEach(function(s){_contactSet.add(s);});
+  var contacted = REFERRAL_DATA ? REFERRAL_DATA.filter(function(r){ return _contactSet.has(r.stage); }).length : 0;
   var medRecsCreated = MED_RECORDS_DATA ? MED_RECORDS_DATA.length : 0;
   var inScreening = (MED_RECORDS_DATA ? MED_RECORDS_DATA.filter(function(r){ return r.status === 'In Screening' || r.status === 'Visit Scheduled'; }).length : 0);
   var enrolled = (MED_RECORDS_DATA ? MED_RECORDS_DATA.filter(function(r){ return r.status === 'Enrolled' || r.status === 'Complete'; }).length : 0);
@@ -9972,6 +10031,9 @@ async function _crpInit() {
       ]);
       _lastCrioRows = rows1;
       _lastAuditRows = auditRows;
+      validateColumns(rows1, 'CRIO');
+      validateColumns(legacyCancels, 'CANCELLATIONS');
+      validateColumns(auditRows, 'AUDIT_LOG');
       const newData = processLiveData(rows1, legacyCancels, auditRows);
       if ((newData.upcomingTotal || 0) < 5 && rows1.length > 10) {
         console.warn('CRP: processLiveData returned suspiciously low upcomingTotal (' + (newData.upcomingTotal||0) + ') from ' + rows1.length + ' rows — skipping');
@@ -9980,6 +10042,7 @@ async function _crpInit() {
         DATA = newData;
         if (srcBadge) srcBadge.textContent = '🔗 Live Google Sheets';
         if (badge) { badge.textContent = 'Updated: ' + new Date().toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'}); badge.style.color = ''; }
+        var fb0=document.getElementById('fallback-banner'); if(fb0) fb0.style.display='none';
         renderAll();
         _lastDataLoadTimestamp = Date.now();
         _log('CRP: Phase 1 complete — upcoming:', rows1.length, 'audit:', auditRows.length);
@@ -10019,6 +10082,7 @@ async function _crpInit() {
           console.warn('CRP: Phase 1 retry also returned low data — staying on SAMPLE');
           if (badge) badge.textContent = '⚠️ Live data unavailable';
           showToast('Live data unavailable — using sample data', 'error', 8000);
+          var fb=document.getElementById('fallback-banner'); if(fb) fb.style.display='';
           setHealthChip('dh-crio','fail','CRIO (failed)');
           setHealthChip('dh-audit','fail','Audit Log');
         }
@@ -10026,6 +10090,7 @@ async function _crpInit() {
         console.warn('CRP: Phase 1 retry failed:', e2.message);
         if (badge) badge.textContent = '⚠️ Live data unavailable — click Refresh';
         showToast('Live data unavailable — click Refresh to retry', 'error', 8000);
+        var fb2=document.getElementById('fallback-banner'); if(fb2) fb2.style.display='';
         setHealthChip('dh-crio','fail','CRIO (failed)');
         setHealthChip('dh-audit','fail','Audit Log');
       }
