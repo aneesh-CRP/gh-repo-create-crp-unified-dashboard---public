@@ -2466,6 +2466,7 @@ body {
     <button onclick="switchAdmin('trends',this)" class="sched-filter active" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid #1843ad;background:#e8eeff;color:#1843ad;cursor:pointer">📈 Trends</button>
     <button onclick="switchAdmin('connect',this)" class="sched-filter" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">⚙ Connect & Setup</button>
     <button onclick="switchAdmin('auditlog',this)" class="sched-filter" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">📋 Audit Log</button>
+    <button onclick="switchAdmin('email',this)" class="sched-filter" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">📧 Daily Email</button>
   </div>
 
   <!-- Audit Log Panel -->
@@ -2481,6 +2482,28 @@ body {
           <tbody id="audit-log-body"></tbody>
         </table>
       </div>
+    </div>
+  </div>
+
+  <div id="admin-email" style="display:none;">
+    <div class="card fade-in" style="margin-bottom:16px;">
+      <div class="card-header">
+        <span class="card-title">📧 Daily Email Reports</span>
+      </div>
+      <div style="padding:16px;">
+        <p style="font-size:12px;color:var(--muted);margin:0 0 16px;">Generate actionable daily emails with CRIO links. Copy to clipboard and paste into your email client.</p>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;">
+          <button class="btn btn-blue" onclick="generateDailyEmail('ops')" style="font-size:12px;">📋 Operations Email (No Financials)</button>
+          <button class="btn btn-green" onclick="generateDailyEmail('finance')" style="font-size:12px;">💰 Full Report (With Financials)</button>
+        </div>
+      </div>
+    </div>
+    <div id="email-preview" style="display:none;">
+      <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center;">
+        <button class="btn btn-blue" onclick="copyEmailToClipboard()" style="font-size:11px;">📋 Copy to Clipboard</button>
+        <span id="email-copy-status" style="font-size:11px;color:var(--green);display:none;">Copied!</span>
+      </div>
+      <div class="card" style="padding:20px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;max-height:600px;overflow-y:auto;" id="email-body"></div>
     </div>
   </div>
 
@@ -9869,10 +9892,232 @@ function buildStudiesView() {
 }
 
 // ══════════════════════════════════════════════════════════════
+// DAILY EMAIL GENERATOR
+// ══════════════════════════════════════════════════════════════
+function generateDailyEmail(type) {
+  const today = new Date();
+  const dateStr = today.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  const dashUrl = location.href.split('#')[0];
+  const flags = DATA.riskFlags || [];
+  const ad = DATA.actionDetails || {};
+  const sites = DATA.sites || [];
+  const cancelRate = DATA.upcomingTotal ? ((DATA.cancelTotal / (DATA.upcomingTotal + DATA.cancelTotal)) * 100).toFixed(1) : '0';
+
+  function pUrl(name, url) { return url ? '<a href="' + url + '">' + name + '</a>' : name; }
+  function sUrl(name, url) { return url ? '<a href="' + url + '">' + name + '</a>' : name; }
+
+  let html = '<div style="font-family:Arial,Helvetica,sans-serif;max-width:700px;margin:0 auto;color:#1e293b;">';
+
+  // Header
+  html += '<div style="background:#072061;color:white;padding:20px 24px;border-radius:8px 8px 0 0;">';
+  html += '<h1 style="margin:0;font-size:20px;font-weight:700;">CRP Daily ' + (type === 'finance' ? 'Full Report' : 'Operations Brief') + '</h1>';
+  html += '<p style="margin:4px 0 0;font-size:13px;opacity:0.8;">' + dateStr + '</p>';
+  html += '</div>';
+
+  // KPI Summary
+  html += '<div style="background:#f8fafc;padding:16px 24px;border-bottom:2px solid #e2e8f0;">';
+  html += '<table style="width:100%;border-collapse:collapse;text-align:center;"><tr>';
+  html += '<td style="padding:8px;"><div style="font-size:24px;font-weight:700;color:#072061;">' + (DATA.upcomingTotal || 0) + '</div><div style="font-size:11px;color:#64748b;">Upcoming</div></td>';
+  html += '<td style="padding:8px;"><div style="font-size:24px;font-weight:700;color:#dc2626;">' + (DATA.cancelTotal || 0) + '</div><div style="font-size:11px;color:#64748b;">Cancellations</div></td>';
+  html += '<td style="padding:8px;"><div style="font-size:24px;font-weight:700;color:' + (parseFloat(cancelRate) > 15 ? '#dc2626' : '#059669') + ';">' + cancelRate + '%</div><div style="font-size:11px;color:#64748b;">Cancel Rate</div></td>';
+  html += '<td style="padding:8px;"><div style="font-size:24px;font-weight:700;color:#d97706;">' + flags.length + '</div><div style="font-size:11px;color:#64748b;">At-Risk Patients</div></td>';
+  html += '</tr></table></div>';
+
+  // Site Breakdown
+  if (sites.length) {
+    html += '<div style="padding:16px 24px;border-bottom:1px solid #e2e8f0;">';
+    html += '<h3 style="margin:0 0 8px;font-size:14px;color:#072061;">Site Breakdown</h3>';
+    html += '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
+    html += '<tr style="background:#f1f5f9;"><th style="padding:6px 10px;text-align:left;">Site</th><th style="text-align:right;padding:6px 10px;">Upcoming</th><th style="text-align:right;padding:6px 10px;">Cancels</th><th style="text-align:right;padding:6px 10px;">Cancel Rate</th></tr>';
+    sites.forEach(s => {
+      html += '<tr><td style="padding:6px 10px;">' + s.site + '</td><td style="text-align:right;padding:6px 10px;">' + s.upcoming + '</td><td style="text-align:right;padding:6px 10px;">' + s.cancels + '</td><td style="text-align:right;padding:6px 10px;">' + s.cancelRate + '%</td></tr>';
+    });
+    html += '</table></div>';
+  }
+
+  // ── ACTION ITEMS ──
+  html += '<div style="padding:16px 24px;">';
+  html += '<h2 style="margin:0 0 16px;font-size:16px;color:#072061;border-bottom:2px solid #072061;padding-bottom:6px;">Action Items</h2>';
+
+  // 1. Urgent Calls
+  const urgentFlags = flags.filter(f => {
+    const m = { Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11 };
+    const p = f.next_visit.split(' ');
+    const d = Math.round((new Date(today.getFullYear(), m[p[0]], parseInt(p[1])) - today) / 86400000);
+    return d <= 14;
+  });
+  if (urgentFlags.length) {
+    html += '<div style="background:#fef2f2;border-left:4px solid #dc2626;padding:12px 16px;margin-bottom:12px;border-radius:0 6px 6px 0;">';
+    html += '<h4 style="margin:0 0 8px;color:#dc2626;font-size:13px;">URGENT CALLS — ' + urgentFlags.length + ' at-risk patient' + (urgentFlags.length > 1 ? 's' : '') + ' with upcoming visits</h4>';
+    html += '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
+    html += '<tr style="border-bottom:1px solid #fecaca;"><th style="text-align:left;padding:4px 6px;">Patient</th><th style="text-align:left;padding:4px 6px;">Study</th><th style="text-align:right;padding:4px 6px;">Cancels</th><th style="text-align:right;padding:4px 6px;">Next Visit</th></tr>';
+    urgentFlags.forEach(f => {
+      html += '<tr style="border-bottom:1px solid #fef2f2;"><td style="padding:4px 6px;font-weight:600;">' + pUrl(f.patient, f.patient_url) + '</td><td style="padding:4px 6px;">' + sUrl(f.study, f.study_url) + '</td><td style="text-align:right;padding:4px 6px;color:#dc2626;font-weight:700;">' + f.cancels + '</td><td style="text-align:right;padding:4px 6px;">' + f.next_visit + '</td></tr>';
+    });
+    html += '</table>';
+    html += '<p style="font-size:11px;color:#991b1b;margin:8px 0 0;font-style:italic;">Call each patient. Confirm attendance, surface barriers. If no answer: try alternate contact, note attempt in CRIO.</p>';
+    html += '</div>';
+  }
+
+  // 2. Undocumented
+  const undoc = ad.undocumented || [];
+  if (undoc.length) {
+    html += '<div style="background:#fef3c7;border-left:4px solid #f59e0b;padding:12px 16px;margin-bottom:12px;border-radius:0 6px 6px 0;">';
+    html += '<h4 style="margin:0 0 8px;color:#92400e;font-size:13px;">DOCUMENTATION REQUIRED — ' + undoc.length + ' cancellation' + (undoc.length > 1 ? 's' : '') + ' missing reasons</h4>';
+    html += '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
+    html += '<tr style="border-bottom:1px solid #fde68a;"><th style="text-align:left;padding:4px 6px;">Patient</th><th style="text-align:left;padding:4px 6px;">Study</th><th style="text-align:left;padding:4px 6px;">Coordinator</th><th style="text-align:left;padding:4px 6px;">Date</th></tr>';
+    undoc.forEach(p => {
+      html += '<tr style="border-bottom:1px solid #fef3c7;"><td style="padding:4px 6px;font-weight:600;">' + pUrl(p.name, p.url) + '</td><td style="padding:4px 6px;">' + (p.study || '') + '</td><td style="padding:4px 6px;">' + (p.coord || '') + '</td><td style="padding:4px 6px;">' + (p.cancel_date || '') + '</td></tr>';
+    });
+    html += '</table>';
+    html += '<p style="font-size:11px;color:#92400e;margin:8px 0 0;font-style:italic;">Coordinators: log into CRIO and add the cancellation reason for your patients.</p>';
+    html += '</div>';
+  }
+
+  // 3. Reschedule Follow-ups
+  const rp = ad.open_reschedule_promises || [];
+  if (rp.length) {
+    html += '<div style="background:#eff6ff;border-left:4px solid #2563eb;padding:12px 16px;margin-bottom:12px;border-radius:0 6px 6px 0;">';
+    html += '<h4 style="margin:0 0 8px;color:#1e40af;font-size:13px;">FOLLOW UP — ' + rp.length + ' patient' + (rp.length > 1 ? 's' : '') + ' said they\'d call back</h4>';
+    html += '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
+    rp.forEach(p => {
+      html += '<tr style="border-bottom:1px solid #dbeafe;"><td style="padding:4px 6px;font-weight:600;">' + pUrl(p.name, p.url) + '</td><td style="padding:4px 6px;">' + (p.study || '') + '</td><td style="padding:4px 6px;">' + (p.coord || '') + '</td></tr>';
+    });
+    html += '</table>';
+    html += '<p style="font-size:11px;color:#1e40af;margin:8px 0 0;font-style:italic;">Do not wait. Reach out today — patients who say they\'ll call back rarely do without a prompt.</p>';
+    html += '</div>';
+  }
+
+  // 4. No-Shows
+  const ns = ad.reschedule_needed || [];
+  const nsu = ad.no_show_unreachable || [];
+  if (ns.length || nsu.length) {
+    html += '<div style="background:#fdf4ff;border-left:4px solid #7c3aed;padding:12px 16px;margin-bottom:12px;border-radius:0 6px 6px 0;">';
+    html += '<h4 style="margin:0 0 8px;color:#5b21b6;font-size:13px;">NO-SHOWS & UNREACHABLE — ' + (ns.length + nsu.length) + ' patient' + ((ns.length + nsu.length) > 1 ? 's' : '') + '</h4>';
+    html += '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
+    ns.concat(nsu).slice(0, 15).forEach(p => {
+      html += '<tr style="border-bottom:1px solid #f5f3ff;"><td style="padding:4px 6px;font-weight:600;">' + pUrl(p.name, p.url) + '</td><td style="padding:4px 6px;">' + (p.study || '') + '</td><td style="padding:4px 6px;">' + (p.reason || '').substring(0, 60) + '</td></tr>';
+    });
+    if (ns.length + nsu.length > 15) html += '<tr><td colspan="3" style="padding:4px 6px;color:#94a3b8;">+' + (ns.length + nsu.length - 15) + ' more</td></tr>';
+    html += '</table>';
+    html += '<p style="font-size:11px;color:#5b21b6;margin:8px 0 0;font-style:italic;">Text + call each patient. Confirm upcoming visits or reschedule. Log all attempts in CRIO.</p>';
+    html += '</div>';
+  }
+
+  // 5. Screen Fails
+  const sfGroups = ad.screen_fail_groups || {};
+  const sfEntries = Object.entries(sfGroups);
+  if (sfEntries.length) {
+    html += '<div style="background:#fff7ed;border-left:4px solid #f97316;padding:12px 16px;margin-bottom:12px;border-radius:0 6px 6px 0;">';
+    html += '<h4 style="margin:0 0 8px;color:#c2410c;font-size:13px;">SCREEN FAILS — review pre-screening criteria</h4>';
+    sfEntries.forEach(([key, v]) => {
+      const study = key.split('|')[1] || key;
+      html += '<div style="margin-bottom:6px;"><strong>' + sUrl(study, v.study_url) + '</strong>: ' + v.patients.length + ' patient' + (v.patients.length > 1 ? 's' : '') + '</div>';
+    });
+    html += '<p style="font-size:11px;color:#c2410c;margin:8px 0 0;font-style:italic;">Revise pre-screening scripts. Add targeted questions to prevent repeat screen fails.</p>';
+    html += '</div>';
+  }
+
+  // 6. Proactive outreach (>14 days)
+  const proactive = flags.filter(f => {
+    const m = { Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11 };
+    const p = f.next_visit.split(' ');
+    return Math.round((new Date(today.getFullYear(), m[p[0]], parseInt(p[1])) - today) / 86400000) > 14;
+  });
+  if (proactive.length) {
+    html += '<div style="background:#fffbeb;border-left:4px solid #d97706;padding:12px 16px;margin-bottom:12px;border-radius:0 6px 6px 0;">';
+    html += '<h4 style="margin:0 0 8px;color:#d97706;font-size:13px;">PROACTIVE OUTREACH — ' + proactive.length + ' at-risk patient' + (proactive.length > 1 ? 's' : '') + ' (visit >14 days out)</h4>';
+    html += '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
+    proactive.slice(0, 10).forEach(f => {
+      html += '<tr style="border-bottom:1px solid #fef3c7;"><td style="padding:4px 6px;font-weight:600;">' + pUrl(f.patient, f.patient_url) + '</td><td style="padding:4px 6px;">' + sUrl(f.study, f.study_url) + '</td><td style="text-align:right;padding:4px 6px;">' + f.cancels + ' cancels</td><td style="text-align:right;padding:4px 6px;">' + f.next_visit + '</td></tr>';
+    });
+    if (proactive.length > 10) html += '<tr><td colspan="4" style="padding:4px 6px;color:#94a3b8;">+' + (proactive.length - 10) + ' more</td></tr>';
+    html += '</table>';
+    html += '<p style="font-size:11px;color:#92400e;margin:8px 0 0;font-style:italic;">Pre-call now. Confirm intent, ask about barriers, lock in the date.</p>';
+    html += '</div>';
+  }
+
+  // 7. Coordinator workload
+  const coords = DATA.coordinators || [];
+  if (coords.length) {
+    html += '<div style="background:#f8fafc;border-left:4px solid #475569;padding:12px 16px;margin-bottom:12px;border-radius:0 6px 6px 0;">';
+    html += '<h4 style="margin:0 0 8px;color:#475569;font-size:13px;">COORDINATOR WORKLOAD</h4>';
+    html += '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
+    html += '<tr style="background:#f1f5f9;"><th style="text-align:left;padding:4px 6px;">Coordinator</th><th style="text-align:right;padding:4px 6px;">Upcoming</th><th style="text-align:right;padding:4px 6px;">Cancels</th><th style="text-align:right;padding:4px 6px;">Cancel Rate</th></tr>';
+    coords.forEach(c => {
+      const rate = ((c.cancels / (c.upcoming + c.cancels || 1)) * 100).toFixed(1);
+      html += '<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:4px 6px;">' + c.name + '</td><td style="text-align:right;padding:4px 6px;">' + c.upcoming + '</td><td style="text-align:right;padding:4px 6px;">' + c.cancels + '</td><td style="text-align:right;padding:4px 6px;color:' + (parseFloat(rate) > 20 ? '#dc2626' : '#059669') + ';font-weight:600;">' + rate + '%</td></tr>';
+    });
+    html += '</table></div>';
+  }
+
+  html += '</div>'; // close action items
+
+  // ── FINANCE SECTION (only in full report) ──
+  if (type === 'finance' && typeof FIN_DATA !== 'undefined' && FIN_DATA) {
+    html += '<div style="padding:16px 24px;border-top:3px solid #059669;">';
+    html += '<h2 style="margin:0 0 16px;font-size:16px;color:#059669;border-bottom:2px solid #059669;padding-bottom:6px;">Financial Summary</h2>';
+    if (FIN_DATA.summary) {
+      const s = FIN_DATA.summary;
+      html += '<table style="width:100%;border-collapse:collapse;text-align:center;margin-bottom:16px;"><tr>';
+      if (s.totalAR !== undefined) html += '<td style="padding:8px;"><div style="font-size:20px;font-weight:700;color:#072061;">$' + Number(s.totalAR).toLocaleString() + '</div><div style="font-size:11px;color:#64748b;">Outstanding AR</div></td>';
+      if (s.collected !== undefined) html += '<td style="padding:8px;"><div style="font-size:20px;font-weight:700;color:#059669;">$' + Number(s.collected).toLocaleString() + '</div><div style="font-size:11px;color:#64748b;">Collected</div></td>';
+      if (s.collectionPct !== undefined) html += '<td style="padding:8px;"><div style="font-size:20px;font-weight:700;color:#2563eb;">' + s.collectionPct + '%</div><div style="font-size:11px;color:#64748b;">Collection Rate</div></td>';
+      html += '</tr></table>';
+    }
+    if (FIN_DATA.aging && FIN_DATA.aging.length) {
+      html += '<h4 style="margin:8px 0;font-size:13px;color:#475569;">AR Aging Breakdown</h4>';
+      html += '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
+      html += '<tr style="background:#f1f5f9;"><th style="text-align:left;padding:4px 6px;">Study</th><th style="text-align:right;padding:4px 6px;">0-30d</th><th style="text-align:right;padding:4px 6px;">31-60d</th><th style="text-align:right;padding:4px 6px;">61-90d</th><th style="text-align:right;padding:4px 6px;">90+</th><th style="text-align:right;padding:4px 6px;">Total</th></tr>';
+      FIN_DATA.aging.slice(0, 15).forEach(r => {
+        html += '<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:4px 6px;">' + (r.study || '') + '</td><td style="text-align:right;padding:4px 6px;">$' + Number(r.d30 || 0).toLocaleString() + '</td><td style="text-align:right;padding:4px 6px;">$' + Number(r.d60 || 0).toLocaleString() + '</td><td style="text-align:right;padding:4px 6px;">$' + Number(r.d90 || 0).toLocaleString() + '</td><td style="text-align:right;padding:4px 6px;color:#dc2626;">$' + Number(r.d90plus || 0).toLocaleString() + '</td><td style="text-align:right;padding:4px 6px;font-weight:600;">$' + Number(r.total || 0).toLocaleString() + '</td></tr>';
+      });
+      html += '</table>';
+    }
+    html += '</div>';
+  }
+
+  // Footer
+  html += '<div style="background:#f1f5f9;padding:12px 24px;border-radius:0 0 8px 8px;font-size:11px;color:#64748b;text-align:center;">';
+  html += '<a href="' + dashUrl + '" style="color:#2563eb;font-weight:600;">Open Live Dashboard</a> · Generated ' + today.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  html += ' · CRP Intelligence Dashboard';
+  html += '</div>';
+
+  html += '</div>';
+
+  // Show preview
+  document.getElementById('email-body').innerHTML = html;
+  document.getElementById('email-preview').style.display = '';
+}
+
+function copyEmailToClipboard() {
+  const el = document.getElementById('email-body');
+  if (!el) return;
+  // Copy as rich HTML
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+  try {
+    document.execCommand('copy');
+    const status = document.getElementById('email-copy-status');
+    if (status) { status.style.display = 'inline'; setTimeout(() => { status.style.display = 'none'; }, 2000); }
+  } catch (e) {
+    // Fallback: copy raw HTML
+    navigator.clipboard.writeText(el.innerHTML).then(() => {
+      const status = document.getElementById('email-copy-status');
+      if (status) { status.style.display = 'inline'; setTimeout(() => { status.style.display = 'none'; }, 2000); }
+    });
+  }
+  sel.removeAllRanges();
+}
+
+// ══════════════════════════════════════════════════════════════
 // ADMIN TAB SUB-NAVIGATION
 // ══════════════════════════════════════════════════════════════
 function switchAdmin(section, btn) {
-  ['trends','connect','auditlog'].forEach(s => {
+  ['trends','connect','auditlog','email'].forEach(s => {
     const el = document.getElementById('admin-'+s);
     if (el) el.style.display = s === section ? '' : 'none';
   });
