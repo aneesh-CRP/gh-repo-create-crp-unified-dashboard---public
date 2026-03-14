@@ -5588,7 +5588,7 @@ function buildRiskTable() {
     const levelLabel = r.level === 'critical' ? 'CRITICAL' : r.level === 'high' ? 'HIGH' : r.level === 'medium' ? 'MEDIUM' : 'LOW';
     const barColor = r.level === 'critical' ? '#dc2626' : r.level === 'high' ? '#d97706' : r.level === 'medium' ? '#f97316' : '#059669';
     const barPct = Math.min((r.score / 8 * 100), 100).toFixed(0);
-    return `<tr style="cursor:pointer;" onclick="showStudyDetail('${jsAttr(r.study||r.name)}','${jsAttr(r.study_url||'')}')"><td style="font-weight:500;color:var(--text)">${r.study_url ? `<a href="${escapeHTML(r.study_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="text-decoration:none;font-weight:500;color:var(--text);">${escapeHTML(r.study)}<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-left:3px;opacity:0.45;vertical-align:middle;flex-shrink:0"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>` : escapeHTML(r.study)}</td>
+    return `<tr style="cursor:pointer;" data-action="studyDetail" data-study="${escapeHTML(r.study||r.name)}" data-url="${escapeHTML(r.study_url||'')}"><td style="font-weight:500;color:var(--text)">${r.study_url ? `<a href="${escapeHTML(r.study_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="text-decoration:none;font-weight:500;color:var(--text);">${escapeHTML(r.study)}<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-left:3px;opacity:0.45;vertical-align:middle;flex-shrink:0"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>` : escapeHTML(r.study)}</td>
       <td><span class="risk-tag ${levelClass}">${levelLabel}</span></td>
       <td style="color:var(--red);font-weight:600;">${r.cancel}</td>
       <td style="color:var(--blue);font-weight:600;">${r.upcoming}</td>
@@ -5600,6 +5600,15 @@ function buildRiskTable() {
       <td style="font-size:11px;color:var(--muted);">${escapeHTML(r.action)}</td>
     </tr>`;
   }).join('');
+  // Event delegation for risk table rows
+  if (!tbody._delegated) {
+    tbody._delegated = true;
+    tbody.addEventListener('click', function(e) {
+      if (e.target.closest('a')) return; // let links handle themselves
+      var tr = e.target.closest('tr[data-action="studyDetail"]');
+      if (tr) showStudyDetail(tr.dataset.study, tr.dataset.url);
+    });
+  }
 }
 
 function buildStudyCards() {
@@ -5610,7 +5619,7 @@ function buildStudyCards() {
   el.innerHTML = DATA.riskMatrix.map(r => {
     const lc = levelColor[r.level] || '#94a3b8';
     const lb = levelBg[r.level]   || '#f1f5f9';
-    return `<div class="study-card" onclick="showStudyDetail('${jsAttr(r.study||r.name)}','${jsAttr(r.study_url||'')}');" style="cursor:pointer;border:1px solid ${lc}30;border-radius:10px;padding:14px 16px;background:#fff;">
+    return `<div class="study-card" data-action="studyDetail" data-study="${escapeHTML(r.study||r.name)}" data-url="${escapeHTML(r.study_url||'')}" style="cursor:pointer;border:1px solid ${lc}30;border-radius:10px;padding:14px 16px;background:#fff;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
         <span style="font-weight:700;font-size:13px;color:var(--text)">${escapeHTML(r.study)}</span>
         <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:${lb};color:${lc}">${r.level.toUpperCase()}</span>
@@ -5623,6 +5632,14 @@ function buildStudyCards() {
       <div style="font-size:11px;color:var(--muted);margin-top:6px">${r.action}</div>
     </div>`;
   }).join('');
+  // Event delegation for study cards
+  if (!el._delegated) {
+    el._delegated = true;
+    el.addEventListener('click', function(e) {
+      var card = e.target.closest('[data-action="studyDetail"]');
+      if (card) showStudyDetail(card.dataset.study, card.dataset.url);
+    });
+  }
 }
 
 // ═══════════════════════════════════════════════════
@@ -5727,7 +5744,37 @@ async function fetchText(url) {
   }
 }
 
-async function fetchCSV(url) {
+// ── Inline Web Worker for off-thread CSV parsing (large datasets) ──
+var _csvWorkerUrl = null;
+function _getCSVWorkerUrl() {
+  if (_csvWorkerUrl) return _csvWorkerUrl;
+  var code = 'self.onmessage=function(e){' +
+    'var text=e.data,clean=text.charCodeAt(0)===0xFEFF?text.slice(1):text;' +
+    'var lines=clean.trim().replace(/\\r\\n?/g,"\\n").split("\\n");' +
+    'var headers=lines[0].split(",").map(function(h){return h.replace(/^"|"$/g,"").trim();});' +
+    'var rows=[];for(var i=1;i<lines.length;i++){var line=lines[i];if(!line.trim())continue;' +
+    'var vals=[],cur="",inQ=false;for(var j=0;j<line.length;j++){var c=line[j];' +
+    'if(c===\'"\'){ if(inQ&&line[j+1]===\'"\'){cur+=\'"\';j++;}else inQ=!inQ;}' +
+    'else if(c===","&&!inQ){vals.push(cur.trim());cur="";}else cur+=c;}' +
+    'vals.push(cur.trim());var obj={};for(var k=0;k<headers.length;k++)obj[headers[k]]=vals[k]||"";' +
+    'rows.push(obj);}self.postMessage(rows);};';
+  _csvWorkerUrl = URL.createObjectURL(new Blob([code], {type: 'application/javascript'}));
+  return _csvWorkerUrl;
+}
+
+function parseCSVInWorker(text) {
+  return new Promise(function(resolve, reject) {
+    try {
+      var w = new Worker(_getCSVWorkerUrl());
+      var timer = setTimeout(function() { w.terminate(); resolve(parseCSV(text)); }, 10000);
+      w.onmessage = function(e) { clearTimeout(timer); w.terminate(); resolve(e.data); };
+      w.onerror = function() { clearTimeout(timer); w.terminate(); resolve(parseCSV(text)); };
+      w.postMessage(text);
+    } catch(e) { resolve(parseCSV(text)); }
+  });
+}
+
+async function fetchCSV(url, useWorker) {
   const text = await fetchText(url);
   // Guard: Google Sheets sometimes returns an HTML error/captcha page with 200 status
   const trimmed = text.trimStart();
@@ -5736,6 +5783,10 @@ async function fetchCSV(url) {
   }
   if (!trimmed || trimmed.length < 20) {
     throw new Error('Empty or invalid CSV response from: ' + url.slice(0, 80));
+  }
+  // Use Web Worker for large CSVs (> 5000 rows) when available
+  if (useWorker && typeof Worker !== 'undefined' && !IS_APPS_SCRIPT) {
+    return parseCSVInWorker(text);
   }
   return parseCSV(text);
 }
@@ -7368,7 +7419,7 @@ async function refreshData() {
     // Phase 1: CRIO data
     const [rows1, legacyCancels, auditRows] = await Promise.all([
       fetchCSV(LIVE_URL1),
-      fetchCSV(LIVE_URL2_LEGACY).catch(() => []),
+      fetchCSV(LIVE_URL2_LEGACY, true).catch(() => []),
       fetchCSV(AUDIT_LOG_URL).catch(() => [])
     ]);
     const newData = processLiveData(rows1, legacyCancels, auditRows);
@@ -8727,7 +8778,7 @@ function renderReferralDashboard() {
     <tbody>${studyRows.map(([name, d]) => {
       const conv = d.total ? Math.round(d.enrolled / d.total * 100) : 0;
       const convColor = conv >= 30 ? '#059669' : conv >= 15 ? '#d97706' : '#dc2626';
-      return `<tr style="cursor:pointer;transition:background .1s" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''" onclick="showStudyPipelineModal('${jsAttr(name)}')">
+      return `<tr style="cursor:pointer;transition:background .1s" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''" data-action="pipelineModal" data-study="${escapeHTML(name)}">
         <td style="padding:8px 12px;font-weight:600;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHTML(name)}">${escapeHTML(name)}</td>
         <td style="text-align:center;font-weight:700;">${d.total}</td>
         <td style="text-align:center;color:#3b82f6;">${d.active}</td>
@@ -8737,6 +8788,14 @@ function renderReferralDashboard() {
       </tr>`;
     }).join('')}</tbody>
   </table>`;
+  // Event delegation for pipeline study table
+  if (!studyEl._delegated) {
+    studyEl._delegated = true;
+    studyEl.addEventListener('click', function(e) {
+      var tr = e.target.closest('tr[data-action="pipelineModal"]');
+      if (tr) showStudyPipelineModal(tr.dataset.study);
+    });
+  }
 
   // ── Stale Leads (active, not updated in 7+ days) ──
   const staleEl = el('ref-stale-list');
@@ -8863,7 +8922,7 @@ function renderReferralDashboard() {
       </tr></thead>
       <tbody>${enriched.map(c => {
         const crColor = c.convRate >= 20 ? '#059669' : c.convRate >= 10 ? '#d97706' : '#dc2626';
-        return `<tr style="cursor:pointer;transition:background .1s" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''" onclick="showCampaignDetailModal('${jsAttr(c.study)}')">
+        return `<tr style="cursor:pointer;transition:background .1s" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''" data-action="campaignDetail" data-study="${escapeHTML(c.study)}">
           <td style="padding:7px 12px;font-weight:600;"><a href="${escapeHTML(c.url)}" target="_blank" onclick="event.stopPropagation()" style="color:#1e293b;text-decoration:none;">${escapeHTML(c.study)}</a></td>
           <td style="text-align:center;"><span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#e8eeff;color:#1843ad;font-weight:600;">${escapeHTML(c.vendor)}</span></td>
           <td style="text-align:center;font-weight:700;">${c.first_contact.toLocaleString()}</td>
@@ -8880,6 +8939,15 @@ function renderReferralDashboard() {
     </table></div>`;
 
     campEl.innerHTML = campHtml;
+    // Event delegation for campaign table
+    if (!campEl._delegated) {
+      campEl._delegated = true;
+      campEl.addEventListener('click', function(e) {
+        if (e.target.closest('a')) return;
+        var tr = e.target.closest('tr[data-action="campaignDetail"]');
+        if (tr) showCampaignDetailModal(tr.dataset.study);
+      });
+    }
   }
 
   // Render the cross-reference detail section
@@ -9892,7 +9960,7 @@ function renderStudiesTable() {
       pct >= 100 ? '#059669' : pct >= 75 ? '#1843ad' : pct >= 50 ? '#d97706' : pct >= 25 ? '#f97316' : '#dc2626';
 
     const safeStudy = jsAttr(s.study);
-    const studyCell = `<span style="font-weight:700;color:var(--navy);cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px;" onclick="showStudyUnifiedModal('${safeStudy}')">${escapeHTML(s.study)}</span>` +
+    const studyCell = `<span style="font-weight:700;color:var(--navy);cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px;" data-action="studyUnified" data-study="${escapeHTML(s.study)}">${escapeHTML(s.study)}</span>` +
       (s.study_url ? `<a href="${escapeHTML(s.study_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="margin-left:4px;opacity:0.4;vertical-align:middle"><svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>` : '');
     const statusBadge = s.enroll_status
       ? `<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;margin-left:5px;background:${s.enroll_status==='Enrolling'?'#e8eeff':s.enroll_status==='Maintenance'?'#f0fdf4':'#f1f5f9'};color:${s.enroll_status==='Enrolling'?'#1843ad':s.enroll_status==='Maintenance'?'#059669':'#94a3b8'}">${s.enroll_status}</span>` : '';
@@ -9917,19 +9985,19 @@ function renderStudiesTable() {
     const riskScoreCell = (s.risk_level === 'n/a' || s.enroll_status !== 'Enrolling')
       ? `<span style="font-size:10px;color:#94a3b8;font-style:italic">N/A</span>`
       : s.risk_score > 0
-        ? `<span style="font-size:11px;font-weight:700;padding:3px 7px;border-radius:5px;background:${lb};color:${lc};cursor:pointer" onclick="showStudyDetail('${jsAttr(s.study)}')">${s.risk_score}</span>`
+        ? `<span style="font-size:11px;font-weight:700;padding:3px 7px;border-radius:5px;background:${lb};color:${lc};cursor:pointer" data-action="studyDetailClick" data-study="${escapeHTML(s.study)}">${s.risk_score}</span>`
         : `<span style="font-size:11px;color:var(--muted)">—</span>`;
 
     const isEnrolling = s.enroll_status === 'Enrolling';
     const cancelsCell = s.cancels > 0
       ? `<div style="display:flex;flex-direction:column;gap:2px">
-           <span style="font-size:12px;font-weight:700;color:#dc2626;cursor:pointer" onclick="showStudyDetail('${safeStudy}')">${s.cancels}</span>
+           <span style="font-size:12px;font-weight:700;color:#dc2626;cursor:pointer" data-action="studyDetailClick" data-study="${escapeHTML(s.study)}">${s.cancels}</span>
            ${!isEnrolling ? `<span style="font-size:9px;color:#94a3b8;font-style:italic">${s.enroll_status} — not actively enrolling</span>` : ''}
          </div>`
       : `<span style="font-size:11px;color:var(--muted)">0</span>`;
 
     const upcomingCell = s.upcoming > 0
-      ? `<span style="font-size:12px;font-weight:700;color:#1843ad;cursor:pointer" onclick="showUpcoming(r=>r.study==='${safeStudy}','${safeStudy} — Upcoming Visits')">${s.upcoming}</span>`
+      ? `<span style="font-size:12px;font-weight:700;color:#1843ad;cursor:pointer" data-action="studyUpcoming" data-study="${escapeHTML(s.study)}">${s.upcoming}</span>`
       : `<span style="font-size:11px;color:var(--muted)">0</span>`;
 
     const sfColor = s.screen_fail_pct > 60 ? '#dc2626' : s.screen_fail_pct > 40 ? '#d97706' : 'var(--muted)';
@@ -9951,15 +10019,37 @@ function renderStudiesTable() {
   });
   const totalRows = allRows.length;
   tbody.innerHTML = allRows.slice(0, _studyPageSize).join('');
-  // Add "Show all" button if there are more rows than the page size
+  // Event delegation for studies table cells
+  if (!tbody._delegated) {
+    tbody._delegated = true;
+    tbody.addEventListener('click', function(e) {
+      if (e.target.closest('a')) return;
+      var el = e.target.closest('[data-action]');
+      if (!el) return;
+      var action = el.dataset.action, study = el.dataset.study;
+      if (action === 'studyUnified') showStudyUnifiedModal(study);
+      else if (action === 'studyDetailClick') showStudyDetail(study);
+      else if (action === 'studyUpcoming') showUpcoming(function(r){ return r.study === study; }, study + ' — Upcoming Visits');
+    });
+  }
+  // Lazy-load more rows on scroll (IntersectionObserver) or button fallback
   var showMoreEl = document.getElementById('study-show-more-btn');
   if (showMoreEl) showMoreEl.remove();
+  if (tbody._observer) { tbody._observer.disconnect(); tbody._observer = null; }
   if (totalRows > _studyPageSize) {
     var btnDiv = document.createElement('div');
     btnDiv.id = 'study-show-more-btn';
     btnDiv.style.cssText = 'text-align:center;padding:12px;';
-    btnDiv.innerHTML = '<button onclick="_studyPageSize=9999;renderStudiesTable()" style="padding:6px 16px;background:#e8eeff;color:#1843ad;border:1px solid #1843ad;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">Show all ' + totalRows + ' studies</button>';
+    var remaining = totalRows - _studyPageSize;
+    btnDiv.innerHTML = '<button onclick="_studyPageSize+=50;renderStudiesTable()" style="padding:6px 16px;background:#e8eeff;color:#1843ad;border:1px solid #1843ad;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">Load ' + Math.min(remaining, 50) + ' more (' + remaining + ' remaining)</button>';
     tbody.parentElement.parentElement.appendChild(btnDiv);
+    // Auto-load on scroll into view
+    if (typeof IntersectionObserver !== 'undefined') {
+      tbody._observer = new IntersectionObserver(function(entries) {
+        if (entries[0].isIntersecting) { _studyPageSize += 50; renderStudiesTable(); }
+      }, { rootMargin: '200px' });
+      tbody._observer.observe(btnDiv);
+    }
   }
 }
 
@@ -10544,7 +10634,7 @@ async function _crpInit() {
     try {
       const [rows1, legacyCancels, auditRows] = await Promise.all([
         fetchCSV(LIVE_URL1),
-        fetchCSV(LIVE_URL2_LEGACY).catch(() => []),
+        fetchCSV(LIVE_URL2_LEGACY, true).catch(() => []),
         fetchCSV(AUDIT_LOG_URL).catch(e => { console.warn('CRP: Audit log fetch failed, continuing without:', e.message); setHealthChip('dh-audit','fail','Audit Log'); return []; })
       ]);
       _lastCrioRows = rows1;
@@ -10578,7 +10668,7 @@ async function _crpInit() {
       try {
         const [rows1b, legacyB, auditB] = await Promise.all([
           fetchCSV(LIVE_URL1),
-          fetchCSV(LIVE_URL2_LEGACY).catch(() => []),
+          fetchCSV(LIVE_URL2_LEGACY, true).catch(() => []),
           fetchCSV(AUDIT_LOG_URL).catch(() => [])
         ]);
         _lastCrioRows = rows1b;
@@ -10704,7 +10794,7 @@ async function _crpInit() {
     try {
       const [rows1, legacyCancels, auditRows] = await Promise.all([
         fetchCSV(LIVE_URL1),
-        fetchCSV(LIVE_URL2_LEGACY).catch(() => []),
+        fetchCSV(LIVE_URL2_LEGACY, true).catch(() => []),
         fetchCSV(AUDIT_LOG_URL).catch(() => [])
       ]);
       const newData = processLiveData(rows1, legacyCancels, auditRows);
