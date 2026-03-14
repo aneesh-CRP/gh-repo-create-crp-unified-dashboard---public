@@ -4074,9 +4074,12 @@ function processLiveData(allRows, legacyCancels, auditLog) {
   // ── riskFlags: 2+ cancels + upcoming visit ──
   // Event-based cancel counting: group by patient+study+cancel_date
   // Prevents bulk-cancelled visits (same cancel date) from inflating counts
+  // NOTE: includes rescheduled cancels — repeat cancellers are a risk signal
+  // even if they rebooked, so riskFlags uses allCategorized, not recentCancels
   const cancelEventMap = {};  // key -> Set of cancel dates
   const cancelMeta = {};
-  recentCancels.forEach(r => {
+  allCategorized.forEach(r => {
+    if (EXCLUDED_CANCEL_CATS.has(r._category) && r._category !== 'Rescheduled') return;
     const p=(r['Subject Full Name']||'').trim(), s=r['Study Name'], key=p+'|'+s;
     const cd = (r['Cancel Date']||'').substring(0,10);
     if (!cancelEventMap[key]) cancelEventMap[key] = new Set();
