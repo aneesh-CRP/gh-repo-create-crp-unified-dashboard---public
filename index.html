@@ -903,7 +903,7 @@ body {
     <span class="nav-tab" onclick="switchTab('schedule', this)" role="tab">Schedule</span>
     <span class="nav-tab" onclick="switchTab('actions', this)" role="tab">Actions</span>
     <span class="nav-tab" onclick="switchTab('referrals', this)" role="tab">Referrals</span>
-    <span class="nav-tab" onclick="switchTab('admin', this)" role="tab">⚙</span>
+    <span class="nav-tab" onclick="switchTab('admin', this)" role="tab">🔒 Admin</span>
     <span style="width:1px;background:#CBD5E0;margin:8px 3px"></span>
     <span class="nav-tab fin-tab" onclick="switchTab('fin-overview',this)" role="tab">🔒 Finance</span>
     <span class="nav-tab fin-tab" onclick="switchTab('fin-collections',this)">🔒 Collections</span>
@@ -3721,11 +3721,12 @@ async function verifyPin() {
   const hash = await hashPin(pin);
   if (hash === FIN_PIN_HASH) {
     sessionStorage.setItem(CRP_CONFIG.AUTH_STORAGE_KEY, 'true');
-    if (typeof logAudit === 'function') logAudit('finance_unlock', 'Finance access granted');
+    if (typeof logAudit === 'function') logAudit('finance_unlock', 'Finance/Admin access granted');
     closeAuthModal();
     initFinanceDashboard();
     const pending = document.getElementById('authModal').dataset.pending;
-    if (pending) switchTab(pending);
+    if (pending === 'admin') { switchView('admin', document.querySelector(".nav-tab[onclick*='admin']")); }
+    else if (pending) switchTab(pending);
   } else {
     document.getElementById('authError').style.display = 'block';
     document.getElementById('authPinInput').value = '';
@@ -5591,6 +5592,11 @@ function buildStudyCards() {
 // VIEW SWITCHING
 // ═══════════════════════════════════════════════════
 function switchView(name, el) {
+  // Admin tab requires same PIN as Finance
+  if (name === 'admin' && !isFinanceUnlocked()) {
+    showAuthModal('admin');
+    return;
+  }
   if (name === 'actions') {
     setTimeout(() => buildRiskFlagCards(), 50);
   }
@@ -11156,7 +11162,7 @@ if (typeof window !== 'undefined') {
   <div style="background:white;border-radius:12px;padding:32px;max-width:400px;width:90%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.2)">
     <div style="font-size:32px;margin-bottom:12px">🔒</div>
     <h3 style="font-size:18px;font-weight:700;color:#1a202c;margin-bottom:8px">Finance Access</h3>
-    <p style="font-size:13px;color:#718096;margin-bottom:20px">Enter PIN to access financial data</p>
+    <p style="font-size:13px;color:#718096;margin-bottom:20px">Enter PIN to access this section</p>
     <input type="password" id="authPinInput" placeholder="Enter PIN" style="width:100%;padding:12px;border:2px solid #E2E8F0;border-radius:8px;font-size:16px;text-align:center;letter-spacing:8px;margin-bottom:8px" onkeypress="if(event.key==='Enter')verifyPin()">
     <div id="authError" style="color:#EF4444;font-size:12px;margin-bottom:12px;display:none">Incorrect PIN. Try again.</div>
     <button onclick="verifyPin()" style="width:100%;padding:12px;background:linear-gradient(135deg,#1e3a5f,#2d5a87);color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer">Unlock</button>

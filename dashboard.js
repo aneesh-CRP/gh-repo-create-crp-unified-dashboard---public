@@ -995,11 +995,12 @@ async function verifyPin() {
   const hash = await hashPin(pin);
   if (hash === FIN_PIN_HASH) {
     sessionStorage.setItem(CRP_CONFIG.AUTH_STORAGE_KEY, 'true');
-    if (typeof logAudit === 'function') logAudit('finance_unlock', 'Finance access granted');
+    if (typeof logAudit === 'function') logAudit('finance_unlock', 'Finance/Admin access granted');
     closeAuthModal();
     initFinanceDashboard();
     const pending = document.getElementById('authModal').dataset.pending;
-    if (pending) switchTab(pending);
+    if (pending === 'admin') { switchView('admin', document.querySelector(".nav-tab[onclick*='admin']")); }
+    else if (pending) switchTab(pending);
   } else {
     document.getElementById('authError').style.display = 'block';
     document.getElementById('authPinInput').value = '';
@@ -2865,6 +2866,11 @@ function buildStudyCards() {
 // VIEW SWITCHING
 // ═══════════════════════════════════════════════════
 function switchView(name, el) {
+  // Admin tab requires same PIN as Finance
+  if (name === 'admin' && !isFinanceUnlocked()) {
+    showAuthModal('admin');
+    return;
+  }
   if (name === 'actions') {
     setTimeout(() => buildRiskFlagCards(), 50);
   }
