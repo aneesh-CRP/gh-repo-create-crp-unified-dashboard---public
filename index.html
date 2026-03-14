@@ -7087,6 +7087,58 @@ function processLiveData(allRows, legacyCancels, auditLog) {
   }
   const visitTypes = classifyVisitTypes(activeUpcoming);
 
+  // ── Trends: per-snapshot-date aggregation for longitudinal charts ──
+  const snapshotTrends = (() => {
+    const bySnap = {};
+    allRows.forEach(r => {
+      const snap = (r.snapshot_date || '').trim();
+      if (!snap || !/^\d{4}-\d{2}-\d{2}$/.test(snap)) return;
+      if (!bySnap[snap]) bySnap[snap] = { upcoming: 0, cancelled: 0, byStudy: {}, byCoord: {} };
+      const status = (r['Appointment Status'] || '').trim().toLowerCase();
+      const isCancelled = status === 'cancelled' || status === 'canceled';
+      if (isCancelled) bySnap[snap].cancelled++;
+      else bySnap[snap].upcoming++;
+      // Per-study
+      const study = (r['Study Name'] || '').split(' - ').pop().trim();
+      if (study) {
+        if (!bySnap[snap].byStudy[study]) bySnap[snap].byStudy[study] = { upcoming: 0, cancelled: 0 };
+        if (isCancelled) bySnap[snap].byStudy[study].cancelled++;
+        else bySnap[snap].byStudy[study].upcoming++;
+      }
+      // Per-coordinator
+      const coord = cleanCoord(r['Full Name'] || r['Staff Full Name'] || '');
+      if (coord && isCoord(r['Full Name'] || r['Staff Full Name'] || '')) {
+        if (!bySnap[snap].byCoord[coord]) bySnap[snap].byCoord[coord] = { upcoming: 0, cancelled: 0 };
+        if (isCancelled) bySnap[snap].byCoord[coord].cancelled++;
+        else bySnap[snap].byCoord[coord].upcoming++;
+      }
+    });
+    // Also add legacy cancel data by snapshot
+    if (legacyCancels && legacyCancels.length) {
+      legacyCancels.forEach(r => {
+        const snap = (r.snapshot_date || '').trim();
+        if (!snap || !/^\d{4}-\d{2}-\d{2}$/.test(snap)) return;
+        if (!bySnap[snap]) bySnap[snap] = { upcoming: 0, cancelled: 0, byStudy: {}, byCoord: {} };
+        bySnap[snap].cancelled++;
+        const study = (r['Study Name'] || '').split(' - ').pop().trim();
+        if (study) {
+          if (!bySnap[snap].byStudy[study]) bySnap[snap].byStudy[study] = { upcoming: 0, cancelled: 0 };
+          bySnap[snap].byStudy[study].cancelled++;
+        }
+      });
+    }
+    const sorted = Object.keys(bySnap).sort();
+    return sorted.map(snap => ({
+      date: snap,
+      label: new Date(snap + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      upcoming: bySnap[snap].upcoming,
+      cancelled: bySnap[snap].cancelled,
+      cancelRate: +((bySnap[snap].cancelled / (bySnap[snap].upcoming + bySnap[snap].cancelled || 1)) * 100).toFixed(1),
+      byStudy: bySnap[snap].byStudy,
+      byCoord: bySnap[snap].byCoord
+    }));
+  })();
+
   return {
     actionDetails,
     visitTypes,
@@ -7098,6 +7150,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
     activeStudies: upcomingByStudy.length,
     cancelWeekly: weekBucket(recentCancels,'Cancel Date'),
     upcomingWeekly: weekBucket(activeUpcoming,'Scheduled Date'),
+    snapshotTrends,
     cancelByStudy,
     upcomingByStudy,
     upcomingByStudyFull: upcomingByStudy,
@@ -7740,6 +7793,7 @@ function renderAll() {
   safe(buildSchedCoordList,      'buildSchedCoordList');
   safe(() => filterSchedTable('all', null), 'buildUpcomingDetailTable');
   safe(backfillInvestigators, 'backfillInvestigators');
+  safe(renderTrendsCharts,       'renderTrendsCharts');
 }
 
 function closeSetup() {
@@ -9274,28 +9328,163 @@ const LIVE_URL1 = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSQJ_QKC-ttmV
 const LIVE_URL2_LEGACY = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRUXJxTDsr5IRByMfuLF0P3hVq_QuEw6M1MPNDwd1CaV2UZ9tnFflUwsmUKAd3xeX3_esn0c4YlrV0q/pub?gid=1487298034&single=true&output=csv';
 const AUDIT_LOG_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRpPUZFSyW0rrx2yQdqYPyccRZC0wqUCWyCfX_n2XTMPyKQr9da4jl1jMbZ5_KKFkYZjJiNl_ClYbXk/pub?output=csv';
 
+function renderTrendsCharts() {
+  const trends = DATA.snapshotTrends || [];
+  const noDataEl = document.getElementById('trends-no-data-msg');
+  const chartsEl = document.getElementById('trends-charts');
+  if (!trends.length) {
+    if (noDataEl) noDataEl.style.display = '';
+    if (chartsEl) chartsEl.style.display = 'none';
+    return;
+  }
+  if (noDataEl) noDataEl.style.display = 'none';
+  if (chartsEl) chartsEl.style.display = '';
+
+  // ── KPI banner ──
+  const snapCountEl = document.getElementById('trends-snapshot-count');
+  if (snapCountEl) snapCountEl.textContent = trends.length;
+
+  const last4 = trends.slice(-4);
+  const first4 = trends.slice(0, Math.min(4, trends.length));
+  const recentAvgRate = last4.reduce((s, t) => s + t.cancelRate, 0) / (last4.length || 1);
+  const olderAvgRate = first4.reduce((s, t) => s + t.cancelRate, 0) / (first4.length || 1);
+  const rateDirEl = document.getElementById('trends-rate-dir');
+  if (rateDirEl) {
+    const diff = recentAvgRate - olderAvgRate;
+    rateDirEl.textContent = (diff > 0 ? '+' : '') + diff.toFixed(1) + '%';
+    rateDirEl.style.color = diff > 0 ? 'var(--red)' : 'var(--green)';
+  }
+  const rateSub = document.getElementById('trends-rate-sub');
+  if (rateSub) rateSub.textContent = trends.length >= 2 ? 'vs. earliest snapshot' : 'single snapshot loaded';
+
+  const avgCancelEl = document.getElementById('trends-avg-cancel');
+  if (avgCancelEl) avgCancelEl.textContent = Math.round(last4.reduce((s, t) => s + t.cancelled, 0) / (last4.length || 1));
+
+  const avgUpEl = document.getElementById('trends-avg-upcoming');
+  if (avgUpEl) avgUpEl.textContent = Math.round(last4.reduce((s, t) => s + t.upcoming, 0) / (last4.length || 1));
+
+  // ── Chart 1: Cancel Rate % Over Time ──
+  mkChart('trendsCancelRateChart', {
+    type: 'line',
+    data: {
+      labels: trends.map(t => t.label),
+      datasets: [{
+        label: 'Cancel Rate %',
+        data: trends.map(t => t.cancelRate),
+        borderColor: '#dc2626', backgroundColor: 'rgba(220,38,38,0.08)',
+        borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#dc2626',
+        fill: true, tension: 0.3
+      }]
+    },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: i => i.raw + '% cancel rate' } } },
+      scales: { x: { grid: { display: false } }, y: { grid: { color: '#f1f5f9' }, beginAtZero: true, ticks: { callback: v => v + '%' } } }
+    }
+  });
+
+  // ── Chart 2: Cancel Volume per Snapshot ──
+  mkChart('trendsCancelVolChart', {
+    type: 'bar',
+    data: {
+      labels: trends.map(t => t.label),
+      datasets: [{
+        data: trends.map(t => t.cancelled),
+        backgroundColor: trends.map(t => t.cancelled >= 30 ? '#fca5a5' : t.cancelled >= 18 ? '#fde68a' : '#bfdbfe'),
+        borderColor: trends.map(t => t.cancelled >= 30 ? '#dc2626' : t.cancelled >= 18 ? '#d97706' : '#072061'),
+        borderWidth: 1.5, borderRadius: 4
+      }]
+    },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: i => i.raw + ' cancellations' } } },
+      scales: { x: { grid: { display: false } }, y: { grid: { color: '#f1f5f9' }, beginAtZero: true } }
+    }
+  });
+
+  // ── Chart 3: Upcoming Volume per Snapshot ──
+  mkChart('trendsUpcomingVolChart', {
+    type: 'line',
+    data: {
+      labels: trends.map(t => t.label),
+      datasets: [{
+        data: trends.map(t => t.upcoming),
+        borderColor: '#072061', backgroundColor: 'rgba(37,99,235,0.08)',
+        borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#072061',
+        fill: true, tension: 0.3
+      }]
+    },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { x: { grid: { display: false } }, y: { grid: { color: '#f1f5f9' }, beginAtZero: true } }
+    }
+  });
+
+  // ── Chart 4: Coordinator Cancel Rate Over Time ──
+  const allCoords = new Set();
+  trends.forEach(t => Object.keys(t.byCoord).forEach(c => allCoords.add(c)));
+  const coordColors = ['#dc2626','#2563eb','#059669','#d97706','#7c3aed','#db2777','#0891b2','#65a30d'];
+  const topCoords = [...allCoords].slice(0, 8);
+  mkChart('trendsCoordChart', {
+    type: 'line',
+    data: {
+      labels: trends.map(t => t.label),
+      datasets: topCoords.map((coord, i) => ({
+        label: coord,
+        data: trends.map(t => {
+          const c = t.byCoord[coord];
+          return c ? +((c.cancelled / (c.upcoming + c.cancelled || 1)) * 100).toFixed(1) : null;
+        }),
+        borderColor: coordColors[i % coordColors.length],
+        borderWidth: 2, pointRadius: 2, tension: 0.3, fill: false, spanGaps: true
+      }))
+    },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
+      scales: { x: { grid: { display: false } }, y: { grid: { color: '#f1f5f9' }, beginAtZero: true, ticks: { callback: v => v + '%' } } }
+    }
+  });
+
+  // ── Chart 5: Study Cancel Rate Trends (top 6 by volume) ──
+  const studyTotals = {};
+  trends.forEach(t => Object.entries(t.byStudy).forEach(([s, d]) => {
+    studyTotals[s] = (studyTotals[s] || 0) + d.cancelled + d.upcoming;
+  }));
+  const topStudies = Object.entries(studyTotals).sort((a, b) => b[1] - a[1]).slice(0, 6).map(e => e[0]);
+  const studyColors = ['#2563eb','#dc2626','#059669','#d97706','#7c3aed','#0891b2'];
+  mkChart('trendsStudyChart', {
+    type: 'line',
+    data: {
+      labels: trends.map(t => t.label),
+      datasets: topStudies.map((study, i) => ({
+        label: study.length > 20 ? study.substring(0, 20) + '...' : study,
+        data: trends.map(t => {
+          const s = t.byStudy[study];
+          return s ? +((s.cancelled / (s.upcoming + s.cancelled || 1)) * 100).toFixed(1) : null;
+        }),
+        borderColor: studyColors[i % studyColors.length],
+        borderWidth: 2, pointRadius: 2, tension: 0.3, fill: false, spanGaps: true
+      }))
+    },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
+      scales: { x: { grid: { display: false } }, y: { grid: { color: '#f1f5f9' }, beginAtZero: true, ticks: { callback: v => v + '%' } } }
+    }
+  });
+}
+
 function loadLongitudinalData() {
-  // Longitudinal/trends data loads from Master Sheet
-  // This requires the Apps Script to have been running and building history
-  const trendsMsg = document.getElementById('trends-no-data-msg');
-  if (trendsMsg) {
-    trendsMsg.innerHTML = `<div style="text-align:center;padding:40px">
-      <div style="font-size:32px;margin-bottom:12px;">📊</div>
-      <div style="font-size:15px;font-weight:700;color:var(--navy);margin-bottom:8px;">Connect live data to unlock Trends</div>
-      <div style="font-size:12px;color:var(--muted);max-width:440px;margin:0 auto;">
-        Trends are populated automatically once the Apps Script consolidator has been running for 2+ weeks.
-        Use the <strong>⚙ Connect</strong> tab to link your Master Google Sheet.
-      </div>
-      <button onclick="switchTab('admin',null)" class="btn btn-blue" style="margin-top:16px;">Go to Connect tab →</button>
-    </div>`;
+  renderTrendsCharts();
+  const status = document.getElementById('trends-load-status');
+  const trends = DATA.snapshotTrends || [];
+  if (status) {
+    if (trends.length) status.textContent = 'Loaded ' + trends.length + ' snapshot(s) from connected data.';
+    else status.textContent = 'No snapshot data found. Make sure the sheet has a snapshot_date column.';
   }
 }
 
-
 // Alias for backward compatibility
-function buildWeeklyTrendChart() { 
-  try { buildCancelTrend(); } catch(e) {} 
-  try { buildUpcomingTrend(); } catch(e) {} 
+function buildWeeklyTrendChart() {
+  try { buildCancelTrend(); } catch(e) {}
+  try { buildUpcomingTrend(); } catch(e) {}
 }
 
 
