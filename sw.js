@@ -1,5 +1,5 @@
 // CRP Dashboard Service Worker — Offline Support
-const CACHE_NAME = 'crp-dashboard-v1';
+const CACHE_NAME = 'crp-dashboard-v2';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -69,7 +69,25 @@ self.addEventListener('fetch', function(event) {
     return;
   }
 
-  // Static assets: cache-first, network fallback
+  // HTML and JS files: network-first (always get latest code)
+  if (url.endsWith('.html') || url.endsWith('.js') || url.endsWith('/')) {
+    event.respondWith(
+      fetch(event.request).then(function(response) {
+        if (response.ok) {
+          var clone = response.clone();
+          caches.open(CACHE_NAME).then(function(cache) {
+            cache.put(event.request, clone);
+          });
+        }
+        return response;
+      }).catch(function() {
+        return caches.match(event.request);
+      })
+    );
+    return;
+  }
+
+  // Other static assets (fonts, images): cache-first, network fallback
   event.respondWith(
     caches.match(event.request).then(function(cached) {
       if (cached) return cached;
