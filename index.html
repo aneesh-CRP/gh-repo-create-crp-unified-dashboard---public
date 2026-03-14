@@ -6849,12 +6849,14 @@ function processLiveData(allRows, legacyCancels, auditLog) {
   const cancelMeta = {};
   allCategorized.forEach(r => {
     if (EXCLUDED_CANCEL_CATS.has(r._category) && r._category !== 'Rescheduled') return;
-    const p=(r['Subject Full Name']||'').trim(), s=r['Study Name'], key=p+'|'+s;
+    const p=(r['Subject Full Name']||'').replace(/\s{2,}/g,' ').trim().toLowerCase(), s=(r['Study Name']||'').trim().toLowerCase(), key=p+'|'+s;
     const cd = (r['Cancel Date']||'').substring(0,10);
     if (!cancelEventMap[key]) cancelEventMap[key] = new Set();
     cancelEventMap[key].add(cd);
     if (!cancelMeta[key] || cd > (cancelMeta[key].last_cancel||'')) {
       cancelMeta[key] = { last_cancel: cd,
+        display_patient: (r['Subject Full Name']||'').replace(/\s{2,}/g,' ').trim(),
+        display_study: (r['Study Name']||'').trim(),
         patient_url: patientUrl(r['Study Key'], r['Subject Key (Back End)'], r['Site Name']),
         study_url:   studyUrl(r['Study Key'], r['Site Name'])
       };
@@ -6864,7 +6866,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
   Object.entries(cancelEventMap).forEach(([k, dates]) => { cancelCounts[k] = dates.size; });
   const upcomingPats = {};
   activeUpcoming.forEach(r => {
-    const p=(r['Subject Full Name']||'').trim(), s=r['Study Name'], key=p+'|'+s;
+    const p=(r['Subject Full Name']||'').replace(/\s{2,}/g,' ').trim().toLowerCase(), s=(r['Study Name']||'').trim().toLowerCase(), key=p+'|'+s;
     const d = parseDate(r['Scheduled Date']);
     if (!upcomingPats[key] || d < upcomingPats[key].date) {
       upcomingPats[key] = { date: d,
@@ -6877,8 +6879,9 @@ function processLiveData(allRows, legacyCancels, auditLog) {
   const riskFlags = Object.entries(cancelCounts)
     .filter(([k,c]) => c >= 2 && upcomingPats[k])
     .map(([k,c]) => {
-      const [patient, study] = k.split('|');
       const meta = cancelMeta[k]||{}, up = upcomingPats[k];
+      const patient = meta.display_patient || k.split('|')[0];
+      const study = meta.display_study || k.split('|')[1];
       return { patient, study: study.split(' - ').pop(),
         patient_url: up.patient_url || meta.patient_url,
         study_url:   up.study_url   || meta.study_url,
