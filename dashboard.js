@@ -597,7 +597,7 @@ function renderAgingTables(){
   inv.innerHTML+='<tr class="total-row"><td>TOTAL</td><td class="r">'+fmt(it.c)+'</td><td class="r">'+fmt(it.a)+'</td><td class="r">'+fmt(it.b)+'</td><td class="r">'+fmt(it.d)+'</td><td class="r">'+fmt(it.e)+'</td><td class="r">'+fmt(it.f)+'</td><td class="r">'+fmt(it.c+it.a+it.b+it.d+it.e+it.f)+'</td></tr>';
   ap.innerHTML=AGING_AP.map(r=>{const t=r.current+r.d30_60+r.d61_90+r.d91_120+r.d121_150+r.d150plus;at.c+=r.current;at.a+=r.d30_60;at.b+=r.d61_90;at.d+=r.d91_120;at.e+=r.d121_150;at.f+=r.d150plus;
     return'<tr class="clickable" onclick="showStudyModal(\''+jsAttr(r.study)+'\')">' +
-      '<td>'+slink(r.study)+'</td><td class="r">'+fmt(r.current)+'</td><td class="r">'+fmt(r.d30_60)+'</td><td class="r">'+fmt(r.d61_90)+'</td><td class="r">'+fmt(r.d91_120)+'</td><td class="r">'+fmt(r.d121_150)+'</td><td class="r">'+fmt(t)+'</td></tr>';}).join('');
+      '<td>'+slink(r.study)+'</td><td class="r">'+fmt(r.current)+'</td><td class="r">'+fmt(r.d30_60)+'</td><td class="r">'+fmt(r.d61_90)+'</td><td class="r">'+fmt(r.d91_120)+'</td><td class="r">'+fmt(r.d121_150)+'</td><td class="r">'+fmt(r.d150plus)+'</td><td class="r">'+fmt(t)+'</td></tr>';}).join('');
   ap.innerHTML+='<tr class="total-row"><td>TOTAL</td><td class="r">'+fmt(at.c)+'</td><td class="r">'+fmt(at.a)+'</td><td class="r">'+fmt(at.b)+'</td><td class="r">'+fmt(at.d)+'</td><td class="r">'+fmt(at.e)+'</td><td class="r">'+fmt(at.f)+'</td><td class="r">'+fmt(at.c+at.a+at.b+at.d+at.e+at.f)+'</td></tr>';
 }
 function renderAgingKPIs(){
@@ -2918,9 +2918,13 @@ async function fetchText(url) {
     });
   } else {
     const bustUrl = url + (url.includes('?') ? '&' : '?') + '_cb=' + Date.now();
-    const resp = await fetch(bustUrl, { cache: 'no-store' });
-    if (!resp.ok) throw new Error('HTTP ' + resp.status + ' fetching: ' + url.slice(0, 80));
-    return resp.text();
+    const ac = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timer = ac ? setTimeout(() => ac.abort(), 30000) : null;
+    try {
+      const resp = await fetch(bustUrl, { cache: 'no-store', signal: ac ? ac.signal : undefined });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status + ' fetching: ' + url.slice(0, 80));
+      return resp.text();
+    } finally { if (timer) clearTimeout(timer); }
   }
 }
 
@@ -2938,14 +2942,20 @@ async function fetchCSV(url) {
 }
 
 function parseCSV(text) {
-  const lines = text.trim().split('\n');
+  // Strip BOM if present
+  var clean = text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text;
+  const lines = clean.trim().replace(/\r\n?/g, '\n').split('\n');
   const headers = lines[0].split(',').map(h => h.replace(/^"|"$/g, '').trim());
-  return lines.slice(1).map(line => {
-    // Handle quoted commas
+  return lines.slice(1).filter(l => l.trim()).map(line => {
+    // Handle quoted commas and escaped quotes (RFC 4180: "" inside quoted fields)
     const vals = [];
     let cur = '', inQ = false;
-    for (let c of line) {
-      if (c === '"') inQ = !inQ;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === '"') {
+        if (inQ && line[i + 1] === '"') { cur += '"'; i++; } // escaped ""
+        else inQ = !inQ;
+      }
       else if (c === ',' && !inQ) { vals.push(cur.trim()); cur = ''; }
       else cur += c;
     }
@@ -3715,7 +3725,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
   }
   let cancels = [];
   allCancelSources.forEach(r => {
-    const key = ((r['Subject Full Name']||'').trim().toLowerCase()) + '|' +
+    const key = ((r['Subject Full Name']||'').replace(/\s{2,}/g,' ').trim().toLowerCase()) + '|' +
                 ((r['Study Name']||'').trim().toLowerCase()) + '|' +
                 ((r['Cancel Date']||r['Scheduled Date']||'').trim());
     if (!_cancelSeen.has(key)) { _cancelSeen.add(key); cancels.push(r); }
@@ -3910,7 +3920,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
   // Step 2: Deduplicate (same patient + study + cancel date)
   const seenCancels = new Set();
   const dedupedCancels = rawCancels.filter(r => {
-    const key = ((r['Subject Full Name']||'').trim().toLowerCase()) + '|' +
+    const key = ((r['Subject Full Name']||'').replace(/\s{2,}/g,' ').trim().toLowerCase()) + '|' +
                 ((r['Study Name']||'').trim().toLowerCase()) + '|' +
                 ((r['Cancel Date']||r['Scheduled Date']||'').trim());
     if (seenCancels.has(key)) return false;
@@ -4126,7 +4136,8 @@ function processLiveData(allRows, legacyCancels, auditLog) {
   });
   recentCancels.forEach(r => {
     const cn = cleanCoord(r['Staff Full Name']); if (!isCoord(r['Staff Full Name'])) return;
-    if (!coordMap2[cn]) coordMap2[cn] = {name:cn, upcoming:0, cancels:0, undoc:0, site:'Philadelphia, PA'};
+    if (!coordMap2[cn]) coordMap2[cn] = {name:cn, upcoming:0, cancels:0, undoc:0,
+      site: siteSlug(r['Study Key'],r['Site Name'])===PNJ?'Pennington, NJ':'Philadelphia, PA'};
     coordMap2[cn].cancels++;
     if (!(r['Cancel Reason']||'').trim()) coordMap2[cn].undoc++;
   });
@@ -4191,8 +4202,8 @@ function processLiveData(allRows, legacyCancels, auditLog) {
   // ── site totals ──
   const phillyUp     = activeUpcoming.filter(r => siteSlug(r['Study Key'],r['Site Name'])===PHL).length;
   const pennUp       = activeUpcoming.filter(r => siteSlug(r['Study Key'],r['Site Name'])===PNJ).length;
-  const phillyCancel = recentCancels.filter(r  => (r['Site Name']||'').includes('Phila')).length;
-  const pennCancel   = recentCancels.filter(r  => (r['Site Name']||'').includes('Penn')).length;
+  const phillyCancel = recentCancels.filter(r  => siteSlug(r['Study Key'],r['Site Name'])===PHL).length;
+  const pennCancel   = recentCancels.filter(r  => siteSlug(r['Study Key'],r['Site Name'])===PNJ).length;
   const phillySt     = new Set(activeUpcoming.filter(r=>siteSlug(r['Study Key'],r['Site Name'])===PHL).map(r=>r['Study Name']));
   const pennSt       = new Set(activeUpcoming.filter(r=>siteSlug(r['Study Key'],r['Site Name'])===PNJ).map(r=>r['Study Name']));
 
@@ -4344,18 +4355,15 @@ function processLiveData(allRows, legacyCancels, auditLog) {
       return (da||0) - (db||0);
     }).map(r => {
       const sk = r['Study Key'], subk = r['Subject Key (Back End)'];
-      const pnj = [161619,162446,167755,167794,172389,173164];
-      const site = pnj.includes(+sk) ? 'clinical-research-philadelphia-pennington' : 'philadelphia-pa';
-      const base = `https://app.clinicalresearch.io/clinical-research-philadelphia-crp/${site}`;
       const d = parseDate(r['Scheduled Date']||'');
       return {
         date: d ? d.toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '—',
         date_iso: r['Scheduled Date']||'',
         study: (r['Study Name']||'').split(' - ').pop().trim(),
-        study_url: `${base}/study/${+sk}/subjects`,
+        study_url: studyUrl(sk, r['Site Name']) || '',
         visit: r['Name']||r['Appointment Type']||'',
         patient: (r['Subject Full Name']||'').replace(/\s{2,}/g,' ').trim(),
-        patient_url: `${base}/study/${+sk}/subject/${+subk}`,
+        patient_url: patientUrl(sk, subk, r['Site Name']) || '',
         status: r['Subject Status']||'',
         coord: cleanCoord(r['Full Name']),
         investigator: cleanCoord(resolveInvestigator(r)),
@@ -4364,9 +4372,9 @@ function processLiveData(allRows, legacyCancels, auditLog) {
     }),
     allCancels: recentCancels.map(r => ({
       name: (r['Subject Full Name']||'').replace(/\s{2,}/g,' ').trim(),
-      url: (() => { try { const sk=r['Study Key'],subk=r['Subject Key (Back End)'],pnj=[161619,162446,167755,167794,172389,173164];const site=pnj.includes(+sk)?'clinical-research-philadelphia-pennington':'philadelphia-pa';return `https://app.clinicalresearch.io/clinical-research-philadelphia-crp/${site}/study/${+sk}/subject/${+subk}`;}catch(e){return '';}})(),
+      url: patientUrl(r['Study Key'], r['Subject Key (Back End)'], r['Site Name']) || '',
       study: (r['Study Name']||'').split(' - ').pop().trim(),
-      study_url: (() => { try { const sk=r['Study Key'],pnj=[161619,162446,167755,167794,172389,173164];const site=pnj.includes(+sk)?'clinical-research-philadelphia-pennington':'philadelphia-pa';return `https://app.clinicalresearch.io/clinical-research-philadelphia-crp/${site}/study/${+sk}/subjects`;}catch(e){return '';}})(),
+      study_url: studyUrl(r['Study Key'], r['Site Name']) || '',
       coord: cleanCoord(r['Staff Full Name'] || r['Full Name']),
       type: r['Appointment Cancellation Type']||'',
       reason: r['Cancel Reason']||'',
@@ -4374,22 +4382,20 @@ function processLiveData(allRows, legacyCancels, auditLog) {
       cancel_date: (() => { try { const d=new Date(r['Cancel Date']);return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});}catch(e){return '';}})()
     })),
     rescheduledVisits: rescheduledVisits.map(r => {
-      const sk=r['Study Key'], subk=r['Subject Key (Back End)'], pnj=[161619,162446,167755,167794,172389,173164];
-      const site = pnj.includes(+sk) ? 'clinical-research-philadelphia-pennington' : 'philadelphia-pa';
-      const base = `https://app.clinicalresearch.io/clinical-research-philadelphia-crp/${site}`;
+      const sk=r['Study Key'], subk=r['Subject Key (Back End)'];
       // Find the matching upcoming visit for this patient+study
       const nameKey = (r['Subject Full Name']||'').replace(/\s{2,}/g,' ').trim().toLowerCase();
-      const studyKey = (r['Study Name']||'').trim().toLowerCase();
+      const studyLookup = (r['Study Name']||'').trim().toLowerCase();
       const upcoming = activeUpcoming.find(u => {
         return (u['Subject Full Name']||'').replace(/\s{2,}/g,' ').trim().toLowerCase() === nameKey
-            && (u['Study Name']||'').trim().toLowerCase() === studyKey;
+            && (u['Study Name']||'').trim().toLowerCase() === studyLookup;
       });
       const newDate = upcoming ? parseDate(upcoming['Scheduled Date']) : null;
       return {
         name: (r['Subject Full Name']||'').replace(/\s{2,}/g,' ').trim(),
-        url: `${base}/study/${+sk}/subject/${+subk}`,
+        url: patientUrl(sk, subk, r['Site Name']) || '',
         study: (r['Study Name']||'').split(' - ').pop().trim(),
-        study_url: `${base}/study/${+sk}/subjects`,
+        study_url: studyUrl(sk, r['Site Name']) || '',
         coord: cleanCoord(r['Staff Full Name'] || r['Full Name']),
         type: r['Appointment Cancellation Type']||'',
         reason: r['Cancel Reason']||'',
@@ -4399,14 +4405,12 @@ function processLiveData(allRows, legacyCancels, auditLog) {
       };
     }),
     pendingReschedules: pendingReschedules.map(r => {
-      const sk=r['Study Key'], subk=r['Subject Key (Back End)'], pnj=[161619,162446,167755,167794,172389,173164];
-      const site = pnj.includes(+sk) ? 'clinical-research-philadelphia-pennington' : 'philadelphia-pa';
-      const base = `https://app.clinicalresearch.io/clinical-research-philadelphia-crp/${site}`;
+      const sk=r['Study Key'], subk=r['Subject Key (Back End)'];
       return {
         name: (r['Subject Full Name']||'').replace(/\s{2,}/g,' ').trim(),
-        url: `${base}/study/${+sk}/subject/${+subk}`,
+        url: patientUrl(sk, subk, r['Site Name']) || '',
         study: (r['Study Name']||'').split(' - ').pop().trim(),
-        study_url: `${base}/study/${+sk}/subjects`,
+        study_url: studyUrl(sk, r['Site Name']) || '',
         coord: cleanCoord(r['Staff Full Name'] || r['Full Name']),
         reason: r['Cancel Reason']||'',
         cancel_date: (() => { try { const d=new Date(r['Cancel Date']);return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});}catch(e){return '';}})(),
@@ -4461,7 +4465,10 @@ function processLiveData(allRows, legacyCancels, auditLog) {
   };
 }
 
+var _refreshInFlight = false;
 async function refreshData() {
+  if (_refreshInFlight) return;
+  _refreshInFlight = true;
   const badge = document.getElementById('last-refresh-badge');
   if (badge) badge.textContent = 'Refreshing...';
   try {
@@ -4495,7 +4502,7 @@ async function refreshData() {
   } catch(e) {
     if (badge) badge.textContent = 'Refresh failed — click to retry';
     console.error(e);
-  }
+  } finally { _refreshInFlight = false; }
 }
 
 // ═══════════════════════════════════════════════════
@@ -5017,6 +5024,7 @@ function openModal(title, sub, bodyHtml) {
   document.getElementById('detail-panel-body').querySelectorAll('.detail-table th').forEach(th => {
     th.onclick = () => sortDetailTable(th);
   });
+  document.removeEventListener('keydown', _escClose);
   document.addEventListener('keydown', _escClose);
 }
 function closeModal() {
@@ -6632,7 +6640,7 @@ function buildEnrollmentView() {
     document.getElementById('enroll-kpi-remaining').textContent = d.totalRemaining ?? '—';
     document.getElementById('enroll-kpi-screening').textContent = d.totalScreening ?? '—';
     document.getElementById('enroll-kpi-complete').innerHTML = `${d.complete ?? '—'} <span style="font-size:14px;font-weight:400;color:var(--muted)">of</span> ${d.studies ?? '—'}`;
-    document.getElementById('enroll-overall-bar').style.width = pct + '%';
+    document.getElementById('enroll-overall-bar').style.width = Math.min(pct, 100) + '%';
     document.getElementById('enroll-overall-bar-complete').style.width = (d.totalTarget ? Math.round(d.totalEnrolled/d.totalTarget*100) : 0) + '%';
     document.getElementById('enroll-overall-label').textContent = `${d.totalEnrolled} enrolled · ${d.totalRemaining} remaining · ${d.totalScreening} in screening`;
     document.getElementById('enroll-overall-target').textContent = `Portfolio target: ${d.totalTarget}`;
