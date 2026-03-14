@@ -4,3 +4,6 @@
 # Don't commit generated files (built from index.html by build-appscript.py)
 Dashboard.html
 DashboardJS*.html
+
+# QuickBooks credentials — never commit with real keys
+QuickBooksSync.gs
