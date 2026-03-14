@@ -2698,6 +2698,10 @@ function escapeHTML(str) {
   if (str == null) return '';
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
+// Safe string for use in single-quoted JS inside HTML attributes: onclick="fn('${jsAttr(val)}')"
+function jsAttr(s) {
+  return escapeHTML(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'"));
+}
 
 // ═══ SERVICE WORKER REGISTRATION ═══
 if ('serviceWorker' in navigator && !(typeof google !== 'undefined' && google.script && google.script.run)) {
@@ -3232,19 +3236,19 @@ function drawPayChart(){
 function renderARStudies(){
   const tb=document.getElementById('arStudiesBody');
   tb.innerHTML=TOP_AR_STUDIES.map(r=>{const pct=r.collected>0?((r.collected/(r.collected+r.total))*100).toFixed(0):'0';
-    return'<tr class="clickable" onclick="showStudyModal(\''+r.study.replace(/'/g,"\\'")+'\')">' +
+    return'<tr class="clickable" onclick="showStudyModal(\''+jsAttr(r.study)+'\')">' +
       '<td>'+slink(r.study)+'</td><td class="r">'+fmt(r.invAR)+'</td><td class="r">'+fmt(r.apAR)+'</td><td class="r">'+fmt(r.total)+'</td><td class="r">'+fmt(r.collected)+'</td><td class="r">'+pct+'%</td></tr>';}).join('');
 }
 function renderAgingTables(){
   const inv=document.getElementById('invAgingBody');const ap=document.getElementById('apAgingBody');
   let it={c:0,a:0,b:0,d:0,e:0,f:0},at={c:0,a:0,b:0,d:0,e:0,f:0};
   inv.innerHTML=AGING_INV.map(r=>{const t=r.current+r.d30_60+r.d61_90+r.d91_120+r.d121_150+r.d150plus;it.c+=r.current;it.a+=r.d30_60;it.b+=r.d61_90;it.d+=r.d91_120;it.e+=r.d121_150;it.f+=r.d150plus;
-    return'<tr class="clickable" onclick="showStudyModal(\''+r.study.replace(/'/g,"\\'")+'\')">' +
+    return'<tr class="clickable" onclick="showStudyModal(\''+jsAttr(r.study)+'\')">' +
       '<td>'+slink(r.study)+'</td><td class="r">'+fmt(r.current)+'</td><td class="r">'+fmt(r.d30_60)+'</td><td class="r">'+fmt(r.d61_90)+'</td><td class="r">'+fmt(r.d91_120)+'</td><td class="r">'+fmt(r.d121_150)+'</td><td class="r">'+fmt(r.d150plus)+'</td><td class="r">'+fmt(t)+'</td></tr>';}).join('');
   inv.innerHTML+='<tr class="total-row"><td>TOTAL</td><td class="r">'+fmt(it.c)+'</td><td class="r">'+fmt(it.a)+'</td><td class="r">'+fmt(it.b)+'</td><td class="r">'+fmt(it.d)+'</td><td class="r">'+fmt(it.e)+'</td><td class="r">'+fmt(it.f)+'</td><td class="r">'+fmt(it.c+it.a+it.b+it.d+it.e+it.f)+'</td></tr>';
   ap.innerHTML=AGING_AP.map(r=>{const t=r.current+r.d30_60+r.d61_90+r.d91_120+r.d121_150+r.d150plus;at.c+=r.current;at.a+=r.d30_60;at.b+=r.d61_90;at.d+=r.d91_120;at.e+=r.d121_150;at.f+=r.d150plus;
-    return'<tr class="clickable" onclick="showStudyModal(\''+r.study.replace(/'/g,"\\'")+'\')">' +
-      '<td>'+slink(r.study)+'</td><td class="r">'+fmt(r.current)+'</td><td class="r">'+fmt(r.d30_60)+'</td><td class="r">'+fmt(r.d61_90)+'</td><td class="r">'+fmt(r.d91_120)+'</td><td class="r">'+fmt(r.d121_150)+'</td><td class="r">'+fmt(r.d150plus)+'</td><td class="r">'+fmt(t)+'</td></tr>';}).join('');
+    return'<tr class="clickable" onclick="showStudyModal(\''+jsAttr(r.study)+'\')">' +
+      '<td>'+slink(r.study)+'</td><td class="r">'+fmt(r.current)+'</td><td class="r">'+fmt(r.d30_60)+'</td><td class="r">'+fmt(r.d61_90)+'</td><td class="r">'+fmt(r.d91_120)+'</td><td class="r">'+fmt(r.d121_150)+'</td><td class="r">'+fmt(t)+'</td></tr>';}).join('');
   ap.innerHTML+='<tr class="total-row"><td>TOTAL</td><td class="r">'+fmt(at.c)+'</td><td class="r">'+fmt(at.a)+'</td><td class="r">'+fmt(at.b)+'</td><td class="r">'+fmt(at.d)+'</td><td class="r">'+fmt(at.e)+'</td><td class="r">'+fmt(at.f)+'</td><td class="r">'+fmt(at.c+at.a+at.b+at.d+at.e+at.f)+'</td></tr>';
 }
 function renderAgingKPIs(){
@@ -3256,7 +3260,7 @@ function renderAgingKPIs(){
 }
 function renderRevByStudy(){
   const tb=document.getElementById('revByStudyBody');let tot=0;
-  tb.innerHTML=Object.entries(STUDY_REVENUE_12M).sort((a,b)=>b[1]-a[1]).filter(([_,v])=>v>0).map(([s,v])=>{tot+=v;return'<tr class="clickable" onclick="showStudyModal(\''+s.replace(/'/g,"\\'")+'\')"><td>'+slink(s)+'</td><td class="r">'+fmt(v)+'</td></tr>';}).join('');
+  tb.innerHTML=Object.entries(STUDY_REVENUE_12M).sort((a,b)=>b[1]-a[1]).filter(([_,v])=>v>0).map(([s,v])=>{tot+=v;return'<tr class="clickable" onclick="showStudyModal(\''+jsAttr(s)+'\')"><td>'+slink(s)+'</td><td class="r">'+fmt(v)+'</td></tr>';}).join('');
   tb.innerHTML+='<tr class="total-row"><td>TOTAL</td><td class="r">'+fmt(tot)+'</td></tr>';
 }
 function renderUninvoiced(){
@@ -3370,7 +3374,7 @@ function renderPayTypeChart() {
   container.innerHTML = REVENUE_BY_PAY_TYPE.map(d => {
     const pct = (d.amount / maxAmt * 100).toFixed(0);
     const c = colors[d.type] || '#8B5CF6';
-    return '<div style="margin-bottom:16px"><div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:13px"><span style="font-weight:600;color:#1a202c">' + d.type + '</span><span style="color:#4A5568;font-weight:700">' + fmt(d.amount) + '</span></div><div style="background:#F3F4F6;border-radius:6px;height:28px;overflow:hidden"><div style="background:' + c + ';height:100%;width:' + pct + '%;border-radius:6px;transition:width 0.5s"></div></div></div>';
+    return '<div style="margin-bottom:16px"><div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:13px"><span style="font-weight:600;color:#1a202c">' + escapeHTML(d.type) + '</span><span style="color:#4A5568;font-weight:700">' + fmt(d.amount) + '</span></div><div style="background:#F3F4F6;border-radius:6px;height:28px;overflow:hidden"><div style="background:' + c + ';height:100%;width:' + pct + '%;border-radius:6px;transition:width 0.5s"></div></div></div>';
   }).join('');
 }
 
@@ -3381,7 +3385,7 @@ function renderRevenueItems() {
   tb.innerHTML = REVENUE_ITEMS_TOP.map(r => {
     total += r.amount;
     const avg = r.count > 0 ? r.amount / r.count : 0;
-    return '<tr><td style="max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + r.item + '</td><td class="r">' + fmt(r.amount) + '</td><td class="r">' + r.count.toLocaleString() + '</td><td class="r">' + fmt(avg) + '</td></tr>';
+    return '<tr><td style="max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHTML(r.item) + '</td><td class="r">' + fmt(r.amount) + '</td><td class="r">' + r.count.toLocaleString() + '</td><td class="r">' + fmt(avg) + '</td></tr>';
   }).join('');
   tb.innerHTML += '<tr class="total-row"><td>TOTAL</td><td class="r">' + fmt(total) + '</td><td></td><td></td></tr>';
 }
@@ -3433,7 +3437,7 @@ function renderUnpaidApTypeChart() {
     const pct = total > 0 ? Math.round(d.amount / total * 100) : 0;
     const barPct = (d.amount / maxAmt * 100).toFixed(0);
     const c = colors[d.type] || '#6B7280';
-    return '<div style="margin-bottom:16px"><div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:13px"><span style="font-weight:600;color:#1a202c">' + d.type + ' <span style="color:#9CA3AF;font-weight:400">(' + d.count + ' items · ' + pct + '%)</span></span><span style="color:#4A5568;font-weight:700">' + fmt(d.amount) + '</span></div><div style="background:#F3F4F6;border-radius:6px;height:24px;overflow:hidden"><div style="background:' + c + ';height:100%;width:' + barPct + '%;border-radius:6px;transition:width 0.5s"></div></div></div>';
+    return '<div style="margin-bottom:16px"><div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:13px"><span style="font-weight:600;color:#1a202c">' + escapeHTML(d.type) + ' <span style="color:#9CA3AF;font-weight:400">(' + d.count + ' items · ' + pct + '%)</span></span><span style="color:#4A5568;font-weight:700">' + fmt(d.amount) + '</span></div><div style="background:#F3F4F6;border-radius:6px;height:24px;overflow:hidden"><div style="background:' + c + ';height:100%;width:' + barPct + '%;border-radius:6px;transition:width 0.5s"></div></div></div>';
   }).join('');
 }
 
@@ -3472,7 +3476,7 @@ function renderUninvoicedDetail() {
   let total = 0;
   tb.innerHTML = data.map(r => {
     total += r.amount;
-    return '<tr><td>' + slink(r.study) + '</td><td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + (r.name || '—') + '</td><td><span class="pill" style="background:' + getCategoryColor(r.category) + '20;color:' + getCategoryColor(r.category) + ';font-size:11px">' + (r.category || '—') + '</span></td><td class="r">' + fmt(r.amount) + '</td></tr>';
+    return '<tr><td>' + slink(r.study) + '</td><td style="max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHTML(r.name || '—') + '</td><td><span class="pill" style="background:' + getCategoryColor(r.category) + '20;color:' + getCategoryColor(r.category) + ';font-size:11px">' + escapeHTML(r.category || '—') + '</span></td><td class="r">' + fmt(r.amount) + '</td></tr>';
   }).join('');
   tb.innerHTML += '<tr class="total-row"><td colspan="3">TOTAL</td><td class="r">' + fmt(total) + '</td></tr>';
 }
@@ -3486,8 +3490,8 @@ function renderStudies(){
   const tb=document.getElementById('studiesBody');
   tb.innerHTML=FIN_MERGED_STUDIES.map(r=>{const rev=STUDY_REVENUE_12M[r.study]||0;const ar=TOP_AR_STUDIES.find(x=>x.study.includes(r.study));const arv=ar?ar.total:0;
     const pc=r.status==='Enrolling'?'pill-enrolling':r.status==='Maintenance'?'pill-maintenance':'pill-pre-closed';
-    const lnk=CRIO_LINKS[r.study]?'<a href="'+CRIO_LINKS[r.study]+'" target="_blank" class="study-link">'+r.study+'</a>':r.study;
-    return'<tr class="clickable"><td>'+lnk+'</td><td><span class="pill '+pc+'">'+r.status+'</span></td><td class="r">'+r.enrolled+'</td><td class="r">'+fmt(rev)+'</td><td class="r">'+fmt(arv)+'</td></tr>';
+    const lnk=CRIO_LINKS[r.study]?'<a href="'+escapeHTML(CRIO_LINKS[r.study])+'" target="_blank" class="study-link">'+escapeHTML(r.study)+'</a>':escapeHTML(r.study);
+    return'<tr class="clickable"><td>'+lnk+'</td><td><span class="pill '+pc+'">'+escapeHTML(r.status)+'</span></td><td class="r">'+r.enrolled+'</td><td class="r">'+fmt(rev)+'</td><td class="r">'+fmt(arv)+'</td></tr>';
   }).join('');
 }
 
@@ -3534,7 +3538,7 @@ function renderCollections(){
   else if(collSort==='amount')d.sort((a,b)=>Math.abs(b.amount)-Math.abs(a.amount));
   else{const o={New:0,Contacted:1,Escalated:2,Disputed:3,Resolved:4};d.sort((a,b)=>o[a.status]-o[b.status]);}
   const pm={New:'pill-new',Contacted:'pill-contacted',Escalated:'pill-escalated',Disputed:'pill-disputed',Resolved:'pill-resolved'};
-  document.getElementById('collBody').innerHTML=d.map(r=>'<tr><td>'+slink(r.study)+'</td><td>'+r.invoice+'</td><td class="r" style="font-weight:700;color:'+(r.days>365?'#DC2626':r.days>180?'#EA580C':'#4A5568')+'">'+r.days+'</td><td class="r">'+fmt(r.unpaid)+'</td><td><span class="pill '+(pm[r.status]||'pill-new')+'" onclick="cycleSt(\''+r.invoice.replace(/'/g,"\\'")+'\')" title="Click to cycle status">'+r.status+'</span></td><td><button class="notes-btn" onclick="toggleNote(\''+r.invoice.replace(/'/g,"\\'")+'\')">Notes</button><input class="notes-input" data-inv="'+r.invoice+'" value="'+(r.notes||'')+'" onblur="saveNote(\''+r.invoice.replace(/'/g,"\\'")+'\')" onkeypress="if(event.key===\'Enter\')saveNote(\''+r.invoice.replace(/'/g,"\\'")+'\')" placeholder="Add note..."></td></tr>').join('');
+  document.getElementById('collBody').innerHTML=d.map(r=>'<tr><td>'+slink(r.study)+'</td><td>'+escapeHTML(r.invoice)+'</td><td class="r" style="font-weight:700;color:'+(r.days>365?'#DC2626':r.days>180?'#EA580C':'#4A5568')+'">'+r.days+'</td><td class="r">'+fmt(r.unpaid)+'</td><td><span class="pill '+(pm[r.status]||'pill-new')+'" onclick="cycleSt(\''+jsAttr(r.invoice)+'\')" title="Click to cycle status">'+escapeHTML(r.status)+'</span></td><td><button class="notes-btn" onclick="toggleNote(\''+jsAttr(r.invoice)+'\')">Notes</button><input class="notes-input" data-inv="'+escapeHTML(r.invoice)+'" value="'+escapeHTML(r.notes||'')+'" onblur="saveNote(\''+jsAttr(r.invoice)+'\')" onkeypress="if(event.key===\'Enter\')saveNote(\''+jsAttr(r.invoice)+'\')" placeholder="Add note..."></td></tr>').join('');
 }
 
 // ══════════ ALERTS ══════════
@@ -3896,9 +3900,8 @@ function renderInsights() {
       else if(ha||hc||lc){risk='Medium';rc='risk-medium';}
       const st=s.status||'--';
       const sc=st==='Enrolling'?'badge-green':st==='Maintenance'?'badge-yellow':'badge-gray';
-      const link=CRIO_LINKS[s.code]?'<a href="'+CRIO_LINKS[s.code]+'" target="_blank" style="color:inherit;text-decoration:underline dotted">'+s.name+'</a>':s.name;
-      const safe=s.name.replace(/'/g,'&#39;');
-      return '<tr class="clickable" onclick="showStudyModal(\''+safe+'\')"><td>'+link+'</td><td><span class="badge '+sc+'">'+st+'</span></td><td class="r">'+(s.cancels||'--')+'</td><td class="r">'+(s.upcoming||'--')+'</td><td class="r">$'+(s.totalAR/1000).toFixed(0)+'K</td><td class="r">'+pct+'%</td><td><span class="risk-tag '+rc+'">'+risk+'</span></td></tr>';
+      const link=CRIO_LINKS[s.code]?'<a href="'+escapeHTML(CRIO_LINKS[s.code])+'" target="_blank" style="color:inherit;text-decoration:underline dotted">'+escapeHTML(s.name)+'</a>':escapeHTML(s.name);
+      return '<tr class="clickable" onclick="showStudyModal(\''+jsAttr(s.name)+'\')"><td>'+link+'</td><td><span class="badge '+sc+'">'+escapeHTML(st)+'</span></td><td class="r">'+(s.cancels||'--')+'</td><td class="r">'+(s.upcoming||'--')+'</td><td class="r">$'+(s.totalAR/1000).toFixed(0)+'K</td><td class="r">'+pct+'%</td><td><span class="risk-tag '+rc+'">'+risk+'</span></td></tr>';
     }).join('');
   }
 
@@ -3913,7 +3916,7 @@ function renderInsights() {
       const avgVR=enrolled>0&&rev12>0?Math.round(rev12/(enrolled*12)):0;
       const lost=s.cancels*avgVR;
       totalLostEst+=lost;
-      const link=CRIO_LINKS[s.code]?'<a href="'+CRIO_LINKS[s.code]+'" target="_blank" style="color:inherit;text-decoration:underline dotted">'+s.code+'</a>':s.code;
+      const link=CRIO_LINKS[s.code]?'<a href="'+escapeHTML(CRIO_LINKS[s.code])+'" target="_blank" style="color:inherit;text-decoration:underline dotted">'+escapeHTML(s.code)+'</a>':escapeHTML(s.code);
       html+='<div style="background:#FEF2F2;border-radius:8px;padding:12px;border-left:3px solid #EF4444"><div style="font-weight:700;font-size:13px">'+link+'</div><div style="font-size:12px;color:#718096;margin-top:4px">'+s.cancels+' cancellations · '+s.upcoming+' upcoming</div><div style="font-size:14px;font-weight:700;color:#EF4444;margin-top:6px">~$'+(lost/1000).toFixed(0)+'K est. revenue impact</div></div>';
     });
     html+='</div>';
@@ -4070,8 +4073,8 @@ function renderInsights() {
       else if(pct>40){alert='Watch';ac='risk-medium';}
       else{alert='OK';ac='risk-low';}
       const nm=ms.name||code;
-      const link=CRIO_LINKS[code]?'<a href="'+CRIO_LINKS[code]+'" target="_blank" style="color:inherit;text-decoration:underline dotted">'+nm+'</a>':nm;
-      rows.push({pct,html:'<tr class="clickable" onclick="showStudyModal(\''+code.replace(/'/g,"\\'")+'\')"><td>'+link+'</td><td><span class="badge '+(st==='Enrolling'?'badge-green':st==='Maintenance'?'badge-yellow':'badge-gray')+'">'+en+' enrolled</span></td><td class="r">$'+(cur/1000).toFixed(0)+'K</td><td class="r" style="color:'+(pct>40?'#EF4444':'inherit')+'">$'+(over/1000).toFixed(0)+'K</td><td class="r" style="font-weight:700;color:'+(pct>60?'#dc2626':pct>40?'#F59E0B':'#10B981')+'">'+pct+'%</td><td><span class="risk-tag '+ac+'">'+alert+'</span></td></tr>'});
+      const link=CRIO_LINKS[code]?'<a href="'+escapeHTML(CRIO_LINKS[code])+'" target="_blank" style="color:inherit;text-decoration:underline dotted">'+escapeHTML(nm)+'</a>':escapeHTML(nm);
+      rows.push({pct,html:'<tr class="clickable" onclick="showStudyModal(\''+jsAttr(code)+'\')"><td>'+link+'</td><td><span class="badge '+(st==='Enrolling'?'badge-green':st==='Maintenance'?'badge-yellow':'badge-gray')+'">'+en+' enrolled</span></td><td class="r">$'+(cur/1000).toFixed(0)+'K</td><td class="r" style="color:'+(pct>40?'#EF4444':'inherit')+'">$'+(over/1000).toFixed(0)+'K</td><td class="r" style="font-weight:700;color:'+(pct>60?'#dc2626':pct>40?'#F59E0B':'#10B981')+'">'+pct+'%</td><td><span class="risk-tag '+ac+'">'+alert+'</span></td></tr>'});
     });
     rows.sort((a,b)=>b.pct-a.pct);
     agingOpsBody.innerHTML=rows.map(r=>r.html).join('');
@@ -4108,7 +4111,7 @@ function renderInsights() {
       FIN_MERGED_STUDIES.forEach(r=>{
         const rev=STUDY_REVENUE_12M[r.study]||0;
         const ar=TOP_AR_STUDIES.find(x=>x.study.includes(r.study));
-        h+='<tr><td>'+slink(r.study)+'</td><td><span class="badge '+(r.status==='Enrolling'?'badge-green':'badge-yellow')+'">'+r.status+'</span></td><td class="r">'+r.enrolled+'</td><td class="r">'+fmt(rev)+'</td><td class="r">'+(ar?fmt(ar.total):'--')+'</td></tr>';
+        h+='<tr><td>'+slink(r.study)+'</td><td><span class="badge '+(r.status==='Enrolling'?'badge-green':'badge-yellow')+'">'+escapeHTML(r.status)+'</span></td><td class="r">'+r.enrolled+'</td><td class="r">'+fmt(rev)+'</td><td class="r">'+(ar?fmt(ar.total):'--')+'</td></tr>';
       });
       h+='</tbody></table>';
       showFinModal('All Tracked Studies ('+FIN_MERGED_STUDIES.length+')',h);
@@ -4185,7 +4188,7 @@ function renderInsights() {
     if (zeroCollStudies.length) {
       actions.push({
         priority: 1,
-        html: '<div style="display:flex;gap:12px;align-items:flex-start;padding:14px;background:#FEF2F2;border-radius:10px;border-left:4px solid #EF4444">'+icon('🚨','#FEE2E2')+'<div><div style="font-weight:700;font-size:13px;color:#991B1B">URGENT: '+zeroCollStudies.length+' studies with $0 collections</div><div style="font-size:12px;color:#6B7280;margin-top:4px">'+zeroCollStudies.map(s=>'<span style="cursor:pointer;text-decoration:underline" onclick="showStudyModal(\''+s.study.replace(/'/g,'&#39;')+'\')">'+s.study.split(' - ').pop()+'</span>').join(', ')+'</div><div style="font-size:12px;font-weight:600;color:#DC2626;margin-top:6px">→ Contact sponsor billing for each study this week. Verify invoice delivery.</div></div></div>'
+        html: '<div style="display:flex;gap:12px;align-items:flex-start;padding:14px;background:#FEF2F2;border-radius:10px;border-left:4px solid #EF4444">'+icon('🚨','#FEE2E2')+'<div><div style="font-weight:700;font-size:13px;color:#991B1B">URGENT: '+zeroCollStudies.length+' studies with $0 collections</div><div style="font-size:12px;color:#6B7280;margin-top:4px">'+zeroCollStudies.map(s=>'<span style="cursor:pointer;text-decoration:underline" onclick="showStudyModal(\''+jsAttr(s.study)+'\')">'+escapeHTML(s.study.split(' - ').pop())+'</span>').join(', ')+'</div><div style="font-size:12px;font-weight:600;color:#DC2626;margin-top:6px">→ Contact sponsor billing for each study this week. Verify invoice delivery.</div></div></div>'
       });
     }
 
@@ -4467,8 +4470,8 @@ function buildSiteChart() {
     ${DATA.sites.map(s => {
       const rateColor = (s.cancelRate||0) >= 50 ? 'var(--red)' : (s.cancelRate||0) >= 35 ? 'var(--yellow)' : 'var(--green)';
       return `<div style="padding:12px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);cursor:pointer"
-                   onclick="showCancels(r=>{const cl=(r.coord||'').toLowerCase();const ip=${s.site.includes('Penn') ? 'true' : 'false'};const rp=['angelina mcmullen','cady chilensky'].includes(cl);return ip?rp:!rp;},'${s.site} — Cancellations','${s.cancels} records')">
-        <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:8px">${s.site}</div>
+                   onclick="showCancels(r=>{const cl=(r.coord||'').toLowerCase();const ip=${s.site.includes('Penn') ? 'true' : 'false'};const rp=['angelina mcmullen','cady chilensky'].includes(cl);return ip?rp:!rp;},'${escapeHTML(s.site)} — Cancellations','${s.cancels} records')">
+        <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:8px">${escapeHTML(s.site)}</div>
         <div style="display:flex;gap:12px;">
           <div><div style="font-size:18px;font-weight:700;color:var(--blue)">${s.upcoming}</div><div style="font-size:10px;color:var(--muted)">Upcoming</div></div>
           <div><div style="font-size:18px;font-weight:700;color:var(--red)">${s.cancels}</div><div style="font-size:10px;color:var(--muted)">Canceled</div></div>
@@ -4580,7 +4583,7 @@ function buildVisitTypeChart() {
     }
   });
   const leg = document.getElementById('visit-type-legend');
-  if (leg) leg.innerHTML = d.map((x,i) => `<div class="legend-row"><div class="legend-dot" style="background:${colors[i]}"></div><span class="legend-label">${x.type}</span><span class="legend-val">${x.count}</span></div>`).join('');
+  if (leg) leg.innerHTML = d.map((x,i) => `<div class="legend-row"><div class="legend-dot" style="background:${colors[i]}"></div><span class="legend-label">${escapeHTML(x.type)}</span><span class="legend-val">${x.count}</span></div>`).join('');
 }
 
 function buildSchedCoordList() {
@@ -4592,9 +4595,9 @@ function buildSchedCoordList() {
   el.innerHTML = coords.map(c => {
     const pct = Math.round(c.upcoming / max * 100);
     const color = c.site && c.site.includes('Penn') ? '#059669' : '#072061';
-    return `<div style="padding:8px 0;border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showCoordDetail('${c.name}')">
+    return `<div style="padding:8px 0;border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showCoordDetail('${jsAttr(c.name)}')">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-        <span style="font-size:12px;font-weight:600">${c.name}</span>
+        <span style="font-size:12px;font-weight:600">${escapeHTML(c.name)}</span>
         <span style="font-size:12px;font-weight:700;color:${color}">${c.upcoming} visits</span>
       </div>
       <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden;">
@@ -4613,10 +4616,10 @@ function buildSchedStudyBars() {
     const pct = (s.count / max * 100).toFixed(0);
     const siteColor = (s.site||'').includes('Penn') ? '#059669' : '#072061';
     const siteShort = (s.site||'').includes('Penn') ? 'PNJ' : 'PHL';
-    const safeStudy = (s.name||'').replace(/'/g,"\\'");
+    const safeStudy = jsAttr(s.name||'');
     return `<div style="display:grid;grid-template-columns:1fr 36px 36px;gap:4px 8px;align-items:center;padding:5px 0;border-bottom:1px solid #f8fafc;">
       <div>
-        <div style="font-size:11px;font-weight:500;margin-bottom:3px">${s.study_url ? `<a href="${s.study_url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="text-decoration:none;font-size:11px;font-weight:500;color:inherit;">${s.name}<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-left:3px;opacity:0.45;vertical-align:middle;flex-shrink:0"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>` : s.name}</div>
+        <div style="font-size:11px;font-weight:500;margin-bottom:3px">${s.study_url ? `<a href="${escapeHTML(s.study_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="text-decoration:none;font-size:11px;font-weight:500;color:inherit;">${escapeHTML(s.name)}<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-left:3px;opacity:0.45;vertical-align:middle;flex-shrink:0"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>` : escapeHTML(s.name)}</div>
         <div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden">
           <div style="width:${pct}%;height:100%;background:${siteColor};border-radius:3px;"></div>
         </div>
@@ -4631,7 +4634,7 @@ function buildStatusLegend() {
   const d = DATA.subjectStatus || [];
   const colors = ['#059669','#072061','#d97706','#7c3aed','#94a3b8'];
   const leg = document.getElementById('status-legend');
-  if (leg) leg.innerHTML = d.map((x,i) => `<div class="legend-row"><div class="legend-dot" style="background:${colors[i]}"></div><span class="legend-label">${x.status}</span><span class="legend-val">${x.count}</span></div>`).join('');
+  if (leg) leg.innerHTML = d.map((x,i) => `<div class="legend-row"><div class="legend-dot" style="background:${colors[i]}"></div><span class="legend-label">${escapeHTML(x.status)}</span><span class="legend-val">${x.count}</span></div>`).join('');
 }
 
 function schedFilter(btn, filter) {
@@ -4815,7 +4818,7 @@ function showHorizonDetail(type, weekLabel) {
   }
   overlay.innerHTML = `<div style="background:#fff;border-radius:12px;max-width:800px;width:100%;max-height:80vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3)">
     <div style="padding:16px 20px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center">
-      <div style="font-size:15px;font-weight:700;color:#1a202c">${title} <span style="font-weight:400;color:#64748b;font-size:13px">(${rows.length} records)</span></div>
+      <div style="font-size:15px;font-weight:700;color:#1a202c">${escapeHTML(title)} <span style="font-weight:400;color:#64748b;font-size:13px">(${rows.length} records)</span></div>
       <button onclick="document.getElementById('horizon-overlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#94a3b8;padding:4px 8px">✕</button>
     </div>
     <div style="padding:16px 20px">${rows.length ? tableHTML : '<div style="text-align:center;padding:24px;color:#94a3b8">No records for this week</div>'}</div>
@@ -4836,7 +4839,7 @@ function buildCancelStudyBars() {
       ? `<a href="${escapeHTML(d.study_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="text-decoration:none;font-size:11px;color:var(--muted);">${esLabel}${linkIcon}</a>`
       : esLabel;
     return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #f1f5f9;cursor:pointer;"
-                 onclick="showCancels(r=>r.study==='${label.replace(/'/g,"\\'")}','${esLabel} — Cancellations','${d.count} records')">
+                 onclick="showCancels(r=>r.study==='${jsAttr(label)}','${esLabel} — Cancellations','${d.count} records')">
       <span style="font-size:11px;color:var(--muted);width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esLabel}">${labelHtml}</span>
       <div style="flex:1;height:8px;background:var(--border);border-radius:4px;overflow:hidden">
         <div style="width:${pct}%;height:100%;background:${color};border-radius:4px;"></div>
@@ -4891,9 +4894,9 @@ function buildInvestigatorList() {
     const pct = Math.round((inv.upcoming||0) / maxUp * 100);
     const color = '#7c3aed';
     return `<div style="padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer"
-                 onclick="showInvDetail('${inv.name.replace(/'/g,"\\'")}')">
+                 onclick="showInvDetail('${jsAttr(inv.name)}')">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
-        <span style="font-size:13px;font-weight:600;color:var(--text)">${inv.name}</span>
+        <span style="font-size:13px;font-weight:600;color:var(--text)">${escapeHTML(inv.name)}</span>
         <div style="text-align:right">
           <span style="font-size:13px;font-weight:700;color:${color}">${inv.upcoming}</span>
           <span style="font-size:10px;color:var(--muted)"> visits</span>
@@ -5174,7 +5177,7 @@ function renderCoordinatorGoals() {
       const barH = Math.min(100, Math.round((visits / (weekMax * 1.2)) * 100));
       const hasVisits = visits > 0 && (isPast || isToday);
       const cursor = hasVisits ? 'cursor:pointer;' : '';
-      const clickAttr = hasVisits ? `onclick="toggleCoordDayDetail('${name}','${d}',this)"` : '';
+      const clickAttr = hasVisits ? `onclick="toggleCoordDayDetail('${jsAttr(name)}','${d}',this)"` : '';
       return `<div style="text-align:center;flex:1;${cursor}position:relative" ${clickAttr}>
         <div style="height:40px;display:flex;align-items:flex-end;justify-content:center">
           <div style="width:18px;height:${isPast || isToday ? Math.max(4,barH) : 4}%;background:${barColor};border-radius:3px 3px 0 0;transition:height 0.3s"></div>
@@ -5232,9 +5235,9 @@ function toggleCoordDayDetail(coordName, date, el) {
   if (!visits || visits.length === 0) { detailDiv.style.display = 'none'; return; }
   const dayLabel = new Date(date + 'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
   const rows = visits.map(v => {
-    const pLink = v.url ? `<a href="${v.url}" target="_blank" style="color:#1843AD;text-decoration:none;font-weight:600">${maskPHI(v.patient)}</a>` : `<span style="font-weight:600">${maskPHI(v.patient)}</span>`;
+    const pLink = v.url ? `<a href="${escapeHTML(v.url)}" target="_blank" style="color:#1843AD;text-decoration:none;font-weight:600">${maskPHI(v.patient)}</a>` : `<span style="font-weight:600">${maskPHI(v.patient)}</span>`;
     return `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid #F3F4F6">
-      ${pLink}<span style="color:#6B7280;font-size:10px;max-width:50%;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${v.study}</span>
+      ${pLink}<span style="color:#6B7280;font-size:10px;max-width:50%;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHTML(v.study)}</span>
     </div>`;
   }).join('');
   detailDiv.innerHTML = `<div style="font-weight:700;color:#374151;margin-bottom:4px;font-size:11px">${dayLabel} — ${visits.length} visit${visits.length>1?'s':''}</div>${rows}`;
@@ -5396,8 +5399,8 @@ function buildInsights() {
   const highUp = upcoming.filter(s => s.count >= 15);
   highUp.forEach(s => {
     const sLink = s.study_url
-      ? `<a href="${s.study_url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:inherit;font-weight:700;text-decoration:underline;text-decoration-style:dotted;">${s.name}</a>`
-      : `<strong>${s.name}</strong>`;
+      ? `<a href="${escapeHTML(s.study_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:inherit;font-weight:700;text-decoration:underline;text-decoration-style:dotted;">${escapeHTML(s.name)}</a>`
+      : `<strong>${escapeHTML(s.name)}</strong>`;
     posItems.push(`<div class="insight-item positive"><span class="insight-icon">⭐</span><div>
       <div class="insight-title">${sLink} — ${s.count} upcoming visits</div>
       <div class="insight-desc">Strong retention and scheduling momentum</div>
@@ -5442,7 +5445,7 @@ function buildRiskTable() {
     const levelLabel = r.level === 'critical' ? 'CRITICAL' : r.level === 'high' ? 'HIGH' : r.level === 'medium' ? 'MEDIUM' : 'LOW';
     const barColor = r.level === 'critical' ? '#dc2626' : r.level === 'high' ? '#d97706' : r.level === 'medium' ? '#f97316' : '#059669';
     const barPct = Math.min((r.score / 8 * 100), 100).toFixed(0);
-    return `<tr style="cursor:pointer;" onclick="showStudyDetail('${r.study||r.name}','${r.study_url||''}')"><td style="font-weight:500;color:var(--text)">${r.study_url ? `<a href="${r.study_url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="text-decoration:none;font-weight:500;color:var(--text);">${r.study}<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-left:3px;opacity:0.45;vertical-align:middle;flex-shrink:0"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>` : r.study}</td>
+    return `<tr style="cursor:pointer;" onclick="showStudyDetail('${jsAttr(r.study||r.name)}','${jsAttr(r.study_url||'')}')"><td style="font-weight:500;color:var(--text)">${r.study_url ? `<a href="${escapeHTML(r.study_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="text-decoration:none;font-weight:500;color:var(--text);">${escapeHTML(r.study)}<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-left:3px;opacity:0.45;vertical-align:middle;flex-shrink:0"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>` : escapeHTML(r.study)}</td>
       <td><span class="risk-tag ${levelClass}">${levelLabel}</span></td>
       <td style="color:var(--red);font-weight:600;">${r.cancel}</td>
       <td style="color:var(--blue);font-weight:600;">${r.upcoming}</td>
@@ -5451,7 +5454,7 @@ function buildRiskTable() {
         <div class="risk-bar-wrap"><div class="risk-bar" style="width:${barPct}%;background:${barColor};"></div></div>
         <span style="font-size:11px;font-weight:600;">${r.score.toFixed(2)}</span>
       </td>
-      <td style="font-size:11px;color:var(--muted);">${r.action}</td>
+      <td style="font-size:11px;color:var(--muted);">${escapeHTML(r.action)}</td>
     </tr>`;
   }).join('');
 }
@@ -5464,9 +5467,9 @@ function buildStudyCards() {
   el.innerHTML = DATA.riskMatrix.map(r => {
     const lc = levelColor[r.level] || '#94a3b8';
     const lb = levelBg[r.level]   || '#f1f5f9';
-    return `<div class="study-card" onclick="showStudyDetail('${r.study||r.name}','${r.study_url||''}');" style="cursor:pointer;border:1px solid ${lc}30;border-radius:10px;padding:14px 16px;background:#fff;">
+    return `<div class="study-card" onclick="showStudyDetail('${jsAttr(r.study||r.name)}','${jsAttr(r.study_url||'')}');" style="cursor:pointer;border:1px solid ${lc}30;border-radius:10px;padding:14px 16px;background:#fff;">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-        <span style="font-weight:700;font-size:13px;color:var(--text)">${r.study}</span>
+        <span style="font-weight:700;font-size:13px;color:var(--text)">${escapeHTML(r.study)}</span>
         <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:${lb};color:${lc}">${r.level.toUpperCase()}</span>
       </div>
       <div style="display:flex;gap:16px;font-size:12px;">
@@ -8379,9 +8382,8 @@ function renderReferralDashboard() {
     const count = stageCounts[stage] || 0;
     const pct = maxCount ? Math.max(count / maxCount * 100, 4) : 4;
     const color = STAGE_COLORS[stage] || '#94a3b8';
-    const safeStage = stage.replace(/'/g,"\\'");
-    return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;cursor:pointer;" onclick="showReferralDetailModal(r=>r.stage==='${safeStage}','${safeStage} Referrals','${count} referrals in this stage')">
-      <div style="width:100px;font-size:11px;font-weight:600;color:#475569;text-align:right;">${stage}</div>
+    return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;cursor:pointer;" onclick="showReferralDetailModal(r=>r.stage==='${jsAttr(stage)}','${escapeHTML(stage)} Referrals','${count} referrals in this stage')">
+      <div style="width:100px;font-size:11px;font-weight:600;color:#475569;text-align:right;">${escapeHTML(stage)}</div>
       <div style="flex:1;background:#f1f5f9;border-radius:4px;height:28px;position:relative;overflow:hidden;">
         <div style="width:${pct}%;background:${color};height:100%;border-radius:4px;transition:width 0.5s;display:flex;align-items:center;justify-content:center;">
           <span style="font-size:11px;font-weight:700;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,0.3);">${count}</span>
@@ -8418,7 +8420,7 @@ function renderReferralDashboard() {
     const color = srcColors[i % srcColors.length];
     return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
       <div style="width:8px;height:8px;border-radius:50%;background:${color};flex-shrink:0;"></div>
-      <div style="width:120px;font-size:12px;font-weight:600;color:#334155;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${name}">${name}</div>
+      <div style="width:120px;font-size:12px;font-weight:600;color:#334155;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHTML(name)}">${escapeHTML(name)}</div>
       <div style="flex:1;background:#f1f5f9;border-radius:3px;height:20px;overflow:hidden;">
         <div style="width:${Math.max(pct,3)}%;background:${color};height:100%;border-radius:3px;"></div>
       </div>
@@ -8451,9 +8453,8 @@ function renderReferralDashboard() {
     <tbody>${studyRows.map(([name, d]) => {
       const conv = d.total ? Math.round(d.enrolled / d.total * 100) : 0;
       const convColor = conv >= 30 ? '#059669' : conv >= 15 ? '#d97706' : '#dc2626';
-      const safeName = name.replace(/'/g,"\\'");
-      return `<tr style="cursor:pointer;transition:background .1s" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''" onclick="showStudyPipelineModal('${safeName}')">
-        <td style="padding:8px 12px;font-weight:600;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${name}">${name}</td>
+      return `<tr style="cursor:pointer;transition:background .1s" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''" onclick="showStudyPipelineModal('${jsAttr(name)}')">
+        <td style="padding:8px 12px;font-weight:600;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHTML(name)}">${escapeHTML(name)}</td>
         <td style="text-align:center;font-weight:700;">${d.total}</td>
         <td style="text-align:center;color:#3b82f6;">${d.active}</td>
         <td style="text-align:center;color:#059669;font-weight:700;">${d.enrolled}</td>
@@ -8477,8 +8478,8 @@ function renderReferralDashboard() {
       const urgency = r.days_since_update >= 14 ? '#dc2626' : '#d97706';
       return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f1f5f9;">
         <div>
-          <a href="${r.url}" target="_blank" style="font-size:12px;font-weight:600;color:#1e293b;text-decoration:none;">${maskPHI(r.name)}</a>
-          <div style="font-size:10px;color:#94a3b8;">${r.study || 'No study'} · ${r.tracker} · ${r.stage}</div>
+          <a href="${escapeHTML(r.url)}" target="_blank" style="font-size:12px;font-weight:600;color:#1e293b;text-decoration:none;">${maskPHI(r.name)}</a>
+          <div style="font-size:10px;color:#94a3b8;">${escapeHTML(r.study || 'No study')} · ${escapeHTML(r.tracker)} · ${escapeHTML(r.stage)}</div>
         </div>
         <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:${urgency}22;color:${urgency};">${r.days_since_update}d ago</span>
       </div>`;
@@ -8508,7 +8509,7 @@ function renderReferralDashboard() {
       const sc = {};
       tasks.forEach(t => { sc[t.stage] = (sc[t.stage] || 0) + 1; });
       return `<tr>
-        <td style="padding:8px 12px;font-weight:600;">${name}</td>
+        <td style="padding:8px 12px;font-weight:600;">${escapeHTML(name)}</td>
         <td style="text-align:center;font-weight:700;">${tasks.length}</td>
         <td style="text-align:center;">${sc['New Lead']||0}</td>
         <td style="text-align:center;">${sc['Contacted']||0}</td>
@@ -8588,10 +8589,9 @@ function renderReferralDashboard() {
       </tr></thead>
       <tbody>${enriched.map(c => {
         const crColor = c.convRate >= 20 ? '#059669' : c.convRate >= 10 ? '#d97706' : '#dc2626';
-        const safeName = c.study.replace(/'/g,"\\'");
-        return `<tr style="cursor:pointer;transition:background .1s" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''" onclick="showCampaignDetailModal('${safeName}')">
-          <td style="padding:7px 12px;font-weight:600;"><a href="${c.url}" target="_blank" onclick="event.stopPropagation()" style="color:#1e293b;text-decoration:none;">${c.study}</a></td>
-          <td style="text-align:center;"><span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#e8eeff;color:#1843ad;font-weight:600;">${c.vendor}</span></td>
+        return `<tr style="cursor:pointer;transition:background .1s" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''" onclick="showCampaignDetailModal('${jsAttr(c.study)}')">
+          <td style="padding:7px 12px;font-weight:600;"><a href="${escapeHTML(c.url)}" target="_blank" onclick="event.stopPropagation()" style="color:#1e293b;text-decoration:none;">${escapeHTML(c.study)}</a></td>
+          <td style="text-align:center;"><span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#e8eeff;color:#1843ad;font-weight:600;">${escapeHTML(c.vendor)}</span></td>
           <td style="text-align:center;font-weight:700;">${c.first_contact.toLocaleString()}</td>
           <td style="text-align:center;">${c.second_contact.toLocaleString()}</td>
           <td style="text-align:center;">${c.third_contact.toLocaleString()}</td>
@@ -8902,9 +8902,9 @@ function renderCampaignXRef() {
         : '<span style="color:#94a3b8;font-size:10px;">Not in DB</span>';
       const staleColor = r.days_since_update >= 14 ? '#dc2626' : r.days_since_update >= 7 ? '#d97706' : '#059669';
       return `<tr>
-        <td style="padding:5px 10px;"><a href="${r.url}" target="_blank" style="font-weight:600;color:#1e293b;text-decoration:none;">${maskPHI(r.name)}</a></td>
-        <td style="padding:5px 8px;font-size:10px;color:#475569;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${r.campaign}">${r.campaign}</td>
-        <td style="padding:5px 8px;text-align:center;"><span style="padding:2px 5px;border-radius:3px;font-size:10px;font-weight:600;background:${(STAGE_COLORS[r.stage]||'#94a3b8')}22;color:${STAGE_COLORS[r.stage]||'#94a3b8'}">${r.stage}</span></td>
+        <td style="padding:5px 10px;"><a href="${escapeHTML(r.url)}" target="_blank" style="font-weight:600;color:#1e293b;text-decoration:none;">${maskPHI(r.name)}</a></td>
+        <td style="padding:5px 8px;font-size:10px;color:#475569;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHTML(r.campaign)}">${escapeHTML(r.campaign)}</td>
+        <td style="padding:5px 8px;text-align:center;"><span style="padding:2px 5px;border-radius:3px;font-size:10px;font-weight:600;background:${(STAGE_COLORS[r.stage]||'#94a3b8')}22;color:${STAGE_COLORS[r.stage]||'#94a3b8'}">${escapeHTML(r.stage)}</span></td>
         <td style="padding:5px 8px;">${apptCell}</td>
         <td style="padding:5px 8px;">${pStatus}</td>
         <td style="padding:5px 8px;text-align:center;font-weight:600;color:${staleColor};">${r.days_since_update}d</td>
@@ -8927,14 +8927,14 @@ function showReferralDetailModal(filterFn, title, subtitle) {
     const nameKey = r.name.toLowerCase().trim();
     const dbMatch = PATIENT_DB_MAP.get(nameKey);
     const pVisits = (DATA.allVisitDetail || []).filter(v => v.patient.toLowerCase().trim() === nameKey);
-    const apptCell = pVisits.length > 0 ? `<span style="color:#059669;font-weight:600;">${pVisits[0].date}</span>` : r.next_appt || '<span style="color:#cbd5e1;">—</span>';
-    const dbCell = dbMatch ? `<span style="font-size:10px;font-weight:600;color:${dbMatch.status==='Available'?'#059669':'#dc2626'}">${dbMatch.status}</span>` : '<span style="color:#cbd5e1;font-size:10px;">—</span>';
+    const apptCell = pVisits.length > 0 ? `<span style="color:#059669;font-weight:600;">${escapeHTML(pVisits[0].date)}</span>` : escapeHTML(r.next_appt) || '<span style="color:#cbd5e1;">—</span>';
+    const dbCell = dbMatch ? `<span style="font-size:10px;font-weight:600;color:${dbMatch.status==='Available'?'#059669':'#dc2626'}">${escapeHTML(dbMatch.status)}</span>` : '<span style="color:#cbd5e1;font-size:10px;">—</span>';
     const staleColor = r.days_since_update >= 14 ? '#dc2626' : r.days_since_update >= 7 ? '#d97706' : '#059669';
     html += `<tr>
-      <td style="padding:5px 8px;"><a href="${r.url}" target="_blank" style="font-weight:600;color:#1e293b;text-decoration:none;">${maskPHI(r.name)}</a></td>
-      <td style="padding:5px 8px;font-size:10px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${r.study||'—'}</td>
-      <td style="padding:5px 8px;text-align:center;"><span style="padding:2px 6px;border-radius:3px;font-size:10px;font-weight:600;background:${(STAGE_COLORS[r.stage]||'#94a3b8')}22;color:${STAGE_COLORS[r.stage]||'#94a3b8'}">${r.stage}</span></td>
-      <td style="padding:5px 8px;font-size:10px;color:#475569;">${r.source}</td>
+      <td style="padding:5px 8px;"><a href="${escapeHTML(r.url)}" target="_blank" style="font-weight:600;color:#1e293b;text-decoration:none;">${maskPHI(r.name)}</a></td>
+      <td style="padding:5px 8px;font-size:10px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHTML(r.study||'—')}</td>
+      <td style="padding:5px 8px;text-align:center;"><span style="padding:2px 6px;border-radius:3px;font-size:10px;font-weight:600;background:${(STAGE_COLORS[r.stage]||'#94a3b8')}22;color:${STAGE_COLORS[r.stage]||'#94a3b8'}">${escapeHTML(r.stage)}</span></td>
+      <td style="padding:5px 8px;font-size:10px;color:#475569;">${escapeHTML(r.source)}</td>
       <td style="padding:5px 8px;">${apptCell}</td>
       <td style="padding:5px 8px;">${dbCell}</td>
       <td style="padding:5px 8px;text-align:center;font-weight:600;color:${staleColor};">${r.days_since_update}d</td>
@@ -9208,8 +9208,8 @@ function renderEnrollCards() {
     ).join(' ');
 
     const studyLink = s.study_url
-      ? `<a href="${s.study_url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="text-decoration:none;color:var(--navy);font-weight:700;font-size:13px">${s.study}<svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left:3px;opacity:0.4;vertical-align:middle"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>`
-      : `<span style="font-weight:700;font-size:13px;color:var(--navy)">${s.study}</span>`;
+      ? `<a href="${escapeHTML(s.study_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="text-decoration:none;color:var(--navy);font-weight:700;font-size:13px">${escapeHTML(s.study)}<svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left:3px;opacity:0.4;vertical-align:middle"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>`
+      : `<span style="font-weight:700;font-size:13px;color:var(--navy)">${escapeHTML(s.study)}</span>`;
 
     // Progress bar section
     const progressSection = hasTarget ? `
@@ -9255,7 +9255,7 @@ function renderEnrollCards() {
     return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;border-top:3px solid ${barColor};">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
         <div style="flex:1;min-width:0;">${studyLink}</div>
-        <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;background:${statusBg};color:${statusColor};margin-left:6px;white-space:nowrap">${s.status}</span>
+        <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;background:${statusBg};color:${statusColor};margin-left:6px;white-space:nowrap">${escapeHTML(s.status)}</span>
       </div>
       <div style="display:flex;gap:4px;align-items:center;margin-bottom:2px;">${siteTag}</div>
       ${progressSection}
@@ -9475,9 +9475,8 @@ function renderStudiesTable() {
     const barColor = !hasTarget ? '#94a3b8' :
       pct >= 100 ? '#059669' : pct >= 75 ? '#1843ad' : pct >= 50 ? '#d97706' : pct >= 25 ? '#f97316' : '#dc2626';
 
-    const safeStudy = s.study.replace(/'/g,"\\'");
-    const studyCell = `<span style="font-weight:700;color:var(--navy);cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px;" onclick="showStudyUnifiedModal('${safeStudy}')">${s.study}</span>` +
-      (s.study_url ? `<a href="${s.study_url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="margin-left:4px;opacity:0.4;vertical-align:middle"><svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>` : '');
+    const studyCell = `<span style="font-weight:700;color:var(--navy);cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px;" onclick="showStudyUnifiedModal('${jsAttr(s.study)}')">${escapeHTML(s.study)}</span>` +
+      (s.study_url ? `<a href="${escapeHTML(s.study_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="margin-left:4px;opacity:0.4;vertical-align:middle"><svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>` : '');
     const statusBadge = s.enroll_status
       ? `<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;margin-left:5px;background:${s.enroll_status==='Enrolling'?'#e8eeff':s.enroll_status==='Maintenance'?'#f0fdf4':'#f1f5f9'};color:${s.enroll_status==='Enrolling'?'#1843ad':s.enroll_status==='Maintenance'?'#059669':'#94a3b8'}">${s.enroll_status}</span>` : '';
 
