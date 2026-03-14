@@ -2693,6 +2693,10 @@ body {
  * © 2026 Clinical Research Philadelphia
  * ═══════════════════════════════════════════════════════════════════ */
 
+// ═══ DEBUG LOGGING ═══
+var CRP_DEBUG = location.search.includes('debug=1');
+function _log() { if (CRP_DEBUG) console.log.apply(console, arguments); }
+
 // ═══ HTML SANITIZATION ═══
 function escapeHTML(str) {
   if (str == null) return '';
@@ -2707,7 +2711,7 @@ function jsAttr(s) {
 if ('serviceWorker' in navigator && !(typeof google !== 'undefined' && google.script && google.script.run)) {
   var swPath = (location.pathname.replace(/\/[^/]*$/, '') || '') + '/sw.js';
   navigator.serviceWorker.register(swPath).then(function(reg) {
-    console.log('CRP: Service worker registered, scope:', reg.scope);
+    _log('CRP: Service worker registered, scope:', reg.scope);
   }).catch(function(err) {
     console.warn('CRP: Service worker registration failed:', err);
   });
@@ -2906,7 +2910,7 @@ const CRP = {
   },
   registerPlugin(plugin) {
     this.plugins.push(plugin);
-    console.log(`CRP: Plugin registered — ${plugin.name || 'unnamed'}`);
+    _log(`CRP: Plugin registered — ${plugin.name || 'unnamed'}`);
     if (plugin.init) plugin.init(CRP_CONFIG);
   },
 };
@@ -3775,7 +3779,7 @@ function initFinanceDashboard() {
   try { initColl(); renderCollections(); } catch(e) { console.warn('collections:', e); }
   // Emit lifecycle event for plugins
   CRP.emit('financeLoaded', { arrays: ['AGING_INV','AGING_AP','UNPAID_INVOICES','UNPAID_AP','UNINVOICED','MONTHLY_PAYMENTS','MONTHLY_REVENUE','TOP_AR_STUDIES'] });
-  console.log('CRP: Finance dashboard initialized');
+  _log('CRP: Finance dashboard initialized');
 }
 
 // ═══ UNIFIED TAB SWITCHER (wraps perf switchView + finance gating) ═══
@@ -4305,7 +4309,7 @@ async function loadFallbackData() {
       var data = await resp.json();
       SAMPLE = data;
       DATA = SAMPLE;
-      console.log('CRP: Fallback data loaded from fallback-data.json');
+      _log('CRP: Fallback data loaded from fallback-data.json');
     }
   } catch(e) {
     console.warn('CRP: Could not load fallback-data.json, using minimal skeleton:', e.message);
@@ -4967,7 +4971,7 @@ function fetchCoordHistory() {
     return r.json();
   }).then(function(json) {
     COORD_FILE_HISTORY = (json && json.data) ? json.data : {};
-    console.log('[CoordHistory] Loaded ' + Object.keys(COORD_FILE_HISTORY).length + ' coordinators from file');
+    _log('[CoordHistory] Loaded ' + Object.keys(COORD_FILE_HISTORY).length + ' coordinators from file');
   }).catch(function(e) {
     console.warn('[CoordHistory] Could not load coord-history.json:', e.message);
     COORD_FILE_HISTORY = {};
@@ -5913,10 +5917,10 @@ function buildMergedStudies(agingInv, agingAp, uninvoiced) {
 
 async function fetchFinanceLive() {
   const pk = CRP_CONFIG.DATA_FEEDS.FINANCE_PUB_KEY;
-  if (!pk) { console.log('CRP Finance: No published key configured'); return false; }
+  if (!pk) { _log('CRP Finance: No published key configured'); return false; }
   const tabs = CRP_CONFIG.FINANCE_TABS;
 
-  console.log('CRP Finance: Fetching live data from Master Sheet...');
+  _log('CRP Finance: Fetching live data from Master Sheet...');
   try {
     // Fetch all tabs in parallel
     const [agingInvRows, agingApRows, unpaidInvRows, unpaidApRows, uninvoicedRows, revenueRows, paymentsRows] = await Promise.all([
@@ -5983,7 +5987,7 @@ async function fetchFinanceLive() {
     UNPAID_AP_BY_TYPE = unpaidApDetail.byType;
     UNPAID_AP_AGING = unpaidApDetail.aging;
 
-    console.log('CRP Finance: Live data loaded — ' + newAgingInv.length + ' invoice studies, ' + newAgingAp.length + ' autopay studies, $' + (newTotalInvAR + newTotalApAR).toLocaleString() + ' total AR');
+    _log('CRP Finance: Live data loaded — ' + newAgingInv.length + ' invoice studies, ' + newAgingAp.length + ' autopay studies, $' + (newTotalInvAR + newTotalApAR).toLocaleString() + ' total AR');
 
     // Update hero values in the Finance overview
     const heroAR = document.querySelector('.hero-val[style*="8B5CF6"]');
@@ -6023,8 +6027,8 @@ async function fetchFinanceLive() {
 // ═══════════════════════════════════════════════════
 async function fetchPatientDB() {
   const url = CRP_CONFIG.PATIENT_DB_URL;
-  if (!url) { console.log('CRP: No patient DB URL configured'); return false; }
-  console.log('CRP: Fetching patient database...');
+  if (!url) { _log('CRP: No patient DB URL configured'); return false; }
+  _log('CRP: Fetching patient database...');
   try {
     const rows = await fetchCSV(url);
     PATIENT_DB = rows.map(r => ({
@@ -6041,7 +6045,7 @@ async function fetchPatientDB() {
       state: (r['State']||'').trim(),
     }));
     PATIENT_DB_MAP = new Map(PATIENT_DB.map(p => [p.name_lower, p]));
-    console.log(`CRP: Patient DB loaded — ${PATIENT_DB.length} records`);
+    _log(`CRP: Patient DB loaded — ${PATIENT_DB.length} records`);
 
     // Run cross-reference against active patients
     crossReferencePatients();
@@ -6192,7 +6196,7 @@ function crossReferencePatients() {
   if (el('cq-kpi-db-total')) el('cq-kpi-db-total').textContent = PATIENT_DB.length.toLocaleString();
   if (el('cq-kpi-db-sub')) el('cq-kpi-db-sub').textContent = `${matched} matched to active patients`;
 
-  console.log(`CRP: Contact cross-ref — ${redCount} red, ${yellowCount} yellow, ${cleanCount} clean out of ${matched} matched`);
+  _log(`CRP: Contact cross-ref — ${redCount} red, ${yellowCount} yellow, ${cleanCount} clean out of ${matched} matched`);
 }
 
 function renderContactAlerts() {
@@ -6304,7 +6308,7 @@ async function connectSheets() {
     closeSetup();
     renderAll();
     CRP.emit('dataLoaded', { source: 'google-sheets', timestamp: new Date() });
-    console.log('CRP: Live data loaded from setup (audit log rows: ' + auditRows.length + ')');
+    _log('CRP: Live data loaded from setup (audit log rows: ' + auditRows.length + ')');
   } catch(e) {
     alert('Could not load data: ' + e.message + '\n\nMake sure the sheet is published as CSV (File → Share → Publish to web → CSV format).');
     location.reload();
@@ -6372,7 +6376,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
                 ((r['Cancel Date']||r['Scheduled Date']||'').trim());
     if (!_cancelSeen.has(key)) { _cancelSeen.add(key); cancels.push(r); }
   });
-  console.log('CRP: Split report → upcoming', upcoming.length, ', derived cancels', derivedCancels.length, ', total cancels (merged+deduped)', cancels.length);
+  _log('CRP: Split report → upcoming', upcoming.length, ', derived cancels', derivedCancels.length, ', total cancels (merged+deduped)', cancels.length);
 
   // ── Coordinator definitions (must be before audit log resolution) ──
   const EXCLUDE_STUDIES = new Set([]);
@@ -6437,7 +6441,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
       _invBySubjKey[subjKey].add(apptFor);
     }
   });
-  console.log('CRP: Audit log —', (auditLog||[]).length, 'rows, coord keys:', Object.keys(_auditByApptKey).length, ', inv keys:', Object.keys(_invByApptKey).length, ', inv subjKeys:', Object.keys(_invBySubjKey).length);
+  _log('CRP: Audit log —', (auditLog||[]).length, 'rows, coord keys:', Object.keys(_auditByApptKey).length, ', inv keys:', Object.keys(_invByApptKey).length, ', inv subjKeys:', Object.keys(_invBySubjKey).length);
 
   // Resolve investigator for a row from the audit log
   function resolveInvestigator(row) {
@@ -6458,7 +6462,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
     const ak = (r['Calendar Appointment Key (back end)'] || r['Calendar Appointment Key'] || '').toString().trim();
     const sk = (r['Subject Key (Back End)'] || '').toString().trim();
     const inv = resolveInvestigator(r);
-    console.log(`CRP INV DEBUG row ${_invDebugCount++}: apptKey="${ak}" subjKey="${sk}" → inv="${inv}" | row keys: ${Object.keys(r).filter(k=>k.toLowerCase().includes('key')||k.toLowerCase().includes('subject')).join(', ')}`);
+    _log(`CRP INV DEBUG row ${_invDebugCount++}: apptKey="${ak}" subjKey="${sk}" → inv="${inv}" | row keys: ${Object.keys(r).filter(k=>k.toLowerCase().includes('key')||k.toLowerCase().includes('subject')).join(', ')}`);
   });
 
   // Resolve actual coordinator for a row: if Full Name is an excluded coordinator,
@@ -6510,7 +6514,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
       }
     }
   });
-  console.log('CRP: Coordinator resolution — resolved', _resolvedCount, 'rows via audit log');
+  _log('CRP: Coordinator resolution — resolved', _resolvedCount, 'rows via audit log');
 
   const BASE = 'https://app.clinicalresearch.io/clinical-research-philadelphia-crp';
   const PHL  = 'philadelphia-pa';
@@ -8333,7 +8337,7 @@ async function refreshReferrals() {
 
     _referralsLoaded = true;
     if (badge) badge.textContent = `✅ ${REFERRAL_DATA.length} referrals · ${new Date().toLocaleTimeString()}`;
-    console.log(`CRP Referrals: Loaded ${REFERRAL_DATA.length} referrals, ${CAMPAIGN_DATA.length} campaigns from Google Sheets`);
+    _log(`CRP Referrals: Loaded ${REFERRAL_DATA.length} referrals, ${CAMPAIGN_DATA.length} campaigns from Google Sheets`);
 
     renderReferralDashboard();
 
@@ -9026,7 +9030,7 @@ async function fetchFacebookCRM() {
       });
     }
 
-    console.log(`CRP: Facebook CRM loaded — ${FB_CRM_DATA.length} rows`);
+    _log(`CRP: Facebook CRM loaded — ${FB_CRM_DATA.length} rows`);
     renderFacebookCRM();
   } catch(e) {
     console.warn('CRP: Facebook CRM fetch failed:', e.message);
@@ -9831,7 +9835,7 @@ async function _crpInit() {
   var _initTabEl = document.querySelector(".nav-tab[onclick*='" + _initTab + "']");
   switchTab(_initTab, _initTabEl || null);
   CRP.emit('init', { version: CRP_CONFIG.VERSION, timestamp: new Date() });
-  console.log(`CRP Dashboard v${CRP_CONFIG.VERSION} initialized`);
+  _log(`CRP Dashboard v${CRP_CONFIG.VERSION} initialized`);
 
   // ═══ STAGGERED DATA LOADING ═══
   // Google Sheets rate-limits when 12+ CSV requests fire simultaneously.
@@ -9888,7 +9892,7 @@ async function _crpInit() {
     fetchCoordHistory();
 
     // ── Phase 1: CRIO data (most critical — drives Overview, Studies, Schedule, Actions) ──
-    console.log('CRP: Phase 1 — loading CRIO data...');
+    _log('CRP: Phase 1 — loading CRIO data...');
     let crioOk = false;
     let _lastCrioRows = [];
     let _lastAuditRows = [];
@@ -9910,7 +9914,7 @@ async function _crpInit() {
         if (badge) { badge.textContent = 'Updated: ' + new Date().toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'}); badge.style.color = ''; }
         renderAll();
         _lastDataLoadTimestamp = Date.now();
-        console.log('CRP: Phase 1 complete — upcoming:', rows1.length, 'audit:', auditRows.length);
+        _log('CRP: Phase 1 complete — upcoming:', rows1.length, 'audit:', auditRows.length);
         crioOk = true;
         setHealthChip('dh-crio','ok','CRIO (' + rows1.length + ')');
         setHealthChip('dh-audit', auditRows.length > 0 ? 'ok' : 'warn', 'Audit Log (' + auditRows.length + ')');
@@ -9938,7 +9942,7 @@ async function _crpInit() {
           renderAll();
           _lastDataLoadTimestamp = Date.now();
           showToast('Live data loaded successfully', 'success');
-          console.log('CRP: Phase 1 retry succeeded — upcoming:', rows1b.length);
+          _log('CRP: Phase 1 retry succeeded — upcoming:', rows1b.length);
           crioOk = true;
           setHealthChip('dh-crio','ok','CRIO (' + rows1b.length + ')');
           setHealthChip('dh-audit', auditB.length > 0 ? 'ok' : 'warn', 'Audit Log (' + auditB.length + ')');
@@ -9960,11 +9964,11 @@ async function _crpInit() {
     }
 
     // ── Phase 2: Finance data (staggered — waits for Phase 1 to finish) ──
-    console.log('CRP: Phase 2 — loading finance data...');
+    _log('CRP: Phase 2 — loading finance data...');
     try {
       const ok = await fetchFinanceLive();
       if (ok) {
-        console.log('CRP Finance: Live data applied — re-rendering finance views');
+        _log('CRP Finance: Live data applied — re-rendering finance views');
         setHealthChip('dh-finance','ok','Finance');
         if (typeof renderForecast === 'function') try { renderForecast(); } catch(e) {}
         if (typeof drawPayChartOverview === 'function') try { drawPayChartOverview(); } catch(e) {}
@@ -9982,10 +9986,10 @@ async function _crpInit() {
     }
 
     // ── Phase 3: Supplemental data (Patient DB + Facebook CRM — lowest priority) ──
-    console.log('CRP: Phase 3 — loading supplemental data...');
+    _log('CRP: Phase 3 — loading supplemental data...');
     fetchPatientDB().then(ok => {
       if (ok) {
-        console.log('CRP: Patient DB cross-reference complete');
+        _log('CRP: Patient DB cross-reference complete');
         setHealthChip('dh-patientdb','ok','Patient DB');
         // Re-render views that depend on Patient DB
         if (typeof renderStudiesTable === 'function') try { renderStudiesTable(); } catch(e) {}
@@ -10004,7 +10008,7 @@ async function _crpInit() {
 
     // ── Phase 4: Referral data from Google Sheets CSV — populates Overview KPIs ──
     setTimeout(() => {
-      console.log('CRP: Phase 4 — loading referral data from Google Sheets...');
+      _log('CRP: Phase 4 — loading referral data from Google Sheets...');
       try { initReferrals(); } catch(e) { console.warn('CRP: Auto-init referrals failed:', e); }
     }, 3000);
   }
@@ -10043,7 +10047,7 @@ async function _crpInit() {
   async function autoRefreshAll() {
     const badge = document.getElementById('last-refresh-badge');
     const now = new Date();
-    console.log(`CRP Auto-Refresh: triggered at ${now.toLocaleTimeString()}`);
+    _log(`CRP Auto-Refresh: triggered at ${now.toLocaleTimeString()}`);
 
     // Phase 1: CRIO data (critical)
     try {
@@ -10058,7 +10062,7 @@ async function _crpInit() {
       } else {
         DATA = newData;
         renderAll();
-        console.log('CRP Auto-Refresh: CRIO refreshed — upcoming:', rows1.length, 'audit:', auditRows.length);
+        _log('CRP Auto-Refresh: CRIO refreshed — upcoming:', rows1.length, 'audit:', auditRows.length);
       }
     } catch(e) { console.warn('CRP Auto-Refresh: CRIO refresh failed:', e.message); }
 
@@ -10086,9 +10090,9 @@ async function _crpInit() {
   if (AUTO_REFRESH_MS > 0) {
     if (_autoRefreshId) clearInterval(_autoRefreshId);
     _autoRefreshId = setInterval(autoRefreshAll, AUTO_REFRESH_MS);
-    console.log(`CRP: Auto-refresh enabled — every ${AUTO_REFRESH_MS / 60000} minutes`);
+    _log(`CRP: Auto-refresh enabled — every ${AUTO_REFRESH_MS / 60000} minutes`);
   } else {
-    console.log('CRP: Auto-refresh disabled (REFRESH_INTERVAL is 0)');
+    _log('CRP: Auto-refresh disabled (REFRESH_INTERVAL is 0)');
   }
 
   // Also refresh when tab becomes visible again (user returns to browser)
@@ -10097,10 +10101,10 @@ async function _crpInit() {
       const FIVE_MINUTES = 5 * 60 * 1000;
       const elapsed = Date.now() - _lastRefreshTime;
       if (elapsed >= FIVE_MINUTES) {
-        console.log(`CRP: Tab visible again — ${Math.round(elapsed / 60000)}m since last refresh, refreshing`);
+        _log(`CRP: Tab visible again — ${Math.round(elapsed / 60000)}m since last refresh, refreshing`);
         setTimeout(autoRefreshAll, 1000);
       } else {
-        console.log(`CRP: Tab visible again — only ${Math.round(elapsed / 60000)}m since last refresh, skipping`);
+        _log(`CRP: Tab visible again — only ${Math.round(elapsed / 60000)}m since last refresh, skipping`);
       }
     }
   });
