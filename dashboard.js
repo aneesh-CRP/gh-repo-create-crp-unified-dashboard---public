@@ -590,6 +590,78 @@ function showStudyModal(s){
   showFinModal(s,h);
 }
 
+// ══════════ REVENUE TAB POPUPS ══════════
+function showRevTotalPopup() {
+  var total = Object.values(STUDY_REVENUE_12M).reduce(function(s,v){return s+v;},0);
+  var entries = Object.entries(STUDY_REVENUE_12M).filter(function(e){return e[1]>0;}).sort(function(a,b){return b[1]-a[1];});
+  var h = '<table><thead><tr><th>Study</th><th class="r">Revenue (12M)</th><th class="r">% of Total</th></tr></thead><tbody>';
+  entries.forEach(function(e){
+    var pct = total > 0 ? Math.round(e[1]/total*100) : 0;
+    h += '<tr><td>'+slink(e[0])+'</td><td class="r">'+fmt(e[1])+'</td><td class="r">'+pct+'%</td></tr>';
+  });
+  h += '<tr class="total-row"><td>TOTAL</td><td class="r">'+fmt(total)+'</td><td class="r">100%</td></tr></tbody></table>';
+  showFinModal('Total Revenue — Last 12 Months', h);
+}
+
+function showRevMonthlyPopup() {
+  var d = MONTHLY_REVENUE.slice(-12);
+  var h = '<table><thead><tr><th>Month</th><th class="r">Autopay</th><th class="r">Invoicables</th><th class="r">Total</th><th class="r">Trend</th></tr></thead><tbody>';
+  var prev = 0;
+  d.forEach(function(m){
+    var tot = m.autopay + m.procedures + Math.max(0, m.invoicables);
+    var trend = prev > 0 ? (tot > prev ? '<span style="color:#059669">▲ '+ Math.round((tot-prev)/prev*100)+'%</span>' : '<span style="color:#dc2626">▼ '+Math.round((prev-tot)/prev*100)+'%</span>') : '—';
+    h += '<tr><td>'+escapeHTML(m.month)+'</td><td class="r">'+fmt(m.autopay)+'</td><td class="r">'+fmt(Math.max(0,m.invoicables))+'</td><td class="r" style="font-weight:700">'+fmt(tot)+'</td><td class="r">'+trend+'</td></tr>';
+    prev = tot;
+  });
+  var totalAll = d.reduce(function(s,m){return s+m.autopay+m.procedures+Math.max(0,m.invoicables);},0);
+  var avg = d.length > 0 ? totalAll/d.length : 0;
+  h += '<tr class="total-row"><td>AVERAGE</td><td></td><td></td><td class="r">'+fmt(avg)+'</td><td></td></tr></tbody></table>';
+  showFinModal('Monthly Revenue Breakdown', h);
+}
+
+function showRevPerStudyPopup() {
+  var entries = Object.entries(STUDY_REVENUE_12M).filter(function(e){return e[1]>0;}).sort(function(a,b){return b[1]-a[1];});
+  var count = entries.length || 1;
+  var total = entries.reduce(function(s,e){return s+e[1];},0);
+  var avg = total / count;
+  var h = '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px;text-align:center">';
+  h += '<div><div style="font-size:20px;font-weight:800;color:#F59E0B">'+fmtK(avg)+'</div><div style="font-size:10px;color:#94a3b8">Avg per Study</div></div>';
+  h += '<div><div style="font-size:20px;font-weight:800;color:#8B5CF6">'+count+'</div><div style="font-size:10px;color:#94a3b8">Active Studies</div></div>';
+  h += '<div><div style="font-size:20px;font-weight:800;color:#14B8A6">'+fmtK(total)+'</div><div style="font-size:10px;color:#94a3b8">Total Revenue</div></div>';
+  h += '</div>';
+  h += '<table><thead><tr><th>Study</th><th class="r">Revenue</th><th class="r">vs Avg</th></tr></thead><tbody>';
+  entries.forEach(function(e){
+    var diff = e[1] - avg;
+    var color = diff >= 0 ? '#059669' : '#dc2626';
+    h += '<tr><td>'+slink(e[0])+'</td><td class="r">'+fmt(e[1])+'</td><td class="r" style="color:'+color+'">'+( diff >= 0 ? '+' : '')+fmtK(diff)+'</td></tr>';
+  });
+  h += '</tbody></table>';
+  showFinModal('Revenue per Study Analysis', h);
+}
+
+function showRevByTypePopup() {
+  var total = REVENUE_BY_TYPE.reduce(function(s,t){return s+t.amount;},0);
+  var h = '<table><thead><tr><th>Revenue Type</th><th class="r">Amount</th><th class="r">%</th><th>Distribution</th></tr></thead><tbody>';
+  var colors = ['#8B5CF6','#14B8A6','#F59E0B','#EF4444','#6B7280'];
+  REVENUE_BY_TYPE.forEach(function(t, i){
+    var pct = total > 0 ? Math.round(t.amount/total*100) : 0;
+    var color = colors[i % colors.length];
+    h += '<tr><td style="font-weight:600">'+escapeHTML(t.type)+'</td><td class="r">'+fmt(t.amount)+'</td><td class="r">'+pct+'%</td>';
+    h += '<td><div style="background:#f1f5f9;border-radius:3px;height:16px;overflow:hidden;min-width:120px"><div style="width:'+Math.max(pct,2)+'%;background:'+color+';height:100%;border-radius:3px"></div></div></td></tr>';
+  });
+  h += '<tr class="total-row"><td>TOTAL</td><td class="r">'+fmt(total)+'</td><td class="r">100%</td><td></td></tr></tbody></table>';
+  if (REVENUE_BY_PAY_TYPE.length) {
+    h += '<h3 style="font-size:13px;font-weight:700;margin:16px 0 8px">By Payment Method</h3>';
+    h += '<table><thead><tr><th>Method</th><th class="r">Amount</th><th class="r">%</th></tr></thead><tbody>';
+    REVENUE_BY_PAY_TYPE.forEach(function(t){
+      var pct = total > 0 ? Math.round(t.amount/total*100) : 0;
+      h += '<tr><td>'+escapeHTML(t.type)+'</td><td class="r">'+fmt(t.amount)+'</td><td class="r">'+pct+'%</td></tr>';
+    });
+    h += '</tbody></table>';
+  }
+  showFinModal('Revenue by Type & Payment Method', h);
+}
+
 // ══════════ CHARTS ══════════
 function drawRevChart(){
   const sv=document.getElementById('revChart');if(!sv)return;sv.innerHTML='';
