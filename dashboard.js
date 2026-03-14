@@ -1713,8 +1713,19 @@ function chartDefaults() {
 function mkChart(id, config) {
   var el = document.getElementById(id);
   if (!el) return;
-  if (charts[id]) charts[id].destroy();
-  charts[id] = new Chart(el, config);
+  var ctx = el.getContext('2d');
+  if (charts[id]) {
+    // Update existing chart instead of destroy+recreate when possible
+    try {
+      charts[id].data = config.data;
+      if (config.options) charts[id].options = Object.assign(charts[id].options, config.options);
+      charts[id].update();
+      return;
+    } catch(e) {
+      charts[id].destroy();
+    }
+  }
+  charts[id] = new Chart(ctx, config);
 }
 
 function buildCancelTrend() {
@@ -5756,6 +5767,7 @@ let FB_CRM_DATA = [];          // Facebook CRM leads from Google Sheet
 let MED_RECORDS_DATA = [];     // Medical Records & Patient's Path (per-study patient tracking)
 let PATIENT_NJ_DATA = [];      // Patient tracker NJ (Pennington site)
 let _referralsLoaded = false;
+let _referralByStudy = new Map();
 
 function getClickUpToken() { return localStorage.getItem('crp_clickup_token') || ''; }
 function saveClickUpToken() {
@@ -5834,6 +5846,13 @@ async function refreshReferrals() {
     }));
 
     _referralsLoaded = true;
+    // Build study→referrals index for O(1) lookups in cell builders
+    _referralByStudy = new Map();
+    REFERRAL_DATA.forEach(function(r) {
+      var sn = (r.study||'').toLowerCase().trim();
+      if (!_referralByStudy.has(sn)) _referralByStudy.set(sn, []);
+      _referralByStudy.get(sn).push(r);
+    });
     if (badge) badge.textContent = `✅ ${REFERRAL_DATA.length} referrals · ${new Date().toLocaleTimeString()}`;
     _log(`CRP Referrals: Loaded ${REFERRAL_DATA.length} referrals, ${CAMPAIGN_DATA.length} campaigns from Google Sheets`);
 
@@ -5849,7 +5868,6 @@ async function refreshReferrals() {
       safe(buildRecruitmentKPIs, 'buildRecruitmentKPIs');
       if (typeof renderStudiesTable === 'function') try { renderStudiesTable(); } catch(e) {}
     }).catch(e => console.warn('FB CRM fetch failed:', e));
-    safe(buildRecruitmentKPIs, 'buildRecruitmentKPIs');
   } catch(e) {
     console.error('CRP Referrals: CSV fetch failed', e);
     if (badge) badge.textContent = '❌ Fetch failed';
@@ -6185,10 +6203,14 @@ function buildPatientJourneyFunnel() {
 function getStudyReferralPipeline(studyName) {
   if (!REFERRAL_DATA || REFERRAL_DATA.length === 0) return null;
   const sn = studyName.toLowerCase().trim();
-  const matches = REFERRAL_DATA.filter(r => {
-    const rs = (r.study||'').toLowerCase().trim();
-    return rs === sn || rs.includes(sn) || sn.includes(rs);
-  });
+  // Try O(1) exact lookup first, fall back to fuzzy filter
+  var matches = _referralByStudy.get(sn);
+  if (!matches || matches.length === 0) {
+    matches = REFERRAL_DATA.filter(r => {
+      const rs = (r.study||'').toLowerCase().trim();
+      return rs.includes(sn) || sn.includes(rs);
+    });
+  }
   if (matches.length === 0) return null;
   const stages = {};
   let active = 0;
@@ -6940,6 +6962,7 @@ function buildEnrollmentView() {
 // ══════════════════════════════════════════════════════════════
 let _studyFilter = 'all';
 let _studySortCol = -1, _studySortAsc = false;
+let _studyPageSize = 50;
 
 function filterStudies(type, btn) {
   _studyFilter = type;
@@ -7110,7 +7133,7 @@ function renderStudiesTable() {
   const LEVEL_COLOR = {critical:'#dc2626',high:'#d97706',medium:'#2563eb',low:'#059669','n/a':'#94a3b8',''  :'#94a3b8'};
   const LEVEL_BG    = {critical:'#fef2f2',high:'#fffbeb',medium:'#eff6ff',low:'#f0fdf4','n/a':'#f8fafc',''  :'#f8fafc'};
 
-  tbody.innerHTML = studies.map(s => {
+  const allRows = studies.map(s => {
     const lc = LEVEL_COLOR[s.risk_level] || '#94a3b8';
     const lb = LEVEL_BG[s.risk_level] || '#f8fafc';
     const hasTarget = s.target !== null && s.target !== undefined;
@@ -7175,7 +7198,19 @@ function renderStudiesTable() {
       <td style="padding:10px 8px;text-align:center">${buildFBLeadCell(s.study)}</td>
       <td style="padding:10px 8px;text-align:center">${buildTotalLeadsCell(s.study, safeStudy)}</td>
     </tr>`;
-  }).join('');
+  });
+  const totalRows = allRows.length;
+  tbody.innerHTML = allRows.slice(0, _studyPageSize).join('');
+  // Add "Show all" button if there are more rows than the page size
+  var showMoreEl = document.getElementById('study-show-more-btn');
+  if (showMoreEl) showMoreEl.remove();
+  if (totalRows > _studyPageSize) {
+    var btnDiv = document.createElement('div');
+    btnDiv.id = 'study-show-more-btn';
+    btnDiv.style.cssText = 'text-align:center;padding:12px;';
+    btnDiv.innerHTML = '<button onclick="_studyPageSize=9999;renderStudiesTable()" style="padding:6px 16px;background:#e8eeff;color:#1843ad;border:1px solid #1843ad;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">Show all ' + totalRows + ' studies</button>';
+    tbody.parentElement.parentElement.appendChild(btnDiv);
+  }
 }
 
 function buildStudiesView() {
