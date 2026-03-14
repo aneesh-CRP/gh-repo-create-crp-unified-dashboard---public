@@ -2908,14 +2908,14 @@ const CRP_CONFIG = {
     // Pipeline stage order for funnel
     PIPELINE_ORDER: ['New Lead', 'Contacted', 'Pre-Screening', 'Screening', 'Screened', 'Enrolled'],
     // Closed/terminal stages (not in funnel)
-    CLOSED_STAGES: ['DNQ', 'Screen Fail', 'Lost'],
+    CLOSED_STAGES: ['DNQ', 'Screen Fail', 'Lost', 'Other'],
     // Stage groups — use these instead of hardcoding stage names in logic
     // To add a stage: add it to the appropriate group + PIPELINE_ORDER or CLOSED_STAGES above
     STAGE_GROUPS: {
       ENROLLED:  new Set(['Screened', 'Enrolled']),         // count as "enrolled" for conversion
       SCREENING: new Set(['Pre-Screening', 'Screening']),   // in active screening process
       SCHEDULED: new Set(['Pre-Screening', 'Screening', 'Screened', 'Enrolled']),  // had a scheduled visit
-      CLOSED:    new Set(['DNQ', 'Screen Fail', 'Lost']),   // terminal / closed
+      CLOSED:    new Set(['DNQ', 'Screen Fail', 'Lost', 'Other']),   // terminal / closed
     },
     SOURCE_RENAME: { 'Practice': 'Princeton CardioMetabolic' },
 
@@ -3030,6 +3030,8 @@ const STAGE_COLORS = {
   'DNQ': '#ef4444',
   'Screen Fail': '#f97316',
   'Lost': '#94a3b8',
+  'Other': '#6b7280',
+  'Unknown': '#9ca3af',
 };
 
 // ════════════════════════════════════════
@@ -3456,7 +3458,7 @@ function drawDonutChart(svgId, legendId, data, colors) {
     startAngle = endAngle;
     // Legend
     if (legend) {
-      legend.innerHTML += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><span style="display:inline-block;width:10px;height:10px;background:' + colors[i % colors.length] + ';border-radius:2px;flex-shrink:0"></span><span style="color:#4A5568">' + d.type + '</span><span style="font-weight:700;color:#1a202c;margin-left:auto">' + fmtK(d.amount) + '</span><span style="color:#9CA3AF;font-size:11px">(' + Math.round(pct * 100) + '%)</span></div>';
+      legend.innerHTML += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><span style="display:inline-block;width:10px;height:10px;background:' + colors[i % colors.length] + ';border-radius:2px;flex-shrink:0"></span><span style="color:#4A5568">' + escapeHTML(d.type) + '</span><span style="font-weight:700;color:#1a202c;margin-left:auto">' + fmtK(d.amount) + '</span><span style="color:#9CA3AF;font-size:11px">(' + Math.round(pct * 100) + '%)</span></div>';
     }
   });
   // Center text
@@ -7876,12 +7878,14 @@ function sortTable(th, tbodyId) {
 function openModal(title, sub, bodyHtml) {
   document.getElementById('detail-panel-title').textContent = title;
   document.getElementById('detail-panel-sub').textContent   = sub || '';
-  document.getElementById('detail-panel-body').innerHTML    = bodyHtml;
+  var _panelBody = document.getElementById('detail-panel-body');
+  _panelBody.innerHTML = bodyHtml;
   document.getElementById('detail-modal').classList.add('open');
-  // Make inner table sortable
-  document.getElementById('detail-panel-body').querySelectorAll('.detail-table th').forEach(th => {
-    th.onclick = () => sortDetailTable(th);
-  });
+  // Make inner table sortable via event delegation (single handler, no accumulation)
+  _panelBody.onclick = function(e) {
+    var th = e.target.closest('.detail-table th');
+    if (th) sortDetailTable(th);
+  };
   document.removeEventListener('keydown', _escClose);
   document.addEventListener('keydown', _escClose);
 }
@@ -8514,6 +8518,13 @@ async function refreshReferrals() {
       fetchCSV(CRP_CONFIG.DATA_FEEDS.CAMPAIGNS_CSV),
     ]);
 
+    // Normalize stage values — CSV may have case variants ("dnq" vs "DNQ") or blanks
+    const STAGE_NORM = { 'dnq':'DNQ', 'screen fail':'Screen Fail', 'new lead':'New Lead',
+      'contacted':'Contacted', 'pre-screening':'Pre-Screening', 'screening':'Screening',
+      'screened':'Screened', 'enrolled':'Enrolled', 'lost':'Lost', 'other':'Other',
+      'randomization':'Randomization', 'treatment':'Treatment', 'follow-up':'Follow-Up' };
+    function normStage(s) { return STAGE_NORM[(s||'').toLowerCase().trim()] || s || 'Unknown'; }
+
     // Parse referral rows — CSV columns match REFERRAL_DATA fields
     REFERRAL_DATA = refRows.map(r => ({
       id: r.id || '',
@@ -8523,7 +8534,7 @@ async function refreshReferrals() {
       source: r.source || '',
       study: r.study || '',
       status_raw: r.status_raw || '',
-      stage: r.stage || '',
+      stage: normStage(r.stage),
       phone: r.phone || '',
       dob: r.dob || '',
       referring_physician: r.referring_physician || '',
@@ -8618,8 +8629,8 @@ function renderReferralDashboard() {
     const count = stageCounts[stage] || 0;
     const pct = maxCount ? Math.max(count / maxCount * 100, 4) : 4;
     const color = STAGE_COLORS[stage] || '#94a3b8';
-    return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
-      <div style="width:100px;font-size:10px;color:#94a3b8;text-align:right;">${stage}</div>
+    return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;cursor:pointer;" onclick="showReferralDetailModal(r=>r.stage==='${jsAttr(stage)}','${escapeHTML(stage)} Referrals','${count} referrals in this stage')">
+      <div style="width:100px;font-size:10px;color:#94a3b8;text-align:right;">${escapeHTML(stage)}</div>
       <div style="flex:1;background:#f8fafc;border-radius:3px;height:20px;position:relative;overflow:hidden;">
         <div style="width:${pct}%;background:${color};height:100%;border-radius:3px;display:flex;align-items:center;justify-content:center;">
           <span style="font-size:10px;font-weight:600;color:#fff;">${count}</span>
@@ -8956,14 +8967,14 @@ function showStudyPipelineModal(studyName) {
     // Check upcoming appointments
     const upcoming = (DATA.allVisitDetail || []).filter(v => v.patient.toLowerCase().trim() === nameKey);
     const nextApptDisplay = upcoming.length > 0
-      ? `<span style="color:#059669;font-weight:600;">${upcoming[0].date}</span> <span style="font-size:9px;color:#94a3b8;">${upcoming[0].visit}</span>`
-      : r.next_appt ? `<span style="color:#3b82f6;">${r.next_appt}</span>` : '<span style="color:#cbd5e1;">—</span>';
+      ? `<span style="color:#059669;font-weight:600;">${escapeHTML(upcoming[0].date)}</span> <span style="font-size:9px;color:#94a3b8;">${escapeHTML(upcoming[0].visit)}</span>`
+      : r.next_appt ? `<span style="color:#3b82f6;">${escapeHTML(r.next_appt)}</span>` : '<span style="color:#cbd5e1;">—</span>';
 
     const staleColor = r.days_since_update >= 14 ? '#dc2626' : r.days_since_update >= 7 ? '#d97706' : '#059669';
     table += `<tr>
-      <td style="padding:6px 8px;"><a href="${r.url}" target="_blank" style="font-weight:600;color:#1e293b;text-decoration:none;">${maskPHI(r.name)}</a></td>
-      <td style="padding:6px 8px;text-align:center;"><span style="padding:2px 6px;border-radius:3px;font-size:10px;font-weight:600;background:${(STAGE_COLORS[r.stage]||'#94a3b8')}22;color:${STAGE_COLORS[r.stage]||'#94a3b8'}">${r.stage}</span></td>
-      <td style="padding:6px 8px;font-size:10px;color:#475569;">${r.source}</td>
+      <td style="padding:6px 8px;"><a href="${escapeHTML(r.url)}" target="_blank" style="font-weight:600;color:#1e293b;text-decoration:none;">${maskPHI(r.name)}</a></td>
+      <td style="padding:6px 8px;text-align:center;"><span style="padding:2px 6px;border-radius:3px;font-size:10px;font-weight:600;background:${(STAGE_COLORS[r.stage]||'#94a3b8')}22;color:${STAGE_COLORS[r.stage]||'#94a3b8'}">${escapeHTML(r.stage)}</span></td>
+      <td style="padding:6px 8px;font-size:10px;color:#475569;">${escapeHTML(r.source)}</td>
       <td style="padding:6px 8px;">${nextApptDisplay}</td>
       <td style="padding:6px 8px;text-align:center;"><span style="font-weight:600;color:${staleColor};">${r.days_since_update}d</span></td>
       <td style="padding:6px 8px;">${dbStatus}</td>
