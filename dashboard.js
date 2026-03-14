@@ -6328,16 +6328,16 @@ function showCampaignDetailModal(studyName) {
       const dbMatch = PATIENT_DB_MAP.get(nameKey);
       const pVisits = (DATA.allVisitDetail || []).filter(v => v.patient.toLowerCase().trim() === nameKey);
       const apptBooked = pVisits.length > 0
-        ? `<span style="color:#059669;font-weight:700;">✓ ${pVisits[0].date}</span><div style="font-size:9px;color:#94a3b8;">${pVisits[0].visit}</div>`
-        : r.next_appt ? `<span style="color:#3b82f6;">${r.next_appt}</span>` : '<span style="color:#ef4444;font-size:10px;">No appt</span>';
+        ? `<span style="color:#059669;font-weight:700;">✓ ${escapeHTML(pVisits[0].date)}</span><div style="font-size:9px;color:#94a3b8;">${escapeHTML(pVisits[0].visit)}</div>`
+        : r.next_appt ? `<span style="color:#3b82f6;">${escapeHTML(r.next_appt)}</span>` : '<span style="color:#ef4444;font-size:10px;">No appt</span>';
       const pStatus = dbMatch
-        ? `<span style="padding:2px 6px;border-radius:3px;font-size:10px;font-weight:600;background:${dbMatch.status==='Available'?'#dcfce7':dbMatch.status==='Do Not Solicit'||dbMatch.status==='Deceased'?'#fef2f2':'#fffbeb'};color:${dbMatch.status==='Available'?'#059669':dbMatch.status==='Do Not Solicit'||dbMatch.status==='Deceased'?'#dc2626':'#d97706'}">${dbMatch.status}</span>`
+        ? `<span style="padding:2px 6px;border-radius:3px;font-size:10px;font-weight:600;background:${dbMatch.status==='Available'?'#dcfce7':dbMatch.status==='Do Not Solicit'||dbMatch.status==='Deceased'?'#fef2f2':'#fffbeb'};color:${dbMatch.status==='Available'?'#059669':dbMatch.status==='Do Not Solicit'||dbMatch.status==='Deceased'?'#dc2626':'#d97706'}">${escapeHTML(dbMatch.status)}</span>`
         : '<span style="color:#94a3b8;font-size:10px;">Not in DB</span>';
       const staleColor = r.days_since_update >= 14 ? '#dc2626' : r.days_since_update >= 7 ? '#d97706' : '#059669';
       html += `<tr>
-        <td style="padding:6px 8px;"><a href="${r.url}" target="_blank" style="font-weight:600;color:#1e293b;text-decoration:none;">${maskPHI(r.name)}</a></td>
-        <td style="padding:6px 8px;text-align:center;"><span style="padding:2px 6px;border-radius:3px;font-size:10px;font-weight:600;background:${(STAGE_COLORS[r.stage]||'#94a3b8')}22;color:${STAGE_COLORS[r.stage]||'#94a3b8'}">${r.stage}</span></td>
-        <td style="padding:6px 8px;font-size:10px;color:#475569;">${r.source}</td>
+        <td style="padding:6px 8px;"><a href="${escapeHTML(r.url)}" target="_blank" style="font-weight:600;color:#1e293b;text-decoration:none;">${maskPHI(r.name)}</a></td>
+        <td style="padding:6px 8px;text-align:center;"><span style="padding:2px 6px;border-radius:3px;font-size:10px;font-weight:600;background:${(STAGE_COLORS[r.stage]||'#94a3b8')}22;color:${STAGE_COLORS[r.stage]||'#94a3b8'}">${escapeHTML(r.stage)}</span></td>
+        <td style="padding:6px 8px;font-size:10px;color:#475569;">${escapeHTML(r.source)}</td>
         <td style="padding:6px 8px;">${apptBooked}</td>
         <td style="padding:6px 8px;">${pStatus}</td>
         <td style="padding:6px 8px;text-align:center;font-weight:600;color:${staleColor};">${r.days_since_update}d ago</td>
