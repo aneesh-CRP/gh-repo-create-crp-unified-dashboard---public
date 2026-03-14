@@ -6819,7 +6819,8 @@ function renderStudiesTable() {
     const barColor = !hasTarget ? '#94a3b8' :
       pct >= 100 ? '#059669' : pct >= 75 ? '#1843ad' : pct >= 50 ? '#d97706' : pct >= 25 ? '#f97316' : '#dc2626';
 
-    const studyCell = `<span style="font-weight:700;color:var(--navy);cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px;" onclick="showStudyUnifiedModal('${jsAttr(s.study)}')">${escapeHTML(s.study)}</span>` +
+    const safeStudy = jsAttr(s.study);
+    const studyCell = `<span style="font-weight:700;color:var(--navy);cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px;" onclick="showStudyUnifiedModal('${safeStudy}')">${escapeHTML(s.study)}</span>` +
       (s.study_url ? `<a href="${escapeHTML(s.study_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="margin-left:4px;opacity:0.4;vertical-align:middle"><svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>` : '');
     const statusBadge = s.enroll_status
       ? `<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;margin-left:5px;background:${s.enroll_status==='Enrolling'?'#e8eeff':s.enroll_status==='Maintenance'?'#f0fdf4':'#f1f5f9'};color:${s.enroll_status==='Enrolling'?'#1843ad':s.enroll_status==='Maintenance'?'#059669':'#94a3b8'}">${s.enroll_status}</span>` : '';
@@ -6844,7 +6845,7 @@ function renderStudiesTable() {
     const riskScoreCell = (s.risk_level === 'n/a' || s.enroll_status !== 'Enrolling')
       ? `<span style="font-size:10px;color:#94a3b8;font-style:italic">N/A</span>`
       : s.risk_score > 0
-        ? `<span style="font-size:11px;font-weight:700;padding:3px 7px;border-radius:5px;background:${lb};color:${lc};cursor:pointer" onclick="showStudyDetail('${safeStudy}')">${s.risk_score}</span>`
+        ? `<span style="font-size:11px;font-weight:700;padding:3px 7px;border-radius:5px;background:${lb};color:${lc};cursor:pointer" onclick="showStudyDetail('${jsAttr(s.study)}')">${s.risk_score}</span>`
         : `<span style="font-size:11px;color:var(--muted)">—</span>`;
 
     const isEnrolling = s.enroll_status === 'Enrolling';
