@@ -1672,7 +1672,7 @@ var SAMPLE = {
   pennTotal: 0, marchTotal: 0, aprilTotal: 0, activeStudies: 0,
   riskFlags: [], next14Detail: [], cancelTrend: [], cancelWeekly: [],
   upcomingWeekly: [], enrollmentData: [], enrollSummary: {},
-  mergedStudies: [], actionDetails: [], snapshotDate: ''
+  mergedStudies: [], actionDetails: [], snapshotDate: '', weeklyTrends: []
 };
 
 async function loadFallbackData() {
@@ -4373,56 +4373,72 @@ function processLiveData(allRows, legacyCancels, auditLog) {
   }
   const visitTypes = classifyVisitTypes(activeUpcoming);
 
-  // ── Trends: per-snapshot-date aggregation for longitudinal charts ──
-  const snapshotTrends = (() => {
-    const bySnap = {};
+  // ── Trends: per-week aggregation for longitudinal charts ──
+  // Groups ALL visits (active + cancelled) by week of their scheduled/cancel date
+  // Past weeks show actual cancel rates; future weeks show scheduled volume
+  const weeklyTrends = (() => {
+    const byWeek = {};
+    function weekKey(d) {
+      const mon = new Date(d); mon.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+      return localISO(mon);
+    }
+    // All rows from the main report (includes both active and cancelled)
     allRows.forEach(r => {
-      const snap = (r.snapshot_date || '').trim();
-      if (!snap || !/^\d{4}-\d{2}-\d{2}$/.test(snap)) return;
-      if (!bySnap[snap]) bySnap[snap] = { upcoming: 0, cancelled: 0, byStudy: {}, byCoord: {} };
+      const d = parseDate(r['Scheduled Date'] || r['Cancel Date']);
+      if (!d || isExcludedStudy(r['Study Name'])) return;
+      const wk = weekKey(d);
+      if (!byWeek[wk]) byWeek[wk] = { upcoming: 0, cancelled: 0, byStudy: {}, byCoord: {} };
       const status = (r['Appointment Status'] || '').trim().toLowerCase();
       const isCancelled = status === 'cancelled' || status === 'canceled';
-      if (isCancelled) bySnap[snap].cancelled++;
-      else bySnap[snap].upcoming++;
-      // Per-study
+      if (isCancelled) byWeek[wk].cancelled++;
+      else byWeek[wk].upcoming++;
       const study = (r['Study Name'] || '').split(' - ').pop().trim();
       if (study) {
-        if (!bySnap[snap].byStudy[study]) bySnap[snap].byStudy[study] = { upcoming: 0, cancelled: 0 };
-        if (isCancelled) bySnap[snap].byStudy[study].cancelled++;
-        else bySnap[snap].byStudy[study].upcoming++;
+        if (!byWeek[wk].byStudy[study]) byWeek[wk].byStudy[study] = { upcoming: 0, cancelled: 0 };
+        if (isCancelled) byWeek[wk].byStudy[study].cancelled++;
+        else byWeek[wk].byStudy[study].upcoming++;
       }
-      // Per-coordinator
       const coord = cleanCoord(r['Full Name'] || r['Staff Full Name'] || '');
       if (coord && isCoord(r['Full Name'] || r['Staff Full Name'] || '')) {
-        if (!bySnap[snap].byCoord[coord]) bySnap[snap].byCoord[coord] = { upcoming: 0, cancelled: 0 };
-        if (isCancelled) bySnap[snap].byCoord[coord].cancelled++;
-        else bySnap[snap].byCoord[coord].upcoming++;
+        if (!byWeek[wk].byCoord[coord]) byWeek[wk].byCoord[coord] = { upcoming: 0, cancelled: 0 };
+        if (isCancelled) byWeek[wk].byCoord[coord].cancelled++;
+        else byWeek[wk].byCoord[coord].upcoming++;
       }
     });
-    // Also add legacy cancel data by snapshot
+    // Add legacy cancels
     if (legacyCancels && legacyCancels.length) {
       legacyCancels.forEach(r => {
-        const snap = (r.snapshot_date || '').trim();
-        if (!snap || !/^\d{4}-\d{2}-\d{2}$/.test(snap)) return;
-        if (!bySnap[snap]) bySnap[snap] = { upcoming: 0, cancelled: 0, byStudy: {}, byCoord: {} };
-        bySnap[snap].cancelled++;
+        const d = parseDate(r['Cancel Date'] || r['Scheduled Date']);
+        if (!d || isExcludedStudy(r['Study Name'])) return;
+        const wk = weekKey(d);
+        if (!byWeek[wk]) byWeek[wk] = { upcoming: 0, cancelled: 0, byStudy: {}, byCoord: {} };
+        byWeek[wk].cancelled++;
         const study = (r['Study Name'] || '').split(' - ').pop().trim();
         if (study) {
-          if (!bySnap[snap].byStudy[study]) bySnap[snap].byStudy[study] = { upcoming: 0, cancelled: 0 };
-          bySnap[snap].byStudy[study].cancelled++;
+          if (!byWeek[wk].byStudy[study]) byWeek[wk].byStudy[study] = { upcoming: 0, cancelled: 0 };
+          byWeek[wk].byStudy[study].cancelled++;
+        }
+        const coord = cleanCoord(r['Staff Full Name'] || '');
+        if (coord && isCoord(r['Staff Full Name'] || '')) {
+          if (!byWeek[wk].byCoord[coord]) byWeek[wk].byCoord[coord] = { upcoming: 0, cancelled: 0 };
+          byWeek[wk].byCoord[coord].cancelled++;
         }
       });
     }
-    const sorted = Object.keys(bySnap).sort();
-    return sorted.map(snap => ({
-      date: snap,
-      label: new Date(snap + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      upcoming: bySnap[snap].upcoming,
-      cancelled: bySnap[snap].cancelled,
-      cancelRate: +((bySnap[snap].cancelled / (bySnap[snap].upcoming + bySnap[snap].cancelled || 1)) * 100).toFixed(1),
-      byStudy: bySnap[snap].byStudy,
-      byCoord: bySnap[snap].byCoord
-    }));
+    const sorted = Object.keys(byWeek).sort();
+    return sorted.map(wk => {
+      const w = byWeek[wk];
+      const total = w.upcoming + w.cancelled;
+      return {
+        date: wk,
+        label: new Date(wk + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        upcoming: w.upcoming,
+        cancelled: w.cancelled,
+        cancelRate: total ? +((w.cancelled / total) * 100).toFixed(1) : 0,
+        byStudy: w.byStudy,
+        byCoord: w.byCoord
+      };
+    });
   })();
 
   return {
@@ -4436,7 +4452,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
     activeStudies: upcomingByStudy.length,
     cancelWeekly: weekBucket(recentCancels,'Cancel Date'),
     upcomingWeekly: weekBucket(activeUpcoming,'Scheduled Date'),
-    snapshotTrends,
+    weeklyTrends,
     cancelByStudy,
     upcomingByStudy,
     upcomingByStudyFull: upcomingByStudy,
@@ -6615,7 +6631,7 @@ const LIVE_URL2_LEGACY = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRUXJx
 const AUDIT_LOG_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRpPUZFSyW0rrx2yQdqYPyccRZC0wqUCWyCfX_n2XTMPyKQr9da4jl1jMbZ5_KKFkYZjJiNl_ClYbXk/pub?output=csv';
 
 function renderTrendsCharts() {
-  const trends = DATA.snapshotTrends || [];
+  const trends = DATA.weeklyTrends || [];
   const noDataEl = document.getElementById('trends-no-data-msg');
   const chartsEl = document.getElementById('trends-charts');
   if (!trends.length) {
@@ -6641,7 +6657,7 @@ function renderTrendsCharts() {
     rateDirEl.style.color = diff > 0 ? 'var(--red)' : 'var(--green)';
   }
   const rateSub = document.getElementById('trends-rate-sub');
-  if (rateSub) rateSub.textContent = trends.length >= 2 ? 'vs. earliest snapshot' : 'single snapshot loaded';
+  if (rateSub) rateSub.textContent = trends.length >= 2 ? 'recent vs. older weeks' : 'single week loaded';
 
   const avgCancelEl = document.getElementById('trends-avg-cancel');
   if (avgCancelEl) avgCancelEl.textContent = Math.round(last4.reduce((s, t) => s + t.cancelled, 0) / (last4.length || 1));
@@ -6760,10 +6776,10 @@ function renderTrendsCharts() {
 function loadLongitudinalData() {
   renderTrendsCharts();
   const status = document.getElementById('trends-load-status');
-  const trends = DATA.snapshotTrends || [];
+  const trends = DATA.weeklyTrends || [];
   if (status) {
-    if (trends.length) status.textContent = 'Loaded ' + trends.length + ' snapshot(s) from connected data.';
-    else status.textContent = 'No snapshot data found. Make sure the sheet has a snapshot_date column.';
+    if (trends.length) status.textContent = 'Showing ' + trends.length + ' weeks of trend data.';
+    else status.textContent = 'No data available yet. Wait for live data to load.';
   }
 }
 
