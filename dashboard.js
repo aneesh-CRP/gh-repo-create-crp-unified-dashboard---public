@@ -49,7 +49,8 @@ function jsAttr(s) {
 
 // ═══ SERVICE WORKER REGISTRATION ═══
 if ('serviceWorker' in navigator && !(typeof google !== 'undefined' && google.script && google.script.run)) {
-  navigator.serviceWorker.register('/sw.js').then(function(reg) {
+  var swPath = (location.pathname.replace(/\/[^/]*$/, '') || '') + '/sw.js';
+  navigator.serviceWorker.register(swPath).then(function(reg) {
     console.log('CRP: Service worker registered, scope:', reg.scope);
   }).catch(function(err) {
     console.warn('CRP: Service worker registration failed:', err);
