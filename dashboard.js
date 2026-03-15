@@ -3649,11 +3649,14 @@ async function fetchQuickBooksData() {
         if (codeBase.length < 4) continue;
         if (acctNorm.includes(codeFull) || codeFull.includes(acctNorm) ||
             acctNorm.includes(codeBase) || codeBase.includes(acctNorm)) {
+          const activeMos = Object.values(monthly).filter(v => v > 0).length;
+          const firstMo = monthCols.find(m => (parseFloat(r[m])||0) !== 0) || '';
           if (pnlByStudy[code]) {
             pnlByStudy[code].total += total;
+            pnlByStudy[code].activeMonths = Math.max(pnlByStudy[code].activeMonths, activeMos);
             Object.entries(monthly).forEach(([k,v]) => { pnlByStudy[code].monthly[k] = (pnlByStudy[code].monthly[k]||0) + v; });
           } else {
-            pnlByStudy[code] = { qbAccount: acct, total, monthly };
+            pnlByStudy[code] = { qbAccount: acct, total, monthly, activeMonths: activeMos, firstMonth: firstMo };
           }
           matched = true;
           break;
@@ -3709,6 +3712,8 @@ function renderCRIOvsQB() {
   // ── Build study-level comparison rows
   const compRows = [];
   let totalCrio12M = 0, totalCrioBilled = 0, totalQbMatched = 0, matchedCount = 0, unmatchedCount = 0;
+  let matureCrioBilled = 0, matureQbRev = 0, matureCount = 0;
+  const MIN_MONTHS = 6;
 
   Object.entries(studyRevMap).sort((a,b) => b[1] - a[1]).forEach(([code, crioRev]) => {
     if (crioRev <= 0) return;
@@ -3725,20 +3730,35 @@ function renderCRIOvsQB() {
     // Find QB P&L match
     const qb = pnlByStudy[code];
     const qbRev = qb ? qb.total : 0;
+    const qbMonths = qb ? (qb.activeMonths || 0) : 0;
+    const qbFirst = qb ? (qb.firstMonth || '') : '';
     totalQbMatched += qbRev;
 
     if (qb) matchedCount++; else unmatchedCount++;
 
+    // Track mature alignment (studies with ≥6 months of QB data)
+    if (qb && qbMonths >= MIN_MONTHS) {
+      matureCrioBilled += crioBilled;
+      matureQbRev += qbRev;
+      matureCount++;
+    }
+
     const diff = crioBilled - qbRev;
     const matchPct = crioBilled > 0 && qbRev > 0 ? Math.round(qbRev / crioBilled * 100) : (qbRev > 0 ? 999 : 0);
+
+    let status;
+    if (!qb) status = 'No QB Data';
+    else if (qbMonths < MIN_MONTHS) status = qbMonths + 'mo data';
+    else if (matchPct >= 80 && matchPct <= 120) status = 'Aligned';
+    else if (matchPct >= 50) status = 'Partial';
+    else status = 'Low Match';
 
     compRows.push({
       code, sponsor, crioRev, crioAR, crioColl, crioBilled,
       qbRev, qbAccount: qb ? qb.qbAccount : '',
+      qbMonths, qbFirst,
       diff, matchPct: Math.min(matchPct, 999),
-      status: !qb ? 'No QB Data' :
-              matchPct >= 80 && matchPct <= 120 ? 'Aligned' :
-              matchPct >= 50 ? 'Partial' : 'Low Match'
+      status
     });
   });
 
@@ -3755,15 +3775,16 @@ function renderCRIOvsQB() {
 
   // ── KPIs
   const qbTotal = QB_DATA.qbTotalIncome;
-  const alignPct = totalCrioBilled > 0 ? Math.round(totalQbMatched / totalCrioBilled * 100) : 0;
+  const matureAlignPct = matureCrioBilled > 0 ? Math.round(matureQbRev / matureCrioBilled * 100) : 0;
+  const allAlignPct = totalCrioBilled > 0 ? Math.round(totalQbMatched / totalCrioBilled * 100) : 0;
   const netIncome = qbTotal - totalQbExpenses;
 
   document.getElementById('qb-kpi1').textContent = fmtK(totalCrioBilled);
   document.getElementById('qb-kpi1-sub').textContent = 'Collected + AR · 12M est: ' + fmtK(totalCrio12M);
   document.getElementById('qb-kpi2').textContent = fmtK(qbTotal);
   document.getElementById('qb-kpi2-sub').textContent = (QB_DATA.qbPeriod || 'YTD') + ' · ' + fmtK(totalQbMatched) + ' matched';
-  document.getElementById('qb-kpi3').textContent = alignPct + '%';
-  document.getElementById('qb-kpi3-sub').textContent = matchedCount + '/' + (matchedCount + unmatchedCount) + ' studies · ' + fmtK(qbOnlyTotal) + ' QB-only';
+  document.getElementById('qb-kpi3').textContent = matureAlignPct + '%';
+  document.getElementById('qb-kpi3-sub').textContent = matureCount + ' mature (≥6mo) · ' + allAlignPct + '% overall';
   document.getElementById('qb-kpi4').textContent = fmtK(totalQbExpenses);
   document.getElementById('qb-kpi4-sub').textContent = expenseRows.length + ' expense classes';
   document.getElementById('qb-kpi5').textContent = fmtK(netIncome);
@@ -3771,17 +3792,21 @@ function renderCRIOvsQB() {
 
   // ── Revenue Comparison Table
   const statusColor = { 'Aligned': '#10B981', 'Partial': '#F59E0B', 'Low Match': '#EF4444', 'No QB Data': '#9CA3AF', 'QB Only': '#60A5FA' };
-  let tableHtml = compRows.map(r =>
-    '<tr>' +
+  const limitedColor = '#60A5FA';
+  let tableHtml = compRows.map(r => {
+    const isLimited = r.status.includes('mo data');
+    const sColor = isLimited ? limitedColor : (statusColor[r.status] || '#9CA3AF');
+    return '<tr' + (isLimited ? ' style="opacity:0.7"' : '') + '>' +
     '<td><strong>' + esc(r.code) + '</strong>' + (r.sponsor ? '<div style="font-size:10px;color:var(--muted)">' + esc(r.sponsor) + '</div>' : '') + '</td>' +
     '<td class="r">' + (r.crioBilled ? fmtD(r.crioBilled) : '—') + '<div style="font-size:10px;color:var(--muted)">AR: ' + fmtD(r.crioAR) + ' + Coll: ' + fmtD(r.crioColl) + '</div></td>' +
     '<td class="r" style="color:var(--muted)">' + (r.crioRev ? fmtD(r.crioRev) : '—') + '</td>' +
     '<td class="r">' + (r.qbRev ? fmtD(r.qbRev) : '—') + (r.qbAccount ? '<div style="font-size:10px;color:var(--muted)">' + esc(r.qbAccount) + '</div>' : '') + '</td>' +
     '<td class="r" style="color:' + (r.diff > 5000 ? '#EF4444' : r.diff < -5000 ? '#F59E0B' : '#10B981') + ';font-weight:600">' + (Math.abs(r.diff) > 100 ? (r.diff > 0 ? '+' : '') + fmtD(r.diff) : '—') + '</td>' +
     '<td class="r">' + (r.matchPct > 0 ? r.matchPct + '%' : '—') + '</td>' +
-    '<td><span style="display:inline-block;padding:2px 8px;border-radius:9px;font-size:10px;font-weight:600;background:' + (statusColor[r.status]||'#9CA3AF') + '22;color:' + (statusColor[r.status]||'#9CA3AF') + '">' + esc(r.status) + '</span></td>' +
-    '</tr>'
-  ).join('');
+    '<td class="r">' + (r.qbMonths > 0 ? r.qbMonths : '—') + (r.qbFirst ? '<div style="font-size:9px;color:var(--muted)">' + esc(r.qbFirst) + '</div>' : '') + '</td>' +
+    '<td><span style="display:inline-block;padding:2px 8px;border-radius:9px;font-size:10px;font-weight:600;background:' + sColor + '22;color:' + sColor + '">' + esc(r.status) + '</span></td>' +
+    '</tr>';
+  }).join('');
 
   // Totals row
   tableHtml += '<tr style="border-top:2px solid var(--border);font-weight:700;background:var(--surface2)">' +
@@ -3790,8 +3815,9 @@ function renderCRIOvsQB() {
     '<td class="r" style="color:var(--muted)">' + fmtD(totalCrio12M) + '</td>' +
     '<td class="r">' + fmtD(totalQbMatched) + '</td>' +
     '<td class="r" style="color:' + (totalCrioBilled - totalQbMatched > 0 ? '#EF4444' : '#F59E0B') + '">' + (totalCrioBilled - totalQbMatched > 0 ? '+' : '') + fmtD(totalCrioBilled - totalQbMatched) + '</td>' +
-    '<td class="r">' + alignPct + '%</td>' +
-    '<td></td></tr>';
+    '<td class="r">' + allAlignPct + '%</td>' +
+    '<td></td>' +
+    '<td><span style="display:inline-block;padding:2px 8px;border-radius:9px;font-size:10px;font-weight:600;background:#10B98122;color:#10B981">' + matureAlignPct + '% mature</span></td></tr>';
 
   document.getElementById('qbReconBody').innerHTML = tableHtml;
 
