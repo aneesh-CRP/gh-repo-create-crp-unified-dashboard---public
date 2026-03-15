@@ -3774,7 +3774,7 @@ function renderCRIOvsQB() {
     '<td class="r">' + (r.qbCollected ? fmtD(r.qbCollected) : '—') + '</td>' +
     '<td class="r" style="color:' + (r.gap > 0 ? '#EF4444' : r.gap < 0 ? '#F59E0B' : '#10B981') + ';font-weight:600">' + (r.gap !== 0 ? fmtD(Math.abs(r.gap)) : '—') + '</td>' +
     '<td>' + esc(r.qbClass) + '</td>' +
-    '<td><span style="display:inline-block;padding:2px 8px;border-radius:9px;font-size:10px;font-weight:600;background:' + (statusColor[r.status]||'#9CA3AF') + '22;color:' + (statusColor[r.status]||'#9CA3AF') + '">' + r.status + '</span></td>' +
+    '<td><span style="display:inline-block;padding:2px 8px;border-radius:9px;font-size:10px;font-weight:600;background:' + (statusColor[r.status]||'#9CA3AF') + '22;color:' + (statusColor[r.status]||'#9CA3AF') + '">' + esc(r.status) + '</span></td>' +
     '</tr>'
   ).join('');
 
@@ -3787,9 +3787,9 @@ function renderCRIOvsQB() {
     '<td class="r">' + fmtD(parseFloat(r['Total Invoiced'])||0) + '</td>' +
     '<td class="r">' + fmtD(parseFloat(r['Total Collected'])||0) + '</td>' +
     '<td class="r">' + fmtD(parseFloat(r['Outstanding'])||0) + '</td>' +
-    '<td class="r">' + (r['Collection Rate %']||'0') + '%</td>' +
+    '<td class="r">' + esc(r['Collection Rate %']||'0') + '%</td>' +
     '<td class="r" style="color:#EF4444;font-weight:600">' + fmtD(parseFloat(r['Gap Amount'])||0) + '</td>' +
-    '<td><span style="display:inline-block;padding:2px 8px;border-radius:9px;font-size:10px;font-weight:600;background:' + (riskColor[risk]||'#9CA3AF') + '22;color:' + (riskColor[risk]||'#9CA3AF') + '">' + risk + '</span></td>' +
+    '<td><span style="display:inline-block;padding:2px 8px;border-radius:9px;font-size:10px;font-weight:600;background:' + (riskColor[risk]||'#9CA3AF') + '22;color:' + (riskColor[risk]||'#9CA3AF') + '">' + esc(risk) + '</span></td>' +
     '</tr>';
   }).join('');
 
