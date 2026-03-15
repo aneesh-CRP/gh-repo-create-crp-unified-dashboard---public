@@ -6360,11 +6360,14 @@ async function fetchQuickBooksData() {
       fetchFinanceTab(pk, tabs.QB_CLASSES),
       fetchFinanceTab(pk, tabs.QB_PAYMENTS),
     ];
-    // Optionally fetch QB_Employees if tab is published
+    // Optionally fetch QB_Employees and INV_Visits if tabs are published
     if (tabs.QB_EMPLOYEES) fetches.push(fetchFinanceTab(pk, tabs.QB_EMPLOYEES));
+    if (tabs.INV_VISITS) fetches.push(fetchFinanceTab(pk, tabs.INV_VISITS));
     const results = await Promise.all(fetches);
     const [pnlMonthly, pnlCls, invLines, timeAct, classes, payments] = results;
-    const qbEmployees = results[6] || [];
+    let nextIdx = 6;
+    const qbEmployees = tabs.QB_EMPLOYEES ? (results[nextIdx++] || []) : [];
+    const invVisitsRaw = tabs.INV_VISITS ? (results[nextIdx++] || []) : [];
 
     // ── Detect QB period from PnL Monthly column headers
     const monthCols = pnlMonthly.length > 0 ? Object.keys(pnlMonthly[0]).filter(k => k !== 'Account' && k !== 'Total') : [];
@@ -6570,6 +6573,23 @@ async function fetchQuickBooksData() {
     });
     if (qbEmployees.length > 0) _log('CRP QB: ' + qbEmployees.length + ' employees loaded, rates: ' + Object.entries(empRates).filter(([,v]) => v.billRate > 0 || v.costRate > 0).map(([k,v]) => k + '=$' + (v.costRate || v.billRate)).join(', '));
 
+    // ── Parse INV_Visits — manual investigator visit log
+    const invVisits = {}; // name -> { byDay: { date: { count, studies: [] } }, total: 0 }
+    invVisitsRaw.forEach(r => {
+      const name = (r['Investigator']||r['Name']||'').trim();
+      const date = (r['Date']||'').trim();
+      const study = (r['Study']||'').trim();
+      const count = parseInt(r['Visits']||r['Count']||'1') || 1;
+      if (!name || !date) return;
+      if (!invVisits[name]) invVisits[name] = { byDay: {}, total: 0 };
+      if (!invVisits[name].byDay[date]) invVisits[name].byDay[date] = { count: 0, studies: [] };
+      invVisits[name].byDay[date].count += count;
+      invVisits[name].byDay[date].studies.push(study);
+      invVisits[name].total += count;
+    });
+    if (invVisitsRaw.length > 0) _log('CRP QB: ' + invVisitsRaw.length + ' investigator visit entries loaded for ' + Object.keys(invVisits).length + ' investigators');
+
+    QB_DATA.invVisits = invVisits;
     QB_DATA.empMap = empMap;
     QB_DATA.empRates = empRates;
     QB_DATA.studyHoursAll = studyHoursAll;
@@ -6903,6 +6923,112 @@ function renderStaffEconomics() {
       '<div class="kpi"><div class="kpi-stripe" style="background:#F59E0B"></div><div class="label">Clinical ROI</div><div class="value" style="color:' + (clinicalROI >= 1 ? '#10B981' : '#EF4444') + '">' + clinicalROI.toFixed(2) + 'x</div><div class="sub">Net: ' + (clinicalRev - clinicalCost >= 0 ? '+' : '') + fmtD(clinicalRev - clinicalCost) + '</div></div>';
   }
 
+  // ── Staff Calendar — daily visit grid (no finance data)
+  const calEl = document.getElementById('staffCalendarGrid');
+  if (calEl) {
+    const today = new Date();
+    const dayMs = 86400000;
+    // Build 4 weeks of weekdays (2 past + current + 1 future)
+    const dates = [];
+    const startDate = new Date(today);
+    startDate.setDate(startDate.getDate() - 21); // start 3 weeks ago
+    for (let d = new Date(startDate); d <= new Date(today.getTime() + 7 * dayMs); d = new Date(d.getTime() + dayMs)) {
+      const dow = d.getDay();
+      if (dow === 0 || dow === 6) continue; // skip weekends
+      dates.push(d.toISOString().split('T')[0]);
+    }
+
+    // Gather visit data for all clinical staff
+    const coordGoals = window._coordGoals || { byDay: {}, byDayDetail: {} };
+    const coordHist = window.COORD_FILE_HISTORY || {};
+    const invVisits = QB_DATA.invVisits || {};
+    const coordNames = CRP_CONFIG.COORDINATORS || [];
+    const invNames = CRP_CONFIG.INVESTIGATORS || [];
+
+    // Merge coordinator visit sources: CRIO coordGoals > coord-history.json > TA daily
+    const calRows = [];
+    coordNames.forEach(name => {
+      const cg = coordGoals.byDay[name] || {};
+      const ch = coordHist[name] || {};
+      const taData = empMap[Object.keys(empMap).find(k => {
+        const parts = name.toLowerCase().split(/\s+/);
+        return parts.length >= 2 && k.toLowerCase().includes(parts[0]) && k.toLowerCase().includes(parts[parts.length-1]);
+      }) || ''];
+      const taDays = taData ? taData.dailyStudies || {} : {};
+      const days = {};
+      dates.forEach(date => {
+        const crioCount = cg[date] || 0;
+        const histCount = ch[date] || 0;
+        const taCount = taDays[date] ? taDays[date].size : 0;
+        const count = crioCount || histCount || taCount;
+        const detail = coordGoals.byDayDetail[name] ? coordGoals.byDayDetail[name][date] || [] : [];
+        days[date] = { count, detail, source: crioCount ? 'crio' : histCount ? 'hist' : taCount ? 'ta' : '' };
+      });
+      calRows.push({ name, role: 'CRC', color: '#3B82F6', days });
+    });
+    invNames.forEach(name => {
+      const iv = invVisits[name] || {};
+      const ivByDay = iv.byDay || {};
+      // Also check empMap for TA daily data
+      const taData = empMap[Object.keys(empMap).find(k => {
+        const parts = name.toLowerCase().split(/\s+/);
+        return parts.length >= 2 && k.toLowerCase().includes(parts[0]) && k.toLowerCase().includes(parts[parts.length-1]);
+      }) || ''];
+      const taDays = taData ? taData.dailyStudies || {} : {};
+      const days = {};
+      dates.forEach(date => {
+        const ivCount = ivByDay[date] ? ivByDay[date].count : 0;
+        const taCount = taDays[date] ? taDays[date].size : 0;
+        const count = ivCount || taCount;
+        const studies = ivByDay[date] ? ivByDay[date].studies : (taDays[date] ? Array.from(taDays[date]) : []);
+        days[date] = { count, detail: studies.map(s => ({ study: s })), source: ivCount ? 'inv' : taCount ? 'ta' : '' };
+      });
+      calRows.push({ name, role: 'INV', color: '#7C3AED', days });
+    });
+
+    // Render calendar grid
+    const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const todayStr = today.toISOString().split('T')[0];
+
+    let html = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px">';
+    // Header row — dates
+    html += '<tr><th style="padding:4px 8px;text-align:left;position:sticky;left:0;background:var(--surface);z-index:1;min-width:120px">Staff</th>';
+    dates.forEach(d => {
+      const dt = new Date(d + 'T12:00:00');
+      const isToday = d === todayStr;
+      const dayLabel = dayNames[dt.getDay()].substring(0,1);
+      const dateLabel = (dt.getMonth()+1) + '/' + dt.getDate();
+      html += '<th style="padding:2px 3px;text-align:center;min-width:36px;font-size:9px;font-weight:' + (isToday ? '700' : '400') + ';color:' + (isToday ? 'var(--text)' : 'var(--muted)') + ';' + (isToday ? 'background:rgba(59,130,246,0.1);border-radius:4px' : '') + '">' + dayLabel + '<br>' + dateLabel + '</th>';
+    });
+    html += '</tr>';
+
+    // Staff rows
+    calRows.forEach(r => {
+      html += '<tr><td style="padding:4px 8px;font-weight:600;white-space:nowrap;position:sticky;left:0;background:var(--surface);z-index:1"><span style="color:' + r.color + ';font-size:9px;margin-right:3px">' + r.role + '</span>' + esc(r.name.split(' ')[0]) + '</td>';
+      dates.forEach(d => {
+        const v = r.days[d];
+        const isToday = d === todayStr;
+        const isPast = d < todayStr;
+        let bg = 'transparent', fg = 'var(--muted)', txt = '';
+        if (v.count > 0) {
+          bg = v.count >= 3 ? 'rgba(16,185,129,0.25)' : v.count >= 2 ? 'rgba(16,185,129,0.12)' : 'rgba(245,158,11,0.15)';
+          fg = v.count >= 2 ? '#10B981' : '#F59E0B';
+          txt = v.count;
+        } else if (isPast) {
+          bg = 'rgba(156,163,175,0.06)';
+          txt = '·';
+          fg = 'var(--muted)';
+        }
+        const title = v.detail.length > 0 ? v.detail.map(x => x.study || x.patient || '').filter(Boolean).join(', ') : '';
+        html += '<td style="text-align:center;padding:3px 2px;background:' + bg + ';color:' + fg + ';font-weight:' + (v.count >= 2 ? '700' : '400') + ';' + (isToday ? 'outline:2px solid #3B82F6;border-radius:3px' : '') + '"' + (title ? ' title="' + esc(title) + '"' : '') + '>' + txt + '</td>';
+      });
+      html += '</tr>';
+    });
+    html += '</table></div>';
+    calEl.innerHTML = html;
+  }
+
   // ── Helper: render a role group table
   function renderGroupTable(bodyId, rows, groupTotals, prefix) {
     const tbody = document.getElementById(bodyId);
@@ -7092,15 +7218,32 @@ function renderStaffEconomics() {
     const workDaysEst = daysPerWeek * weeksPerYear;
     const totalCost = pnlCost > 0 ? pnlCost : rate * hrsPerWeek * weeksPerYear;
     const dailyCost = totalCost / workDaysEst;
-    // We don't know visit count — show cost/day and let user compare
+    // Check INV_Visits for actual visit counts
+    const ivData = QB_DATA.invVisits || {};
+    let ivTotalVisits = 0;
+    let ivDailyDetail = [];
+    Object.entries(ivData).forEach(([ivName, ivInfo]) => {
+      const ivParts = ivName.toLowerCase().split(/\s+/);
+      const schParts = invName.toLowerCase().split(/\s+/);
+      if (ivParts.length >= 2 && schParts.length >= 2 && invName.toLowerCase().includes(ivParts[0]) && invName.toLowerCase().includes(ivParts[ivParts.length-1])) {
+        ivTotalVisits = ivInfo.total;
+        ivDailyDetail = Object.entries(ivInfo.byDay).sort((a,b) => b[0].localeCompare(a[0])).map(([date, d]) => ({
+          date, hrs: avgHrsDay, studies: d.studies, dayCost: dailyCost, visitCount: d.count
+        }));
+      }
+    });
+    const hasVisitData = ivTotalVisits > 0;
+    const ivWorkDays = hasVisitData ? ivDailyDetail.length : workDaysEst;
+    const ivVisitsPerDay = hasVisitData && ivWorkDays > 0 ? ivTotalVisits / ivWorkDays : 0;
+    const ivCostPerVisit = hasVisitData && ivTotalVisits > 0 ? totalCost / ivTotalVisits : 0;
     visitRows.push({
-      name: invName, role: 'investigator', workDays: workDaysEst,
+      name: invName, role: 'investigator', workDays: hasVisitData ? ivWorkDays : workDaysEst,
       avgHrsDay, dailyCost, rate,
-      totalVisits: 0, visitsPerDay: 0,
-      costPerVisit: 0, revPerVisit: 0, marginPerVisit: 0,
+      totalVisits: ivTotalVisits, visitsPerDay: ivVisitsPerDay,
+      costPerVisit: ivCostPerVisit, revPerVisit: 0, marginPerVisit: hasVisitData ? -ivCostPerVisit : 0,
       totalCost, attrRevenue: 0, lowVisitDays: 0,
-      dailyDetail: [], rateSource: pnlCost > 0 ? 'pnl' : 'qb-cost',
-      manualSchedule: true, hrsPerWeek, daysPerWeek
+      dailyDetail: ivDailyDetail, rateSource: pnlCost > 0 ? 'pnl' : 'qb-cost',
+      manualSchedule: !hasVisitData, hrsPerWeek, daysPerWeek
     });
   });
 
@@ -7989,6 +8132,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
     coordGoals.byDayDetail[name][date].push({ patient: _ptName, study: _ptStudy, url: _ptUrl });
     if (date >= _cgMonthStart && date <= `${_cgYY}-${_cgMM}-31`) coordGoals.byMonth[name]++;
   });
+  window._coordGoals = coordGoals; // expose for staff calendar
 
   // ── cancelReasons (only true cancellations — excludes rescheduled, completed, admin error, fibroscan, study closed) ──
   const rb = {};
@@ -12246,6 +12390,13 @@ if (typeof window !== 'undefined') {
 
   <div class="section-label">Clinical Staff Economics — Coordinators &amp; Investigators</div>
   <div class="kpi-row" id="staffEconKpis"></div>
+
+  <div class="section-label" style="margin-top:16px">Staff Visit Calendar</div>
+  <div class="panel">
+    <div class="panel-body" id="staffCalendarGrid" style="padding:8px">
+      <div style="color:var(--muted);font-size:12px;padding:12px">Loading calendar...</div>
+    </div>
+  </div>
 
   <div class="section-label" style="margin-top:12px"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#3B82F6;margin-right:6px"></span>Clinical Research Coordinators</div>
   <div class="panel">
