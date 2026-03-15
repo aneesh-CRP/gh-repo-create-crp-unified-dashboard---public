@@ -4020,10 +4020,12 @@ function renderStaffEconomics() {
   const totalTrackedHours = QB_DATA.totalTrackedHours;
   const pnlCostByName = QB_DATA.pnlCostByName || {};
 
-  // Payroll rate: payroll cost / ALL employee hours (including non-study time)
+  // Compute average cost rate from QB employee data (wage-based, not inflated blended)
   const totalAllHours = QB_DATA.totalAllHours || totalTrackedHours;
-  const payrollRate = totalAllHours > 0 ? totalPayroll / totalAllHours : 0;
   const empRates = QB_DATA.empRates || {};
+  let rateSum = 0, rateCount = 0;
+  Object.values(empMap).forEach(d => { if (d.costRate > 0) { rateSum += d.costRate; rateCount++; } });
+  const avgCostRate = rateCount > 0 ? rateSum / rateCount : (totalAllHours > 0 ? totalPayroll / totalAllHours : 0);
 
   // Role classification using CRP_CONFIG lists — fuzzy: first+last name must both appear
   const coordList = (CRP_CONFIG.COORDINATORS || []).map(n => ({ full: n, lo: n.toLowerCase().trim(), parts: n.toLowerCase().trim().split(/\s+/) }));
@@ -4069,8 +4071,8 @@ function renderStaffEconomics() {
     const pnlCost = pnlCostByName[name] || 0;
     // Individual rate: costRate > billRate > payroll blended
     const indivRate = data.costRate > 0 ? data.costRate : (data.billRate > 0 ? data.billRate : 0);
-    const effectiveRate = indivRate > 0 ? indivRate : payrollRate;
-    const rateSource = pnlCost > 0 ? 'pnl' : (indivRate > 0 ? (data.costRate > 0 ? 'qb-cost' : 'qb-bill') : 'blended');
+    const effectiveRate = indivRate > 0 ? indivRate : avgCostRate;
+    const rateSource = pnlCost > 0 ? 'pnl' : (indivRate > 0 ? (data.costRate > 0 ? 'qb-cost' : 'qb-bill') : 'avg');
 
     let attrRevenue = 0;
     const studyDetail = studies.map(([study, hrs]) => {
@@ -4132,7 +4134,7 @@ function renderStaffEconomics() {
   const kpiEl = document.getElementById('staffEconKpis');
   if (kpiEl) {
     kpiEl.innerHTML =
-      '<div class="kpi"><div class="kpi-stripe" style="background:#3B82F6"></div><div class="label">Coordinators</div><div class="value" style="color:#3B82F6">' + cG.count + '</div><div class="sub">' + Math.round(cG.hrs).toLocaleString() + ' hrs · ' + fmtD(payrollRate) + '/hr</div></div>' +
+      '<div class="kpi"><div class="kpi-stripe" style="background:#3B82F6"></div><div class="label">Coordinators</div><div class="value" style="color:#3B82F6">' + cG.count + '</div><div class="sub">' + Math.round(cG.hrs).toLocaleString() + ' hrs · avg ' + fmtD(avgCostRate) + '/hr</div></div>' +
       '<div class="kpi"><div class="kpi-stripe" style="background:#7C3AED"></div><div class="label">Investigators</div><div class="value" style="color:#7C3AED">' + iG.count + '</div><div class="sub">' + (iG.hrs > 0 ? Math.round(iG.hrs).toLocaleString() + ' tracked hrs' : 'PnL costs only') + '</div></div>' +
       '<div class="kpi"><div class="kpi-stripe" style="background:#10B981"></div><div class="label">Clinical Revenue</div><div class="value" style="color:#10B981">' + fmtK(clinicalRev) + '</div><div class="sub">Coord: ' + fmtK(cG.rev) + ' · Inv: ' + fmtK(iG.rev) + '</div></div>' +
       '<div class="kpi"><div class="kpi-stripe" style="background:#EF4444"></div><div class="label">Clinical Cost</div><div class="value" style="color:#EF4444">' + fmtK(clinicalCost) + '</div><div class="sub">Coord: ' + fmtK(cG.cost) + ' · Inv: ' + fmtK(iG.cost) + '</div></div>' +
@@ -4147,7 +4149,7 @@ function renderStaffEconomics() {
 
     tbody.innerHTML = rows.map(r => {
       const roiColor = r.roi >= 1.5 ? '#10B981' : r.roi >= 1 ? '#F59E0B' : '#EF4444';
-      const rateLabel = r.rateSource === 'pnl' ? 'PnL' : r.rateSource === 'qb-cost' ? 'QB cost' : r.rateSource === 'qb-bill' ? 'QB bill' : r.rateSource === 'none' ? '' : 'blended';
+      const rateLabel = r.rateSource === 'pnl' ? 'PnL' : r.rateSource === 'qb-cost' ? 'QB cost' : r.rateSource === 'qb-bill' ? 'QB bill' : r.rateSource === 'none' ? '' : 'avg';
       const rid = prefix + '-' + (idx++);
       const net = r.attrRevenue - r.estCost;
       const noTime = r.hours === 0;
@@ -4201,7 +4203,7 @@ function renderStaffEconomics() {
   clinicalRows.forEach(emp => {
     emp.studyDetail.forEach(sd => {
       if (!studyStaffMap[sd.study]) studyStaffMap[sd.study] = { study: sd.study, totalHrs: 0, revenue: sd.studyRev, staff: [], totalCost: 0, coords: 0, invs: 0 };
-      const empCostRate = emp.pnlCost > 0 ? emp.pnlCost / emp.hours : payrollRate;
+      const empCostRate = emp.pnlCost > 0 ? emp.pnlCost / emp.hours : (emp.hourlyRate > 0 ? emp.hourlyRate : avgCostRate);
       const studyCost = empCostRate * sd.hours;
       studyStaffMap[sd.study].totalHrs += sd.hours;
       studyStaffMap[sd.study].totalCost += studyCost;
