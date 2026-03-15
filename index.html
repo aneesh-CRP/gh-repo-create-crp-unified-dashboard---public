@@ -6347,14 +6347,19 @@ async function fetchQuickBooksData() {
 
   _log('CRP QB: Fetching QuickBooks data...');
   try {
-    const [pnlMonthly, pnlCls, invLines, timeAct, classes, payments] = await Promise.all([
+    const fetches = [
       fetchFinanceTab(pk, tabs.QB_PNL_MONTHLY),
       fetchFinanceTab(pk, tabs.QB_PNL_CLASS),
       fetchFinanceTab(pk, tabs.QB_INVOICE_LINES),
       fetchFinanceTab(pk, tabs.QB_TIME_ACTIVITY),
       fetchFinanceTab(pk, tabs.QB_CLASSES),
       fetchFinanceTab(pk, tabs.QB_PAYMENTS),
-    ]);
+    ];
+    // Optionally fetch QB_Employees if tab is published
+    if (tabs.QB_EMPLOYEES) fetches.push(fetchFinanceTab(pk, tabs.QB_EMPLOYEES));
+    const results = await Promise.all(fetches);
+    const [pnlMonthly, pnlCls, invLines, timeAct, classes, payments] = results;
+    const qbEmployees = results[6] || [];
 
     // ── Detect QB period from PnL Monthly column headers
     const monthCols = pnlMonthly.length > 0 ? Object.keys(pnlMonthly[0]).filter(k => k !== 'Account' && k !== 'Total') : [];
@@ -6529,7 +6534,32 @@ async function fetchQuickBooksData() {
       if (isInv || !empMap[name]) contractorNames.add(name);
     });
 
+    // ── Parse QB Employees — extract bill rates, cost rates, hire dates
+    const empRates = {}; // name -> { billRate, costRate, hiredDate, active, email }
+    qbEmployees.forEach(r => {
+      const name = (r['Display Name']||'').trim();
+      if (!name) return;
+      const billRate = parseFloat(r['Bill Rate']) || 0;
+      const costRate = parseFloat(r['Cost Rate']) || 0;
+      const hiredDate = (r['Hired Date']||'').trim();
+      const active = (r['Active']||'').toLowerCase() === 'yes';
+      const email = (r['Email']||'').trim();
+      empRates[name] = { billRate, costRate, hiredDate, active, email };
+      // Also match to empMap entries by fuzzy name
+      Object.keys(empMap).forEach(empName => {
+        const lo = empName.toLowerCase();
+        const parts = name.toLowerCase().split(/\s+/);
+        if (parts.length >= 2 && lo.includes(parts[0]) && lo.includes(parts[parts.length-1])) {
+          empMap[empName].billRate = billRate;
+          empMap[empName].costRate = costRate;
+          empMap[empName].hiredDate = hiredDate;
+        }
+      });
+    });
+    if (qbEmployees.length > 0) _log('CRP QB: ' + qbEmployees.length + ' employees loaded, rates: ' + Object.entries(empRates).filter(([,v]) => v.billRate > 0 || v.costRate > 0).map(([k,v]) => k + '=$' + (v.costRate || v.billRate)).join(', '));
+
     QB_DATA.empMap = empMap;
+    QB_DATA.empRates = empRates;
     QB_DATA.studyHoursAll = studyHoursAll;
     QB_DATA.studyBillableAll = studyBillableAll;
     QB_DATA.totalPayroll = totalPayroll;
@@ -6743,6 +6773,7 @@ function renderStaffEconomics() {
   // Payroll rate: payroll cost / ALL employee hours (including non-study time)
   const totalAllHours = QB_DATA.totalAllHours || totalTrackedHours;
   const payrollRate = totalAllHours > 0 ? totalPayroll / totalAllHours : 0;
+  const empRates = QB_DATA.empRates || {};
 
   // Role classification using CRP_CONFIG lists — fuzzy: first+last name must both appear
   const coordList = (CRP_CONFIG.COORDINATORS || []).map(n => ({ full: n, lo: n.toLowerCase().trim(), parts: n.toLowerCase().trim().split(/\s+/) }));
@@ -6786,6 +6817,10 @@ function renderStaffEconomics() {
     const studies = Object.entries(data.studyHours).sort((a,b) => b[1] - a[1]);
     const role = classifyRole(name);
     const pnlCost = pnlCostByName[name] || 0;
+    // Individual rate: costRate > billRate > payroll blended
+    const indivRate = data.costRate > 0 ? data.costRate : (data.billRate > 0 ? data.billRate : 0);
+    const effectiveRate = indivRate > 0 ? indivRate : payrollRate;
+    const rateSource = pnlCost > 0 ? 'pnl' : (indivRate > 0 ? (data.costRate > 0 ? 'qb-cost' : 'qb-bill') : 'blended');
 
     let attrRevenue = 0;
     const studyDetail = studies.map(([study, hrs]) => {
@@ -6797,13 +6832,13 @@ function renderStaffEconomics() {
       return { study, hours: hrs, share: Math.round(share * 100), studyRev: info.rev, attrRev: studyAttr };
     });
 
-    // Cost: PnL actual if found, else payroll blended rate × hours
-    const estCost = pnlCost > 0 ? pnlCost : payrollRate * data.hours;
-    const costSource = pnlCost > 0 ? 'pnl' : 'payroll';
+    // Cost: PnL actual > individual rate × hours > payroll blended rate × hours
+    const estCost = pnlCost > 0 ? pnlCost : effectiveRate * data.hours;
     const roi = estCost > 0 ? attrRevenue / estCost : 0;
     const revPerHr = data.hours > 0 ? attrRevenue / data.hours : 0;
+    const hourlyRate = pnlCost > 0 && data.hours > 0 ? pnlCost / data.hours : effectiveRate;
 
-    return { name, role, hours: data.hours, numStudies: studies.length, pnlCost, attrRevenue, estCost, costSource, roi, revPerHr, studyDetail };
+    return { name, role, hours: data.hours, numStudies: studies.length, pnlCost, hourlyRate, rateSource, attrRevenue, estCost, roi, revPerHr, studyDetail };
   });
 
   // Add investigators from CRP_CONFIG who are NOT in Time Activity but have PnL costs
@@ -6819,7 +6854,8 @@ function renderStaffEconomics() {
     allRows.push({
       name: inv.full + (pnlCost > 0 ? '' : ' (no QB data)'),
       role: 'investigator', hours: 0, numStudies: 0, pnlCost,
-      attrRevenue: 0, estCost: pnlCost, costSource: pnlCost > 0 ? 'pnl' : 'none',
+      hourlyRate: 0, rateSource: pnlCost > 0 ? 'pnl' : 'none',
+      attrRevenue: 0, estCost: pnlCost,
       roi: 0, revPerHr: 0, studyDetail: []
     });
   });
@@ -6861,7 +6897,7 @@ function renderStaffEconomics() {
 
     tbody.innerHTML = rows.map(r => {
       const roiColor = r.roi >= 1.5 ? '#10B981' : r.roi >= 1 ? '#F59E0B' : '#EF4444';
-      const costLabel = r.costSource === 'pnl' ? '<div style="font-size:9px;color:var(--muted)">PnL actual</div>' : r.costSource === 'none' ? '<div style="font-size:9px;color:var(--muted)">no data</div>' : '';
+      const rateLabel = r.rateSource === 'pnl' ? 'PnL' : r.rateSource === 'qb-cost' ? 'QB cost' : r.rateSource === 'qb-bill' ? 'QB bill' : r.rateSource === 'none' ? '' : 'blended';
       const rid = prefix + '-' + (idx++);
       const net = r.attrRevenue - r.estCost;
       const noTime = r.hours === 0;
@@ -6873,16 +6909,17 @@ function renderStaffEconomics() {
         '<td class="r">' + sd.share + '%</td>' +
         '<td class="r" style="color:var(--muted)">' + fmtD(sd.studyRev) + '</td>' +
         '<td class="r" style="color:#10B981">' + fmtD(sd.attrRev) + '</td>' +
-        '<td></td><td></td></tr>'
+        '<td></td><td></td><td></td></tr>'
       ).join('');
 
       return '<tr style="cursor:pointer' + (noTime ? ';opacity:0.6' : '') + '" onclick="var d=document.getElementById(\'' + rid + '\');d.style.display=d.style.display===\'none\'?\'contents\':\'none\'">' +
         '<td><span style="font-size:10px;color:var(--muted);margin-right:4px">\u25B6</span><strong>' + esc(r.name) + '</strong></td>' +
         '<td class="r">' + (noTime ? '—' : Math.round(r.hours).toLocaleString()) + '</td>' +
+        '<td class="r">' + (r.hourlyRate > 0 ? fmtD(r.hourlyRate) + '<div style="font-size:9px;color:var(--muted)">' + rateLabel + '</div>' : '—') + '</td>' +
         '<td class="r">' + (noTime ? '—' : r.numStudies) + '</td>' +
         '<td class="r">' + (noTime ? '—' : fmtD(r.revPerHr)) + '</td>' +
         '<td class="r" style="color:#10B981;font-weight:600">' + (r.attrRevenue > 0 ? fmtD(r.attrRevenue) : '—') + '</td>' +
-        '<td class="r" style="color:#EF4444">' + (r.estCost > 0 ? fmtD(r.estCost) : '—') + costLabel + '</td>' +
+        '<td class="r" style="color:#EF4444">' + (r.estCost > 0 ? fmtD(r.estCost) : '—') + '</td>' +
         '<td class="r" style="font-weight:700;color:' + (noTime && r.estCost > 0 ? '#9CA3AF' : roiColor) + '">' + (r.estCost > 0 && r.attrRevenue > 0 ? r.roi.toFixed(2) + 'x' : (r.estCost > 0 ? 'cost only' : '—')) + '</td>' +
         '</tr>' +
         (detailRows ? '<tbody id="' + rid + '" style="display:none">' + detailRows + '</tbody>' : '');
@@ -6892,6 +6929,7 @@ function renderStaffEconomics() {
     tbody.innerHTML += '<tr style="border-top:2px solid var(--border);font-weight:700;background:var(--surface2)">' +
       '<td>TOTALS (' + g.count + ')</td>' +
       '<td class="r">' + (g.hrs > 0 ? Math.round(g.hrs).toLocaleString() : '—') + '</td>' +
+      '<td></td>' +
       '<td></td>' +
       '<td class="r">' + (g.revPerHr > 0 ? fmtD(g.revPerHr) : '') + '</td>' +
       '<td class="r" style="color:#10B981">' + fmtD(g.rev) + '</td>' +
@@ -12053,6 +12091,7 @@ if (typeof window !== 'undefined') {
         <thead><tr>
           <th>Coordinator</th>
           <th class="r">Hours</th>
+          <th class="r">Rate</th>
           <th class="r"># Studies</th>
           <th class="r">Rev/Hr</th>
           <th class="r">Revenue Attributed</th>
@@ -12072,6 +12111,7 @@ if (typeof window !== 'undefined') {
         <thead><tr>
           <th>Investigator</th>
           <th class="r">Hours</th>
+          <th class="r">Rate</th>
           <th class="r"># Studies</th>
           <th class="r">Rev/Hr</th>
           <th class="r">Revenue Attributed</th>
@@ -12110,6 +12150,7 @@ if (typeof window !== 'undefined') {
         <thead><tr>
           <th>Staff</th>
           <th class="r">Hours</th>
+          <th class="r">Rate</th>
           <th class="r"># Studies</th>
           <th class="r">Rev/Hr</th>
           <th class="r">Revenue Attributed</th>
