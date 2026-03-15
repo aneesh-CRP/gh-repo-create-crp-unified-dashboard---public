@@ -123,6 +123,15 @@ const CRP_CONFIG = {
     UNINVOICED:    '1408187165',
     REVENUE:       '1739434495',
     PAYMENTS:      '454961282',
+    // QuickBooks tabs
+    QB_INVOICE_LINES: '1796313718',
+    QB_CLASSES:       '290152182',
+    QB_PNL_CLASS:     '629976666',
+    QB_INVOICES:      '1199010047',
+    QB_PAYMENTS:      '1181551688',
+    QB_INCOME_GAPS:   '2002097301',
+    QB_TIME_ACTIVITY: '899947143',
+    QB_ITEMS:         '706580197',
   },
 
   // Patient Database (CRIO daily export — published CSV)
@@ -239,7 +248,7 @@ const CRP_CONFIG = {
   // Tab registry — add new tabs here
   TABS: {
     PERFORMANCE: ['overview', 'studies', 'schedule', 'actions', 'referrals', 'admin'],
-    FINANCE: ['fin-overview', 'fin-collections', 'fin-aging', 'fin-revenue', 'fin-accruals', 'insights'],
+    FINANCE: ['fin-overview', 'fin-collections', 'fin-aging', 'fin-revenue', 'fin-accruals', 'fin-qb', 'insights'],
     CROSS: ['insights'],
   },
 
@@ -1297,6 +1306,13 @@ function switchTab(name, el) {
     setTimeout(() => {
       if (typeof renderInsights === 'function') renderInsights();
     }, 50);
+  }
+
+  // CRIO vs QB — lazy load
+  if (name === 'fin-qb' && !QB_DATA.loaded) {
+    fetchQuickBooksData().catch(e => console.warn('QB fetch failed:', e));
+  } else if (name === 'fin-qb' && QB_DATA.loaded) {
+    renderCRIOvsQB();
   }
 }
 
@@ -3568,6 +3584,258 @@ async function fetchFinanceLive() {
 }
 
 // ═══════════════════════════════════════════════════
+// CRIO vs QUICKBOOKS — Reconciliation
+// ═══════════════════════════════════════════════════
+let QB_DATA = { invoiceLines: [], incomeGaps: [], pnlClass: [], timeActivity: [], classes: [], items: [], loaded: false };
+
+async function fetchQuickBooksData() {
+  const pk = CRP_CONFIG.DATA_FEEDS.FINANCE_PUB_KEY;
+  const tabs = CRP_CONFIG.FINANCE_TABS;
+  if (!pk || !tabs.QB_INVOICE_LINES) return;
+
+  _log('CRP QB: Fetching QuickBooks data...');
+  try {
+    const [invLines, gaps, pnlCls, timeAct, classes, items] = await Promise.all([
+      fetchFinanceTab(pk, tabs.QB_INVOICE_LINES),
+      fetchFinanceTab(pk, tabs.QB_INCOME_GAPS),
+      fetchFinanceTab(pk, tabs.QB_PNL_CLASS),
+      fetchFinanceTab(pk, tabs.QB_TIME_ACTIVITY),
+      fetchFinanceTab(pk, tabs.QB_CLASSES),
+      fetchFinanceTab(pk, tabs.QB_ITEMS),
+    ]);
+
+    QB_DATA.invoiceLines = invLines.filter(r => (r['Invoice #']||'').trim());
+    QB_DATA.incomeGaps = gaps.filter(r => (r['Customer']||'').trim());
+    QB_DATA.pnlClass = pnlCls.filter(r => (r['Class (Study)']||'').trim());
+    QB_DATA.classes = classes.filter(r => (r['Name']||'').trim());
+    QB_DATA.items = items.filter(r => (r['Name']||'').trim());
+
+    // Parse time activity — aggregate by customer/study
+    const timeMap = {};
+    timeAct.filter(r => (r['Customer/Study']||'').trim()).forEach(r => {
+      const study = (r['Customer/Study']||'').trim();
+      if (!timeMap[study]) timeMap[study] = { hours: 0, billableHrs: 0, amount: 0, count: 0 };
+      const hrs = (parseFloat(r['Hours'])||0) + (parseFloat(r['Minutes'])||0)/60;
+      timeMap[study].hours += hrs;
+      if ((r['Billable']||'').toLowerCase() === 'yes') timeMap[study].billableHrs += hrs;
+      timeMap[study].amount += parseFloat(r['Amount'])||0;
+      timeMap[study].count++;
+    });
+    QB_DATA.timeActivity = Object.entries(timeMap).map(([study, d]) => ({
+      study, hours: Math.round(d.hours*10)/10, billableHrs: Math.round(d.billableHrs*10)/10,
+      amount: Math.round(d.amount*100)/100, count: d.count
+    })).sort((a,b) => b.hours - a.hours);
+
+    QB_DATA.loaded = true;
+    _log('CRP QB: Loaded — ' + QB_DATA.invoiceLines.length + ' invoice lines, ' + QB_DATA.incomeGaps.length + ' gap entries, ' + QB_DATA.timeActivity.length + ' time studies');
+    renderCRIOvsQB();
+  } catch(e) {
+    console.warn('CRP QB: Fetch failed:', e.message);
+  }
+}
+
+function renderCRIOvsQB() {
+  if (!QB_DATA.loaded) return;
+  const fmtK = v => v >= 1000 ? '$' + Math.round(v/1000).toLocaleString() + 'K' : '$' + Math.round(v).toLocaleString();
+  const fmtD = v => '$' + Math.round(v).toLocaleString();
+  const esc = s => (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+  // ── Build QB revenue by customer from income gaps
+  const qbByCustomer = {};
+  QB_DATA.incomeGaps.forEach(r => {
+    const name = (r['Customer']||'').trim();
+    qbByCustomer[name] = {
+      invoiced: parseFloat(r['Total Invoiced'])||0,
+      collected: parseFloat(r['Total Collected'])||0,
+      outstanding: parseFloat(r['Outstanding'])||0,
+      collRate: parseFloat(r['Collection Rate %'])||0,
+      gap: parseFloat(r['Gap Amount'])||0,
+      risk: (r['Risk Level']||'').trim()
+    };
+  });
+
+  // ── Build CRIO study data from existing globals
+  const crioStudies = {};
+  if (typeof STUDY_REVENUE_12M !== 'undefined') {
+    Object.entries(STUDY_REVENUE_12M).forEach(([code, rev]) => {
+      crioStudies[code] = { revenue: rev, visits: 0 };
+    });
+  }
+  // Add visit counts from processLiveData results if available
+  if (window._lastLiveData && window._lastLiveData.upcomingByStudy) {
+    window._lastLiveData.upcomingByStudy.forEach(s => {
+      const code = s.name;
+      if (crioStudies[code]) crioStudies[code].visits += s.count;
+      else crioStudies[code] = { revenue: 0, visits: s.count };
+    });
+  }
+  if (window._lastLiveData && window._lastLiveData.cancelByStudy) {
+    window._lastLiveData.cancelByStudy.forEach(s => {
+      const code = s.name;
+      if (crioStudies[code]) crioStudies[code].visits += s.count;
+      else crioStudies[code] = { revenue: 0, visits: s.count };
+    });
+  }
+
+  // ── Build QB invoice totals by class (study)
+  const qbByClass = {};
+  QB_DATA.invoiceLines.forEach(r => {
+    const cls = (r['Class']||'').trim();
+    const customer = (r['Customer']||'').trim();
+    const amt = parseFloat(r['Amount'])||0;
+    const key = cls || customer;
+    if (!key) return;
+    if (!qbByClass[key]) qbByClass[key] = { invoiced: 0, customer: customer, cls: cls };
+    qbByClass[key].invoiced += amt;
+  });
+
+  // ── Match CRIO studies to QB customers/classes
+  const reconRows = [];
+  let matched = 0, unmatched = 0;
+  const qbCustomerKeys = Object.keys(qbByCustomer);
+  const qbClassKeys = Object.keys(qbByClass);
+
+  Object.entries(crioStudies).forEach(([code, crio]) => {
+    // Try matching: study code in QB customer name or class name
+    const codeLower = code.toLowerCase();
+    let qbMatch = null, qbClass = '';
+
+    // Check QB classes
+    for (const cls of qbClassKeys) {
+      if (cls.toLowerCase().includes(codeLower) || codeLower.includes(cls.toLowerCase())) {
+        qbMatch = qbByClass[cls];
+        qbClass = cls;
+        break;
+      }
+    }
+    // Check QB customers
+    if (!qbMatch) {
+      for (const cust of qbCustomerKeys) {
+        if (cust.toLowerCase().includes(codeLower) || codeLower.includes(cust.toLowerCase())) {
+          qbMatch = { invoiced: qbByCustomer[cust].invoiced, customer: cust, cls: '' };
+          qbClass = cust;
+          break;
+        }
+      }
+    }
+
+    const qbInvoiced = qbMatch ? qbMatch.invoiced : 0;
+    const qbCollected = qbMatch && qbByCustomer[qbMatch.customer] ? qbByCustomer[qbMatch.customer].collected : 0;
+    const gap = crio.revenue - qbInvoiced;
+    const status = !qbMatch ? 'No QB Match' : gap > 10000 ? 'Gap' : gap < -10000 ? 'QB > CRIO' : 'Aligned';
+
+    if (qbMatch) matched++; else unmatched++;
+
+    reconRows.push({ code, visits: crio.visits, crioRev: crio.revenue, qbInvoiced, qbCollected, gap, qbClass, status });
+  });
+
+  // Add QB-only entries (in QB but not CRIO)
+  qbCustomerKeys.forEach(cust => {
+    const custLower = cust.toLowerCase();
+    const alreadyMatched = reconRows.some(r => r.qbClass.toLowerCase() === custLower || custLower.includes(r.code.toLowerCase()));
+    if (!alreadyMatched && qbByCustomer[cust].invoiced > 0) {
+      reconRows.push({
+        code: cust, visits: 0, crioRev: 0,
+        qbInvoiced: qbByCustomer[cust].invoiced,
+        qbCollected: qbByCustomer[cust].collected,
+        gap: -qbByCustomer[cust].invoiced,
+        qbClass: cust, status: 'QB Only'
+      });
+    }
+  });
+
+  reconRows.sort((a,b) => Math.abs(b.gap) - Math.abs(a.gap));
+
+  // ── KPIs
+  const totalInvoiced = QB_DATA.incomeGaps.reduce((s,r) => s + (parseFloat(r['Total Invoiced'])||0), 0);
+  const totalCollected = QB_DATA.incomeGaps.reduce((s,r) => s + (parseFloat(r['Total Collected'])||0), 0);
+  const totalGap = totalInvoiced - totalCollected;
+  const collRate = totalInvoiced > 0 ? Math.round(totalCollected / totalInvoiced * 100) : 0;
+
+  document.getElementById('qb-matched').textContent = matched;
+  document.getElementById('qb-matched-sub').textContent = 'of ' + Object.keys(crioStudies).length + ' CRIO studies';
+  document.getElementById('qb-unmatched').textContent = unmatched;
+  document.getElementById('qb-unmatched-sub').textContent = 'need mapping';
+  document.getElementById('qb-total-inv').textContent = fmtK(totalInvoiced);
+  document.getElementById('qb-total-inv-sub').textContent = QB_DATA.incomeGaps.length + ' customers';
+  document.getElementById('qb-coll-rate').textContent = collRate + '%';
+  document.getElementById('qb-coll-rate-sub').textContent = fmtK(totalCollected) + ' collected';
+  document.getElementById('qb-total-gap').textContent = fmtK(totalGap);
+  document.getElementById('qb-total-gap-sub').textContent = 'invoiced − collected';
+
+  // ── Reconciliation Table
+  const statusColor = { 'Aligned': '#10B981', 'Gap': '#EF4444', 'QB > CRIO': '#F59E0B', 'No QB Match': '#9CA3AF', 'QB Only': '#60A5FA' };
+  document.getElementById('qbReconBody').innerHTML = reconRows.map(r =>
+    '<tr>' +
+    '<td>' + esc(r.code) + '</td>' +
+    '<td class="r">' + (r.visits||'—') + '</td>' +
+    '<td class="r">' + (r.crioRev ? fmtD(r.crioRev) : '—') + '</td>' +
+    '<td class="r">' + (r.qbInvoiced ? fmtD(r.qbInvoiced) : '—') + '</td>' +
+    '<td class="r">' + (r.qbCollected ? fmtD(r.qbCollected) : '—') + '</td>' +
+    '<td class="r" style="color:' + (r.gap > 0 ? '#EF4444' : r.gap < 0 ? '#F59E0B' : '#10B981') + ';font-weight:600">' + (r.gap !== 0 ? fmtD(Math.abs(r.gap)) : '—') + '</td>' +
+    '<td>' + esc(r.qbClass) + '</td>' +
+    '<td><span style="display:inline-block;padding:2px 8px;border-radius:9px;font-size:10px;font-weight:600;background:' + (statusColor[r.status]||'#9CA3AF') + '22;color:' + (statusColor[r.status]||'#9CA3AF') + '">' + r.status + '</span></td>' +
+    '</tr>'
+  ).join('');
+
+  // ── Income Gaps Table
+  const riskColor = { 'Low': '#10B981', 'Medium': '#F59E0B', 'High': '#F97316', 'Critical': '#EF4444' };
+  document.getElementById('qbGapsBody').innerHTML = QB_DATA.incomeGaps.map(r => {
+    const risk = (r['Risk Level']||'').trim();
+    return '<tr>' +
+    '<td>' + esc(r['Customer']) + '</td>' +
+    '<td class="r">' + fmtD(parseFloat(r['Total Invoiced'])||0) + '</td>' +
+    '<td class="r">' + fmtD(parseFloat(r['Total Collected'])||0) + '</td>' +
+    '<td class="r">' + fmtD(parseFloat(r['Outstanding'])||0) + '</td>' +
+    '<td class="r">' + (r['Collection Rate %']||'0') + '%</td>' +
+    '<td class="r" style="color:#EF4444;font-weight:600">' + fmtD(parseFloat(r['Gap Amount'])||0) + '</td>' +
+    '<td><span style="display:inline-block;padding:2px 8px;border-radius:9px;font-size:10px;font-weight:600;background:' + (riskColor[risk]||'#9CA3AF') + '22;color:' + (riskColor[risk]||'#9CA3AF') + '">' + risk + '</span></td>' +
+    '</tr>';
+  }).join('');
+
+  // ── Invoice Lines Table
+  document.getElementById('qbInvLinesBody').innerHTML = QB_DATA.invoiceLines.slice(0, 200).map(r =>
+    '<tr>' +
+    '<td>' + esc(r['Invoice #']) + '</td>' +
+    '<td>' + esc(r['Invoice Date']) + '</td>' +
+    '<td>' + esc(r['Customer']) + '</td>' +
+    '<td>' + esc(r['Item']) + '</td>' +
+    '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(r['Description']) + '</td>' +
+    '<td class="r">' + (r['Qty']||'') + '</td>' +
+    '<td class="r">' + (parseFloat(r['Unit Price']) ? fmtD(parseFloat(r['Unit Price'])) : '') + '</td>' +
+    '<td class="r" style="font-weight:600">' + fmtD(parseFloat(r['Amount'])||0) + '</td>' +
+    '<td>' + esc(r['Class']) + '</td>' +
+    '</tr>'
+  ).join('');
+
+  // ── P&L by Class Table
+  document.getElementById('qbPnlClassBody').innerHTML = QB_DATA.pnlClass.map(r => {
+    const rev = parseFloat(r['Revenue'])||0;
+    const exp = parseFloat(r['Expenses'])||0;
+    const net = parseFloat(r['Net'])||0;
+    return '<tr>' +
+    '<td>' + esc(r['Class (Study)']) + '</td>' +
+    '<td>' + esc(r['Customer']) + '</td>' +
+    '<td class="r" style="color:#10B981">' + fmtD(rev) + '</td>' +
+    '<td class="r" style="color:#EF4444">' + fmtD(exp) + '</td>' +
+    '<td class="r" style="font-weight:600;color:' + (net >= 0 ? '#10B981' : '#EF4444') + '">' + fmtD(net) + '</td>' +
+    '<td style="font-size:11px;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(r['Top Items']) + '</td>' +
+    '</tr>';
+  }).join('');
+
+  // ── Time Activity Table
+  document.getElementById('qbTimeBody').innerHTML = QB_DATA.timeActivity.map(r =>
+    '<tr>' +
+    '<td>' + esc(r.study) + '</td>' +
+    '<td class="r">' + r.hours.toLocaleString() + '</td>' +
+    '<td class="r">' + r.billableHrs.toLocaleString() + '</td>' +
+    '<td class="r">' + fmtD(r.amount) + '</td>' +
+    '<td class="r">' + r.count + '</td>' +
+    '</tr>'
+  ).join('');
+}
+
+// ═══════════════════════════════════════════════════
 // PATIENT DATABASE — Cross-reference with active study patients
 // ═══════════════════════════════════════════════════
 async function fetchPatientDB() {
@@ -3848,6 +4116,7 @@ async function connectSheets() {
   try {
     const [rows1, legacyCancels, auditRows] = await Promise.all([fetchCSV(url1), fetchCSV(url2).catch(() => []), fetchCSV(AUDIT_LOG_URL).catch(() => [])]);
     DATA = processLiveData(rows1, legacyCancels, auditRows);
+    window._lastLiveData = DATA;
     document.getElementById('data-source-badge').textContent = '🔗 Live Google Sheets';
     document.getElementById('last-refresh-badge').textContent = 'Updated: ' + new Date().toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'});
     closeSetup();
@@ -4750,6 +5019,7 @@ async function refreshData() {
       if (badge) badge.textContent = 'Refresh returned empty data';
     } else {
       DATA = newData;
+      window._lastLiveData = DATA;
       renderAll();
       if (badge) badge.textContent = 'Updated: ' + new Date().toLocaleTimeString();
     }
@@ -4759,6 +5029,8 @@ async function refreshData() {
         if (typeof renderForecast === 'function') try { renderForecast(); } catch(e) {}
         if (typeof drawPayChartOverview === 'function') try { drawPayChartOverview(); } catch(e) {}
       }
+      // Phase 2b: QuickBooks data
+      fetchQuickBooksData().catch(e => console.warn('QB fetch failed:', e));
     }).catch(() => {});
     // Phase 3: Supplemental (staggered)
     setTimeout(() => {
