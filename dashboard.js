@@ -3586,7 +3586,7 @@ async function fetchFinanceLive() {
 // ═══════════════════════════════════════════════════
 // CRIO vs QUICKBOOKS — Reconciliation
 // ═══════════════════════════════════════════════════
-let QB_DATA = { invoiceLines: [], incomeGaps: [], pnlClass: [], timeActivity: [], classes: [], items: [], loaded: false };
+let QB_DATA = { invoiceLines: [], incomeGaps: [], pnlClass: [], timeActivity: [], payments: [], classes: [], items: [], loaded: false };
 
 async function fetchQuickBooksData() {
   const pk = CRP_CONFIG.DATA_FEEDS.FINANCE_PUB_KEY;
@@ -3595,13 +3595,14 @@ async function fetchQuickBooksData() {
 
   _log('CRP QB: Fetching QuickBooks data...');
   try {
-    const [invLines, gaps, pnlCls, timeAct, classes, items] = await Promise.all([
+    const [invLines, gaps, pnlCls, timeAct, classes, items, payments] = await Promise.all([
       fetchFinanceTab(pk, tabs.QB_INVOICE_LINES),
       fetchFinanceTab(pk, tabs.QB_INCOME_GAPS),
       fetchFinanceTab(pk, tabs.QB_PNL_CLASS),
       fetchFinanceTab(pk, tabs.QB_TIME_ACTIVITY),
       fetchFinanceTab(pk, tabs.QB_CLASSES),
       fetchFinanceTab(pk, tabs.QB_ITEMS),
+      fetchFinanceTab(pk, tabs.QB_PAYMENTS),
     ]);
 
     QB_DATA.invoiceLines = invLines.filter(r => (r['Invoice #']||'').trim());
@@ -3609,6 +3610,7 @@ async function fetchQuickBooksData() {
     QB_DATA.pnlClass = pnlCls.filter(r => (r['Class (Study)']||'').trim());
     QB_DATA.classes = classes.filter(r => (r['Name']||'').trim());
     QB_DATA.items = items.filter(r => (r['Name']||'').trim());
+    QB_DATA.payments = payments.filter(r => (r['Payment ID']||'').trim());
 
     // Parse time activity — aggregate by customer/study
     const timeMap = {};
@@ -3627,7 +3629,7 @@ async function fetchQuickBooksData() {
     })).sort((a,b) => b.hours - a.hours);
 
     QB_DATA.loaded = true;
-    _log('CRP QB: Loaded — ' + QB_DATA.invoiceLines.length + ' invoice lines, ' + QB_DATA.incomeGaps.length + ' gap entries, ' + QB_DATA.timeActivity.length + ' time studies');
+    _log('CRP QB: Loaded — ' + QB_DATA.invoiceLines.length + ' inv lines, ' + QB_DATA.payments.length + ' payments, ' + QB_DATA.incomeGaps.length + ' gap entries');
     renderCRIOvsQB();
   } catch(e) {
     console.warn('CRP QB: Fetch failed:', e.message);
@@ -3640,11 +3642,12 @@ function renderCRIOvsQB() {
   const fmtD = v => '$' + Math.round(v).toLocaleString();
   const esc = s => (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
-  // ── Build QB revenue by customer from income gaps
+  // ── Build QB data by customer — from Income Gaps (invoiced vs collected)
   const qbByCustomer = {};
   QB_DATA.incomeGaps.forEach(r => {
     const name = (r['Customer']||'').trim();
-    qbByCustomer[name] = {
+    qbByCustomer[name.toLowerCase()] = {
+      name,
       invoiced: parseFloat(r['Total Invoiced'])||0,
       collected: parseFloat(r['Total Collected'])||0,
       outstanding: parseFloat(r['Outstanding'])||0,
@@ -3654,133 +3657,148 @@ function renderCRIOvsQB() {
     };
   });
 
-  // ── Build CRIO study data from existing globals
-  const crioStudies = {};
-  if (typeof STUDY_REVENUE_12M !== 'undefined') {
-    Object.entries(STUDY_REVENUE_12M).forEach(([code, rev]) => {
-      crioStudies[code] = { revenue: rev, visits: 0 };
-    });
-  }
-  // Add visit counts from processLiveData results if available
-  if (window._lastLiveData && window._lastLiveData.upcomingByStudy) {
-    window._lastLiveData.upcomingByStudy.forEach(s => {
-      const code = s.name;
-      if (crioStudies[code]) crioStudies[code].visits += s.count;
-      else crioStudies[code] = { revenue: 0, visits: s.count };
-    });
-  }
-  if (window._lastLiveData && window._lastLiveData.cancelByStudy) {
-    window._lastLiveData.cancelByStudy.forEach(s => {
-      const code = s.name;
-      if (crioStudies[code]) crioStudies[code].visits += s.count;
-      else crioStudies[code] = { revenue: 0, visits: s.count };
-    });
-  }
-
-  // ── Build QB invoice totals by class (study)
-  const qbByClass = {};
-  QB_DATA.invoiceLines.forEach(r => {
-    const cls = (r['Class']||'').trim();
-    const customer = (r['Customer']||'').trim();
-    const amt = parseFloat(r['Amount'])||0;
-    const key = cls || customer;
-    if (!key) return;
-    if (!qbByClass[key]) qbByClass[key] = { invoiced: 0, customer: customer, cls: cls };
-    qbByClass[key].invoiced += amt;
+  // ── Build QB payments by customer
+  const qbPayByCustomer = {};
+  QB_DATA.payments.forEach(r => {
+    const cust = (r['Customer']||'').trim().toLowerCase();
+    if (!cust) return;
+    if (!qbPayByCustomer[cust]) qbPayByCustomer[cust] = { total: 0, count: 0 };
+    qbPayByCustomer[cust].total += parseFloat(r['Amount'])||0;
+    qbPayByCustomer[cust].count++;
   });
 
-  // ── Match CRIO studies to QB customers/classes
+  // ── Use TOP_AR_STUDIES as the primary CRIO source — has "Sponsor - StudyCode" format
+  // This gives us: sponsor name, study code, invAR, apAR, collected
   const reconRows = [];
-  let matched = 0, unmatched = 0;
-  const qbCustomerKeys = Object.keys(qbByCustomer);
-  const qbClassKeys = Object.keys(qbByClass);
+  let matched = 0, unmatched = 0, totalCrioRev = 0, totalQbInv = 0, totalQbColl = 0;
 
-  Object.entries(crioStudies).forEach(([code, crio]) => {
-    // Try matching: study code in QB customer name or class name
-    const codeLower = code.toLowerCase();
-    let qbMatch = null, qbClass = '';
+  const arStudies = (typeof TOP_AR_STUDIES !== 'undefined' && TOP_AR_STUDIES.length) ? TOP_AR_STUDIES : [];
 
-    // Check QB classes
-    for (const cls of qbClassKeys) {
-      if (cls.toLowerCase().includes(codeLower) || codeLower.includes(cls.toLowerCase())) {
-        qbMatch = qbByClass[cls];
-        qbClass = cls;
+  arStudies.forEach(ar => {
+    const fullName = ar.study; // "Abbvie - M20-465"
+    const parts = fullName.split(' - ');
+    const sponsor = parts.length > 1 ? parts.slice(0, -1).join(' - ').trim() : fullName;
+    const studyCode = parts.length > 1 ? parts[parts.length - 1].trim() : fullName;
+    const crioRev = (typeof STUDY_REVENUE_12M !== 'undefined' ? STUDY_REVENUE_12M[studyCode] : 0) || 0;
+    const crioAR = ar.total || 0;
+    const crioColl = ar.collected || 0;
+    const visits = window._lastLiveData ? (
+      (window._lastLiveData.upcomingByStudy || []).find(s => s.name === studyCode) || {}
+    ).count || 0 : 0;
+
+    // Match to QB by sponsor name (fuzzy)
+    const sponsorLower = sponsor.toLowerCase();
+    const studyLower = studyCode.toLowerCase();
+    let qbMatch = null;
+
+    // Try exact sponsor match
+    for (const [key, val] of Object.entries(qbByCustomer)) {
+      if (key.includes(sponsorLower) || sponsorLower.includes(key) ||
+          key.includes(studyLower) || studyLower.includes(key)) {
+        qbMatch = val;
         break;
       }
     }
-    // Check QB customers
-    if (!qbMatch) {
-      for (const cust of qbCustomerKeys) {
-        if (cust.toLowerCase().includes(codeLower) || codeLower.includes(cust.toLowerCase())) {
-          qbMatch = { invoiced: qbByCustomer[cust].invoiced, customer: cust, cls: '' };
-          qbClass = cust;
-          break;
-        }
+
+    // Try matching study code in QB class names
+    let qbClassName = '';
+    for (const cls of QB_DATA.classes) {
+      const clsName = (cls['Name']||'').trim().toLowerCase();
+      const clsFull = (cls['Full Path']||'').trim().toLowerCase();
+      if (clsName.includes(studyLower) || studyLower.includes(clsName) ||
+          clsFull.includes(studyLower)) {
+        qbClassName = cls['Name'] || cls['Full Path'] || '';
+        break;
+      }
+    }
+
+    // Get QB payment total for this sponsor
+    let qbPayments = 0;
+    for (const [key, val] of Object.entries(qbPayByCustomer)) {
+      if (key.includes(sponsorLower) || sponsorLower.includes(key) ||
+          key.includes(studyLower) || studyLower.includes(key)) {
+        qbPayments += val.total;
       }
     }
 
     const qbInvoiced = qbMatch ? qbMatch.invoiced : 0;
-    const qbCollected = qbMatch && qbByCustomer[qbMatch.customer] ? qbByCustomer[qbMatch.customer].collected : 0;
-    const gap = crio.revenue - qbInvoiced;
-    const status = !qbMatch ? 'No QB Match' : gap > 10000 ? 'Gap' : gap < -10000 ? 'QB > CRIO' : 'Aligned';
+    const qbCollected = qbMatch ? qbMatch.collected : qbPayments;
+    const diff = crioColl - qbCollected;
+    const status = !qbMatch && qbPayments === 0 ? 'No QB Match' :
+                   Math.abs(diff) < 5000 ? 'Aligned' :
+                   diff > 0 ? 'CRIO > QB' : 'QB > CRIO';
 
-    if (qbMatch) matched++; else unmatched++;
+    if (qbMatch || qbPayments > 0) matched++; else unmatched++;
+    totalCrioRev += crioRev;
+    totalQbInv += qbInvoiced;
+    totalQbColl += qbCollected;
 
-    reconRows.push({ code, visits: crio.visits, crioRev: crio.revenue, qbInvoiced, qbCollected, gap, qbClass, status });
+    reconRows.push({
+      study: fullName, code: studyCode, sponsor, visits,
+      crioRev, crioAR, crioColl,
+      qbInvoiced, qbCollected, qbPayments,
+      diff: Math.abs(diff), diffDir: diff > 0 ? 'crio' : diff < 0 ? 'qb' : 'match',
+      qbClass: qbClassName, qbCustomer: qbMatch ? qbMatch.name : '',
+      status
+    });
   });
 
-  // Add QB-only entries (in QB but not CRIO)
-  qbCustomerKeys.forEach(cust => {
-    const custLower = cust.toLowerCase();
-    const alreadyMatched = reconRows.some(r => r.qbClass.toLowerCase() === custLower || custLower.includes(r.code.toLowerCase()));
-    if (!alreadyMatched && qbByCustomer[cust].invoiced > 0) {
+  // Add QB-only customers (in QB but not in CRIO AR)
+  const matchedSponsors = new Set(reconRows.map(r => r.sponsor.toLowerCase()));
+  Object.entries(qbByCustomer).forEach(([key, val]) => {
+    if (!matchedSponsors.has(key) && val.invoiced > 0) {
       reconRows.push({
-        code: cust, visits: 0, crioRev: 0,
-        qbInvoiced: qbByCustomer[cust].invoiced,
-        qbCollected: qbByCustomer[cust].collected,
-        gap: -qbByCustomer[cust].invoiced,
-        qbClass: cust, status: 'QB Only'
+        study: val.name, code: '', sponsor: val.name, visits: 0,
+        crioRev: 0, crioAR: 0, crioColl: 0,
+        qbInvoiced: val.invoiced, qbCollected: val.collected, qbPayments: qbPayByCustomer[key] ? qbPayByCustomer[key].total : 0,
+        diff: val.invoiced, diffDir: 'qb', qbClass: '', qbCustomer: val.name,
+        status: 'QB Only'
       });
+      totalQbInv += val.invoiced;
+      totalQbColl += val.collected;
     }
   });
 
-  reconRows.sort((a,b) => Math.abs(b.gap) - Math.abs(a.gap));
+  reconRows.sort((a,b) => b.diff - a.diff);
 
   // ── KPIs
-  const totalInvoiced = QB_DATA.incomeGaps.reduce((s,r) => s + (parseFloat(r['Total Invoiced'])||0), 0);
-  const totalCollected = QB_DATA.incomeGaps.reduce((s,r) => s + (parseFloat(r['Total Collected'])||0), 0);
-  const totalGap = totalInvoiced - totalCollected;
-  const collRate = totalInvoiced > 0 ? Math.round(totalCollected / totalInvoiced * 100) : 0;
+  const qbTotalInv = Object.values(qbByCustomer).reduce((s,v) => s + v.invoiced, 0);
+  const qbTotalColl = Object.values(qbByCustomer).reduce((s,v) => s + v.collected, 0);
+  const qbTotalPay = QB_DATA.payments.reduce((s,r) => s + (parseFloat(r['Amount'])||0), 0);
+  const collRate = qbTotalInv > 0 ? Math.round(qbTotalColl / qbTotalInv * 100) : 0;
+  const overallGap = Math.abs(totalCrioRev - qbTotalInv);
 
   document.getElementById('qb-matched').textContent = matched;
-  document.getElementById('qb-matched-sub').textContent = 'of ' + Object.keys(crioStudies).length + ' CRIO studies';
+  document.getElementById('qb-matched-sub').textContent = 'of ' + arStudies.length + ' CRIO studies';
   document.getElementById('qb-unmatched').textContent = unmatched;
-  document.getElementById('qb-unmatched-sub').textContent = 'need mapping';
-  document.getElementById('qb-total-inv').textContent = fmtK(totalInvoiced);
-  document.getElementById('qb-total-inv-sub').textContent = QB_DATA.incomeGaps.length + ' customers';
+  document.getElementById('qb-unmatched-sub').textContent = 'no QB match found';
+  document.getElementById('qb-total-inv').textContent = fmtK(qbTotalInv);
+  document.getElementById('qb-total-inv-sub').textContent = 'QB payments: ' + fmtK(qbTotalPay);
   document.getElementById('qb-coll-rate').textContent = collRate + '%';
-  document.getElementById('qb-coll-rate-sub').textContent = fmtK(totalCollected) + ' collected';
-  document.getElementById('qb-total-gap').textContent = fmtK(totalGap);
-  document.getElementById('qb-total-gap-sub').textContent = 'invoiced − collected';
+  document.getElementById('qb-coll-rate-sub').textContent = fmtK(qbTotalColl) + ' of ' + fmtK(qbTotalInv);
+  document.getElementById('qb-total-gap').textContent = fmtK(overallGap);
+  document.getElementById('qb-total-gap-sub').textContent = 'CRIO ' + fmtK(totalCrioRev) + ' vs QB ' + fmtK(qbTotalInv);
 
   // ── Reconciliation Table
-  const statusColor = { 'Aligned': '#10B981', 'Gap': '#EF4444', 'QB > CRIO': '#F59E0B', 'No QB Match': '#9CA3AF', 'QB Only': '#60A5FA' };
+  const statusColor = { 'Aligned': '#10B981', 'CRIO > QB': '#EF4444', 'QB > CRIO': '#F59E0B', 'No QB Match': '#9CA3AF', 'QB Only': '#60A5FA' };
   document.getElementById('qbReconBody').innerHTML = reconRows.map(r =>
     '<tr>' +
-    '<td>' + esc(r.code) + '</td>' +
+    '<td><strong>' + esc(r.code || r.study) + '</strong><div style="font-size:10px;color:#718096">' + esc(r.sponsor) + '</div></td>' +
     '<td class="r">' + (r.visits||'—') + '</td>' +
-    '<td class="r">' + (r.crioRev ? fmtD(r.crioRev) : '—') + '</td>' +
+    '<td class="r">' + (r.crioRev ? fmtD(r.crioRev) : '—') + '<div style="font-size:10px;color:#718096">AR: ' + fmtD(r.crioAR) + ' | Coll: ' + fmtD(r.crioColl) + '</div></td>' +
     '<td class="r">' + (r.qbInvoiced ? fmtD(r.qbInvoiced) : '—') + '</td>' +
-    '<td class="r">' + (r.qbCollected ? fmtD(r.qbCollected) : '—') + '</td>' +
-    '<td class="r" style="color:' + (r.gap > 0 ? '#EF4444' : r.gap < 0 ? '#F59E0B' : '#10B981') + ';font-weight:600">' + (r.gap !== 0 ? fmtD(Math.abs(r.gap)) : '—') + '</td>' +
-    '<td>' + esc(r.qbClass) + '</td>' +
+    '<td class="r">' + (r.qbCollected ? fmtD(r.qbCollected) : (r.qbPayments ? fmtD(r.qbPayments) + '*' : '—')) + '</td>' +
+    '<td class="r" style="color:' + (r.diffDir === 'crio' ? '#EF4444' : r.diffDir === 'qb' ? '#F59E0B' : '#10B981') + ';font-weight:600">' + (r.diff > 100 ? fmtD(r.diff) : '—') + '</td>' +
+    '<td style="font-size:11px">' + esc(r.qbClass || r.qbCustomer) + '</td>' +
     '<td><span style="display:inline-block;padding:2px 8px;border-radius:9px;font-size:10px;font-weight:600;background:' + (statusColor[r.status]||'#9CA3AF') + '22;color:' + (statusColor[r.status]||'#9CA3AF') + '">' + esc(r.status) + '</span></td>' +
     '</tr>'
   ).join('');
 
-  // ── Income Gaps Table
+  // ── Income Gaps Table (from QB)
   const riskColor = { 'Low': '#10B981', 'Medium': '#F59E0B', 'High': '#F97316', 'Critical': '#EF4444' };
-  document.getElementById('qbGapsBody').innerHTML = QB_DATA.incomeGaps.map(r => {
+  document.getElementById('qbGapsBody').innerHTML = QB_DATA.incomeGaps
+    .filter(r => parseFloat(r['Gap Amount']||0) > 0 || parseFloat(r['Outstanding']||0) > 0)
+    .map(r => {
     const risk = (r['Risk Level']||'').trim();
     return '<tr>' +
     '<td>' + esc(r['Customer']) + '</td>' +
