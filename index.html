@@ -6338,7 +6338,7 @@ async function fetchFinanceLive() {
 // ═══════════════════════════════════════════════════
 // CRIO vs QUICKBOOKS — Reconciliation
 // ═══════════════════════════════════════════════════
-let QB_DATA = { pnlMonthly: [], pnlByStudy: {}, pnlUnmatched: [], qbTotalIncome: 0, qbPeriod: '', invoiceLines: [], pnlClass: [], timeActivity: [], payments: [], loaded: false };
+let QB_DATA = { pnlMonthly: [], pnlByStudy: {}, pnlUnmatched: [], qbTotalIncome: 0, qbPeriod: '', invoiceLines: [], pnlClass: [], timeActivity: [], payments: [], empMap: {}, studyHoursAll: {}, totalPayroll: 0, totalContractors: 0, totalTrackedHours: 0, loaded: false };
 
 async function fetchQuickBooksData() {
   const pk = CRP_CONFIG.DATA_FEEDS.FINANCE_PUB_KEY;
@@ -6441,9 +6441,46 @@ async function fetchQuickBooksData() {
       amount: Math.round(d.amount*100)/100, count: d.count
     })).sort((a,b) => b.hours - a.hours);
 
+    // ── Parse time activity by EMPLOYEE — for staff economics
+    const empMap = {};
+    const studyHoursAll = {};
+    let totalTrackedHours = 0;
+    timeAct.filter(r => (r['Customer/Study']||'').trim()).forEach(r => {
+      const emp = (r['Employee'] || r['Name'] || r['Vendor/Employee'] || r['Employee/Vendor'] || '').trim();
+      if (!emp) return;
+      const study = (r['Customer/Study']||'').trim();
+      const hrs = (parseFloat(r['Hours'])||0) + (parseFloat(r['Minutes'])||0)/60;
+      if (!empMap[emp]) empMap[emp] = { hours: 0, studyHours: {}, entries: 0 };
+      empMap[emp].hours += hrs;
+      empMap[emp].studyHours[study] = (empMap[emp].studyHours[study]||0) + hrs;
+      empMap[emp].entries++;
+      studyHoursAll[study] = (studyHoursAll[study]||0) + hrs;
+      totalTrackedHours += hrs;
+    });
+
+    // ── Extract payroll & contractor totals from PnL expense section
+    let totalPayroll = 0, totalContractors = 0;
+    let inExp = false;
+    pnlMonthly.forEach(r => {
+      const acct = (r['Account'] || Object.values(r)[0] || '').trim();
+      if (!acct) return;
+      const lo = acct.toLowerCase();
+      const tot = parseFloat(r['Total']) || 0;
+      if (lo === 'gross profit' || lo === 'total income') { inExp = true; return; }
+      if (!inExp || tot === 0) return;
+      if (lo.includes('total payroll')) totalPayroll += tot;
+      if ((lo.includes('contractor') || lo.includes('subcontract')) && !lo.startsWith('total ')) totalContractors += tot;
+    });
+
+    QB_DATA.empMap = empMap;
+    QB_DATA.studyHoursAll = studyHoursAll;
+    QB_DATA.totalPayroll = totalPayroll;
+    QB_DATA.totalContractors = totalContractors;
+    QB_DATA.totalTrackedHours = totalTrackedHours;
+
     QB_DATA.loaded = true;
     const matchedRev = Object.values(pnlByStudy).reduce((s,v) => s + v.total, 0);
-    _log('CRP QB: Loaded — ' + Object.keys(pnlByStudy).length + ' studies matched ($' + Math.round(matchedRev).toLocaleString() + '), ' + pnlUnmatched.length + ' unmatched QB accounts, total QB income: $' + Math.round(qbTotalIncome).toLocaleString());
+    _log('CRP QB: Loaded — ' + Object.keys(pnlByStudy).length + ' studies matched ($' + Math.round(matchedRev).toLocaleString() + '), ' + pnlUnmatched.length + ' unmatched QB accounts, total QB income: $' + Math.round(qbTotalIncome).toLocaleString() + ', ' + Object.keys(empMap).length + ' staff tracked (' + Math.round(totalTrackedHours) + ' hrs), payroll: $' + Math.round(totalPayroll).toLocaleString() + ', contractors: $' + Math.round(totalContractors).toLocaleString());
     renderCRIOvsQB();
   } catch(e) {
     console.warn('CRP QB: Fetch failed:', e.message);
@@ -6622,6 +6659,107 @@ function renderCRIOvsQB() {
     '<td class="r">' + r.count + '</td>' +
     '</tr>'
   ).join('');
+
+  renderStaffEconomics();
+}
+
+function renderStaffEconomics() {
+  if (!QB_DATA.loaded || !Object.keys(QB_DATA.empMap).length) return;
+  const fmtD = v => '$' + Math.round(v).toLocaleString();
+  const fmtK = v => v >= 1000 ? '$' + Math.round(v/1000).toLocaleString() + 'K' : '$' + Math.round(v).toLocaleString();
+  const esc = s => (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+  const empMap = QB_DATA.empMap;
+  const studyHoursAll = QB_DATA.studyHoursAll;
+  const pnlByStudy = QB_DATA.pnlByStudy;
+  const totalPayroll = QB_DATA.totalPayroll;
+  const totalContractors = QB_DATA.totalContractors;
+  const totalTrackedHours = QB_DATA.totalTrackedHours;
+  const totalStaffCost = totalPayroll + totalContractors;
+  const blendedRate = totalTrackedHours > 0 ? totalStaffCost / totalTrackedHours : 0;
+
+  // Build revenue lookup: normalized name -> revenue (from matched + unmatched QB accounts)
+  const qbRevLookup = {};
+  Object.entries(pnlByStudy).forEach(([code, data]) => {
+    const codeBase = code.replace(/\s*\(.*$/, '').trim().toLowerCase().replace(/[\s\-]/g, '');
+    qbRevLookup[data.qbAccount.toLowerCase().replace(/[\s\-]/g, '')] = data.total;
+    if (codeBase.length >= 4) qbRevLookup[codeBase] = data.total;
+  });
+  (QB_DATA.pnlUnmatched || []).forEach(u => {
+    qbRevLookup[u.account.toLowerCase().replace(/[\s\-]/g, '')] = u.total;
+  });
+
+  function getStudyRevenue(taStudy) {
+    const norm = taStudy.toLowerCase().replace(/[\s\-]/g, '');
+    if (qbRevLookup[norm] !== undefined) return qbRevLookup[norm];
+    for (const [key, rev] of Object.entries(qbRevLookup)) {
+      if (key.length >= 4 && (norm.includes(key) || key.includes(norm))) return rev;
+    }
+    return 0;
+  }
+
+  // Build per-employee rows
+  const empRows = Object.entries(empMap).map(([name, data]) => {
+    const studies = Object.entries(data.studyHours).sort((a,b) => b[1] - a[1]);
+    const numStudies = studies.length;
+    const topStudies = studies.slice(0, 3).map(([s, h]) => {
+      const short = s.length > 20 ? s.split(' ').slice(-1)[0] : s;
+      return short + ' (' + Math.round(h) + 'h)';
+    }).join(', ');
+
+    // Revenue attribution: (emp hours on study / total hours on study) × study QB revenue
+    let attrRevenue = 0;
+    studies.forEach(([study, hrs]) => {
+      const totalStudyHrs = studyHoursAll[study] || hrs;
+      const studyRev = getStudyRevenue(study);
+      attrRevenue += (hrs / totalStudyHrs) * studyRev;
+    });
+
+    const estCost = blendedRate * data.hours;
+    const roi = estCost > 0 ? attrRevenue / estCost : 0;
+    return { name, hours: data.hours, numStudies, topStudies, attrRevenue, estCost, roi, entries: data.entries };
+  }).sort((a, b) => b.attrRevenue - a.attrRevenue);
+
+  // KPIs
+  const totalAttrRev = empRows.reduce((s, r) => s + r.attrRevenue, 0);
+  const totalEstCost = empRows.reduce((s, r) => s + r.estCost, 0);
+  const avgROI = totalEstCost > 0 ? totalAttrRev / totalEstCost : 0;
+
+  const kpiEl = document.getElementById('staffEconKpis');
+  if (kpiEl) {
+    kpiEl.innerHTML =
+      '<div class="kpi"><div class="kpi-stripe" style="background:#3B82F6"></div><div class="label">Staff Tracked</div><div class="value" style="color:#3B82F6">' + empRows.length + '</div><div class="sub">' + Math.round(totalTrackedHours).toLocaleString() + ' total hours</div></div>' +
+      '<div class="kpi"><div class="kpi-stripe" style="background:#8B5CF6"></div><div class="label">Total Staff Cost</div><div class="value" style="color:#8B5CF6">' + fmtK(totalStaffCost) + '</div><div class="sub">Payroll: ' + fmtK(totalPayroll) + ' · Contract: ' + fmtK(totalContractors) + '</div></div>' +
+      '<div class="kpi"><div class="kpi-stripe" style="background:#10B981"></div><div class="label">Blended Rate</div><div class="value" style="color:#10B981">' + fmtD(blendedRate) + '/hr</div><div class="sub">Total cost \u00F7 tracked hours</div></div>' +
+      '<div class="kpi"><div class="kpi-stripe" style="background:#F59E0B"></div><div class="label">Revenue per $1 Cost</div><div class="value" style="color:' + (avgROI >= 1 ? '#10B981' : '#EF4444') + '">' + avgROI.toFixed(2) + 'x</div><div class="sub">Attributed revenue \u00F7 est. cost</div></div>';
+  }
+
+  // Table
+  const tbody = document.getElementById('staffEconBody');
+  if (!tbody) return;
+
+  tbody.innerHTML = empRows.map(r => {
+    const roiColor = r.roi >= 1.5 ? '#10B981' : r.roi >= 1 ? '#F59E0B' : '#EF4444';
+    return '<tr>' +
+      '<td><strong>' + esc(r.name) + '</strong></td>' +
+      '<td class="r">' + Math.round(r.hours).toLocaleString() + '</td>' +
+      '<td class="r">' + r.numStudies + '</td>' +
+      '<td style="font-size:11px;max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(r.topStudies) + '</td>' +
+      '<td class="r" style="color:#10B981;font-weight:600">' + fmtD(r.attrRevenue) + '</td>' +
+      '<td class="r" style="color:#EF4444">' + fmtD(r.estCost) + '</td>' +
+      '<td class="r" style="font-weight:700;color:' + roiColor + '">' + r.roi.toFixed(2) + 'x</td>' +
+      '</tr>';
+  }).join('');
+
+  // Totals row
+  tbody.innerHTML += '<tr style="border-top:2px solid var(--border);font-weight:700;background:var(--surface2)">' +
+    '<td>TOTALS (' + empRows.length + ' staff)</td>' +
+    '<td class="r">' + Math.round(totalTrackedHours).toLocaleString() + '</td>' +
+    '<td></td><td></td>' +
+    '<td class="r" style="color:#10B981">' + fmtD(totalAttrRev) + '</td>' +
+    '<td class="r" style="color:#EF4444">' + fmtD(totalEstCost) + '</td>' +
+    '<td class="r" style="color:' + (avgROI >= 1 ? '#10B981' : '#EF4444') + '">' + avgROI.toFixed(2) + 'x</td>' +
+    '</tr>';
 }
 
 // ═══════════════════════════════════════════════════
@@ -11695,6 +11833,25 @@ if (typeof window !== 'undefined') {
           <th class="r">Entries</th>
         </tr></thead>
         <tbody id="qbTimeBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section-label">Staff Economics — Cost vs Revenue per Employee</div>
+  <div class="kpi-row" id="staffEconKpis"></div>
+  <div class="panel">
+    <div class="panel-body" style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr>
+          <th>Employee / Contractor</th>
+          <th class="r">Hours</th>
+          <th class="r"># Studies</th>
+          <th>Top Studies</th>
+          <th class="r">Revenue Attributed</th>
+          <th class="r">Est. Cost</th>
+          <th class="r">ROI</th>
+        </tr></thead>
+        <tbody id="staffEconBody"></tbody>
       </table>
     </div>
   </div>
