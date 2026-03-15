@@ -238,6 +238,10 @@ const CRP_CONFIG = {
   // Coordinator visit goals
   COORDINATORS: ['Mario Castellanos','Stacey Scott','Ruby Pereira','Cady Chilensky','Angelina Mcmullen'],
   INVESTIGATORS: ['Taher Modarressi','Eugene Andruczyk','Lolita Vaughan','Michael Tomeo','Joseph Heether','Brian Shaffer'],
+  // Manual schedule overrides for investigators who don't track time in QB
+  INV_SCHEDULES: {
+    'Eugene Andruczyk':   { hrsPerWeek: 20, daysPerWeek: 3 },
+  },
   COORD_DAILY_GOAL: 2,
 
   // Auto-refresh interval (ms) — 0 to disable
@@ -4305,7 +4309,51 @@ function renderStaffEconomics() {
       totalVisits, visitsPerDay, costPerVisit, revPerVisit, marginPerVisit,
       totalCost, attrRevenue: r.attrRevenue, lowVisitDays, dailyDetail, rateSource: r.rateSource
     };
-  }).filter(Boolean).sort((a,b) => a.marginPerVisit - b.marginPerVisit); // worst margin first
+  }).filter(Boolean);
+
+  // Add investigators with manual schedule overrides (no QB time tracking)
+  const invSchedules = CRP_CONFIG.INV_SCHEDULES || {};
+  Object.entries(invSchedules).forEach(([invName, sched]) => {
+    // Skip if already in visitRows (has TA data)
+    if (visitRows.some(r => r.name.toLowerCase().includes(invName.toLowerCase().split(/\s+/)[0]) && r.name.toLowerCase().includes(invName.toLowerCase().split(/\s+/).pop()))) return;
+    // Look up rate from empRates
+    let rate = 0;
+    Object.entries(empRates).forEach(([qbName, data]) => {
+      const qp = qbName.toLowerCase().split(/\s+/);
+      const ip = invName.toLowerCase().split(/\s+/);
+      if (qp.length >= 2 && ip.length >= 2 && invName.toLowerCase().includes(qp[0]) && invName.toLowerCase().includes(qp[qp.length-1])) {
+        rate = data.costRate || data.billRate || 0;
+      }
+    });
+    if (rate === 0) rate = avgCostRate;
+    // Check PnL cost
+    let pnlCost = 0;
+    Object.entries(pnlCostByName).forEach(([key, cost]) => {
+      const kLo = key.toLowerCase();
+      const ip = invName.toLowerCase().split(/\s+/);
+      if (ip.length >= 2 && kLo.includes(ip[0]) && kLo.includes(ip[ip.length-1])) pnlCost = cost;
+    });
+    const hrsPerWeek = sched.hrsPerWeek || 0;
+    const daysPerWeek = sched.daysPerWeek || 0;
+    if (hrsPerWeek === 0 || daysPerWeek === 0) return;
+    const weeksPerYear = 50; // approx working weeks
+    const avgHrsDay = hrsPerWeek / daysPerWeek;
+    const workDaysEst = daysPerWeek * weeksPerYear;
+    const totalCost = pnlCost > 0 ? pnlCost : rate * hrsPerWeek * weeksPerYear;
+    const dailyCost = totalCost / workDaysEst;
+    // We don't know visit count — show cost/day and let user compare
+    visitRows.push({
+      name: invName, role: 'investigator', workDays: workDaysEst,
+      avgHrsDay, dailyCost, rate,
+      totalVisits: 0, visitsPerDay: 0,
+      costPerVisit: 0, revPerVisit: 0, marginPerVisit: 0,
+      totalCost, attrRevenue: 0, lowVisitDays: 0,
+      dailyDetail: [], rateSource: pnlCost > 0 ? 'pnl' : 'qb-cost',
+      manualSchedule: true, hrsPerWeek, daysPerWeek
+    });
+  });
+
+  visitRows.sort((a,b) => a.marginPerVisit - b.marginPerVisit); // worst margin first
 
   let vIdx = 0;
   visitProfBody.innerHTML = visitRows.map(r => {
@@ -4325,6 +4373,20 @@ function renderStaffEconomics() {
         '<td class="r" style="color:#EF4444">' + fmtD(d.dayCost) + '</td>' +
         '<td></td><td></td></tr>';
     }).join('');
+
+    // For manual schedule investigators: show cost/day instead of cost/visit
+    if (r.manualSchedule) {
+      const weeklyCost = r.rate * r.hrsPerWeek;
+      return '<tr style="opacity:0.85">' +
+        '<td><strong>' + esc(r.name) + '</strong> <span style="font-size:9px;color:' + roleColor + '">' + roleTag + '</span> <span style="font-size:9px;color:var(--muted)">(manual schedule)</span></td>' +
+        '<td class="r">' + r.daysPerWeek + '/wk</td>' +
+        '<td class="r">' + r.avgHrsDay.toFixed(1) + '</td>' +
+        '<td class="r" style="color:var(--muted)">—</td>' +
+        '<td class="r" style="color:#EF4444">' + fmtD(r.dailyCost) + '/day<div style="font-size:9px;color:var(--muted)">' + fmtD(weeklyCost) + '/wk · ' + fmtD(r.rate) + '/hr</div></td>' +
+        '<td class="r" style="color:var(--muted)">no visits tracked</td>' +
+        '<td class="r" style="color:var(--muted)">—</td>' +
+        '</tr>';
+    }
 
     return '<tr style="cursor:pointer" onclick="var d=document.getElementById(\'' + vid + '\');d.style.display=d.style.display===\'none\'?\'contents\':\'none\'">' +
       '<td><span style="font-size:10px;color:var(--muted);margin-right:4px">\u25B6</span><strong>' + esc(r.name) + '</strong> <span style="font-size:9px;color:' + roleColor + '">' + roleTag + '</span>' + warn + '</td>' +
