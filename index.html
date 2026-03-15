@@ -6338,7 +6338,7 @@ async function fetchFinanceLive() {
 // ═══════════════════════════════════════════════════
 // CRIO vs QUICKBOOKS — Reconciliation
 // ═══════════════════════════════════════════════════
-let QB_DATA = { pnlMonthly: [], pnlByStudy: {}, qbTotalIncome: 0, invoiceLines: [], pnlClass: [], timeActivity: [], payments: [], loaded: false };
+let QB_DATA = { pnlMonthly: [], pnlByStudy: {}, pnlUnmatched: [], qbTotalIncome: 0, qbPeriod: '', invoiceLines: [], pnlClass: [], timeActivity: [], payments: [], loaded: false };
 
 async function fetchQuickBooksData() {
   const pk = CRP_CONFIG.DATA_FEEDS.FINANCE_PUB_KEY;
@@ -6356,16 +6356,31 @@ async function fetchQuickBooksData() {
       fetchFinanceTab(pk, tabs.QB_PAYMENTS),
     ]);
 
-    // ── Parse PnL Monthly — match accounts to CRIO study codes
+    // ── Detect QB period from PnL Monthly column headers
+    const monthCols = pnlMonthly.length > 0 ? Object.keys(pnlMonthly[0]).filter(k => k !== 'Account' && k !== 'Total') : [];
+    const qbPeriod = monthCols.length >= 2 ? monthCols[0] + ' — ' + monthCols[monthCols.length - 1] : '';
+
+    // ── Parse PnL Monthly — ONLY income rows (stop at Gross Profit/Total Income)
     const studyCodes = typeof STUDY_REVENUE_12M !== 'undefined' ? Object.keys(STUDY_REVENUE_12M) : [];
     const pnlByStudy = {};
+    const pnlUnmatched = [];
     let qbTotalIncome = 0;
+    let pastIncome = false;
 
     pnlMonthly.forEach(r => {
       const acct = (r['Account'] || Object.values(r)[0] || '').trim();
-      if (!acct || acct.toLowerCase().startsWith('total')) return;
+      if (!acct) return;
+      const acctLower = acct.toLowerCase();
+
+      // Stop at the income/expense boundary
+      if (acctLower === 'gross profit' || acctLower === 'total income') { pastIncome = true; return; }
+      if (pastIncome) return;
+      if (acctLower.startsWith('total ')) return; // skip category subtotals
+
       const total = parseFloat(r['Total']) || 0;
       if (total === 0) return;
+
+      qbTotalIncome += total;
 
       // Build monthly breakdown
       const monthly = {};
@@ -6376,23 +6391,33 @@ async function fetchQuickBooksData() {
         }
       });
 
-      // Try to match to a CRIO study code
-      const acctLower = acct.toLowerCase().replace(/[\s\-]/g, '');
+      // Try to match to a CRIO study code — strip parenthetical from CRIO codes
+      const acctNorm = acctLower.replace(/[\s\-]/g, '');
       let matched = false;
       for (const code of studyCodes) {
-        const codeLower = code.toLowerCase().replace(/[\s\-]/g, '');
-        if (acctLower.includes(codeLower) || codeLower.includes(acctLower)) {
-          pnlByStudy[code] = { qbAccount: acct, total, monthly };
+        const codeFull = code.toLowerCase().replace(/[\s\-]/g, '');
+        const codeBase = code.replace(/\s*\(.*$/, '').trim().toLowerCase().replace(/[\s\-]/g, '');
+        if (codeBase.length < 4) continue;
+        if (acctNorm.includes(codeFull) || codeFull.includes(acctNorm) ||
+            acctNorm.includes(codeBase) || codeBase.includes(acctNorm)) {
+          if (pnlByStudy[code]) {
+            pnlByStudy[code].total += total;
+            Object.entries(monthly).forEach(([k,v]) => { pnlByStudy[code].monthly[k] = (pnlByStudy[code].monthly[k]||0) + v; });
+          } else {
+            pnlByStudy[code] = { qbAccount: acct, total, monthly };
+          }
           matched = true;
           break;
         }
       }
-      qbTotalIncome += total;
+      if (!matched) pnlUnmatched.push({ account: acct, total, monthly });
     });
 
     QB_DATA.pnlMonthly = pnlMonthly;
     QB_DATA.pnlByStudy = pnlByStudy;
+    QB_DATA.pnlUnmatched = pnlUnmatched;
     QB_DATA.qbTotalIncome = qbTotalIncome;
+    QB_DATA.qbPeriod = qbPeriod;
     QB_DATA.pnlClass = pnlCls.filter(r => (r['Class (Study)']||'').trim());
     QB_DATA.invoiceLines = invLines.filter(r => (r['Invoice #']||'').trim());
     QB_DATA.payments = payments.filter(r => (r['Payment ID']||'').trim());
@@ -6414,7 +6439,8 @@ async function fetchQuickBooksData() {
     })).sort((a,b) => b.hours - a.hours);
 
     QB_DATA.loaded = true;
-    _log('CRP QB: Loaded — ' + Object.keys(pnlByStudy).length + ' studies matched from P&L, ' + QB_DATA.pnlClass.length + ' expense classes, total QB income: $' + Math.round(qbTotalIncome).toLocaleString());
+    const matchedRev = Object.values(pnlByStudy).reduce((s,v) => s + v.total, 0);
+    _log('CRP QB: Loaded — ' + Object.keys(pnlByStudy).length + ' studies matched ($' + Math.round(matchedRev).toLocaleString() + '), ' + pnlUnmatched.length + ' unmatched QB accounts, total QB income: $' + Math.round(qbTotalIncome).toLocaleString());
     renderCRIOvsQB();
   } catch(e) {
     console.warn('CRP QB: Fetch failed:', e.message);
@@ -6433,92 +6459,101 @@ function renderCRIOvsQB() {
 
   // ── Build study-level comparison rows
   const compRows = [];
-  let totalCrioRev = 0, totalQbRev = 0, matchedCount = 0, unmatchedCount = 0;
+  let totalCrio12M = 0, totalCrioBilled = 0, totalQbMatched = 0, matchedCount = 0, unmatchedCount = 0;
 
   Object.entries(studyRevMap).sort((a,b) => b[1] - a[1]).forEach(([code, crioRev]) => {
     if (crioRev <= 0) return;
-    totalCrioRev += crioRev;
+    totalCrio12M += crioRev;
 
     // Find AR data from CRIO
     const ar = arStudies.find(a => a.study.includes(code));
     const sponsor = ar ? ar.study.split(' - ').slice(0, -1).join(' - ') : '';
     const crioAR = ar ? ar.total : 0;
     const crioColl = ar ? ar.collected : 0;
+    const crioBilled = crioColl + crioAR;
+    totalCrioBilled += crioBilled;
 
     // Find QB P&L match
     const qb = pnlByStudy[code];
     const qbRev = qb ? qb.total : 0;
-    totalQbRev += qbRev;
+    totalQbMatched += qbRev;
 
     if (qb) matchedCount++; else unmatchedCount++;
 
-    const diff = crioRev - qbRev;
-    const matchPct = crioRev > 0 && qbRev > 0 ? Math.round(qbRev / crioRev * 100) : (qbRev > 0 ? 999 : 0);
+    const diff = crioBilled - qbRev;
+    const matchPct = crioBilled > 0 && qbRev > 0 ? Math.round(qbRev / crioBilled * 100) : (qbRev > 0 ? 999 : 0);
 
     compRows.push({
-      code, sponsor, crioRev, crioAR, crioColl,
+      code, sponsor, crioRev, crioAR, crioColl, crioBilled,
       qbRev, qbAccount: qb ? qb.qbAccount : '',
       diff, matchPct: Math.min(matchPct, 999),
       status: !qb ? 'No QB Data' :
               matchPct >= 80 && matchPct <= 120 ? 'Aligned' :
-              matchPct >= 40 ? 'Partial' : 'Low Match'
+              matchPct >= 50 ? 'Partial' : 'Low Match'
     });
   });
 
-  // Add QB-only studies (in QB P&L but not in CRIO)
-  Object.entries(pnlByStudy).forEach(([code, qb]) => {
-    if (!studyRevMap[code] || studyRevMap[code] <= 0) {
-      compRows.push({
-        code, sponsor: '', crioRev: 0, crioAR: 0, crioColl: 0,
-        qbRev: qb.total, qbAccount: qb.qbAccount,
-        diff: -qb.total, matchPct: 0,
-        status: 'QB Only'
-      });
-      totalQbRev += qb.total;
-    }
-  });
-
   compRows.sort((a,b) => Math.abs(b.diff) - Math.abs(a.diff));
+
+  // ── QB-only income (in QB but not matched to any CRIO study)
+  const qbOnlyTotal = QB_DATA.pnlUnmatched.reduce((s,r) => s + r.total, 0);
 
   // ── Expense data from QB Classes (pnlClass)
   const expenseRows = QB_DATA.pnlClass.filter(r => {
     return (parseFloat(r['Expenses'])||0) > 0 || (parseFloat(r['Revenue'])||0) > 0;
   });
   const totalQbExpenses = expenseRows.reduce((s,r) => s + (parseFloat(r['Expenses'])||0), 0);
-  const totalQbClassRev = expenseRows.reduce((s,r) => s + (parseFloat(r['Revenue'])||0), 0);
-
-  // ── QB Payments total
-  const qbTotalPay = QB_DATA.payments.reduce((s,r) => s + (parseFloat(r['Amount'])||0), 0);
 
   // ── KPIs
-  const netProfit = totalQbClassRev - totalQbExpenses;
-  const coveragePct = totalCrioRev > 0 ? Math.round(totalQbRev / totalCrioRev * 100) : 0;
+  const qbTotal = QB_DATA.qbTotalIncome;
+  const alignPct = totalCrioBilled > 0 ? Math.round(totalQbMatched / totalCrioBilled * 100) : 0;
+  const netIncome = qbTotal - totalQbExpenses;
 
-  document.getElementById('qb-kpi1').textContent = fmtK(totalCrioRev);
-  document.getElementById('qb-kpi1-sub').textContent = Object.keys(studyRevMap).filter(k => studyRevMap[k] > 0).length + ' active studies';
-  document.getElementById('qb-kpi2').textContent = fmtK(totalQbRev);
-  document.getElementById('qb-kpi2-sub').textContent = Object.keys(pnlByStudy).length + ' matched in QB P&L';
-  document.getElementById('qb-kpi3').textContent = coveragePct + '%';
-  document.getElementById('qb-kpi3-sub').textContent = matchedCount + ' matched, ' + unmatchedCount + ' unmatched';
+  document.getElementById('qb-kpi1').textContent = fmtK(totalCrioBilled);
+  document.getElementById('qb-kpi1-sub').textContent = 'Collected + AR · 12M est: ' + fmtK(totalCrio12M);
+  document.getElementById('qb-kpi2').textContent = fmtK(qbTotal);
+  document.getElementById('qb-kpi2-sub').textContent = (QB_DATA.qbPeriod || 'YTD') + ' · ' + fmtK(totalQbMatched) + ' matched';
+  document.getElementById('qb-kpi3').textContent = alignPct + '%';
+  document.getElementById('qb-kpi3-sub').textContent = matchedCount + '/' + (matchedCount + unmatchedCount) + ' studies · ' + fmtK(qbOnlyTotal) + ' QB-only';
   document.getElementById('qb-kpi4').textContent = fmtK(totalQbExpenses);
-  document.getElementById('qb-kpi4-sub').textContent = expenseRows.length + ' classes · Payments: ' + fmtK(qbTotalPay);
-  document.getElementById('qb-kpi5').textContent = fmtK(netProfit);
-  document.getElementById('qb-kpi5-sub').textContent = (totalQbClassRev > 0 ? Math.round(netProfit / totalQbClassRev * 100) : 0) + '% margin';
+  document.getElementById('qb-kpi4-sub').textContent = expenseRows.length + ' expense classes';
+  document.getElementById('qb-kpi5').textContent = fmtK(netIncome);
+  document.getElementById('qb-kpi5-sub').textContent = (qbTotal > 0 ? Math.round(netIncome / qbTotal * 100) : 0) + '% margin · ' + (QB_DATA.qbPeriod || 'YTD');
 
   // ── Revenue Comparison Table
   const statusColor = { 'Aligned': '#10B981', 'Partial': '#F59E0B', 'Low Match': '#EF4444', 'No QB Data': '#9CA3AF', 'QB Only': '#60A5FA' };
-  document.getElementById('qbReconBody').innerHTML = compRows.map(r =>
+  let tableHtml = compRows.map(r =>
     '<tr>' +
     '<td><strong>' + esc(r.code) + '</strong>' + (r.sponsor ? '<div style="font-size:10px;color:var(--muted)">' + esc(r.sponsor) + '</div>' : '') + '</td>' +
-    '<td class="r">' + (r.crioRev ? fmtD(r.crioRev) : '—') + '</td>' +
-    '<td class="r">' + (r.crioAR ? fmtD(r.crioAR) : '—') + '</td>' +
-    '<td class="r">' + (r.crioColl ? fmtD(r.crioColl) : '—') + '</td>' +
+    '<td class="r">' + (r.crioBilled ? fmtD(r.crioBilled) : '—') + '<div style="font-size:10px;color:var(--muted)">AR: ' + fmtD(r.crioAR) + ' + Coll: ' + fmtD(r.crioColl) + '</div></td>' +
+    '<td class="r" style="color:var(--muted)">' + (r.crioRev ? fmtD(r.crioRev) : '—') + '</td>' +
     '<td class="r">' + (r.qbRev ? fmtD(r.qbRev) : '—') + (r.qbAccount ? '<div style="font-size:10px;color:var(--muted)">' + esc(r.qbAccount) + '</div>' : '') + '</td>' +
     '<td class="r" style="color:' + (r.diff > 5000 ? '#EF4444' : r.diff < -5000 ? '#F59E0B' : '#10B981') + ';font-weight:600">' + (Math.abs(r.diff) > 100 ? (r.diff > 0 ? '+' : '') + fmtD(r.diff) : '—') + '</td>' +
     '<td class="r">' + (r.matchPct > 0 ? r.matchPct + '%' : '—') + '</td>' +
     '<td><span style="display:inline-block;padding:2px 8px;border-radius:9px;font-size:10px;font-weight:600;background:' + (statusColor[r.status]||'#9CA3AF') + '22;color:' + (statusColor[r.status]||'#9CA3AF') + '">' + esc(r.status) + '</span></td>' +
     '</tr>'
   ).join('');
+
+  // Totals row
+  tableHtml += '<tr style="border-top:2px solid var(--border);font-weight:700;background:var(--surface2)">' +
+    '<td>TOTALS (' + compRows.length + ' studies)</td>' +
+    '<td class="r">' + fmtD(totalCrioBilled) + '</td>' +
+    '<td class="r" style="color:var(--muted)">' + fmtD(totalCrio12M) + '</td>' +
+    '<td class="r">' + fmtD(totalQbMatched) + '</td>' +
+    '<td class="r" style="color:' + (totalCrioBilled - totalQbMatched > 0 ? '#EF4444' : '#F59E0B') + '">' + (totalCrioBilled - totalQbMatched > 0 ? '+' : '') + fmtD(totalCrioBilled - totalQbMatched) + '</td>' +
+    '<td class="r">' + alignPct + '%</td>' +
+    '<td></td></tr>';
+
+  document.getElementById('qbReconBody').innerHTML = tableHtml;
+
+  // ── QB-Only Accounts Table (income in QB but not tracked in CRIO)
+  const qbOnlyEl = document.getElementById('qbOnlyBody');
+  if (qbOnlyEl) {
+    qbOnlyEl.innerHTML = QB_DATA.pnlUnmatched
+      .sort((a,b) => b.total - a.total)
+      .map(r => '<tr><td>' + esc(r.account) + '</td><td class="r" style="font-weight:600">' + fmtD(r.total) + '</td></tr>')
+      .join('');
+  }
 
   // ── Expense Breakdown Table (from QB Classes)
   document.getElementById('qbExpenseBody').innerHTML = expenseRows.map(r => {
@@ -11523,19 +11558,19 @@ if (typeof window !== 'undefined') {
   <div class="kpi-row" id="qbKpiRow">
     <div class="kpi">
       <div class="kpi-stripe" style="background:#10B981"></div>
-      <div class="label">CRIO 12M Revenue</div>
+      <div class="label">CRIO Billed</div>
       <div class="value" id="qb-kpi1" style="color:#10B981">--</div>
       <div class="sub" id="qb-kpi1-sub"></div>
     </div>
     <div class="kpi">
       <div class="kpi-stripe" style="background:#8B5CF6"></div>
-      <div class="label">QB P&amp;L Revenue</div>
+      <div class="label">QB Total Income</div>
       <div class="value" id="qb-kpi2" style="color:#8B5CF6">--</div>
       <div class="sub" id="qb-kpi2-sub"></div>
     </div>
     <div class="kpi">
       <div class="kpi-stripe" style="background:#3B82F6"></div>
-      <div class="label">Revenue Coverage</div>
+      <div class="label">Alignment</div>
       <div class="value" id="qb-kpi3" style="color:#3B82F6">--</div>
       <div class="sub" id="qb-kpi3-sub"></div>
     </div>
@@ -11553,21 +11588,33 @@ if (typeof window !== 'undefined') {
     </div>
   </div>
 
-  <div class="section-label">Study Revenue Comparison — CRIO vs QB P&amp;L Monthly</div>
+  <div class="section-label">Study Revenue Comparison — CRIO Billed vs QB P&amp;L</div>
   <div class="panel">
     <div class="panel-body" style="overflow-x:auto">
       <table class="tbl" id="qbReconTable">
         <thead><tr>
           <th>Study / Sponsor</th>
-          <th class="r">CRIO 12M Rev</th>
-          <th class="r">CRIO AR</th>
-          <th class="r">Collected</th>
-          <th class="r">QB P&amp;L Rev</th>
-          <th class="r">Difference</th>
-          <th class="r">Match %</th>
+          <th class="r">CRIO Billed<div style="font-size:9px;font-weight:400;color:var(--muted)">Collected + AR</div></th>
+          <th class="r" style="color:var(--muted)">12M Est.</th>
+          <th class="r">QB P&amp;L Rev<div style="font-size:9px;font-weight:400;color:var(--muted)">Jan 2025+</div></th>
+          <th class="r">Diff</th>
+          <th class="r">Match</th>
           <th>Status</th>
         </tr></thead>
         <tbody id="qbReconBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section-label">QB-Only Income — Not Tracked in CRIO</div>
+  <div class="panel">
+    <div class="panel-body" style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr>
+          <th>QB Account</th>
+          <th class="r">Revenue</th>
+        </tr></thead>
+        <tbody id="qbOnlyBody"></tbody>
       </table>
     </div>
   </div>
