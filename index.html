@@ -6467,7 +6467,7 @@ async function fetchQuickBooksData() {
       const hrs = (parseFloat(r['Hours'])||0) + (parseFloat(r['Minutes'])||0)/60;
       const billable = (r['Billable']||'').toLowerCase() === 'yes';
       const amt = parseFloat(r['Amount'])||0;
-      if (!empMap[emp]) empMap[emp] = { hours: 0, billableHrs: 0, amount: 0, studyHours: {}, studyBillable: {}, studyAmount: {}, entries: 0 };
+      if (!empMap[emp]) empMap[emp] = { hours: 0, billableHrs: 0, amount: 0, studyHours: {}, studyBillable: {}, studyAmount: {}, entries: 0, dailyHours: {}, dailyStudies: {} };
       empMap[emp].hours += hrs;
       if (billable) empMap[emp].billableHrs += hrs;
       empMap[emp].amount += amt;
@@ -6475,6 +6475,13 @@ async function fetchQuickBooksData() {
       empMap[emp].studyBillable[study] = (empMap[emp].studyBillable[study]||0) + (billable ? hrs : 0);
       empMap[emp].studyAmount[study] = (empMap[emp].studyAmount[study]||0) + amt;
       empMap[emp].entries++;
+      // Daily tracking for visit economics
+      const taDate = (r['Date']||'').trim();
+      if (taDate) {
+        empMap[emp].dailyHours[taDate] = (empMap[emp].dailyHours[taDate]||0) + hrs;
+        if (!empMap[emp].dailyStudies[taDate]) empMap[emp].dailyStudies[taDate] = new Set();
+        empMap[emp].dailyStudies[taDate].add(study);
+      }
       studyHoursAll[study] = (studyHoursAll[study]||0) + hrs;
       studyBillableAll[study] = (studyBillableAll[study]||0) + (billable ? hrs : 0);
       totalTrackedHours += hrs;
@@ -7006,6 +7013,97 @@ function renderStaffEconomics() {
     '<td class="r" style="color:#10B981">' + fmtD(sTotalRev) + '</td>' +
     '<td class="r" style="color:' + (sNet >= 0 ? '#10B981' : '#EF4444') + '">' + (sNet >= 0 ? '+' : '') + fmtD(sNet) + '</td>' +
     '<td class="r" style="color:' + (sMargin >= 30 ? '#10B981' : sMargin >= 0 ? '#F59E0B' : '#EF4444') + '">' + sMargin + '%</td>' +
+    '</tr>';
+
+  // ═══ Visit Profitability Analysis — cost per visit vs revenue per visit ═══
+  const visitProfBody = document.getElementById('visitProfBody');
+  if (!visitProfBody) return;
+
+  // Build visit economics for each clinical staff member with time data
+  const visitRows = allRows.filter(r => r.hours > 0).map(r => {
+    const data = empMap[r.name];
+    if (!data || !data.dailyHours) return null;
+    const dailyH = data.dailyHours;
+    const dailyS = data.dailyStudies;
+    const workDays = Object.keys(dailyH).length;
+    if (workDays === 0) return null;
+
+    const avgHrsDay = r.hours / workDays;
+    const rate = r.hourlyRate > 0 ? r.hourlyRate : avgCostRate;
+    const dailyCost = rate * avgHrsDay;
+    const totalCost = rate * r.hours;
+
+    // Count visits: each unique study per work day = 1 visit
+    let totalVisits = 0;
+    Object.values(dailyS).forEach(studies => { totalVisits += studies.size; });
+    const visitsPerDay = totalVisits / workDays;
+    const costPerVisit = totalVisits > 0 ? totalCost / totalVisits : 0;
+    const revPerVisit = totalVisits > 0 ? r.attrRevenue / totalVisits : 0;
+    const marginPerVisit = revPerVisit - costPerVisit;
+
+    // Build daily detail sorted by date (most recent first)
+    const dailyDetail = Object.entries(dailyH).sort((a,b) => b[0].localeCompare(a[0])).slice(0, 60).map(([date, hrs]) => {
+      const studies = dailyS[date] ? Array.from(dailyS[date]) : [];
+      const dayCost = rate * hrs;
+      return { date, hrs, studies, dayCost, visitCount: studies.length };
+    });
+
+    // Flag: low visit days (< 2 visits with 6+ hours)
+    const lowVisitDays = dailyDetail.filter(d => d.visitCount < 2 && d.hrs >= 6).length;
+
+    return {
+      name: r.name, role: r.role, workDays, avgHrsDay, dailyCost, rate,
+      totalVisits, visitsPerDay, costPerVisit, revPerVisit, marginPerVisit,
+      totalCost, attrRevenue: r.attrRevenue, lowVisitDays, dailyDetail, rateSource: r.rateSource
+    };
+  }).filter(Boolean).sort((a,b) => a.marginPerVisit - b.marginPerVisit); // worst margin first
+
+  let vIdx = 0;
+  visitProfBody.innerHTML = visitRows.map(r => {
+    const roleColor = r.role === 'coordinator' ? '#3B82F6' : r.role === 'investigator' ? '#7C3AED' : '#9CA3AF';
+    const roleTag = r.role === 'coordinator' ? 'CRC' : r.role === 'investigator' ? 'INV' : 'Staff';
+    const marginColor = r.marginPerVisit >= 50 ? '#10B981' : r.marginPerVisit >= 0 ? '#F59E0B' : '#EF4444';
+    const vid = 'vp-' + (vIdx++);
+    const warn = r.lowVisitDays > 5 ? ' <span style="color:#EF4444;font-size:9px" title="' + r.lowVisitDays + ' days with &lt;2 visits and 6+ hrs">&#9888; ' + r.lowVisitDays + ' low-visit days</span>' : '';
+
+    const detailRows = r.dailyDetail.map(d => {
+      const lowFlag = d.visitCount < 2 && d.hrs >= 6;
+      return '<tr style="background:' + (lowFlag ? 'rgba(239,68,68,0.08)' : 'var(--surface2)') + ';font-size:11px">' +
+        '<td style="padding-left:28px;color:var(--muted)">' + d.date + (lowFlag ? ' <span style="color:#EF4444">&#9888;</span>' : '') + '</td>' +
+        '<td class="r">' + d.hrs.toFixed(1) + 'h</td>' +
+        '<td class="r">' + d.visitCount + '</td>' +
+        '<td style="font-size:10px;color:var(--muted)">' + d.studies.map(s => esc(s.length > 30 ? s.substring(0,28) + '..' : s)).join(', ') + '</td>' +
+        '<td class="r" style="color:#EF4444">' + fmtD(d.dayCost) + '</td>' +
+        '<td></td><td></td></tr>';
+    }).join('');
+
+    return '<tr style="cursor:pointer" onclick="var d=document.getElementById(\'' + vid + '\');d.style.display=d.style.display===\'none\'?\'contents\':\'none\'">' +
+      '<td><span style="font-size:10px;color:var(--muted);margin-right:4px">\u25B6</span><strong>' + esc(r.name) + '</strong> <span style="font-size:9px;color:' + roleColor + '">' + roleTag + '</span>' + warn + '</td>' +
+      '<td class="r">' + r.workDays + '</td>' +
+      '<td class="r">' + r.avgHrsDay.toFixed(1) + '</td>' +
+      '<td class="r">' + r.visitsPerDay.toFixed(1) + '</td>' +
+      '<td class="r" style="color:#EF4444">' + fmtD(r.costPerVisit) + '</td>' +
+      '<td class="r" style="color:#10B981">' + fmtD(r.revPerVisit) + '</td>' +
+      '<td class="r" style="font-weight:700;color:' + marginColor + '">' + (r.marginPerVisit >= 0 ? '+' : '') + fmtD(r.marginPerVisit) + '</td>' +
+      '</tr>' +
+      '<tbody id="' + vid + '" style="display:none">' + detailRows + '</tbody>';
+  }).join('');
+
+  // Totals
+  const vTotalVisits = visitRows.reduce((s,r) => s + r.totalVisits, 0);
+  const vTotalCost = visitRows.reduce((s,r) => s + r.totalCost, 0);
+  const vTotalRev = visitRows.reduce((s,r) => s + r.attrRevenue, 0);
+  const vAvgCPV = vTotalVisits > 0 ? vTotalCost / vTotalVisits : 0;
+  const vAvgRPV = vTotalVisits > 0 ? vTotalRev / vTotalVisits : 0;
+  const vTotalDays = visitRows.reduce((s,r) => s + r.workDays, 0);
+  visitProfBody.innerHTML += '<tr style="border-top:2px solid var(--border);font-weight:700;background:var(--surface2)">' +
+    '<td>AVERAGES (' + visitRows.length + ' staff)</td>' +
+    '<td class="r">' + Math.round(vTotalDays / visitRows.length) + '</td>' +
+    '<td class="r">' + (vTotalDays > 0 ? (visitRows.reduce((s,r) => s + r.hours, 0) / vTotalDays).toFixed(1) : '—') + '</td>' +
+    '<td class="r">' + (vTotalDays > 0 ? (vTotalVisits / vTotalDays).toFixed(1) : '—') + '</td>' +
+    '<td class="r" style="color:#EF4444">' + fmtD(vAvgCPV) + '</td>' +
+    '<td class="r" style="color:#10B981">' + fmtD(vAvgRPV) + '</td>' +
+    '<td class="r" style="font-weight:700;color:' + (vAvgRPV - vAvgCPV >= 0 ? '#10B981' : '#EF4444') + '">' + (vAvgRPV - vAvgCPV >= 0 ? '+' : '') + fmtD(vAvgRPV - vAvgCPV) + '</td>' +
     '</tr>';
 }
 
@@ -12143,6 +12241,25 @@ if (typeof window !== 'undefined') {
         <tbody id="studyStaffBody"></tbody>
       </table>
       <div style="padding:8px 12px;font-size:10px;color:var(--muted);border-top:1px solid var(--border)">Click any row to see CRC/INV allocation. Cost = blended rate ($payroll + $contractors) / tracked hours &times; individual hours. Margin = (revenue &minus; clinical staff cost) / revenue.</div>
+    </div>
+  </div>
+
+  <div class="section-label" style="margin-top:20px"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#F59E0B;margin-right:6px"></span>Visit Profitability — Cost per Visit vs Revenue per Visit</div>
+  <div class="panel">
+    <div class="panel-body" style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr>
+          <th>Staff</th>
+          <th class="r">Work Days</th>
+          <th class="r">Avg Hrs/Day</th>
+          <th class="r">Visits/Day</th>
+          <th class="r">Cost/Visit</th>
+          <th class="r">Rev/Visit</th>
+          <th class="r">Margin/Visit</th>
+        </tr></thead>
+        <tbody id="visitProfBody"></tbody>
+      </table>
+      <div style="padding:8px 12px;font-size:10px;color:var(--muted);border-top:1px solid var(--border)">Visit = unique study per work day in QB Time Activity. Cost/Visit = (hourly rate &times; daily hours) / visits that day. <span style="color:#EF4444">&#9888;</span> = day with &lt;2 visits and 6+ hours (low utilization). Click any row for daily breakdown. Sorted worst margin first.</div>
     </div>
   </div>
 
