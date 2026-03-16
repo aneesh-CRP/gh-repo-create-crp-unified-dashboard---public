@@ -2259,20 +2259,25 @@ function showVisitReadiness(idx) {
 }
 
 function injectScheduleMedRecords() {
-  if (!MED_RECORDS_DATA || MED_RECORDS_DATA.length === 0) return;
+  var dbg = [];
+  dbg.push('MED_RECORDS_DATA: ' + (MED_RECORDS_DATA ? MED_RECORDS_DATA.length : 'null'));
+  if (!MED_RECORDS_DATA || MED_RECORDS_DATA.length === 0) { dbg.push('BAIL: no data'); _schedMedDebug(dbg); return; }
   var tbody = document.getElementById('upcoming-tbody');
-  if (!tbody) return;
+  dbg.push('tbody: ' + (tbody ? 'found' : 'NOT FOUND'));
+  if (!tbody) { _schedMedDebug(dbg); return; }
   var rows = tbody.querySelectorAll('tr');
+  dbg.push('rows: ' + rows.length);
   var matched = 0;
+  var samples = [];
   rows.forEach(function(row) {
     if (row.dataset.medInjected) return;
     var cells = row.querySelectorAll('td');
     if (cells.length < 4) return;
     var patCell = cells[3];
-    // Use stored original name if PHI-masked, otherwise textContent
     var link = patCell.querySelector('a') || patCell;
     var patName = (link.dataset.phiOriginal || patCell.textContent || '').trim().toLowerCase();
     if (!patName) return;
+    if (samples.length < 3) samples.push(patName);
     var mrIdx = -1;
     for (var i = 0; i < MED_RECORDS_DATA.length; i++) {
       var mName = (MED_RECORDS_DATA[i].name || '').trim().toLowerCase();
@@ -2283,7 +2288,23 @@ function injectScheduleMedRecords() {
     row.dataset.medInjected = '1';
     matched++;
   });
-  console.log('Schedule med records: matched ' + matched + '/' + rows.length + ' rows');
+  dbg.push('matched: ' + matched + '/' + rows.length);
+  dbg.push('samples: ' + samples.join(', '));
+  _schedMedDebug(dbg);
+}
+function _schedMedDebug(lines) {
+  console.log('injectScheduleMedRecords:', lines.join(' | '));
+  var el = document.getElementById('sched-med-debug');
+  if (!el) {
+    var tbody = document.getElementById('upcoming-tbody');
+    if (tbody && tbody.parentElement) {
+      el = document.createElement('div');
+      el.id = 'sched-med-debug';
+      el.style.cssText = 'padding:6px 12px;font-size:11px;color:#64748b;background:#f1f5f9;border-radius:6px;margin:6px 0';
+      tbody.parentElement.parentElement.insertBefore(el, tbody.parentElement.nextSibling);
+    }
+  }
+  if (el) el.textContent = 'Med Records Cross-Ref: ' + lines.join(' | ');
 }
 
 function buildStatusChart() {
@@ -7357,7 +7378,8 @@ function initReferrals() {
   document.getElementById('referral-dashboard').style.display = 'block';
   if (!_referralsLoaded) refreshReferrals();
   if (FB_CRM_DATA.length === 0) fetchFacebookCRM().catch(e => console.warn('FB CRM:', e));
-  if (MED_RECORDS_DATA.length === 0) fetchMedicalRecords().catch(e => console.warn('Med Records:', e));
+  // Delay med records fetch to avoid Google Sheets rate limiting (referrals+campaigns fetch first)
+  if (MED_RECORDS_DATA.length === 0) setTimeout(function(){ fetchMedicalRecords().catch(e => console.warn('Med Records:', e)); }, 5000);
 }
 
 async function refreshReferrals() {
@@ -8069,7 +8091,8 @@ function showReferralDetailModal(filterFn, title, subtitle) {
 // ══════════════════════════════════════════════════════════════
 // MEDICAL RECORDS & PATIENT'S PATH
 // ══════════════════════════════════════════════════════════════
-async function fetchMedicalRecords() {
+async function fetchMedicalRecords(attempt) {
+  attempt = attempt || 1;
   const url = CRP_CONFIG.DATA_FEEDS.MED_RECORDS_CSV;
   if (!url) return;
   try {
@@ -8115,11 +8138,18 @@ async function fetchMedicalRecords() {
       };
     });
     console.log('MedRecords loaded:', MED_RECORDS_DATA.length, 'patients');
-    renderMedicalRecords();
+    safe(renderMedicalRecords, 'renderMedicalRecords');
     safe(buildMedRecAlerts, 'buildMedRecAlerts');
     safe(injectScheduleMedRecords, 'injectScheduleMedRecords');
   } catch(e) {
-    console.warn('fetchMedicalRecords error:', e);
+    console.warn('fetchMedicalRecords error (attempt ' + attempt + '):', e);
+    // Retry up to 3 times with increasing delay (Google Sheets rate limiting)
+    if (attempt < 3) {
+      var delay = attempt * 3000;
+      console.log('Retrying fetchMedicalRecords in ' + (delay/1000) + 's...');
+      await new Promise(function(r){ setTimeout(r, delay); });
+      return fetchMedicalRecords(attempt + 1);
+    }
   }
 }
 
