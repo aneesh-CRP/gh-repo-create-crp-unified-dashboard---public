@@ -188,8 +188,13 @@ function syncCampaigns(token) {
 var MED_RECORDS_FOLDER_ID = '90147290121';
 
 var MED_RECORDS_HEADERS = [
-  'id','name','study','status_raw','status','phone','dob',
-  'investigator_approval','next_appointment','notes',
+  'id','name','study','status_raw','status','assignee',
+  'phone','dob','crio_link',
+  'records_received','medical_release','records_in_crio','records_portal','retrieval_deadline',
+  'investigator_approval',
+  'pre_screening_date','screening_date','randomization_date','next_visit_date','next_appointment',
+  'last_contact_date','same_day_cancel',
+  'notes','ops_notes',
   'date_created','date_updated','days_since_update','url',
   'is_active','is_closed'
 ];
@@ -259,17 +264,42 @@ function normalizeMedRecord(t, studyName) {
   var daysSinceUpdate = t.date_updated
     ? Math.floor((Date.now() - parseInt(t.date_updated)) / 86400000) : 999;
 
+  // Assignees
+  var assignees = (t.assignees || []).map(function(a) { return a.username || ''; }).join(', ');
+
+  // Checkbox field — value is "true"/"false" string
+  var recordsInCrio = '';
+  (t.custom_fields || []).forEach(function(f) {
+    if (f.name === 'Medical records added to CRIO' && f.type === 'checkbox') {
+      recordsInCrio = f.value === 'true' || f.value === true ? 'Yes' : 'No';
+    }
+  });
+
   return [
     t.id,
     t.name || '',
     studyName,
     (t.status || {}).status || '',
     status,
+    assignees,
     fields['Phone #'] || fields['Phone'] || '',
     fields['Patient DOB'] || fields['DOB'] || '',
+    fields['CRIO Link'] || '',
+    fields['Medical records received?'] || '',
+    fields['Medical release (Jotform)'] || '',
+    recordsInCrio,
+    fields['Medical Records Portal'] || '',
+    fields['Retrieval Deadline'] || '',
     fields['Investigator Approval'] || fields['PI Approval'] || '',
+    fields['Pre-Screening Visit (Date)'] || '',
+    fields['Screening Visit (Date)'] || '',
+    fields['Randomization Visit (Date)'] || '',
+    fields['Next Visit'] || fields['Next visit date'] || '',
     fields['Next Appointment Date'] || fields['Next Appointment'] || '',
+    fields['Last Contact Date'] || '',
+    fields['Same day cancellation?'] || '',
     fields['Notes'] || '',
+    fields['Operations Team Notes'] || '',
     dateCreated,
     dateUpdated,
     daysSinceUpdate,

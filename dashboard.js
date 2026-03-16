@@ -6299,7 +6299,17 @@ function buildMedRecAlerts() {
     });
   }
 
-  // 3. Stale records (active but not updated in 14+ days)
+  // 3. Pending medical records (records_received === 'Pending')
+  const pendingRecs = MED_RECORDS_DATA.filter(r => r.is_active && r.records_received === 'Pending');
+  if (pendingRecs.length > 0) {
+    alerts.push({ icon: '📄', color: '#f59e0b', bg: '#fffbeb',
+      title: pendingRecs.length + ' patient' + (pendingRecs.length>1?'s':'') + ' waiting on medical records',
+      detail: pendingRecs.slice(0, 5).map(r => '<div style="font-size:11px;padding:2px 0;">' + maskPHI(r.name) + ' — ' + escapeHTML(r.records_portal||'') + ' — ' + escapeHTML(r.study||'') + '</div>').join('') + (pendingRecs.length > 5 ? '<div style="font-size:10px;color:#94a3b8;">+' + (pendingRecs.length-5) + ' more</div>' : ''),
+      action: 'Follow up with records portals to obtain pending medical records.'
+    });
+  }
+
+  // 4. Stale records (active but not updated in 14+ days)
   const stale = MED_RECORDS_DATA.filter(r => r.is_active && r.days_since_update > 14);
   if (stale.length > 0) {
     alerts.push({ icon: '⏰', color: '#f59e0b', bg: '#fffbeb',
@@ -6310,7 +6320,7 @@ function buildMedRecAlerts() {
   }
 
   // 4. Pending investigator approval
-  const pendingApproval = MED_RECORDS_DATA.filter(r => r.is_active && r.investigator_approval && r.investigator_approval !== 'Approved' && r.investigator_approval !== '');
+  const pendingApproval = MED_RECORDS_DATA.filter(r => r.is_active && r.investigator_approval && r.investigator_approval.indexOf('Confirmed') === -1 && r.investigator_approval !== 'Not Applicable' && r.investigator_approval !== '');
   if (pendingApproval.length > 0) {
     alerts.push({ icon: '📋', color: '#8b5cf6', bg: '#f5f3ff',
       title: pendingApproval.length + ' patient' + (pendingApproval.length>1?'s':'') + ' pending investigator approval',
@@ -6893,14 +6903,16 @@ function showStudyUnifiedModal(studyName) {
     if (medRec.patients && medRec.patients.length > 0) {
       var activePatients = medRec.patients.filter(function(p){ return p.is_active; });
       if (activePatients.length > 0) {
-        body += '<table class="detail-table" style="margin-bottom:12px;"><thead><tr><th>Patient</th><th>Status</th><th>Approval</th><th>Updated</th></tr></thead><tbody>';
+        body += '<table class="detail-table" style="margin-bottom:12px;"><thead><tr><th>Patient</th><th>Status</th><th>Records</th><th>Approval</th><th>Updated</th></tr></thead><tbody>';
         activePatients.slice(0,8).forEach(function(p) {
           var statusColors = {'Enrolled':'#059669','In Screening':'#8b5cf6','Visit Scheduled':'#06b6d4','Ready to Schedule':'#f59e0b','Pending Release':'#94a3b8','Under Review':'#64748b'};
           var sc = statusColors[p.status] || '#94a3b8';
-          var appBadge = p.investigator_approval === 'Approved' ? '<span style="color:#059669;">✓</span>' : (p.investigator_approval ? '<span style="color:#f59e0b;">' + escapeHTML(p.investigator_approval) + '</span>' : '—');
+          var recBadge = p.records_received === 'Received' ? '<span style="color:#059669;font-weight:700;">✓</span>' : p.records_received === 'Pending' ? '<span style="color:#f59e0b;">⏳</span>' : '<span style="color:#94a3b8;">—</span>';
+          var appBadge = (p.investigator_approval||'').indexOf('Confirmed') !== -1 ? '<span style="color:#059669;">✓</span>' : (p.investigator_approval ? '<span style="color:#f59e0b;">' + escapeHTML(p.investigator_approval) + '</span>' : '—');
           var staleColor = p.days_since_update > 14 ? '#dc2626' : p.days_since_update > 7 ? '#f59e0b' : '#64748b';
-          body += '<tr><td><a href="' + escapeHTML(p.url) + '" target="_blank" style="color:#1e293b;text-decoration:none;font-weight:600;">' + maskPHI(p.name) + '</a></td>';
+          body += '<tr><td><a href="' + escapeHTML(p.crio_link || p.url) + '" target="_blank" style="color:#1e293b;text-decoration:none;font-weight:600;">' + maskPHI(p.name) + '</a></td>';
           body += '<td><span style="font-size:10px;padding:2px 6px;border-radius:4px;background:' + sc + '22;color:' + sc + ';font-weight:600;">' + escapeHTML(p.status) + '</span></td>';
+          body += '<td style="text-align:center;">' + recBadge + '</td>';
           body += '<td style="text-align:center;">' + appBadge + '</td>';
           body += '<td style="text-align:center;font-weight:600;color:' + staleColor + ';">' + (p.days_since_update || '—') + 'd</td></tr>';
         });
@@ -7791,11 +7803,25 @@ async function fetchMedicalRecords() {
         study: r.study || '',
         status_raw: r.status_raw || '',
         status: status,
+        assignee: r.assignee || '',
         phone: r.phone || '',
         dob: r.dob || '',
+        crio_link: r.crio_link || '',
+        records_received: r.records_received || '',
+        medical_release: r.medical_release || '',
+        records_in_crio: r.records_in_crio || '',
+        records_portal: r.records_portal || '',
+        retrieval_deadline: r.retrieval_deadline || '',
         investigator_approval: r.investigator_approval || '',
+        pre_screening_date: r.pre_screening_date || '',
+        screening_date: r.screening_date || '',
+        randomization_date: r.randomization_date || '',
+        next_visit_date: r.next_visit_date || '',
         next_appointment: r.next_appointment || '',
+        last_contact_date: r.last_contact_date || '',
+        same_day_cancel: r.same_day_cancel || '',
         notes: r.notes || '',
+        ops_notes: r.ops_notes || '',
         date_created: r.date_created || '',
         date_updated: r.date_updated || '',
         days_since_update: r.date_updated ? Math.floor((Date.now() - new Date(r.date_updated).getTime()) / 86400000) : parseInt(r.days_since_update) || 999,
@@ -7844,22 +7870,35 @@ function showMedRecDetailModal(studyName) {
   }
   const active = patients.filter(r => r.is_active);
   const closed = patients.filter(r => r.is_closed);
-  let html = '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
+  let html = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;min-width:700px;">';
   html += '<thead><tr style="border-bottom:2px solid #e2e8f0;text-align:left;">';
-  html += '<th style="padding:6px 8px;">Patient</th><th style="padding:6px 8px;">Status</th><th style="padding:6px 8px;">PI Approval</th><th style="padding:6px 8px;">Next Appt</th><th style="padding:6px 8px;">Updated</th></tr></thead><tbody>';
+  html += '<th style="padding:6px 8px;">Patient</th><th style="padding:6px 8px;">Status</th><th style="padding:6px 8px;">Records</th><th style="padding:6px 8px;">Release</th><th style="padding:6px 8px;">PI Approval</th><th style="padding:6px 8px;">Portal</th><th style="padding:6px 8px;">Next Visit</th><th style="padding:6px 8px;">Assignee</th><th style="padding:6px 8px;">Updated</th></tr></thead><tbody>';
   patients.sort((a,b) => (a.is_active===b.is_active ? 0 : a.is_active ? -1 : 1));
+  const recColors = {'Received':'#059669','Pending':'#f59e0b','Not applicable':'#94a3b8','Unavailable':'#dc2626'};
+  const relColors = {'Recieved':'#059669','Pending':'#f59e0b','Not Applicable ( Link to proxy in collum E)':'#94a3b8','Contact 1':'#3b82f6','Contact 2':'#8b5cf6','Contact 3':'#dc2626'};
+  const piColors = {'Confirmed - (ready to schedule)':'#059669','Pending Submission':'#f59e0b','Under Review':'#8b5cf6','DNQ':'#dc2626','Not Applicable':'#94a3b8'};
+  function badge(val, colorMap) {
+    if (!val) return '<span style="color:#cbd5e1;">—</span>';
+    const c = colorMap[val] || '#64748b';
+    return '<span style="padding:1px 5px;border-radius:3px;font-size:9px;font-weight:600;background:' + c + '18;color:' + c + ';">' + escapeHTML(val) + '</span>';
+  }
   patients.forEach(r => {
     const staleColor = r.days_since_update > 14 ? '#dc2626' : r.days_since_update > 7 ? '#f59e0b' : '#64748b';
     const statusColor = r.is_active ? '#8b5cf6' : r.is_closed ? '#94a3b8' : '#64748b';
+    const patLink = r.crio_link ? r.crio_link : r.url;
     html += '<tr style="border-bottom:1px solid #f1f5f9;">';
-    html += '<td style="padding:5px 8px;"><a href="' + escapeHTML(r.url) + '" target="_blank" style="font-weight:600;color:#1e293b;text-decoration:none;">' + maskPHI(r.name) + '</a></td>';
-    html += '<td style="padding:5px 8px;"><span style="padding:2px 6px;border-radius:3px;font-size:10px;font-weight:600;background:' + statusColor + '22;color:' + statusColor + ';">' + escapeHTML(r.status) + '</span></td>';
-    html += '<td style="padding:5px 8px;font-size:10px;">' + escapeHTML(r.investigator_approval || '—') + '</td>';
-    html += '<td style="padding:5px 8px;font-size:10px;">' + escapeHTML(r.next_appointment || '—') + '</td>';
-    html += '<td style="padding:5px 8px;text-align:center;font-weight:600;color:' + staleColor + ';">' + r.days_since_update + 'd</td>';
+    html += '<td style="padding:4px 8px;"><a href="' + escapeHTML(patLink) + '" target="_blank" style="font-weight:600;color:#1e293b;text-decoration:none;">' + maskPHI(r.name) + '</a></td>';
+    html += '<td style="padding:4px 8px;">' + badge(r.status, {Enrolled:'#059669','In Screening':'#8b5cf6','Visit Scheduled':'#06b6d4','Ready to Schedule':'#f59e0b','Pending Release':'#94a3b8','Under Review':'#64748b',DNQ:'#dc2626','Screen Fail':'#dc2626'}) + '</td>';
+    html += '<td style="padding:4px 8px;">' + badge(r.records_received, recColors) + '</td>';
+    html += '<td style="padding:4px 8px;">' + badge(r.medical_release, relColors) + '</td>';
+    html += '<td style="padding:4px 8px;">' + badge(r.investigator_approval, piColors) + '</td>';
+    html += '<td style="padding:4px 8px;font-size:10px;">' + escapeHTML(r.records_portal || '—') + '</td>';
+    html += '<td style="padding:4px 8px;font-size:10px;">' + escapeHTML(r.next_visit_date || r.next_appointment || '—') + '</td>';
+    html += '<td style="padding:4px 8px;font-size:10px;">' + escapeHTML(r.assignee || '—') + '</td>';
+    html += '<td style="padding:4px 8px;text-align:center;font-weight:600;color:' + staleColor + ';">' + r.days_since_update + 'd</td>';
     html += '</tr>';
   });
-  html += '</tbody></table>';
+  html += '</tbody></table></div>';
   openModal('Medical Records — ' + studyName, active.length + ' active · ' + closed.length + ' closed · ' + patients.length + ' total', html);
 }
 
@@ -8371,6 +8410,8 @@ function getStudyMedRecords(studyName) {
     pendingRecords: patients.filter(function(r){ return r.status === 'Pending Release' || r.status === 'Under Review'; }).length,
     dnq: patients.filter(function(r){ return r.status === 'DNQ' || r.status === 'Screen Fail'; }).length,
     stale: patients.filter(function(r){ return r.is_active && r.days_since_update > 14; }).length,
+    recordsReceived: patients.filter(function(r){ return r.records_received === 'Received'; }).length,
+    recordsPending: patients.filter(function(r){ return r.records_received === 'Pending'; }).length,
     patients: patients,
   };
 }
