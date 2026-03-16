@@ -2269,7 +2269,9 @@ function injectScheduleMedRecords() {
     var cells = row.querySelectorAll('td');
     if (cells.length < 4) return;
     var patCell = cells[3];
-    var patName = (patCell.textContent || '').trim().toLowerCase();
+    // Use stored original name if PHI-masked, otherwise textContent
+    var link = patCell.querySelector('a') || patCell;
+    var patName = (link.dataset.phiOriginal || patCell.textContent || '').trim().toLowerCase();
     if (!patName) return;
     var mrIdx = -1;
     for (var i = 0; i < MED_RECORDS_DATA.length; i++) {
