@@ -1511,7 +1511,7 @@ body {
     <div style="max-height:480px;overflow-y:auto;border-radius:0 0 8px 8px;">
       <table class="data-table sortable" id="vis-table">
         <thead>
-          <tr><th onclick="sortTable(this)">Date</th><th onclick="sortTable(this)">Study</th><th onclick="sortTable(this)">Visit</th><th onclick="sortTable(this)">Patient</th><th onclick="sortTable(this)">Records</th><th onclick="sortTable(this)">Status</th><th onclick="sortTable(this)">Coordinator</th><th onclick="sortTable(this)">Investigator</th><th onclick="sortTable(this)">Site</th></tr>
+          <tr><th onclick="sortTable(this)">Date</th><th onclick="sortTable(this)">Study</th><th onclick="sortTable(this)">Visit</th><th onclick="sortTable(this)">Patient</th><th onclick="sortTable(this)">Status</th><th onclick="sortTable(this)">Coordinator</th><th onclick="sortTable(this)">Investigator</th><th onclick="sortTable(this)">Site</th></tr>
         </thead>
         <tbody id="upcoming-tbody">
 <tr data-date="2026-03-09" data-site="PNJ" data-coord="Cady Chilensky">
@@ -4932,55 +4932,11 @@ function buildUpcomingDetailTable(rows) {
     const patientCell = r.patient_url
       ? `<a href="${escapeHTML(r.patient_url)}" target="_blank" rel="noopener" style="text-decoration:none;color:var(--navy);font-weight:600;">${maskPHI(r.patient)}${extIcon}</a>`
       : `<strong>${maskPHI(r.patient)}</strong>`;
-    // Look up medical records for this patient
-    let medCell = '<span style="color:#cbd5e1;font-size:10px">—</span>';
-    if (typeof MED_RECORDS_DATA !== 'undefined' && MED_RECORDS_DATA.length > 0) {
-      const pName = (r.patient || '').trim().toLowerCase();
-      const pStudy = (r.study || '').trim().toLowerCase();
-      const mr = MED_RECORDS_DATA.find(m => {
-        const mName = (m.name || '').trim().toLowerCase();
-        return mName === pName || mName.includes(pName) || pName.includes(mName);
-      });
-      if (mr) {
-        const rel = (mr.medical_release || '').toLowerCase();
-        const rec = (mr.records_received || '').toLowerCase();
-        const relDone = rel === 'signed' || rel === 'yes' || rel === 'complete' || rel === 'received';
-        const recDone = rec === 'received' || rec === 'recieved' || rec === 'yes' || rec === 'complete';
-        const relNo = rel === 'no';
-        const relPending = !relDone && !relNo && rel && rel !== 'n/a' && rel !== '';
-        const recPending = !recDone && rec && rec !== 'n/a' && rec !== 'no' && rec !== '';
-        let badges = '';
-        if (recDone && relDone) {
-          badges = `<span style="font-size:9px;font-weight:700;padding:2px 5px;border-radius:3px;background:#05966920;color:#059669" title="Release: ${escapeHTML(mr.medical_release||'')}, Records: ${escapeHTML(mr.records_received||'')}">✓ Complete</span>`;
-        } else {
-          // Release badge
-          if (relDone) {
-            badges += `<span style="font-size:9px;font-weight:600;padding:1px 4px;border-radius:3px;background:#05966920;color:#059669" title="Medical Release: ${escapeHTML(mr.medical_release||'')}">Rel ✓</span> `;
-          } else if (relPending) {
-            badges += `<span style="font-size:9px;font-weight:600;padding:1px 4px;border-radius:3px;background:#d9770620;color:#d97706" title="Medical Release: ${escapeHTML(mr.medical_release||'')}">Rel ⏳</span> `;
-          } else if (relNo) {
-            badges += `<span style="font-size:9px;font-weight:600;padding:1px 4px;border-radius:3px;background:#dc262620;color:#dc2626" title="Medical Release: No">Rel ✗</span> `;
-          } else {
-            badges += `<span style="font-size:9px;font-weight:600;padding:1px 4px;border-radius:3px;background:#94a3b820;color:#94a3b8" title="Medical Release: not set">Rel —</span> `;
-          }
-          // Records badge
-          if (recDone) {
-            badges += `<span style="font-size:9px;font-weight:600;padding:1px 4px;border-radius:3px;background:#05966920;color:#059669" title="Records Received: ${escapeHTML(mr.records_received||'')}">Rec ✓</span>`;
-          } else if (recPending) {
-            badges += `<span style="font-size:9px;font-weight:600;padding:1px 4px;border-radius:3px;background:#d9770620;color:#d97706" title="Records Received: ${escapeHTML(mr.records_received||'')}">Rec ⏳</span>`;
-          } else {
-            badges += `<span style="font-size:9px;font-weight:600;padding:1px 4px;border-radius:3px;background:#94a3b820;color:#94a3b8" title="Records: not set">Rec —</span>`;
-          }
-        }
-        medCell = badges;
-      }
-    }
     return `<tr>
       <td style="font-weight:600;color:var(--blue);white-space:nowrap">${escapeHTML(r.date)}</td>
       <td>${studyCell}</td>
       <td style="color:var(--muted);font-size:11px">${escapeHTML(r.visit)}</td>
       <td>${patientCell}</td>
-      <td style="white-space:nowrap">${medCell}</td>
       <td><span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:${sc}20;color:${sc}">${escapeHTML(r.status)}</span></td>
       <td style="font-size:11px">${escapeHTML(r.coord)}</td>
       <td style="font-size:11px;color:${r.investigator ? '#7c3aed' : '#cbd5e1'}">${escapeHTML(r.investigator || '—')}</td>
@@ -4994,46 +4950,44 @@ function injectScheduleMedRecords() {
   const tbody = document.getElementById('upcoming-tbody');
   if (!tbody) return;
   const rows = tbody.querySelectorAll('tr');
+  let matched = 0;
   rows.forEach(row => {
+    // Skip if already injected
+    if (row.dataset.medInjected) return;
     const cells = row.querySelectorAll('td');
-    if (cells.length < 5) return;
+    if (cells.length < 4) return;
     // Patient name is in the 4th cell (index 3)
-    const patName = (cells[3].textContent || '').trim().toLowerCase();
+    const patCell = cells[3];
+    const patName = (patCell.textContent || '').trim().toLowerCase();
+    if (!patName) return;
     // Look up in MED_RECORDS_DATA
     const mr = MED_RECORDS_DATA.find(m => {
       const mName = (m.name || '').trim().toLowerCase();
       return mName === patName || mName.includes(patName) || patName.includes(mName);
     });
-    // Build badge HTML
-    let html = '<span style="color:#cbd5e1;font-size:10px">\u2014</span>';
-    if (mr) {
-      const rel = (mr.medical_release || '').toLowerCase();
-      const rec = (mr.records_received || '').toLowerCase();
-      const relDone = rel === 'signed' || rel === 'yes' || rel === 'complete' || rel === 'received';
-      const recDone = rec === 'received' || rec === 'recieved' || rec === 'yes' || rec === 'complete';
-      const relNo = rel === 'no';
-      const relPending = !relDone && !relNo && rel && rel !== 'n/a' && rel !== '';
-      const recPending = !recDone && rec && rec !== 'n/a' && rec !== 'no' && rec !== '';
-      if (recDone && relDone) {
-        html = '<span style="font-size:9px;font-weight:700;padding:2px 5px;border-radius:3px;background:#05966920;color:#059669" title="Release: ' + escapeHTML(mr.medical_release||'') + ', Records: ' + escapeHTML(mr.records_received||'') + '">\u2713 Complete</span>';
-      } else {
-        html = '';
-        if (relDone) html += '<span style="font-size:9px;font-weight:600;padding:1px 4px;border-radius:3px;background:#05966920;color:#059669" title="Release: ' + escapeHTML(mr.medical_release||'') + '">Rel \u2713</span> ';
-        else if (relPending) html += '<span style="font-size:9px;font-weight:600;padding:1px 4px;border-radius:3px;background:#d9770620;color:#d97706" title="Release: ' + escapeHTML(mr.medical_release||'') + '">Rel \u23f3</span> ';
-        else if (relNo) html += '<span style="font-size:9px;font-weight:600;padding:1px 4px;border-radius:3px;background:#dc262620;color:#dc2626" title="Release: No">Rel \u2717</span> ';
-        else html += '<span style="font-size:9px;font-weight:600;padding:1px 4px;border-radius:3px;background:#94a3b820;color:#94a3b8" title="Release: not set">Rel \u2014</span> ';
-        if (recDone) html += '<span style="font-size:9px;font-weight:600;padding:1px 4px;border-radius:3px;background:#05966920;color:#059669" title="Records: ' + escapeHTML(mr.records_received||'') + '">Rec \u2713</span>';
-        else if (recPending) html += '<span style="font-size:9px;font-weight:600;padding:1px 4px;border-radius:3px;background:#d9770620;color:#d97706" title="Records: ' + escapeHTML(mr.records_received||'') + '">Rec \u23f3</span>';
-        else html += '<span style="font-size:9px;font-weight:600;padding:1px 4px;border-radius:3px;background:#94a3b820;color:#94a3b8" title="Records: not set">Rec \u2014</span>';
-      }
+    if (!mr) return;
+    const rel = (mr.medical_release || '').toLowerCase();
+    const rec = (mr.records_received || '').toLowerCase();
+    const relDone = rel === 'signed' || rel === 'yes' || rel === 'complete' || rel === 'received';
+    const recDone = rec === 'received' || rec === 'recieved' || rec === 'yes' || rec === 'complete';
+    const relNo = rel === 'no';
+    const relPending = !relDone && !relNo && rel && rel !== 'n/a' && rel !== '';
+    const recPending = !recDone && rec && rec !== 'n/a' && rec !== 'no' && rec !== '';
+    let badge = '';
+    if (recDone && relDone) {
+      badge = '<span style="display:inline-block;margin-left:6px;font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#05966920;color:#059669;vertical-align:middle" title="Release: ' + escapeHTML(mr.medical_release||'') + ' | Records: ' + escapeHTML(mr.records_received||'') + '">RECORDS \u2713</span>';
+    } else if (recDone) {
+      badge = '<span style="display:inline-block;margin-left:6px;font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#05966920;color:#059669;vertical-align:middle" title="Release: ' + escapeHTML(mr.medical_release||'') + ' | Records: ' + escapeHTML(mr.records_received||'') + '">REC \u2713</span>';
+    } else if (recPending) {
+      badge = '<span style="display:inline-block;margin-left:6px;font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#d9770620;color:#d97706;vertical-align:middle" title="Release: ' + escapeHTML(mr.medical_release||'') + ' | Records: ' + escapeHTML(mr.records_received||'') + '">REC \u23f3</span>';
+    } else {
+      badge = '<span style="display:inline-block;margin-left:6px;font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#dc262620;color:#dc2626;vertical-align:middle" title="Release: ' + escapeHTML(mr.medical_release||'No') + ' | Records: ' + escapeHTML(mr.records_received||'None') + '">REC \u2717</span>';
     }
-    // Insert new td after patient cell (index 3), before status cell (index 4)
-    const td = document.createElement('td');
-    td.style.whiteSpace = 'nowrap';
-    td.innerHTML = html;
-    cells[3].parentNode.insertBefore(td, cells[4]);
+    patCell.insertAdjacentHTML('beforeend', badge);
+    row.dataset.medInjected = '1';
+    matched++;
   });
-  console.log('Schedule med records injected for', rows.length, 'rows');
+  console.log('Schedule med records: matched ' + matched + '/' + rows.length + ' rows');
 }
 
 function buildStatusChart() {
