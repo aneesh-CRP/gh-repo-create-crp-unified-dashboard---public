@@ -229,10 +229,15 @@ const CRP_CONFIG = {
       'in screening':     'In Screening',
       'screen fail':      'Screen Fail',
       'no show':          'No Show',
+      'no show not rescheduled': 'No Show',
       'complete':         'Complete',
+      'discontinued':     'Discontinued',
+      'cancelled':        'Cancelled',
+      'in another study': 'In Another Study',
+      'withdrawn':        'Withdrawn',
     },
     MED_RECORDS_ACTIVE: ['Pending Release','Under Review','Ready to Schedule','Visit Scheduled','In Screening','Enrolled'],
-    MED_RECORDS_CLOSED: ['DNQ','Screen Fail','Not Interested','Unable to Reach','No Show','Complete'],
+    MED_RECORDS_CLOSED: ['DNQ','Screen Fail','Not Interested','Unable to Reach','No Show','Complete','Discontinued','Cancelled','In Another Study','Withdrawn'],
 
   },
 
@@ -6280,64 +6285,83 @@ function buildMedRecAlerts() {
   // ── Pipeline summary stats ──
   const active = MED_RECORDS_DATA.filter(r => r.is_active);
   const total = MED_RECORDS_DATA.length;
+  // Step 1: Medical Release (Jotform authorization)
+  const releaseRecvd = MED_RECORDS_DATA.filter(r => r.medical_release === 'Recieved' || r.medical_release === 'Received').length;
+  const releasePending = MED_RECORDS_DATA.filter(r => r.is_active && r.medical_release === 'Pending').length;
+  const releaseContact = MED_RECORDS_DATA.filter(r => r.is_active && (r.medical_release||'').indexOf('Contact') !== -1).length;
+  const releaseNA = MED_RECORDS_DATA.filter(r => (r.medical_release||'').indexOf('Not Applicable') !== -1).length;
+  // Step 2: Medical Records Received
   const recsComplete = MED_RECORDS_DATA.filter(r => r.records_received === 'Received').length;
   const recsPending = MED_RECORDS_DATA.filter(r => r.is_active && r.records_received === 'Pending').length;
-  const recsNA = MED_RECORDS_DATA.filter(r => r.records_received === 'Not applicable').length;
   const recsUnavail = MED_RECORDS_DATA.filter(r => r.is_active && r.records_received === 'Unavailable').length;
+  const recsNA = MED_RECORDS_DATA.filter(r => r.records_received === 'Not applicable').length;
   const recsBlank = active.filter(r => !r.records_received || r.records_received === '').length;
-  const releaseRecvd = MED_RECORDS_DATA.filter(r => r.medical_release === 'Recieved').length;
-  const releasePending = MED_RECORDS_DATA.filter(r => r.is_active && r.medical_release === 'Pending').length;
+  // Other
   const inCrio = MED_RECORDS_DATA.filter(r => r.records_in_crio === 'Yes').length;
   const piConfirmed = MED_RECORDS_DATA.filter(r => r.investigator_approval && r.investigator_approval.indexOf('Confirmed') !== -1).length;
   const piPending = active.filter(r => r.investigator_approval && r.investigator_approval.indexOf('Confirmed') === -1 && r.investigator_approval !== 'Not Applicable' && r.investigator_approval !== '').length;
 
   // Completion: records_received === 'Received' means that patient's medical records workflow is done
   const completionPct = total > 0 ? Math.round(recsComplete / total * 100) : 0;
+  const releasePct = total > 0 ? Math.round(releaseRecvd / total * 100) : 0;
   const barColor = completionPct >= 75 ? '#059669' : completionPct >= 50 ? '#f59e0b' : '#dc2626';
+  const relBarColor = releasePct >= 75 ? '#059669' : releasePct >= 50 ? '#f59e0b' : '#3b82f6';
 
   // ── Summary dashboard ──
   let html = `<div style="padding:12px 16px;border-bottom:1px solid #e2e8f0;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-      <span style="font-size:12px;font-weight:700;color:#1e293b;">Medical Records Pipeline</span>
-      <span style="font-size:11px;color:${barColor};font-weight:700;">${recsComplete} / ${total} complete (${completionPct}%)</span>
+    <div style="font-size:12px;font-weight:700;color:#1e293b;margin-bottom:10px;">Medical Records Pipeline <span style="font-size:10px;font-weight:400;color:#94a3b8;">${total} patients across ${Object.keys(MED_RECORDS_DATA.reduce((s,r)=>{s[r.study]=1;return s;},{})).length} studies</span></div>
+
+    <!-- Step 1: Medical Release -->
+    <div style="margin-bottom:10px;padding:8px 10px;background:#f8fafc;border-radius:6px;border-left:3px solid ${relBarColor};">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+        <span style="font-size:11px;font-weight:700;color:#475569;">Step 1: Medical Release (Jotform)</span>
+        <span style="font-size:10px;color:${relBarColor};font-weight:700;">${releaseRecvd} / ${total} signed (${releasePct}%)</span>
+      </div>
+      <div style="height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden;margin-bottom:6px;">
+        <div style="height:100%;width:${releasePct}%;background:${relBarColor};border-radius:3px;"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center;">
+        <div><span style="font-size:14px;font-weight:800;color:#059669;">${releaseRecvd}</span><div style="font-size:8px;color:#94a3b8;">Signed</div></div>
+        <div><span style="font-size:14px;font-weight:800;color:#f59e0b;">${releasePending}</span><div style="font-size:8px;color:#94a3b8;">Pending</div></div>
+        <div><span style="font-size:14px;font-weight:800;color:#8b5cf6;">${releaseContact}</span><div style="font-size:8px;color:#94a3b8;">Contacting</div></div>
+        <div><span style="font-size:14px;font-weight:800;color:#94a3b8;">${releaseNA}</span><div style="font-size:8px;color:#94a3b8;">N/A</div></div>
+      </div>
     </div>
-    <div style="height:8px;background:#f1f5f9;border-radius:4px;overflow:hidden;margin-bottom:10px;">
-      <div style="height:100%;width:${completionPct}%;background:${barColor};border-radius:4px;transition:width .3s;"></div>
+
+    <!-- Step 2: Records Received -->
+    <div style="margin-bottom:10px;padding:8px 10px;background:#f8fafc;border-radius:6px;border-left:3px solid ${barColor};">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+        <span style="font-size:11px;font-weight:700;color:#475569;">Step 2: Medical Records Received</span>
+        <span style="font-size:10px;color:${barColor};font-weight:700;">${recsComplete} / ${total} received (${completionPct}%)</span>
+      </div>
+      <div style="height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden;margin-bottom:6px;">
+        <div style="height:100%;width:${completionPct}%;background:${barColor};border-radius:3px;"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center;">
+        <div><span style="font-size:14px;font-weight:800;color:#059669;">${recsComplete}</span><div style="font-size:8px;color:#94a3b8;">Received</div></div>
+        <div><span style="font-size:14px;font-weight:800;color:#f59e0b;">${recsPending}</span><div style="font-size:8px;color:#94a3b8;">Pending</div></div>
+        <div><span style="font-size:14px;font-weight:800;color:#dc2626;">${recsUnavail}</span><div style="font-size:8px;color:#94a3b8;">Unavailable</div></div>
+        <div><span style="font-size:14px;font-weight:800;color:#94a3b8;">${recsBlank}</span><div style="font-size:8px;color:#94a3b8;">Not Set</div></div>
+      </div>
     </div>
+
+    <!-- Supporting metrics -->
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center;">
-      <div style="padding:6px;background:#f0fdf4;border-radius:6px;">
-        <div style="font-size:16px;font-weight:800;color:#059669;">${recsComplete}</div>
-        <div style="font-size:9px;color:#059669;font-weight:600;">Records Received</div>
+      <div style="padding:5px;background:#f0fdf4;border-radius:6px;">
+        <div style="font-size:14px;font-weight:800;color:#059669;">${active.length}</div>
+        <div style="font-size:8px;color:#059669;font-weight:600;">Active</div>
       </div>
-      <div style="padding:6px;background:#fffbeb;border-radius:6px;">
-        <div style="font-size:16px;font-weight:800;color:#f59e0b;">${recsPending}</div>
-        <div style="font-size:9px;color:#f59e0b;font-weight:600;">Pending Records</div>
+      <div style="padding:5px;background:#eff6ff;border-radius:6px;">
+        <div style="font-size:14px;font-weight:800;color:#3b82f6;">${inCrio}</div>
+        <div style="font-size:8px;color:#3b82f6;font-weight:600;">In CRIO</div>
       </div>
-      <div style="padding:6px;background:#f5f3ff;border-radius:6px;">
-        <div style="font-size:16px;font-weight:800;color:#8b5cf6;">${piConfirmed}</div>
-        <div style="font-size:9px;color:#8b5cf6;font-weight:600;">PI Approved</div>
+      <div style="padding:5px;background:#f5f3ff;border-radius:6px;">
+        <div style="font-size:14px;font-weight:800;color:#8b5cf6;">${piConfirmed}</div>
+        <div style="font-size:8px;color:#8b5cf6;font-weight:600;">PI Approved</div>
       </div>
-      <div style="padding:6px;background:#eff6ff;border-radius:6px;">
-        <div style="font-size:16px;font-weight:800;color:#3b82f6;">${inCrio}</div>
-        <div style="font-size:9px;color:#3b82f6;font-weight:600;">In CRIO</div>
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center;margin-top:6px;">
-      <div style="padding:4px;background:#f8fafc;border-radius:4px;">
-        <div style="font-size:13px;font-weight:700;color:#475569;">${active.length}</div>
-        <div style="font-size:9px;color:#94a3b8;">Active</div>
-      </div>
-      <div style="padding:4px;background:#f8fafc;border-radius:4px;">
-        <div style="font-size:13px;font-weight:700;color:#475569;">${releaseRecvd}</div>
-        <div style="font-size:9px;color:#94a3b8;">Releases Signed</div>
-      </div>
-      <div style="padding:4px;background:#f8fafc;border-radius:4px;">
-        <div style="font-size:13px;font-weight:700;color:#475569;">${releasePending}</div>
-        <div style="font-size:9px;color:#94a3b8;">Releases Pending</div>
-      </div>
-      <div style="padding:4px;background:#f8fafc;border-radius:4px;">
-        <div style="font-size:13px;font-weight:700;color:#dc2626;">${recsUnavail + recsBlank}</div>
-        <div style="font-size:9px;color:#94a3b8;">No Records</div>
+      <div style="padding:5px;background:#fef2f2;border-radius:6px;">
+        <div style="font-size:14px;font-weight:800;color:#dc2626;">${total - active.length}</div>
+        <div style="font-size:8px;color:#dc2626;font-weight:600;">Closed</div>
       </div>
     </div>
   </div>`;
@@ -6346,47 +6370,64 @@ function buildMedRecAlerts() {
   const byStudy = {};
   MED_RECORDS_DATA.forEach(r => {
     const s = r.study || 'Unknown';
-    if (!byStudy[s]) byStudy[s] = { total: 0, active: 0, complete: 0, pending: 0, piPending: 0 };
+    if (!byStudy[s]) byStudy[s] = { total: 0, active: 0, relSigned: 0, relPending: 0, recsRecvd: 0, recsPending: 0 };
     byStudy[s].total++;
     if (r.is_active) byStudy[s].active++;
-    if (r.records_received === 'Received') byStudy[s].complete++;
-    if (r.is_active && r.records_received === 'Pending') byStudy[s].pending++;
-    if (r.is_active && r.investigator_approval && r.investigator_approval.indexOf('Confirmed') === -1 && r.investigator_approval !== 'Not Applicable' && r.investigator_approval !== '') byStudy[s].piPending++;
+    if (r.medical_release === 'Recieved' || r.medical_release === 'Received') byStudy[s].relSigned++;
+    if (r.is_active && r.medical_release === 'Pending') byStudy[s].relPending++;
+    if (r.records_received === 'Received') byStudy[s].recsRecvd++;
+    if (r.is_active && r.records_received === 'Pending') byStudy[s].recsPending++;
   });
-  const studyArr = Object.entries(byStudy).sort((a,b) => b[1].pending - a[1].pending);
+  const studyArr = Object.entries(byStudy).sort((a,b) => b[1].total - a[1].total);
 
   if (studyArr.length > 0) {
     html += `<div style="padding:12px 16px;border-bottom:1px solid #e2e8f0;">
-      <div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:6px;">By Study</div>
-      <table style="width:100%;border-collapse:collapse;font-size:11px;">
-        <thead><tr style="border-bottom:1px solid #e2e8f0;text-align:left;">
-          <th style="padding:4px 6px;">Study</th>
-          <th style="padding:4px 6px;text-align:center;">Total</th>
-          <th style="padding:4px 6px;text-align:center;">Complete</th>
-          <th style="padding:4px 6px;text-align:center;">Pending</th>
-          <th style="padding:4px 6px;text-align:center;">PI Waiting</th>
-          <th style="padding:4px 6px;text-align:center;">Progress</th>
+      <div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:6px;">By Study (${studyArr.length} studies)</div>
+      <div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:10px;min-width:500px;">
+        <thead><tr style="border-bottom:1px solid #e2e8f0;text-align:center;">
+          <th style="padding:4px 6px;text-align:left;">Study</th>
+          <th style="padding:4px 6px;">Pts</th>
+          <th style="padding:4px 6px;" title="Medical Release Signed">Release</th>
+          <th style="padding:4px 6px;" title="Medical Records Received">Records</th>
+          <th style="padding:4px 6px;">Pipeline</th>
         </tr></thead><tbody>`;
     studyArr.forEach(([name, d]) => {
-      const pct = d.total > 0 ? Math.round(d.complete / d.total * 100) : 0;
-      const pctColor = pct >= 75 ? '#059669' : pct >= 50 ? '#f59e0b' : pct > 0 ? '#3b82f6' : '#94a3b8';
-      html += `<tr style="border-bottom:1px solid #f8fafc;">
-        <td style="padding:3px 6px;font-weight:600;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHTML(name)}">${escapeHTML(name)}</td>
-        <td style="padding:3px 6px;text-align:center;">${d.total}</td>
-        <td style="padding:3px 6px;text-align:center;color:#059669;font-weight:600;">${d.complete}</td>
-        <td style="padding:3px 6px;text-align:center;color:${d.pending > 0 ? '#f59e0b' : '#94a3b8'};font-weight:${d.pending > 0 ? '700' : '400'};">${d.pending || '—'}</td>
-        <td style="padding:3px 6px;text-align:center;color:${d.piPending > 0 ? '#8b5cf6' : '#94a3b8'};">${d.piPending || '—'}</td>
+      const relPct = d.total > 0 ? Math.round(d.relSigned / d.total * 100) : 0;
+      const recPct = d.total > 0 ? Math.round(d.recsRecvd / d.total * 100) : 0;
+      const relColor = relPct >= 75 ? '#059669' : relPct >= 50 ? '#f59e0b' : relPct > 0 ? '#3b82f6' : '#94a3b8';
+      const recColor = recPct >= 75 ? '#059669' : recPct >= 50 ? '#f59e0b' : recPct > 0 ? '#3b82f6' : '#94a3b8';
+      html += `<tr style="border-bottom:1px solid #f8fafc;" onclick="showMedRecDetailModal('${escapeHTML(name).replace(/'/g,"\\'")}')" style="cursor:pointer;">
+        <td style="padding:3px 6px;font-weight:600;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;" title="${escapeHTML(name)}">${escapeHTML(name)}</td>
+        <td style="padding:3px 6px;text-align:center;font-weight:700;">${d.total}</td>
+        <td style="padding:3px 6px;text-align:center;">
+          <span style="color:${relColor};font-weight:700;">${d.relSigned}</span><span style="color:#94a3b8;font-size:9px;">/${d.total}</span>
+          ${d.relPending > 0 ? '<div style="font-size:8px;color:#f59e0b;">'+d.relPending+' pending</div>' : ''}
+        </td>
+        <td style="padding:3px 6px;text-align:center;">
+          <span style="color:${recColor};font-weight:700;">${d.recsRecvd}</span><span style="color:#94a3b8;font-size:9px;">/${d.total}</span>
+          ${d.recsPending > 0 ? '<div style="font-size:8px;color:#f59e0b;">'+d.recsPending+' pending</div>' : ''}
+        </td>
         <td style="padding:3px 6px;">
-          <div style="display:flex;align-items:center;gap:4px;">
-            <div style="flex:1;height:4px;background:#f1f5f9;border-radius:2px;overflow:hidden;">
-              <div style="height:100%;width:${pct}%;background:${pctColor};border-radius:2px;"></div>
+          <div style="display:flex;flex-direction:column;gap:2px;">
+            <div style="display:flex;align-items:center;gap:3px;" title="Release: ${relPct}%">
+              <span style="font-size:8px;color:#94a3b8;width:14px;">Rel</span>
+              <div style="flex:1;height:3px;background:#f1f5f9;border-radius:2px;overflow:hidden;">
+                <div style="height:100%;width:${relPct}%;background:${relColor};border-radius:2px;"></div>
+              </div>
+              <span style="font-size:8px;color:${relColor};font-weight:600;width:24px;text-align:right;">${relPct}%</span>
             </div>
-            <span style="font-size:9px;color:${pctColor};font-weight:600;min-width:28px;text-align:right;">${pct}%</span>
+            <div style="display:flex;align-items:center;gap:3px;" title="Records: ${recPct}%">
+              <span style="font-size:8px;color:#94a3b8;width:14px;">Rec</span>
+              <div style="flex:1;height:3px;background:#f1f5f9;border-radius:2px;overflow:hidden;">
+                <div style="height:100%;width:${recPct}%;background:${recColor};border-radius:2px;"></div>
+              </div>
+              <span style="font-size:8px;color:${recColor};font-weight:600;width:24px;text-align:right;">${recPct}%</span>
+            </div>
           </div>
         </td>
       </tr>`;
     });
-    html += '</tbody></table></div>';
+    html += '</tbody></table></div></div>';
   }
 
   // ── Action alerts ──
@@ -6412,7 +6453,27 @@ function buildMedRecAlerts() {
     });
   }
 
-  // 3. Pending records by portal (grouped)
+  // 3. Pending medical releases (Step 1 bottleneck)
+  if (releasePending > 0) {
+    const relPendList = active.filter(r => r.medical_release === 'Pending');
+    alerts.push({ icon: '📝', color: '#f59e0b', bg: '#fffbeb',
+      title: releasePending + ' patient' + (releasePending>1?'s':'') + ' awaiting medical release signature',
+      detail: relPendList.slice(0, 5).map(r => '<div style="font-size:11px;padding:2px 0;">' + maskPHI(r.name) + ' — ' + escapeHTML(r.study||'') + '</div>').join('') + (releasePending > 5 ? '<div style="font-size:10px;color:#94a3b8;">+' + (releasePending-5) + ' more</div>' : ''),
+      action: 'Send Jotform release links to these patients. Records cannot be requested without a signed release.'
+    });
+  }
+
+  // 3b. Patients still being contacted for release
+  if (releaseContact > 0) {
+    const contactList = active.filter(r => (r.medical_release||'').indexOf('Contact') !== -1);
+    alerts.push({ icon: '📞', color: '#8b5cf6', bg: '#f5f3ff',
+      title: releaseContact + ' patient' + (releaseContact>1?'s':'') + ' being contacted for release',
+      detail: contactList.slice(0, 5).map(r => '<div style="font-size:11px;padding:2px 0;">' + maskPHI(r.name) + ' — ' + escapeHTML(r.medical_release) + ' — ' + escapeHTML(r.study||'') + '</div>').join(''),
+      action: 'Continue outreach — these patients have been contacted but release not yet signed.'
+    });
+  }
+
+  // 4. Pending records by portal (Step 2 bottleneck — release signed but records not received)
   const pendingByPortal = {};
   MED_RECORDS_DATA.filter(r => r.is_active && r.records_received === 'Pending').forEach(r => {
     const portal = r.records_portal || 'Unknown';
@@ -6427,22 +6488,13 @@ function buildMedRecAlerts() {
     });
   });
 
-  // 4. Unavailable records (need alternate approach)
+  // 5. Unavailable records
   const unavail = MED_RECORDS_DATA.filter(r => r.is_active && r.records_received === 'Unavailable');
   if (unavail.length > 0) {
     alerts.push({ icon: '🚫', color: '#dc2626', bg: '#fef2f2',
       title: unavail.length + ' patient' + (unavail.length>1?'s':'') + ' with unavailable records',
       detail: unavail.slice(0, 5).map(r => '<div style="font-size:11px;padding:2px 0;">' + maskPHI(r.name) + ' — ' + escapeHTML(r.study||'') + '</div>').join(''),
       action: 'Records marked unavailable — try alternate physicians or request patient to bring copies.'
-    });
-  }
-
-  // 5. Active patients with no records status set
-  if (recsBlank > 0) {
-    alerts.push({ icon: '❓', color: '#64748b', bg: '#f8fafc',
-      title: recsBlank + ' active patient' + (recsBlank>1?'s':'') + ' with no records status',
-      detail: active.filter(r => !r.records_received || r.records_received === '').slice(0, 5).map(r => '<div style="font-size:11px;padding:2px 0;">' + maskPHI(r.name) + ' — ' + escapeHTML(r.study||'') + '</div>').join('') + (recsBlank > 5 ? '<div style="font-size:10px;color:#94a3b8;">+' + (recsBlank-5) + ' more</div>' : ''),
-      action: 'Update "Medical records received?" in ClickUp for these patients to track progress.'
     });
   }
 

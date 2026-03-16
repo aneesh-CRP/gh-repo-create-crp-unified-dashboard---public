@@ -218,11 +218,16 @@ var MED_STATUS_MAP = {
   'in screening':     'In Screening',
   'screen fail':      'Screen Fail',
   'no show':          'No Show',
+  'no show not rescheduled': 'No Show',
   'complete':         'Complete',
+  'discontinued':     'Discontinued',
+  'cancelled':        'Cancelled',
+  'in another study': 'In Another Study',
+  'withdrawn':        'Withdrawn',
 };
 
 var MED_ACTIVE_STATUSES = ['Pending Release','Under Review','Ready to Schedule','Visit Scheduled','In Screening','Enrolled'];
-var MED_CLOSED_STATUSES = ['DNQ','Screen Fail','Not Interested','Unable to Reach','No Show','Complete'];
+var MED_CLOSED_STATUSES = ['DNQ','Screen Fail','Not Interested','Unable to Reach','No Show','Complete','Discontinued','Cancelled','In Another Study','Withdrawn'];
 
 function syncMedicalRecords(token) {
   // Fetch all lists in the Medical Records folder
