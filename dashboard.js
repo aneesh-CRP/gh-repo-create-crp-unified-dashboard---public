@@ -105,7 +105,7 @@ const CRP_CONFIG = {
     CAMPAIGNS_CSV: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTPrFpOKckIDKYtnV30EBkL9ryI4q4HHKXDLxzgu6ZqVzrALoGU0Tpf_MNYHzg2UxcPajaJWpOONBbP/pub?gid=44963051&single=true&output=csv',
     // Medical Records — synced from ClickUp folder 90147290121 by clickup-sync/Code.gs
     // After first syncAll(), get the MedicalRecords sheet GID and update below
-    MED_RECORDS_CSV: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTPrFpOKckIDKYtnV30EBkL9ryI4q4HHKXDLxzgu6ZqVzrALoGU0Tpf_MNYHzg2UxcPajaJWpOONBbP/pub?gid=0&single=true&output=csv',
+    MED_RECORDS_CSV: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTPrFpOKckIDKYtnV30EBkL9ryI4q4HHKXDLxzgu6ZqVzrALoGU0Tpf_MNYHzg2UxcPajaJWpOONBbP/pub?gid=1921715962&single=true&output=csv',
     // Finance Master Sheet — published key + tab GIDs for CSV access
     FINANCE_PUB_KEY: '2PACX-1vQXxreb6lrZHej3luMOSI07ditFm6mmGHIHrxWu9BkTfsvk0OLk_gx7o_JIY34UIgroGIKgEYbVdC_V',
   },
