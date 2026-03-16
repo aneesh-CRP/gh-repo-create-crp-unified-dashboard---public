@@ -4430,7 +4430,7 @@ function renderStaffEconomics() {
     const lowVisitDays = dailyDetail.filter(d => d.visitCount < 2 && d.hrs >= 6).length;
 
     return {
-      name: r.name, role: r.role, workDays, avgHrsDay, dailyCost, rate,
+      name: r.name, role: r.role, hours: r.hours, workDays, avgHrsDay, dailyCost, rate,
       totalVisits, visitsPerDay, costPerVisit, revPerVisit, marginPerVisit,
       totalCost, attrRevenue: r.attrRevenue, lowVisitDays, dailyDetail, rateSource: r.rateSource
     };
@@ -4488,8 +4488,8 @@ function renderStaffEconomics() {
     const ivVisitsPerDay = hasVisitData && ivWorkDays > 0 ? ivTotalVisits / ivWorkDays : 0;
     const ivCostPerVisit = hasVisitData && ivTotalVisits > 0 ? totalCost / ivTotalVisits : 0;
     visitRows.push({
-      name: invName, role: 'investigator', workDays: hasVisitData ? ivWorkDays : workDaysEst,
-      avgHrsDay, dailyCost, rate,
+      name: invName, role: 'investigator', hours: hrsPerWeek * 50,
+      workDays: hasVisitData ? ivWorkDays : workDaysEst, avgHrsDay, dailyCost, rate,
       totalVisits: ivTotalVisits, visitsPerDay: ivVisitsPerDay,
       costPerVisit: ivCostPerVisit, revPerVisit: 0, marginPerVisit: hasVisitData ? -ivCostPerVisit : 0,
       totalCost, attrRevenue: 0, lowVisitDays: 0,
@@ -4554,7 +4554,7 @@ function renderStaffEconomics() {
   const vTotalDays = visitRows.reduce((s,r) => s + r.workDays, 0);
   visitProfBody.innerHTML += '<tr style="border-top:2px solid var(--border);font-weight:700;background:var(--surface2)">' +
     '<td>AVERAGES (' + visitRows.length + ' staff)</td>' +
-    '<td class="r">' + Math.round(vTotalDays / visitRows.length) + '</td>' +
+    '<td class="r">' + (visitRows.length > 0 ? Math.round(vTotalDays / visitRows.length) : '—') + '</td>' +
     '<td class="r">' + (vTotalDays > 0 ? (visitRows.reduce((s,r) => s + r.hours, 0) / vTotalDays).toFixed(1) : '—') + '</td>' +
     '<td class="r">' + (vTotalDays > 0 ? (vTotalVisits / vTotalDays).toFixed(1) : '—') + '</td>' +
     '<td class="r" style="color:#EF4444">' + fmtD(vAvgCPV) + '</td>' +
