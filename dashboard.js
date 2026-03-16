@@ -5820,7 +5820,7 @@ function loadDismissedItems() {
   try { return JSON.parse(localStorage.getItem('crp_dismissed_items') || '{}'); } catch(e) { return {}; }
 }
 function saveDismissedItems(map) {
-  localStorage.setItem('crp_dismissed_items', JSON.stringify(map));
+  try { localStorage.setItem('crp_dismissed_items', JSON.stringify(map)); } catch(e) {}
 }
 function dismissItem(itemKey, reason) {
   var map = loadDismissedItems();
@@ -5882,7 +5882,7 @@ function buildActionSteps() {
       : '';
     const typeCell = typeBadge(p.type||'');
     const coordCell = coordChip(p.coord);
-    const esc = itemKey.replace(/'/g,"\\'");
+    const esc = itemKey.replace(/'/g,"\\'").replace(/"/g,'&quot;');
     const chk = itemKey ? (isDone
       ? `<button onclick="event.stopPropagation();undismissItem('${esc}')" style="background:none;border:none;cursor:pointer;font-size:12px;padding:0;color:#16a34a;line-height:1;" title="Undo">↩</button>`
       : `<button onclick="event.stopPropagation();dismissItem('${esc}','done')" style="background:none;border:1px solid #d1d5db;border-radius:3px;width:18px;height:18px;cursor:pointer;font-size:11px;padding:0;color:#d1d5db;line-height:1;transition:all .15s;display:flex;align-items:center;justify-content:center;" onmouseover="this.style.color='#16a34a';this.style.borderColor='#16a34a'" onmouseout="this.style.color='#d1d5db';this.style.borderColor='#d1d5db'" title="Mark done">✓</button>`)
@@ -6012,7 +6012,7 @@ function buildActionSteps() {
     </div><div style="margin-top:4px;">${nsWithUpcoming.map(p=>patRow(p,true,sid)).join('')}</div>`,
     action:'Text + call each patient today. Confirm the upcoming visit explicitly. Log all contact attempts in CRIO.'
   });}
-  if(nsNoUpcoming.length>0){ const sid='ns-resched-'+nsNoUpcoming.length; steps.push({pri:8,id:sid,icon:'📋',tag:'NO SHOW — RESCHEDULE',tagBg:'#f5f3ff','tagColor':'#5b21b6',
+  if(nsNoUpcoming.length>0){ const sid='ns-resched-'+nsNoUpcoming.length; steps.push({pri:8,id:sid,icon:'📋',tag:'NO SHOW — RESCHEDULE',tagBg:'#f5f3ff',tagColor:'#5b21b6',
     title:`${nsNoUpcoming.length} no-shows with no future visit scheduled`,
     body:`<div style="margin-top:6px;">${nsNoUpcoming.slice(0,6).map(p=>patRow(p,true,sid)).join('')}${nsNoUpcoming.length>6?`<div style="padding:4px 0;color:#94a3b8;font-size:11px;">+${nsNoUpcoming.length-6} more</div>`:''}</div>`,
     action:'Reach out to reschedule. If no response in 5 days: document as LTF.'
@@ -6893,16 +6893,16 @@ function showStudyUnifiedModal(studyName) {
     if (medRec.patients && medRec.patients.length > 0) {
       var activePatients = medRec.patients.filter(function(p){ return p.is_active; });
       if (activePatients.length > 0) {
-        body += '<table class="detail-table" style="margin-bottom:12px;"><thead><tr><th>Patient</th><th>Status</th><th>Records</th><th>Approval</th></tr></thead><tbody>';
+        body += '<table class="detail-table" style="margin-bottom:12px;"><thead><tr><th>Patient</th><th>Status</th><th>Approval</th><th>Updated</th></tr></thead><tbody>';
         activePatients.slice(0,8).forEach(function(p) {
           var statusColors = {'Enrolled':'#059669','In Screening':'#8b5cf6','Visit Scheduled':'#06b6d4','Ready to Schedule':'#f59e0b','Pending Release':'#94a3b8','Under Review':'#64748b'};
           var sc = statusColors[p.status] || '#94a3b8';
-          var recBadge = p.records_received === 'Yes' ? '<span style="color:#059669;font-weight:700;">✓</span>' : '<span style="color:#dc2626;">✗</span>';
-          var appBadge = p.investigator_approval === 'Approved' ? '<span style="color:#059669;">✓</span>' : (p.investigator_approval ? '<span style="color:#f59e0b;">' + p.investigator_approval + '</span>' : '—');
-          body += '<tr><td><a href="' + p.url + '" target="_blank" style="color:#1e293b;text-decoration:none;font-weight:600;">' + p.name + '</a></td>';
-          body += '<td><span style="font-size:10px;padding:2px 6px;border-radius:4px;background:' + sc + '22;color:' + sc + ';font-weight:600;">' + p.status + '</span></td>';
-          body += '<td style="text-align:center;">' + recBadge + '</td>';
-          body += '<td style="text-align:center;">' + appBadge + '</td></tr>';
+          var appBadge = p.investigator_approval === 'Approved' ? '<span style="color:#059669;">✓</span>' : (p.investigator_approval ? '<span style="color:#f59e0b;">' + escapeHTML(p.investigator_approval) + '</span>' : '—');
+          var staleColor = p.days_since_update > 14 ? '#dc2626' : p.days_since_update > 7 ? '#f59e0b' : '#64748b';
+          body += '<tr><td><a href="' + escapeHTML(p.url) + '" target="_blank" style="color:#1e293b;text-decoration:none;font-weight:600;">' + maskPHI(p.name) + '</a></td>';
+          body += '<td><span style="font-size:10px;padding:2px 6px;border-radius:4px;background:' + sc + '22;color:' + sc + ';font-weight:600;">' + escapeHTML(p.status) + '</span></td>';
+          body += '<td style="text-align:center;">' + appBadge + '</td>';
+          body += '<td style="text-align:center;font-weight:600;color:' + staleColor + ';">' + (p.days_since_update || '—') + 'd</td></tr>';
         });
         body += '</tbody></table>';
         if (activePatients.length > 8) body += '<div style="font-size:10px;color:#94a3b8;margin-bottom:8px;">+' + (activePatients.length - 8) + ' more active patients</div>';
@@ -8370,7 +8370,7 @@ function getStudyMedRecords(studyName) {
     visitSched: patients.filter(function(r){ return r.status === 'Visit Scheduled'; }).length,
     pendingRecords: patients.filter(function(r){ return r.status === 'Pending Release' || r.status === 'Under Review'; }).length,
     dnq: patients.filter(function(r){ return r.status === 'DNQ' || r.status === 'Screen Fail'; }).length,
-    noRecords: patients.filter(function(r){ return r.records_received === 'No' || !r.records_received; }).length,
+    stale: patients.filter(function(r){ return r.is_active && r.days_since_update > 14; }).length,
     patients: patients,
   };
 }
