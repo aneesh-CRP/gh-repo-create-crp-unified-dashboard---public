@@ -6881,10 +6881,10 @@ function renderStaffEconomics() {
     const alreadyIn = allRows.some(r => r.role === 'investigator' && r.name.toLowerCase().includes(inv.parts[0]) && r.name.toLowerCase().includes(inv.parts[inv.parts.length-1]));
     if (alreadyIn) return;
     // Find PnL cost for this investigator
-    let pnlCost = 0, matchedKey = '';
+    let pnlCost = 0;
     Object.entries(pnlCostByName).forEach(([key, cost]) => {
       const kLo = key.toLowerCase();
-      if (kLo.includes(inv.parts[0]) && kLo.includes(inv.parts[inv.parts.length-1])) { pnlCost = cost; matchedKey = key; }
+      if (kLo.includes(inv.parts[0]) && kLo.includes(inv.parts[inv.parts.length-1])) { pnlCost = cost; }
     });
     allRows.push({
       name: inv.full + (pnlCost > 0 ? '' : ' (no QB data)'),
@@ -6948,13 +6948,16 @@ function renderStaffEconomics() {
 
     // Merge coordinator visit sources: CRIO coordGoals > coord-history.json > TA daily
     const calRows = [];
+    function findEmpMap(name) {
+      const parts = name.toLowerCase().split(/\s+/);
+      if (parts.length < 2) return null;
+      const key = Object.keys(empMap).find(k => k.toLowerCase().includes(parts[0]) && k.toLowerCase().includes(parts[parts.length-1]));
+      return key ? empMap[key] : null;
+    }
     coordNames.forEach(name => {
       const cg = coordGoals.byDay[name] || {};
       const ch = coordHist[name] || {};
-      const taData = empMap[Object.keys(empMap).find(k => {
-        const parts = name.toLowerCase().split(/\s+/);
-        return parts.length >= 2 && k.toLowerCase().includes(parts[0]) && k.toLowerCase().includes(parts[parts.length-1]);
-      }) || ''];
+      const taData = findEmpMap(name);
       const taDays = taData ? taData.dailyStudies || {} : {};
       const days = {};
       dates.forEach(date => {
@@ -6970,11 +6973,7 @@ function renderStaffEconomics() {
     invNames.forEach(name => {
       const iv = invVisits[name] || {};
       const ivByDay = iv.byDay || {};
-      // Also check empMap for TA daily data
-      const taData = empMap[Object.keys(empMap).find(k => {
-        const parts = name.toLowerCase().split(/\s+/);
-        return parts.length >= 2 && k.toLowerCase().includes(parts[0]) && k.toLowerCase().includes(parts[parts.length-1]);
-      }) || ''];
+      const taData = findEmpMap(name);
       const taDays = taData ? taData.dailyStudies || {} : {};
       const days = {};
       dates.forEach(date => {
@@ -6989,7 +6988,6 @@ function renderStaffEconomics() {
 
     // Render calendar grid
     const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-    const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     const todayStr = today.toISOString().split('T')[0];
 
     let html = '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px">';
@@ -7092,7 +7090,7 @@ function renderStaffEconomics() {
   clinicalRows.forEach(emp => {
     emp.studyDetail.forEach(sd => {
       if (!studyStaffMap[sd.study]) studyStaffMap[sd.study] = { study: sd.study, totalHrs: 0, revenue: sd.studyRev, staff: [], totalCost: 0, coords: 0, invs: 0 };
-      const empCostRate = emp.pnlCost > 0 ? emp.pnlCost / emp.hours : (emp.hourlyRate > 0 ? emp.hourlyRate : avgCostRate);
+      const empCostRate = emp.pnlCost > 0 && emp.hours > 0 ? emp.pnlCost / emp.hours : (emp.hourlyRate > 0 ? emp.hourlyRate : avgCostRate);
       const studyCost = empCostRate * sd.hours;
       studyStaffMap[sd.study].totalHrs += sd.hours;
       studyStaffMap[sd.study].totalCost += studyCost;
@@ -7194,14 +7192,17 @@ function renderStaffEconomics() {
   Object.entries(invSchedules).forEach(([invName, sched]) => {
     // Skip if already in visitRows (has TA data)
     if (visitRows.some(r => r.name.toLowerCase().includes(invName.toLowerCase().split(/\s+/)[0]) && r.name.toLowerCase().includes(invName.toLowerCase().split(/\s+/).pop()))) return;
-    // Look up rate from empRates
+    // Look up rate from empRates (bidirectional fuzzy match)
     let rate = 0;
+    const ipLo = invName.toLowerCase();
+    const ipParts = ipLo.split(/\s+/);
     Object.entries(empRates).forEach(([qbName, data]) => {
-      const qp = qbName.toLowerCase().split(/\s+/);
-      const ip = invName.toLowerCase().split(/\s+/);
-      if (qp.length >= 2 && ip.length >= 2 && invName.toLowerCase().includes(qp[0]) && invName.toLowerCase().includes(qp[qp.length-1])) {
-        rate = data.costRate || data.billRate || 0;
-      }
+      const qpLo = qbName.toLowerCase();
+      const qpParts = qpLo.split(/\s+/);
+      if (qpParts.length < 2 || ipParts.length < 2) return;
+      const fwd = ipLo.includes(qpParts[0]) && ipLo.includes(qpParts[qpParts.length-1]);
+      const rev = qpLo.includes(ipParts[0]) && qpLo.includes(ipParts[ipParts.length-1]);
+      if (fwd || rev) rate = data.costRate || data.billRate || 0;
     });
     if (rate === 0) rate = avgCostRate;
     // Check PnL cost
