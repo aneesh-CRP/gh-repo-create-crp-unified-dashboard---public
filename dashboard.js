@@ -2238,6 +2238,53 @@ function buildUpcomingDetailTable(rows) {
   }).join('');
 }
 
+function injectScheduleMedRecords() {
+  if (!MED_RECORDS_DATA || MED_RECORDS_DATA.length === 0) return;
+  const tbody = document.getElementById('upcoming-tbody');
+  if (!tbody) return;
+  const rows = tbody.querySelectorAll('tr');
+  rows.forEach(row => {
+    const cells = row.querySelectorAll('td');
+    if (cells.length < 5) return;
+    // Patient name is in the 4th cell (index 3)
+    const patName = (cells[3].textContent || '').trim().toLowerCase();
+    // Look up in MED_RECORDS_DATA
+    const mr = MED_RECORDS_DATA.find(m => {
+      const mName = (m.name || '').trim().toLowerCase();
+      return mName === patName || mName.includes(patName) || patName.includes(mName);
+    });
+    // Build badge HTML
+    let html = '<span style="color:#cbd5e1;font-size:10px">\u2014</span>';
+    if (mr) {
+      const rel = (mr.medical_release || '').toLowerCase();
+      const rec = (mr.records_received || '').toLowerCase();
+      const relDone = rel === 'signed' || rel === 'yes' || rel === 'complete' || rel === 'received';
+      const recDone = rec === 'received' || rec === 'recieved' || rec === 'yes' || rec === 'complete';
+      const relNo = rel === 'no';
+      const relPending = !relDone && !relNo && rel && rel !== 'n/a' && rel !== '';
+      const recPending = !recDone && rec && rec !== 'n/a' && rec !== 'no' && rec !== '';
+      if (recDone && relDone) {
+        html = '<span style="font-size:9px;font-weight:700;padding:2px 5px;border-radius:3px;background:#05966920;color:#059669" title="Release: ' + escapeHTML(mr.medical_release||'') + ', Records: ' + escapeHTML(mr.records_received||'') + '">\u2713 Complete</span>';
+      } else {
+        html = '';
+        if (relDone) html += '<span style="font-size:9px;font-weight:600;padding:1px 4px;border-radius:3px;background:#05966920;color:#059669" title="Release: ' + escapeHTML(mr.medical_release||'') + '">Rel \u2713</span> ';
+        else if (relPending) html += '<span style="font-size:9px;font-weight:600;padding:1px 4px;border-radius:3px;background:#d9770620;color:#d97706" title="Release: ' + escapeHTML(mr.medical_release||'') + '">Rel \u23f3</span> ';
+        else if (relNo) html += '<span style="font-size:9px;font-weight:600;padding:1px 4px;border-radius:3px;background:#dc262620;color:#dc2626" title="Release: No">Rel \u2717</span> ';
+        else html += '<span style="font-size:9px;font-weight:600;padding:1px 4px;border-radius:3px;background:#94a3b820;color:#94a3b8" title="Release: not set">Rel \u2014</span> ';
+        if (recDone) html += '<span style="font-size:9px;font-weight:600;padding:1px 4px;border-radius:3px;background:#05966920;color:#059669" title="Records: ' + escapeHTML(mr.records_received||'') + '">Rec \u2713</span>';
+        else if (recPending) html += '<span style="font-size:9px;font-weight:600;padding:1px 4px;border-radius:3px;background:#d9770620;color:#d97706" title="Records: ' + escapeHTML(mr.records_received||'') + '">Rec \u23f3</span>';
+        else html += '<span style="font-size:9px;font-weight:600;padding:1px 4px;border-radius:3px;background:#94a3b820;color:#94a3b8" title="Records: not set">Rec \u2014</span>';
+      }
+    }
+    // Insert new td after patient cell (index 3), before status cell (index 4)
+    const td = document.createElement('td');
+    td.style.whiteSpace = 'nowrap';
+    td.innerHTML = html;
+    cells[3].parentNode.insertBefore(td, cells[4]);
+  });
+  console.log('Schedule med records injected for', rows.length, 'rows');
+}
+
 function buildStatusChart() {
   const d = DATA.subjectStatus;
   mkChart('statusChart', {
@@ -8069,6 +8116,7 @@ async function fetchMedicalRecords() {
     console.log('MedRecords loaded:', MED_RECORDS_DATA.length, 'patients');
     renderMedicalRecords();
     safe(buildMedRecAlerts, 'buildMedRecAlerts');
+    safe(injectScheduleMedRecords, 'injectScheduleMedRecords');
   } catch(e) {
     console.warn('fetchMedicalRecords error:', e);
   }
