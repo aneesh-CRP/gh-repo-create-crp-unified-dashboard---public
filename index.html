@@ -2273,7 +2273,7 @@ body {
       <span class="card-title">🏥 Medical Records Follow-Up Required</span>
       <span class="badge badge-purple" id="medrec-alerts-badge">Loading...</span>
     </div>
-    <div id="medrec-alerts-content" style="max-height:300px;overflow-y:auto;">
+    <div id="medrec-alerts-content" style="max-height:500px;overflow-y:auto;">
       <div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">Loading medical records alerts...</div>
     </div>
   </div>
@@ -9028,6 +9028,119 @@ function buildMedRecAlerts() {
     return;
   }
 
+  // ── Pipeline summary stats ──
+  const active = MED_RECORDS_DATA.filter(r => r.is_active);
+  const total = MED_RECORDS_DATA.length;
+  const recsComplete = MED_RECORDS_DATA.filter(r => r.records_received === 'Received').length;
+  const recsPending = MED_RECORDS_DATA.filter(r => r.is_active && r.records_received === 'Pending').length;
+  const recsNA = MED_RECORDS_DATA.filter(r => r.records_received === 'Not applicable').length;
+  const recsUnavail = MED_RECORDS_DATA.filter(r => r.is_active && r.records_received === 'Unavailable').length;
+  const recsBlank = active.filter(r => !r.records_received || r.records_received === '').length;
+  const releaseRecvd = MED_RECORDS_DATA.filter(r => r.medical_release === 'Recieved').length;
+  const releasePending = MED_RECORDS_DATA.filter(r => r.is_active && r.medical_release === 'Pending').length;
+  const inCrio = MED_RECORDS_DATA.filter(r => r.records_in_crio === 'Yes').length;
+  const piConfirmed = MED_RECORDS_DATA.filter(r => r.investigator_approval && r.investigator_approval.indexOf('Confirmed') !== -1).length;
+  const piPending = active.filter(r => r.investigator_approval && r.investigator_approval.indexOf('Confirmed') === -1 && r.investigator_approval !== 'Not Applicable' && r.investigator_approval !== '').length;
+
+  // Completion: records_received === 'Received' means that patient's medical records workflow is done
+  const completionPct = total > 0 ? Math.round(recsComplete / total * 100) : 0;
+  const barColor = completionPct >= 75 ? '#059669' : completionPct >= 50 ? '#f59e0b' : '#dc2626';
+
+  // ── Summary dashboard ──
+  let html = `<div style="padding:12px 16px;border-bottom:1px solid #e2e8f0;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <span style="font-size:12px;font-weight:700;color:#1e293b;">Medical Records Pipeline</span>
+      <span style="font-size:11px;color:${barColor};font-weight:700;">${recsComplete} / ${total} complete (${completionPct}%)</span>
+    </div>
+    <div style="height:8px;background:#f1f5f9;border-radius:4px;overflow:hidden;margin-bottom:10px;">
+      <div style="height:100%;width:${completionPct}%;background:${barColor};border-radius:4px;transition:width .3s;"></div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center;">
+      <div style="padding:6px;background:#f0fdf4;border-radius:6px;">
+        <div style="font-size:16px;font-weight:800;color:#059669;">${recsComplete}</div>
+        <div style="font-size:9px;color:#059669;font-weight:600;">Records Received</div>
+      </div>
+      <div style="padding:6px;background:#fffbeb;border-radius:6px;">
+        <div style="font-size:16px;font-weight:800;color:#f59e0b;">${recsPending}</div>
+        <div style="font-size:9px;color:#f59e0b;font-weight:600;">Pending Records</div>
+      </div>
+      <div style="padding:6px;background:#f5f3ff;border-radius:6px;">
+        <div style="font-size:16px;font-weight:800;color:#8b5cf6;">${piConfirmed}</div>
+        <div style="font-size:9px;color:#8b5cf6;font-weight:600;">PI Approved</div>
+      </div>
+      <div style="padding:6px;background:#eff6ff;border-radius:6px;">
+        <div style="font-size:16px;font-weight:800;color:#3b82f6;">${inCrio}</div>
+        <div style="font-size:9px;color:#3b82f6;font-weight:600;">In CRIO</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center;margin-top:6px;">
+      <div style="padding:4px;background:#f8fafc;border-radius:4px;">
+        <div style="font-size:13px;font-weight:700;color:#475569;">${active.length}</div>
+        <div style="font-size:9px;color:#94a3b8;">Active</div>
+      </div>
+      <div style="padding:4px;background:#f8fafc;border-radius:4px;">
+        <div style="font-size:13px;font-weight:700;color:#475569;">${releaseRecvd}</div>
+        <div style="font-size:9px;color:#94a3b8;">Releases Signed</div>
+      </div>
+      <div style="padding:4px;background:#f8fafc;border-radius:4px;">
+        <div style="font-size:13px;font-weight:700;color:#475569;">${releasePending}</div>
+        <div style="font-size:9px;color:#94a3b8;">Releases Pending</div>
+      </div>
+      <div style="padding:4px;background:#f8fafc;border-radius:4px;">
+        <div style="font-size:13px;font-weight:700;color:#dc2626;">${recsUnavail + recsBlank}</div>
+        <div style="font-size:9px;color:#94a3b8;">No Records</div>
+      </div>
+    </div>
+  </div>`;
+
+  // ── By-study breakdown ──
+  const byStudy = {};
+  MED_RECORDS_DATA.forEach(r => {
+    const s = r.study || 'Unknown';
+    if (!byStudy[s]) byStudy[s] = { total: 0, active: 0, complete: 0, pending: 0, piPending: 0 };
+    byStudy[s].total++;
+    if (r.is_active) byStudy[s].active++;
+    if (r.records_received === 'Received') byStudy[s].complete++;
+    if (r.is_active && r.records_received === 'Pending') byStudy[s].pending++;
+    if (r.is_active && r.investigator_approval && r.investigator_approval.indexOf('Confirmed') === -1 && r.investigator_approval !== 'Not Applicable' && r.investigator_approval !== '') byStudy[s].piPending++;
+  });
+  const studyArr = Object.entries(byStudy).sort((a,b) => b[1].pending - a[1].pending);
+
+  if (studyArr.length > 0) {
+    html += `<div style="padding:12px 16px;border-bottom:1px solid #e2e8f0;">
+      <div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:6px;">By Study</div>
+      <table style="width:100%;border-collapse:collapse;font-size:11px;">
+        <thead><tr style="border-bottom:1px solid #e2e8f0;text-align:left;">
+          <th style="padding:4px 6px;">Study</th>
+          <th style="padding:4px 6px;text-align:center;">Total</th>
+          <th style="padding:4px 6px;text-align:center;">Complete</th>
+          <th style="padding:4px 6px;text-align:center;">Pending</th>
+          <th style="padding:4px 6px;text-align:center;">PI Waiting</th>
+          <th style="padding:4px 6px;text-align:center;">Progress</th>
+        </tr></thead><tbody>`;
+    studyArr.forEach(([name, d]) => {
+      const pct = d.total > 0 ? Math.round(d.complete / d.total * 100) : 0;
+      const pctColor = pct >= 75 ? '#059669' : pct >= 50 ? '#f59e0b' : pct > 0 ? '#3b82f6' : '#94a3b8';
+      html += `<tr style="border-bottom:1px solid #f8fafc;">
+        <td style="padding:3px 6px;font-weight:600;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHTML(name)}">${escapeHTML(name)}</td>
+        <td style="padding:3px 6px;text-align:center;">${d.total}</td>
+        <td style="padding:3px 6px;text-align:center;color:#059669;font-weight:600;">${d.complete}</td>
+        <td style="padding:3px 6px;text-align:center;color:${d.pending > 0 ? '#f59e0b' : '#94a3b8'};font-weight:${d.pending > 0 ? '700' : '400'};">${d.pending || '—'}</td>
+        <td style="padding:3px 6px;text-align:center;color:${d.piPending > 0 ? '#8b5cf6' : '#94a3b8'};">${d.piPending || '—'}</td>
+        <td style="padding:3px 6px;">
+          <div style="display:flex;align-items:center;gap:4px;">
+            <div style="flex:1;height:4px;background:#f1f5f9;border-radius:2px;overflow:hidden;">
+              <div style="height:100%;width:${pct}%;background:${pctColor};border-radius:2px;"></div>
+            </div>
+            <span style="font-size:9px;color:${pctColor};font-weight:600;min-width:28px;text-align:right;">${pct}%</span>
+          </div>
+        </td>
+      </tr>`;
+    });
+    html += '</tbody></table></div>';
+  }
+
+  // ── Action alerts ──
   const alerts = [];
 
   // 1. Referrals with no medical records entry
@@ -9036,7 +9149,7 @@ function buildMedRecAlerts() {
     alerts.push({ icon: '⚠️', color: '#d97706', bg: '#fffbeb',
       title: refsNoMR.length + ' active referral' + (refsNoMR.length>1?'s':'') + ' missing medical records entry',
       detail: refsNoMR.slice(0, 5).map(r => '<div style="font-size:11px;padding:2px 0;">' + maskPHI(r.name) + ' — ' + escapeHTML(r.study||'') + '</div>').join('') + (refsNoMR.length > 5 ? '<div style="font-size:10px;color:#94a3b8;">+' + (refsNoMR.length-5) + ' more</div>' : ''),
-      action: 'Create medical records entries in ClickUp for these patients to track intake progress.'
+      action: 'Create medical records entries in ClickUp for these patients.'
     });
   }
 
@@ -9046,61 +9159,89 @@ function buildMedRecAlerts() {
     alerts.push({ icon: '📅', color: '#dc2626', bg: '#fef2f2',
       title: readyNoVisit.length + ' patient' + (readyNoVisit.length>1?'s':'') + ' ready to schedule but no upcoming visit',
       detail: readyNoVisit.slice(0, 5).map(r => '<div style="font-size:11px;padding:2px 0;">' + maskPHI(r.name) + ' — ' + escapeHTML(r.study||'') + '</div>').join(''),
-      action: 'Schedule visits for these patients immediately — they are cleared and waiting.'
+      action: 'Schedule visits for these patients — they are cleared and waiting.'
     });
   }
 
-  // 3. Pending medical records (records_received === 'Pending')
-  const pendingRecs = MED_RECORDS_DATA.filter(r => r.is_active && r.records_received === 'Pending');
-  if (pendingRecs.length > 0) {
+  // 3. Pending records by portal (grouped)
+  const pendingByPortal = {};
+  MED_RECORDS_DATA.filter(r => r.is_active && r.records_received === 'Pending').forEach(r => {
+    const portal = r.records_portal || 'Unknown';
+    if (!pendingByPortal[portal]) pendingByPortal[portal] = [];
+    pendingByPortal[portal].push(r);
+  });
+  Object.entries(pendingByPortal).sort((a,b) => b[1].length - a[1].length).forEach(([portal, pts]) => {
     alerts.push({ icon: '📄', color: '#f59e0b', bg: '#fffbeb',
-      title: pendingRecs.length + ' patient' + (pendingRecs.length>1?'s':'') + ' waiting on medical records',
-      detail: pendingRecs.slice(0, 5).map(r => '<div style="font-size:11px;padding:2px 0;">' + maskPHI(r.name) + ' — ' + escapeHTML(r.records_portal||'') + ' — ' + escapeHTML(r.study||'') + '</div>').join('') + (pendingRecs.length > 5 ? '<div style="font-size:10px;color:#94a3b8;">+' + (pendingRecs.length-5) + ' more</div>' : ''),
-      action: 'Follow up with records portals to obtain pending medical records.'
+      title: pts.length + ' pending record' + (pts.length>1?'s':'') + ' via ' + escapeHTML(portal),
+      detail: pts.slice(0, 4).map(r => '<div style="font-size:11px;padding:2px 0;">' + maskPHI(r.name) + ' — ' + escapeHTML(r.study||'') + '</div>').join('') + (pts.length > 4 ? '<div style="font-size:10px;color:#94a3b8;">+' + (pts.length-4) + ' more</div>' : ''),
+      action: 'Follow up with ' + escapeHTML(portal) + ' to obtain pending medical records.'
+    });
+  });
+
+  // 4. Unavailable records (need alternate approach)
+  const unavail = MED_RECORDS_DATA.filter(r => r.is_active && r.records_received === 'Unavailable');
+  if (unavail.length > 0) {
+    alerts.push({ icon: '🚫', color: '#dc2626', bg: '#fef2f2',
+      title: unavail.length + ' patient' + (unavail.length>1?'s':'') + ' with unavailable records',
+      detail: unavail.slice(0, 5).map(r => '<div style="font-size:11px;padding:2px 0;">' + maskPHI(r.name) + ' — ' + escapeHTML(r.study||'') + '</div>').join(''),
+      action: 'Records marked unavailable — try alternate physicians or request patient to bring copies.'
     });
   }
 
-  // 4. Stale records (active but not updated in 14+ days)
+  // 5. Active patients with no records status set
+  if (recsBlank > 0) {
+    alerts.push({ icon: '❓', color: '#64748b', bg: '#f8fafc',
+      title: recsBlank + ' active patient' + (recsBlank>1?'s':'') + ' with no records status',
+      detail: active.filter(r => !r.records_received || r.records_received === '').slice(0, 5).map(r => '<div style="font-size:11px;padding:2px 0;">' + maskPHI(r.name) + ' — ' + escapeHTML(r.study||'') + '</div>').join('') + (recsBlank > 5 ? '<div style="font-size:10px;color:#94a3b8;">+' + (recsBlank-5) + ' more</div>' : ''),
+      action: 'Update "Medical records received?" in ClickUp for these patients to track progress.'
+    });
+  }
+
+  // 6. Stale records (active but not updated in 14+ days)
   const stale = MED_RECORDS_DATA.filter(r => r.is_active && r.days_since_update > 14);
   if (stale.length > 0) {
     alerts.push({ icon: '⏰', color: '#f59e0b', bg: '#fffbeb',
       title: stale.length + ' active patient' + (stale.length>1?'s':'') + ' with no update in 14+ days',
-      detail: stale.sort((a,b) => b.days_since_update - a.days_since_update).slice(0, 5).map(r => '<div style="font-size:11px;padding:2px 0;">' + maskPHI(r.name) + ' — ' + r.days_since_update + ' days — ' + escapeHTML(r.study||'') + '</div>').join(''),
-      action: 'Review these records and update status. Stale records may indicate lost patients.'
+      detail: stale.sort((a,b) => b.days_since_update - a.days_since_update).slice(0, 5).map(r => '<div style="font-size:11px;padding:2px 0;">' + maskPHI(r.name) + ' — ' + r.days_since_update + 'd — ' + escapeHTML(r.study||'') + '</div>').join(''),
+      action: 'Review and update status. Stale records may indicate lost patients.'
     });
   }
 
-  // 4. Pending investigator approval
-  const pendingApproval = MED_RECORDS_DATA.filter(r => r.is_active && r.investigator_approval && r.investigator_approval.indexOf('Confirmed') === -1 && r.investigator_approval !== 'Not Applicable' && r.investigator_approval !== '');
-  if (pendingApproval.length > 0) {
+  // 7. Pending investigator approval
+  if (piPending > 0) {
+    const piList = active.filter(r => r.investigator_approval && r.investigator_approval.indexOf('Confirmed') === -1 && r.investigator_approval !== 'Not Applicable' && r.investigator_approval !== '');
     alerts.push({ icon: '📋', color: '#8b5cf6', bg: '#f5f3ff',
-      title: pendingApproval.length + ' patient' + (pendingApproval.length>1?'s':'') + ' pending investigator approval',
-      detail: pendingApproval.slice(0, 5).map(r => '<div style="font-size:11px;padding:2px 0;">' + maskPHI(r.name) + ' — ' + escapeHTML(r.investigator_approval) + ' — ' + escapeHTML(r.study||'') + '</div>').join(''),
+      title: piPending + ' patient' + (piPending>1?'s':'') + ' pending investigator approval',
+      detail: piList.slice(0, 5).map(r => '<div style="font-size:11px;padding:2px 0;">' + maskPHI(r.name) + ' — ' + escapeHTML(r.investigator_approval) + ' — ' + escapeHTML(r.study||'') + '</div>').join(''),
       action: 'Follow up with PI to approve these patients for study enrollment.'
     });
   }
 
-  if (alerts.length === 0) {
-    el.innerHTML = '<div style="text-align:center;padding:16px;color:#059669;font-size:12px;font-weight:600;">All medical records are up to date</div>';
-    if (badge) { badge.textContent = '0'; badge.className = 'badge badge-green'; }
-    return;
+  // ── Badge ──
+  const actionCount = alerts.length;
+  if (badge) {
+    if (actionCount === 0) { badge.textContent = completionPct + '% complete'; badge.className = 'badge badge-green'; }
+    else { badge.textContent = actionCount + ' action' + (actionCount>1?'s':''); badge.className = 'badge badge-purple'; }
   }
 
-  if (badge) { badge.textContent = alerts.length + ' alert' + (alerts.length>1?'s':''); badge.className = 'badge badge-purple'; }
-
-  el.innerHTML = alerts.map(a => `
-    <div style="padding:12px 16px;border-bottom:1px solid #f1f5f9;">
-      <div style="display:flex;gap:8px;align-items:flex-start;">
-        <span style="font-size:16px;">${a.icon}</span>
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:12px;font-weight:700;color:${a.color};margin-bottom:4px;">${a.title}</div>
-          <div style="margin-bottom:6px;">${a.detail}</div>
-          <div style="font-size:11px;color:#64748b;padding:4px 8px;background:#f8fafc;border-radius:4px;border-left:2px solid ${a.color};">
-            <strong>Action:</strong> ${a.action}
+  // ── Render alerts ──
+  if (alerts.length > 0) {
+    html += alerts.map(a => `
+      <div style="padding:10px 16px;border-bottom:1px solid #f1f5f9;">
+        <div style="display:flex;gap:8px;align-items:flex-start;">
+          <span style="font-size:14px;">${a.icon}</span>
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:11px;font-weight:700;color:${a.color};margin-bottom:3px;">${a.title}</div>
+            <div style="margin-bottom:4px;">${a.detail}</div>
+            <div style="font-size:10px;color:#64748b;padding:3px 8px;background:#f8fafc;border-radius:4px;border-left:2px solid ${a.color};">
+              <strong>Action:</strong> ${a.action}
+            </div>
           </div>
         </div>
-      </div>
-    </div>`).join('');
+      </div>`).join('');
+  }
+
+  el.innerHTML = html;
 }
 
 function renderAll() {
