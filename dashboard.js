@@ -2193,10 +2193,11 @@ function buildUpcomingDetailTable(rows) {
       if (mr) {
         const rel = (mr.medical_release || '').toLowerCase();
         const rec = (mr.records_received || '').toLowerCase();
-        const relDone = rel === 'signed' || rel === 'received' || rel === 'yes' || rel === 'complete';
-        const recDone = rec === 'received' || rec === 'yes' || rec === 'complete';
-        const relPending = !relDone && rel && rel !== 'n/a' && rel !== '';
-        const recPending = !recDone && rec && rec !== 'n/a' && rec !== '';
+        const relDone = rel === 'signed' || rel === 'yes' || rel === 'complete' || rel === 'received';
+        const recDone = rec === 'received' || rec === 'recieved' || rec === 'yes' || rec === 'complete';
+        const relNo = rel === 'no';
+        const relPending = !relDone && !relNo && rel && rel !== 'n/a' && rel !== '';
+        const recPending = !recDone && rec && rec !== 'n/a' && rec !== 'no' && rec !== '';
         let badges = '';
         if (recDone && relDone) {
           badges = `<span style="font-size:9px;font-weight:700;padding:2px 5px;border-radius:3px;background:#05966920;color:#059669" title="Release: ${escapeHTML(mr.medical_release||'')}, Records: ${escapeHTML(mr.records_received||'')}">✓ Complete</span>`;
@@ -2206,8 +2207,10 @@ function buildUpcomingDetailTable(rows) {
             badges += `<span style="font-size:9px;font-weight:600;padding:1px 4px;border-radius:3px;background:#05966920;color:#059669" title="Medical Release: ${escapeHTML(mr.medical_release||'')}">Rel ✓</span> `;
           } else if (relPending) {
             badges += `<span style="font-size:9px;font-weight:600;padding:1px 4px;border-radius:3px;background:#d9770620;color:#d97706" title="Medical Release: ${escapeHTML(mr.medical_release||'')}">Rel ⏳</span> `;
+          } else if (relNo) {
+            badges += `<span style="font-size:9px;font-weight:600;padding:1px 4px;border-radius:3px;background:#dc262620;color:#dc2626" title="Medical Release: No">Rel ✗</span> `;
           } else {
-            badges += `<span style="font-size:9px;font-weight:600;padding:1px 4px;border-radius:3px;background:#dc262620;color:#dc2626" title="Medical Release: not set">Rel ✗</span> `;
+            badges += `<span style="font-size:9px;font-weight:600;padding:1px 4px;border-radius:3px;background:#94a3b820;color:#94a3b8" title="Medical Release: not set">Rel —</span> `;
           }
           // Records badge
           if (recDone) {
@@ -2215,7 +2218,7 @@ function buildUpcomingDetailTable(rows) {
           } else if (recPending) {
             badges += `<span style="font-size:9px;font-weight:600;padding:1px 4px;border-radius:3px;background:#d9770620;color:#d97706" title="Records Received: ${escapeHTML(mr.records_received||'')}">Rec ⏳</span>`;
           } else {
-            badges += `<span style="font-size:9px;font-weight:600;padding:1px 4px;border-radius:3px;background:#dc262620;color:#dc2626" title="Records: not set">Rec ✗</span>`;
+            badges += `<span style="font-size:9px;font-weight:600;padding:1px 4px;border-radius:3px;background:#94a3b820;color:#94a3b8" title="Records: not set">Rec —</span>`;
           }
         }
         medCell = badges;
