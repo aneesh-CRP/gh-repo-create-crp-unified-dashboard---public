@@ -76,6 +76,10 @@ function syncAll() {
   writeSheet(ss, 'Campaigns', CAMPAIGN_HEADERS, campRows);
   Logger.log('Campaigns: ' + campRows.length + ' rows');
 
+  var medRows = syncMedicalRecords(token);
+  writeSheet(ss, 'MedicalRecords', MED_RECORDS_HEADERS, medRows);
+  Logger.log('MedicalRecords: ' + medRows.length + ' rows');
+
   // Write a sync timestamp to a metadata sheet
   var metaSheet = getOrCreateSheet(ss, '_SyncMeta');
   metaSheet.getRange('A1').setValue('last_sync');
@@ -84,6 +88,8 @@ function syncAll() {
   metaSheet.getRange('B2').setValue(refRows.length);
   metaSheet.getRange('A3').setValue('campaign_count');
   metaSheet.getRange('B3').setValue(campRows.length);
+  metaSheet.getRange('A4').setValue('medrec_count');
+  metaSheet.getRange('B4').setValue(medRows.length);
 }
 
 
@@ -173,6 +179,104 @@ function syncCampaigns(token) {
       t.url || 'https://app.clickup.com/t/' + t.id,
     ];
   });
+}
+
+
+// ============================================================
+// MEDICAL RECORDS SYNC (folder 90147290121 — one list per study)
+// ============================================================
+var MED_RECORDS_FOLDER_ID = '90147290121';
+
+var MED_RECORDS_HEADERS = [
+  'id','name','study','status_raw','status','phone','dob',
+  'investigator_approval','next_appointment','notes',
+  'date_created','date_updated','days_since_update','url',
+  'is_active','is_closed'
+];
+
+var MED_STATUS_MAP = {
+  'unable to reach': 'Unable to Reach',
+  'not interested':  'Not Interested',
+  'pending release':  'Pending Release',
+  'under review':     'Under Review',
+  'dnq':              'DNQ',
+  'ready to schedule':'Ready to Schedule',
+  'visit 0 scheduled':'Visit Scheduled',
+  'visit 1 scheduled':'Visit Scheduled',
+  'visit 2 scheduled':'Visit Scheduled',
+  'visit 3 scheduled':'Visit Scheduled',
+  'visit 4 scheduled':'Visit Scheduled',
+  'visit 5 scheduled':'Visit Scheduled',
+  'visit 6 scheduled':'Visit Scheduled',
+  'visit 7 scheduled':'Visit Scheduled',
+  'enrolled':         'Enrolled',
+  'in screening':     'In Screening',
+  'screen fail':      'Screen Fail',
+  'no show':          'No Show',
+  'complete':         'Complete',
+};
+
+var MED_ACTIVE_STATUSES = ['Pending Release','Under Review','Ready to Schedule','Visit Scheduled','In Screening','Enrolled'];
+var MED_CLOSED_STATUSES = ['DNQ','Screen Fail','Not Interested','Unable to Reach','No Show','Complete'];
+
+function syncMedicalRecords(token) {
+  // Fetch all lists in the Medical Records folder
+  var url = API_BASE + '/folder/' + MED_RECORDS_FOLDER_ID + '/list';
+  var resp = UrlFetchApp.fetch(url, {
+    headers: { 'Authorization': token },
+    muteHttpExceptions: true,
+  });
+  if (resp.getResponseCode() !== 200) {
+    Logger.log('ClickUp API error fetching MedRecords folder: ' + resp.getContentText().slice(0, 200));
+    return [];
+  }
+  var lists = JSON.parse(resp.getContentText()).lists || [];
+  var allRows = [];
+  for (var i = 0; i < lists.length; i++) {
+    var list = lists[i];
+    var studyName = list.name || '';
+    var tasks = fetchAllTasks(token, list.id);
+    for (var j = 0; j < tasks.length; j++) {
+      allRows.push(normalizeMedRecord(tasks[j], studyName));
+    }
+  }
+  return allRows;
+}
+
+function normalizeMedRecord(t, studyName) {
+  var fields = parseCustomFields(t.custom_fields || []);
+  var statusRaw = ((t.status || {}).status || '').toLowerCase();
+  var status = MED_STATUS_MAP[statusRaw] || statusRaw || 'Unknown';
+  var isActive = MED_ACTIVE_STATUSES.indexOf(status) !== -1;
+  var isClosed = MED_CLOSED_STATUSES.indexOf(status) !== -1
+    || (t.status || {}).type === 'closed'
+    || (t.status || {}).type === 'done';
+
+  var dateCreated = t.date_created
+    ? new Date(parseInt(t.date_created)).toISOString().split('T')[0] : '';
+  var dateUpdated = t.date_updated
+    ? new Date(parseInt(t.date_updated)).toISOString().split('T')[0] : '';
+  var daysSinceUpdate = t.date_updated
+    ? Math.floor((Date.now() - parseInt(t.date_updated)) / 86400000) : 999;
+
+  return [
+    t.id,
+    t.name || '',
+    studyName,
+    (t.status || {}).status || '',
+    status,
+    fields['Phone #'] || fields['Phone'] || '',
+    fields['Patient DOB'] || fields['DOB'] || '',
+    fields['Investigator Approval'] || fields['PI Approval'] || '',
+    fields['Next Appointment Date'] || fields['Next Appointment'] || '',
+    fields['Notes'] || '',
+    dateCreated,
+    dateUpdated,
+    daysSinceUpdate,
+    t.url || 'https://app.clickup.com/t/' + t.id,
+    isActive ? 'TRUE' : 'FALSE',
+    isClosed ? 'TRUE' : 'FALSE',
+  ];
 }
 
 
