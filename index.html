@@ -4945,45 +4945,90 @@ function buildUpcomingDetailTable(rows) {
   }).join('');
 }
 
+function _medReadiness(mr) {
+  // Score visit readiness from MED_RECORDS_DATA record
+  var rel = (mr.medical_release || '').toLowerCase();
+  var rec = (mr.records_received || '').toLowerCase();
+  var crio = (mr.records_in_crio || '').toLowerCase();
+  var pi = (mr.investigator_approval || '').toLowerCase();
+  var relOk = rel === 'signed' || rel === 'yes' || rel === 'complete' || rel === 'received';
+  var recOk = rec === 'received' || rec === 'recieved' || rec === 'yes' || rec === 'complete';
+  var crioOk = crio === 'yes';
+  var piOk = pi.indexOf('confirmed') !== -1;
+  var score = 0; var total = 4;
+  if (relOk) score++; if (recOk) score++; if (crioOk) score++; if (piOk) score++;
+  var level = score === total ? 'ready' : score >= 2 ? 'partial' : 'needs-action';
+  return { score:score, total:total, level:level, relOk:relOk, recOk:recOk, crioOk:crioOk, piOk:piOk };
+}
+
+function _readinessBadge(mr, idx) {
+  var r = _medReadiness(mr);
+  var colors = { ready:'#059669', partial:'#d97706', 'needs-action':'#dc2626' };
+  var labels = { ready:'\u2713 Ready', partial:'\u26a0 ' + r.score + '/' + r.total, 'needs-action':'\u2717 ' + r.score + '/' + r.total };
+  var c = colors[r.level];
+  return '<span onclick="showVisitReadiness(' + idx + ')" style="cursor:pointer;display:inline-block;margin-left:6px;font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:' + c + '20;color:' + c + ';vertical-align:middle" title="Click for details">' + labels[r.level] + '</span>';
+}
+
+function showVisitReadiness(idx) {
+  var mr = MED_RECORDS_DATA[idx];
+  if (!mr) return;
+  var r = _medReadiness(mr);
+  var dot = function(ok) { return ok ? '<span style="color:#059669;font-weight:700">\u2713</span>' : '<span style="color:#dc2626;font-weight:700">\u2717</span>'; };
+  var ref = (typeof REFERRAL_DATA !== 'undefined') ? REFERRAL_DATA.find(function(x){ return (x.name||'').toLowerCase().trim() === (mr.name||'').toLowerCase().trim(); }) : null;
+  var rows = '';
+  rows += '<tr><td style="font-weight:600">Medical Release</td><td>' + dot(r.relOk) + ' ' + escapeHTML(mr.medical_release || 'Not set') + '</td></tr>';
+  rows += '<tr><td style="font-weight:600">Records Received</td><td>' + dot(r.recOk) + ' ' + escapeHTML(mr.records_received || 'Not set') + '</td></tr>';
+  rows += '<tr><td style="font-weight:600">Records in CRIO</td><td>' + dot(r.crioOk) + ' ' + escapeHTML(mr.records_in_crio || 'Not set') + '</td></tr>';
+  rows += '<tr><td style="font-weight:600">PI Approval</td><td>' + dot(r.piOk) + ' ' + escapeHTML(mr.investigator_approval || 'Not set') + '</td></tr>';
+  rows += '<tr><td colspan="2" style="border-top:2px solid #e2e8f0;padding-top:8px;font-weight:700;color:#64748b">Additional Details</td></tr>';
+  rows += '<tr><td>Status</td><td>' + escapeHTML(mr.status || '—') + '</td></tr>';
+  rows += '<tr><td>Assignee</td><td>' + escapeHTML(mr.assignee || '—') + '</td></tr>';
+  rows += '<tr><td>Records Portal</td><td>' + escapeHTML(mr.records_portal || '—') + '</td></tr>';
+  rows += '<tr><td>Retrieval Deadline</td><td>' + escapeHTML(mr.retrieval_deadline || '—') + '</td></tr>';
+  if (mr.same_day_cancel && mr.same_day_cancel.toLowerCase() !== 'false' && mr.same_day_cancel.toLowerCase() !== 'no')
+    rows += '<tr><td>Same-Day Cancel</td><td style="color:#dc2626;font-weight:700">\u26a0 ' + escapeHTML(mr.same_day_cancel) + '</td></tr>';
+  rows += '<tr><td>Last Contact</td><td>' + escapeHTML(mr.last_contact_date || '—') + '</td></tr>';
+  rows += '<tr><td>Days Since Update</td><td>' + (mr.days_since_update > 14 ? '<span style="color:#dc2626;font-weight:600">' + mr.days_since_update + ' days</span>' : mr.days_since_update + ' days') + '</td></tr>';
+  if (mr.pre_screening_date) rows += '<tr><td>Pre-Screening</td><td>' + escapeHTML(mr.pre_screening_date) + '</td></tr>';
+  if (mr.screening_date) rows += '<tr><td>Screening</td><td>' + escapeHTML(mr.screening_date) + '</td></tr>';
+  if (mr.randomization_date) rows += '<tr><td>Randomization</td><td>' + escapeHTML(mr.randomization_date) + '</td></tr>';
+  if (mr.next_visit_date) rows += '<tr><td>Next Visit (ClickUp)</td><td>' + escapeHTML(mr.next_visit_date) + '</td></tr>';
+  if (ref) {
+    rows += '<tr><td colspan="2" style="border-top:2px solid #e2e8f0;padding-top:8px;font-weight:700;color:#64748b">Referral Info</td></tr>';
+    rows += '<tr><td>Referral Stage</td><td>' + escapeHTML(ref.stage || '—') + '</td></tr>';
+    rows += '<tr><td>Source</td><td>' + escapeHTML(ref.source || '—') + '</td></tr>';
+    if (ref.referring_physician) rows += '<tr><td>Referring Physician</td><td>' + escapeHTML(ref.referring_physician) + '</td></tr>';
+    rows += '<tr><td>Referral Updated</td><td>' + escapeHTML(ref.date_updated || '—') + '</td></tr>';
+  }
+  if (mr.notes) rows += '<tr><td colspan="2" style="border-top:2px solid #e2e8f0;padding-top:8px"><strong>Notes:</strong> ' + escapeHTML(mr.notes) + '</td></tr>';
+  if (mr.ops_notes) rows += '<tr><td colspan="2"><strong>Ops Notes:</strong> ' + escapeHTML(mr.ops_notes) + '</td></tr>';
+  var crioBtn = mr.crio_link ? ' <a href="' + escapeHTML(mr.crio_link) + '" target="_blank" style="font-size:11px;color:#072061;text-decoration:none;font-weight:600">[CRIO]</a>' : '';
+  var cuBtn = mr.url ? ' <a href="' + escapeHTML(mr.url) + '" target="_blank" style="font-size:11px;color:#7c3aed;text-decoration:none;font-weight:600">[ClickUp]</a>' : '';
+  var body = '<div style="margin-bottom:8px">' + crioBtn + cuBtn + '</div>'
+    + '<table class="detail-table" style="width:100%"><tbody>' + rows + '</tbody></table>';
+  openModal(maskPHI(mr.name), 'Visit Readiness — ' + escapeHTML(mr.study), body);
+}
+
 function injectScheduleMedRecords() {
   if (!MED_RECORDS_DATA || MED_RECORDS_DATA.length === 0) return;
-  const tbody = document.getElementById('upcoming-tbody');
+  var tbody = document.getElementById('upcoming-tbody');
   if (!tbody) return;
-  const rows = tbody.querySelectorAll('tr');
-  let matched = 0;
-  rows.forEach(row => {
-    // Skip if already injected
+  var rows = tbody.querySelectorAll('tr');
+  var matched = 0;
+  rows.forEach(function(row) {
     if (row.dataset.medInjected) return;
-    const cells = row.querySelectorAll('td');
+    var cells = row.querySelectorAll('td');
     if (cells.length < 4) return;
-    // Patient name is in the 4th cell (index 3)
-    const patCell = cells[3];
-    const patName = (patCell.textContent || '').trim().toLowerCase();
+    var patCell = cells[3];
+    var patName = (patCell.textContent || '').trim().toLowerCase();
     if (!patName) return;
-    // Look up in MED_RECORDS_DATA
-    const mr = MED_RECORDS_DATA.find(m => {
-      const mName = (m.name || '').trim().toLowerCase();
-      return mName === patName || mName.includes(patName) || patName.includes(mName);
-    });
-    if (!mr) return;
-    const rel = (mr.medical_release || '').toLowerCase();
-    const rec = (mr.records_received || '').toLowerCase();
-    const relDone = rel === 'signed' || rel === 'yes' || rel === 'complete' || rel === 'received';
-    const recDone = rec === 'received' || rec === 'recieved' || rec === 'yes' || rec === 'complete';
-    const relNo = rel === 'no';
-    const relPending = !relDone && !relNo && rel && rel !== 'n/a' && rel !== '';
-    const recPending = !recDone && rec && rec !== 'n/a' && rec !== 'no' && rec !== '';
-    let badge = '';
-    if (recDone && relDone) {
-      badge = '<span style="display:inline-block;margin-left:6px;font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#05966920;color:#059669;vertical-align:middle" title="Release: ' + escapeHTML(mr.medical_release||'') + ' | Records: ' + escapeHTML(mr.records_received||'') + '">RECORDS \u2713</span>';
-    } else if (recDone) {
-      badge = '<span style="display:inline-block;margin-left:6px;font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#05966920;color:#059669;vertical-align:middle" title="Release: ' + escapeHTML(mr.medical_release||'') + ' | Records: ' + escapeHTML(mr.records_received||'') + '">REC \u2713</span>';
-    } else if (recPending) {
-      badge = '<span style="display:inline-block;margin-left:6px;font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#d9770620;color:#d97706;vertical-align:middle" title="Release: ' + escapeHTML(mr.medical_release||'') + ' | Records: ' + escapeHTML(mr.records_received||'') + '">REC \u23f3</span>';
-    } else {
-      badge = '<span style="display:inline-block;margin-left:6px;font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:#dc262620;color:#dc2626;vertical-align:middle" title="Release: ' + escapeHTML(mr.medical_release||'No') + ' | Records: ' + escapeHTML(mr.records_received||'None') + '">REC \u2717</span>';
+    var mrIdx = -1;
+    for (var i = 0; i < MED_RECORDS_DATA.length; i++) {
+      var mName = (MED_RECORDS_DATA[i].name || '').trim().toLowerCase();
+      if (mName === patName || mName.includes(patName) || patName.includes(mName)) { mrIdx = i; break; }
     }
-    patCell.insertAdjacentHTML('beforeend', badge);
+    if (mrIdx === -1) return;
+    patCell.insertAdjacentHTML('beforeend', _readinessBadge(MED_RECORDS_DATA[mrIdx], mrIdx));
     row.dataset.medInjected = '1';
     matched++;
   });
