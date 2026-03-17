@@ -2167,6 +2167,96 @@ function jsAttr(s) {
   return escapeHTML(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'"));
 }
 
+// ═══ DATA NORMALIZATION UTILITIES ═══
+// Central normalization — use everywhere before comparing strings across data sources
+function normalize(s) {
+  return (s == null ? '' : String(s)).trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+// Build composite keys for dedup/lookup — normalizes each part
+function buildKey(/* ...parts */) {
+  var parts = [];
+  for (var i = 0; i < arguments.length; i++) parts.push(normalize(arguments[i]));
+  return parts.join('|');
+}
+
+// Levenshtein distance for fuzzy string comparison
+function _levenshtein(a, b) {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+  var matrix = [];
+  for (var i = 0; i <= b.length; i++) matrix[i] = [i];
+  for (var j = 0; j <= a.length; j++) matrix[0][j] = j;
+  for (var i = 1; i <= b.length; i++) {
+    for (var j = 1; j <= a.length; j++) {
+      matrix[i][j] = b[i-1] === a[j-1]
+        ? matrix[i-1][j-1]
+        : Math.min(matrix[i-1][j-1]+1, matrix[i][j-1]+1, matrix[i-1][j]+1);
+    }
+  }
+  return matrix[b.length][a.length];
+}
+
+// Strip name suffixes (Jr, Sr, II, III, IV, MD, etc.)
+function _stripSuffix(name) {
+  return name.replace(/\s*,?\s*\b(jr|sr|ii|iii|iv|md|do|phd|np|pa|rn|esq)\.?\s*$/i, '').trim();
+}
+
+// Enhanced fuzzy name matching — handles suffixes, middle names, typos
+function fuzzyNameMatch(rawA, rawB) {
+  var a = normalize(_stripSuffix(rawA));
+  var b = normalize(_stripSuffix(rawB));
+  if (!a || !b) return false;
+  // Exact match after normalization
+  if (a === b) return true;
+  // Split into parts
+  var pa = a.split(' '), pb = b.split(' ');
+  // Last name must match (or be within edit distance 1)
+  var lastA = pa[pa.length-1], lastB = pb[pb.length-1];
+  var lastMatch = lastA === lastB || _levenshtein(lastA, lastB) <= 1;
+  if (!lastMatch) return false;
+  // First name match — exact, initial, or edit distance ≤ 2
+  var firstA = pa[0], firstB = pb[0];
+  if (firstA === firstB) return true;
+  if (firstA.charAt(0) === firstB.charAt(0) && (firstA.length === 1 || firstB.length === 1)) return true;
+  if (_levenshtein(firstA, firstB) <= 2) return true;
+  // Middle name tolerance: "John Michael Smith" vs "John Smith"
+  if (pa.length > 2 && pb.length >= 2 && pa[0] === pb[0] && pa[pa.length-1] === pb[pb.length-1]) return true;
+  if (pb.length > 2 && pa.length >= 2 && pb[0] === pa[0] && pb[pb.length-1] === pa[pa.length-1]) return true;
+  return false;
+}
+
+// Study name matching — extract protocol code and compare
+function matchStudyName(a, b) {
+  if (!a || !b) return false;
+  var na = normalize(a), nb = normalize(b);
+  if (na === nb) return true;
+  // Extract protocol codes (last segment after " - ")
+  var codeA = na.split(' - ').pop().trim();
+  var codeB = nb.split(' - ').pop().trim();
+  if (codeA === codeB && codeA.length > 3) return true;
+  // One contains the other's protocol code (minimum 4 chars to avoid false matches)
+  if (codeA.length >= 4 && nb.indexOf(codeA) !== -1) return true;
+  if (codeB.length >= 4 && na.indexOf(codeB) !== -1) return true;
+  return false;
+}
+
+// Parse date robustly — handles YYYY-MM-DD, MM/DD/YYYY, Month DD YYYY
+function parseLocalDate(s) {
+  if (!s) return null;
+  var t = String(s).trim();
+  // YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return new Date(t + 'T00:00:00');
+  // MM/DD/YYYY or M/D/YYYY
+  var mdy = t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (mdy) return new Date(parseInt(mdy[3]), parseInt(mdy[1])-1, parseInt(mdy[2]));
+  // Fallback: native parsing, force local time
+  var d = new Date(t);
+  if (!isNaN(d)) return d;
+  return null;
+}
+
 // ═══ SERVICE WORKER REGISTRATION ═══
 if ('serviceWorker' in navigator && !(typeof google !== 'undefined' && google.script && google.script.run)) {
   var swPath = (location.pathname.replace(/\/[^/]*$/, '') || '') + '/sw.js';
@@ -2393,6 +2483,9 @@ const CRP_CONFIG = {
     PHL: { name: 'Philadelphia, PA', coordinators: ['Stacey Scott', 'Ruby Pereira', 'Mario Castellanos'] },
     PNJ: { name: 'Pennington, NJ', coordinators: ['Angelina McMullen', 'Cady Chilensky'] },
   },
+
+  // CRIO Study Keys for Pennington site — add new Pennington studies here
+  PENNINGTON_STUDY_KEYS: [161619, 162446, 167755, 167794, 172389, 173164],
 
   // Expected CSV columns per data source — used by validateColumns() to warn on schema drift
   EXPECTED_COLUMNS: {
@@ -4483,20 +4576,9 @@ function showVisitReadiness(idx) {
   openModal(maskPHI(mr.name), 'Visit Readiness — ' + escapeHTML(mr.study), body);
 }
 
+// Legacy wrapper — delegates to improved fuzzyNameMatch()
 function _fuzzyNameMatch(a, b) {
-  // Exact match
-  if (a === b) return true;
-  // Substring match
-  if (a.includes(b) || b.includes(a)) return true;
-  // Split into parts and check if first+last name match
-  var pa = a.split(/\s+/), pb = b.split(/\s+/);
-  if (pa.length >= 2 && pb.length >= 2) {
-    // First name + last name match (handles middle names, suffixes)
-    if (pa[0] === pb[0] && pa[pa.length-1] === pb[pb.length-1]) return true;
-    // Last name match + first name starts with same letter
-    if (pa[pa.length-1] === pb[pb.length-1] && pa[0][0] === pb[0][0] && (pa[0].length <= 2 || pb[0].length <= 2)) return true;
-  }
-  return false;
+  return fuzzyNameMatch(a, b);
 }
 
 function _findBestMedRecord(patName, studyName) {
@@ -4507,7 +4589,7 @@ function _findBestMedRecord(patName, studyName) {
     var mName = (mr.name || '').trim().toLowerCase();
     if (!_fuzzyNameMatch(patName, mName)) continue;
     var hasData = !!(mr.medical_release || mr.records_received);
-    var studyMatch = studyName && (mr.study || '').toLowerCase().indexOf(studyName.toLowerCase()) !== -1;
+    var studyMatch = studyName && matchStudyName(mr.study, studyName);
     candidates.push({ idx: i, hasData: hasData, studyMatch: studyMatch });
   }
   if (candidates.length === 0) return -1;
@@ -7421,9 +7503,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
   }
   let cancels = [];
   allCancelSources.forEach(r => {
-    const key = ((r['Subject Full Name']||'').replace(/\s{2,}/g,' ').trim().toLowerCase()) + '|' +
-                ((r['Study Name']||'').trim().toLowerCase()) + '|' +
-                ((r['Cancel Date']||r['Scheduled Date']||'').trim());
+    const key = buildKey(r['Subject Full Name'], r['Study Name'], r['Cancel Date']||r['Scheduled Date']);
     if (!_cancelSeen.has(key)) { _cancelSeen.add(key); cancels.push(r); }
   });
   _log('CRP: Split report → upcoming', upcoming.length, ', derived cancels', derivedCancels.length, ', total cancels (merged+deduped)', cancels.length);
@@ -7577,7 +7657,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
   const BASE = 'https://app.clinicalresearch.io/clinical-research-philadelphia-crp';
   const PHL  = 'philadelphia-pa';
   const PNJ  = 'clinical-research-philadelphia-pennington';
-  const PENNINGTON_KEYS = new Set([161619, 162446, 167755, 167794, 172389, 173164]);
+  const PENNINGTON_KEYS = new Set(CRP_CONFIG.PENNINGTON_STUDY_KEYS || [161619, 162446, 167755, 167794, 172389, 173164]);
 
   function siteSlug(studyKey, siteName) {
     const k = parseInt(studyKey);
@@ -7621,9 +7701,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
   // Step 2: Deduplicate (same patient + study + cancel date)
   const seenCancels = new Set();
   const dedupedCancels = rawCancels.filter(r => {
-    const key = ((r['Subject Full Name']||'').replace(/\s{2,}/g,' ').trim().toLowerCase()) + '|' +
-                ((r['Study Name']||'').trim().toLowerCase()) + '|' +
-                ((r['Cancel Date']||r['Scheduled Date']||'').trim());
+    const key = buildKey(r['Subject Full Name'], r['Study Name'], r['Cancel Date']||r['Scheduled Date']);
     if (seenCancels.has(key)) return false;
     seenCancels.add(key);
     return true;
@@ -7641,9 +7719,8 @@ function processLiveData(allRows, legacyCancels, auditLog) {
   // Build lookup of patients who have a future appointment (i.e. they rescheduled)
   const rescheduledPatientStudy = new Set();
   activeUpcoming.forEach(r => {
-    const name = (r['Subject Full Name']||'').replace(/\s{2,}/g,' ').trim().toLowerCase();
-    const study = (r['Study Name']||'').trim().toLowerCase();
-    if (name && study) rescheduledPatientStudy.add(name + '||' + study);
+    var k = buildKey(r['Subject Full Name'], r['Study Name']);
+    if (k !== '|') rescheduledPatientStudy.add(k);
   });
 
   // recentCancels = only TRUE cancellations (excludes rescheduled, completed, admin error, fibroscan, study closed)
@@ -7654,9 +7731,8 @@ function processLiveData(allRows, legacyCancels, auditLog) {
     if (EXCLUDED_CANCEL_CATS.has(r._category)) {
       if (r._category === 'Rescheduled') {
         // Check if they actually have a future appointment
-        const name = (r['Subject Full Name']||'').replace(/\s{2,}/g,' ').trim().toLowerCase();
-        const study = (r['Study Name']||'').trim().toLowerCase();
-        if (name && study && rescheduledPatientStudy.has(name + '||' + study)) {
+        var rk = buildKey(r['Subject Full Name'], r['Study Name']);
+        if (rk !== '|' && rescheduledPatientStudy.has(rk)) {
           rescheduledVisits.push(r);
         } else {
           pendingReschedules.push(r);
@@ -7787,13 +7863,13 @@ function processLiveData(allRows, legacyCancels, auditLog) {
   const cancelMeta = {};
   allCategorized.forEach(r => {
     if (EXCLUDED_CANCEL_CATS.has(r._category) && r._category !== 'Rescheduled') return;
-    const p=(r['Subject Full Name']||'').replace(/\s{2,}/g,' ').trim().toLowerCase(), s=(r['Study Name']||'').trim().toLowerCase(), key=p+'|'+s;
+    const key=buildKey(r['Subject Full Name'],r['Study Name']);
     const cd = (r['Cancel Date']||'').substring(0,10);
     if (!cancelEventMap[key]) cancelEventMap[key] = new Set();
     cancelEventMap[key].add(cd);
     if (!cancelMeta[key] || cd > (cancelMeta[key].last_cancel||'')) {
       cancelMeta[key] = { last_cancel: cd,
-        display_patient: (r['Subject Full Name']||'').replace(/\s{2,}/g,' ').trim(),
+        display_patient: (r['Subject Full Name']||'').replace(/\s+/g,' ').trim(),
         display_study: (r['Study Name']||'').trim(),
         patient_url: patientUrl(r['Study Key'], r['Subject Key (Back End)'], r['Site Name']),
         study_url:   studyUrl(r['Study Key'], r['Site Name'])
@@ -7804,7 +7880,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
   Object.entries(cancelEventMap).forEach(([k, dates]) => { cancelCounts[k] = dates.size; });
   const upcomingPats = {};
   activeUpcoming.forEach(r => {
-    const p=(r['Subject Full Name']||'').replace(/\s{2,}/g,' ').trim().toLowerCase(), s=(r['Study Name']||'').trim().toLowerCase(), key=p+'|'+s;
+    const key=buildKey(r['Subject Full Name'],r['Study Name']);
     const d = parseDate(r['Scheduled Date']);
     if (!upcomingPats[key] || d < upcomingPats[key].date) {
       upcomingPats[key] = { date: d,
@@ -11089,11 +11165,9 @@ function sortMergedTable(th, col) {
 // ══════════════════════════════════════════════════════════════
 // CROSS-SOURCE ENRICHMENT UTILITIES
 // ══════════════════════════════════════════════════════════════
+// Legacy wrapper — delegates to improved matchStudyName()
 function matchesStudy(a, b) {
-  var n1 = (a || '').toLowerCase().trim();
-  var n2 = (b || '').toLowerCase().trim();
-  if (!n1 || !n2) return false;
-  return n1 === n2 || n1.includes(n2) || n2.includes(n1);
+  return matchStudyName(a, b);
 }
 
 function getStudyMedRecords(studyName) {
