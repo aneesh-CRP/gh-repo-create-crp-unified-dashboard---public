@@ -7596,10 +7596,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
   // ── Filter rows ──
   const activeUpcoming = upcoming.filter(r => {
     const d = parseDate(r['Scheduled Date'] || r['snapshot_date']);
-    return d && d >= today && d <= twoMonthsAhead
-      && !isExcludedStudy(r['Study Name'])
-      && !FIBRO.test(r['Cancel Reason'] || '')
-      && isCoord(r['Full Name']);
+    return d && d >= today && d <= twoMonthsAhead;
   });
 
   // Step 1: Basic date/study filter
