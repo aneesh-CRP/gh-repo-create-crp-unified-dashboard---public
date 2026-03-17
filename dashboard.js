@@ -2389,7 +2389,7 @@ function _medReadiness(mr, crioStatus) {
   // Statuses at or past screening → records are complete
   // Check BOTH ClickUp status AND CRIO Subject Status
   var POST_SCREENING = ['in screening','enrolled','complete','visit scheduled','screen fail',
-    'discontinued','withdrawn','randomized','screening','active','randomized'];
+    'discontinued','withdrawn','randomized','screening','active'];
   var pastScreening = POST_SCREENING.indexOf(st) !== -1 || POST_SCREENING.indexOf(cst) !== -1;
 
   if (pastScreening) {
