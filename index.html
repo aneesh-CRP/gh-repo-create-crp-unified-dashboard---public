@@ -1217,283 +1217,6 @@ body {
     </div>
   </div>
 
-  <!-- Study breakdown + coord workload -->
-  <div class="grid-2 mb16 fade-in">
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title">Upcoming by Study</span>
-        <span class="badge badge-blue" id="sched-study-count">17 studies</span>
-      </div>
-      <div id="upcoming-study-bars" style="padding:12px 16px;max-height:320px;overflow-y:auto;"></div>
-    </div>
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title">Coordinator Workload</span>
-      </div>
-      <div id="sched-coord-list" style="padding:12px 16px;"><div style="padding:8px 0;border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showCoordDetail('Ruby Pereira')">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-    <span style="font-size:12px;font-weight:600">Ruby Pereira</span>
-    <span style="font-size:12px;font-weight:700;color:#072061">22 visits</span>
-  </div>
-  <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden;display:flex;">
-    <div style="width:100%;background:#072061;border-radius:3px 0 0 3px;"></div>
-    <div style="width:0%;background:#059669;border-radius:0 3px 3px 0;"></div>
-  </div>
-  <div style="display:flex;gap:8px;margin-top:3px;">
-    <span style="font-size:10px;color:#072061;">PHL: 22</span>
-    
-  </div>
-</div>
-<div style="padding:8px 0;border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showCoordDetail('Mario Castellanos')">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-    <span style="font-size:12px;font-weight:600">Mario Castellanos</span>
-    <span style="font-size:12px;font-weight:700;color:#072061">21 visits</span>
-  </div>
-  <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden;display:flex;">
-    <div style="width:91%;background:#072061;border-radius:3px 0 0 3px;"></div>
-    <div style="width:5%;background:#059669;border-radius:0 3px 3px 0;"></div>
-  </div>
-  <div style="display:flex;gap:8px;margin-top:3px;">
-    <span style="font-size:10px;color:#072061;">PHL: 20</span>
-    <span style="font-size:10px;color:#059669;">PNJ: 1</span>
-  </div>
-</div>
-<div style="padding:8px 0;border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showCoordDetail('Angelina McMullen')">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-    <span style="font-size:12px;font-weight:600">Angelina McMullen</span>
-    <span style="font-size:12px;font-weight:700;color:#059669">12 visits</span>
-  </div>
-  <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden;display:flex;">
-    <div style="width:18%;background:#072061;border-radius:3px 0 0 3px;"></div>
-    <div style="width:36%;background:#059669;border-radius:0 3px 3px 0;"></div>
-  </div>
-  <div style="display:flex;gap:8px;margin-top:3px;">
-    <span style="font-size:10px;color:#072061;">PHL: 4</span>
-    <span style="font-size:10px;color:#059669;">PNJ: 8</span>
-  </div>
-</div>
-<div style="padding:8px 0;border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showCoordDetail('Stacey Scott')">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-    <span style="font-size:12px;font-weight:600">Stacey Scott</span>
-    <span style="font-size:12px;font-weight:700;color:#072061">9 visits</span>
-  </div>
-  <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden;display:flex;">
-    <div style="width:41%;background:#072061;border-radius:3px 0 0 3px;"></div>
-    <div style="width:0%;background:#059669;border-radius:0 3px 3px 0;"></div>
-  </div>
-  <div style="display:flex;gap:8px;margin-top:3px;">
-    <span style="font-size:10px;color:#072061;">PHL: 9</span>
-    
-  </div>
-</div>
-<div style="padding:8px 0;border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showCoordDetail('Cady Chilensky')">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-    <span style="font-size:12px;font-weight:600">Cady Chilensky</span>
-    <span style="font-size:12px;font-weight:700;color:#059669">7 visits</span>
-  </div>
-  <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden;display:flex;">
-    <div style="width:0%;background:#072061;border-radius:3px 0 0 3px;"></div>
-    <div style="width:32%;background:#059669;border-radius:0 3px 3px 0;"></div>
-  </div>
-  <div style="display:flex;gap:8px;margin-top:3px;">
-    
-    <span style="font-size:10px;color:#059669;">PNJ: 7</span>
-  </div>
-</div></div>
-    </div>
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title">Investigator Workload</span>
-      </div>
-      <div id="sched-inv-list" style="padding:12px 16px;">
-        <p style="color:#94a3b8;font-size:12px">Loading investigator data...</p>
-      </div>
-    </div>
-  </div>
-
-  <!-- Recruiter Performance -->
-  <div class="card mb16 fade-in">
-    <div class="card-header">
-      <span class="card-title">🔍 Recruiter Performance · Last 2 Months</span>
-      <span class="badge badge-gray">Gaby · Ana · Vlado · Ema · Jana</span>
-    </div>
-    <div style="padding:0 16px 4px;display:grid;grid-template-columns:1fr 1fr;gap:0 24px;">
-<div style="padding:12px 0;border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showCoordDetail('Gabrijela Ateljevic')">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-    <span style="font-size:13px;font-weight:700;color:var(--navy)">Gaby</span>
-    <div style="display:flex;gap:6px;">
-      <span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#e0f2fe;color:#0369a1;font-weight:600;">15 upcoming</span>
-      <span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#fef3c7;color:#92400e;font-weight:600;">14 cancels</span>
-    </div>
-  </div>
-  <div style="display:grid;grid-template-columns:60px 1fr 28px;gap:3px 6px;align-items:center;font-size:10px;color:var(--muted);">
-    <span>Upcoming</span>
-    <div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;">
-      <div style="width:100%;height:100%;background:#072061;border-radius:3px;"></div>
-    </div>
-    <span style="text-align:right;font-weight:600;color:#072061">15</span>
-    <span>Cancels</span>
-    <div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;">
-      <div style="width:100%;height:100%;background:#f59e0b;border-radius:3px;"></div>
-    </div>
-    <span style="text-align:right;font-weight:600;color:#d97706">14</span>
-  </div>
-  <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">
-    <span style="font-size:10px;color:#6b7280;">No-shows: <b style="color:#374151">4 (29%)</b></span>
-    <span style="font-size:10px;color:#6b7280;">Screen fails: <b>1</b></span>
-    <span style="font-size:10px;color:#6b7280;">Undocumented: <b style="color:#d97706">4</b></span>
-  </div>
-</div>
-<div style="padding:12px 0;border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showCoordDetail('Ema Gunic')">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-    <span style="font-size:13px;font-weight:700;color:var(--navy)">Ema</span>
-    <div style="display:flex;gap:6px;">
-      <span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#e0f2fe;color:#0369a1;font-weight:600;">14 upcoming</span>
-      <span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#fef3c7;color:#92400e;font-weight:600;">13 cancels</span>
-    </div>
-  </div>
-  <div style="display:grid;grid-template-columns:60px 1fr 28px;gap:3px 6px;align-items:center;font-size:10px;color:var(--muted);">
-    <span>Upcoming</span>
-    <div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;">
-      <div style="width:93%;height:100%;background:#072061;border-radius:3px;"></div>
-    </div>
-    <span style="text-align:right;font-weight:600;color:#072061">14</span>
-    <span>Cancels</span>
-    <div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;">
-      <div style="width:93%;height:100%;background:#f59e0b;border-radius:3px;"></div>
-    </div>
-    <span style="text-align:right;font-weight:600;color:#d97706">13</span>
-  </div>
-  <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">
-    <span style="font-size:10px;color:#6b7280;">No-shows: <b style="color:#374151">5 (38%)</b></span>
-    <span style="font-size:10px;color:#6b7280;">Screen fails: <b>0</b></span>
-    <span style="font-size:10px;color:#6b7280;">Undocumented: <b style="color:#d97706">3</b></span>
-  </div>
-</div>
-<div style="padding:12px 0;border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showCoordDetail('Ana Lambic')">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-    <span style="font-size:13px;font-weight:700;color:var(--navy)">Ana</span>
-    <div style="display:flex;gap:6px;">
-      <span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#e0f2fe;color:#0369a1;font-weight:600;">14 upcoming</span>
-      <span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#fef3c7;color:#92400e;font-weight:600;">5 cancels</span>
-    </div>
-  </div>
-  <div style="display:grid;grid-template-columns:60px 1fr 28px;gap:3px 6px;align-items:center;font-size:10px;color:var(--muted);">
-    <span>Upcoming</span>
-    <div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;">
-      <div style="width:93%;height:100%;background:#072061;border-radius:3px;"></div>
-    </div>
-    <span style="text-align:right;font-weight:600;color:#072061">14</span>
-    <span>Cancels</span>
-    <div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;">
-      <div style="width:36%;height:100%;background:#f59e0b;border-radius:3px;"></div>
-    </div>
-    <span style="text-align:right;font-weight:600;color:#d97706">5</span>
-  </div>
-  <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">
-    <span style="font-size:10px;color:#6b7280;">No-shows: <b style="color:#374151">2 (40%)</b></span>
-    <span style="font-size:10px;color:#6b7280;">Screen fails: <b>1</b></span>
-    <span style="font-size:10px;color:#6b7280;">Undocumented: <b style="color:#374151">1</b></span>
-  </div>
-</div>
-<div style="padding:12px 0;border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showCoordDetail('Vlado Draganic')">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-    <span style="font-size:13px;font-weight:700;color:var(--navy)">Vlado</span>
-    <div style="display:flex;gap:6px;">
-      <span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#e0f2fe;color:#0369a1;font-weight:600;">4 upcoming</span>
-      <span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#fef3c7;color:#92400e;font-weight:600;">8 cancels</span>
-    </div>
-  </div>
-  <div style="display:grid;grid-template-columns:60px 1fr 28px;gap:3px 6px;align-items:center;font-size:10px;color:var(--muted);">
-    <span>Upcoming</span>
-    <div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;">
-      <div style="width:27%;height:100%;background:#072061;border-radius:3px;"></div>
-    </div>
-    <span style="text-align:right;font-weight:600;color:#072061">4</span>
-    <span>Cancels</span>
-    <div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;">
-      <div style="width:57%;height:100%;background:#f59e0b;border-radius:3px;"></div>
-    </div>
-    <span style="text-align:right;font-weight:600;color:#d97706">8</span>
-  </div>
-  <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">
-    <span style="font-size:10px;color:#6b7280;">No-shows: <b style="color:#374151">0 (0%)</b></span>
-    <span style="font-size:10px;color:#6b7280;">Screen fails: <b>0</b></span>
-    <span style="font-size:10px;color:#6b7280;">Undocumented: <b style="color:#374151">2</b></span>
-  </div>
-</div>
-<div style="padding:12px 0;border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showCoordDetail('Jana Milankovic')">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-    <span style="font-size:13px;font-weight:700;color:var(--navy)">Jana</span>
-    <div style="display:flex;gap:6px;">
-      <span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#e0f2fe;color:#0369a1;font-weight:600;">0 upcoming</span>
-      <span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#fef3c7;color:#92400e;font-weight:600;">39 cancels</span>
-    </div>
-  </div>
-  <div style="display:grid;grid-template-columns:60px 1fr 28px;gap:3px 6px;align-items:center;font-size:10px;color:var(--muted);">
-    <span>Upcoming</span>
-    <div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;">
-      <div style="width:0%;height:100%;background:#072061;border-radius:3px;"></div>
-    </div>
-    <span style="text-align:right;font-weight:600;color:#072061">0</span>
-    <span>Cancels</span>
-    <div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;">
-      <div style="width:100%;height:100%;background:#f59e0b;border-radius:3px;"></div>
-    </div>
-    <span style="text-align:right;font-weight:600;color:#d97706">39</span>
-  </div>
-  <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">
-    <span style="font-size:10px;color:#6b7280;">No-shows: <b style="color:#374151">9 (23%)</b></span>
-    <span style="font-size:10px;color:#6b7280;">Screen fails: <b>4</b></span>
-    <span style="font-size:10px;color:#6b7280;">Undocumented: <b style="color:#374151">0</b></span>
-  </div>
-</div>
-    </div>
-  </div>
-
-  <!-- Charts row: visit type + subject status -->
-  <div class="grid-2 mb16 fade-in">
-    <div class="card">
-      <div class="card-header"><span class="card-title">Visit Type Breakdown</span></div>
-      <div class="chart-wrap h180" style="margin-bottom:8px"><canvas id="visitTypeChart"></canvas></div>
-      <div id="visit-type-legend" style="padding:0 16px 12px;"></div>
-    </div>
-    <div class="card">
-      <div class="card-header"><span class="card-title">Subject Status</span></div>
-      <div class="chart-wrap h180" style="margin-bottom:8px"><canvas id="statusChart"></canvas></div>
-      <div id="status-legend" style="padding:0 16px 12px;"></div>
-    </div>
-  </div>
-
-  <!-- ── COORDINATOR DAILY GOALS ── -->
-  <div class="section-title" style="margin-top:24px">Coordinator Visit Tracker</div>
-  <div class="card fade-in">
-    <div style="padding:16px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <div style="font-size:14px;font-weight:700;color:var(--navy)">Coordinator Visit Snapshot</div>
-        <div style="display:flex;align-items:center;gap:8px">
-          <button onclick="exportCoordHistory()" title="Export coordinator history as JSON" style="background:none;border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:11px;color:var(--muted);cursor:pointer">&#x2B07; Export</button>
-          <div style="font-size:11px;color:var(--muted)" id="coord-week-label">This Week</div>
-        </div>
-      </div>
-      <div id="coordGoalsGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px"></div>
-      <div style="margin-top:16px">
-        <div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">Monthly Snapshot — <span id="coord-month-label">March 2026</span></div>
-        <div style="overflow-x:auto">
-          <table style="width:100%;border-collapse:collapse;font-size:12px" id="coordMonthTable">
-            <thead><tr style="background:var(--surface2);border-bottom:2px solid var(--border)">
-              <th style="padding:8px 12px;text-align:left;font-weight:700">Coordinator</th>
-              <th style="padding:8px 8px;text-align:center;font-weight:700">Visits</th>
-              <th style="padding:8px 8px;text-align:center;font-weight:700">Avg/Day</th>
-              <th style="padding:8px 8px;text-align:center;font-weight:700">Volume</th>
-              <th style="padding:8px 8px;text-align:center;font-weight:700">Period</th>
-            </tr></thead>
-            <tbody id="coordMonthBody"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  </div>
 
   <!-- Full visit table -->
   <div class="card fade-in">
@@ -1509,7 +1232,7 @@ body {
         <button class="filter-btn"        onclick="schedFilter(this,'pnj')"  style="font-size:11px;padding:3px 8px;">PNJ only</button>
       </div>
     </div>
-    <div style="max-height:480px;overflow-y:auto;border-radius:0 0 8px 8px;">
+    <div style="max-height:600px;overflow-y:auto;border-radius:0 0 8px 8px;">
       <table class="data-table sortable" id="vis-table">
         <thead>
           <tr><th style="width:28px"></th><th onclick="sortTable(this)">Date</th><th onclick="sortTable(this)">Study</th><th onclick="sortTable(this)">Visit</th><th onclick="sortTable(this)">Patient</th><th onclick="sortTable(this)">Status</th><th onclick="sortTable(this)">Coordinator</th><th onclick="sortTable(this)">Investigator</th><th onclick="sortTable(this)">Site</th></tr>
@@ -2157,6 +1880,285 @@ body {
     </tr>
     </tbody>
       </table>
+    </div>
+  </div>
+
+
+  <!-- Study breakdown + coord workload -->
+  <div class="grid-2 mb16 fade-in">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Upcoming by Study</span>
+        <span class="badge badge-blue" id="sched-study-count">17 studies</span>
+      </div>
+      <div id="upcoming-study-bars" style="padding:12px 16px;max-height:320px;overflow-y:auto;"></div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Coordinator Workload</span>
+      </div>
+      <div id="sched-coord-list" style="padding:12px 16px;"><div style="padding:8px 0;border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showCoordDetail('Ruby Pereira')">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+    <span style="font-size:12px;font-weight:600">Ruby Pereira</span>
+    <span style="font-size:12px;font-weight:700;color:#072061">22 visits</span>
+  </div>
+  <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden;display:flex;">
+    <div style="width:100%;background:#072061;border-radius:3px 0 0 3px;"></div>
+    <div style="width:0%;background:#059669;border-radius:0 3px 3px 0;"></div>
+  </div>
+  <div style="display:flex;gap:8px;margin-top:3px;">
+    <span style="font-size:10px;color:#072061;">PHL: 22</span>
+    
+  </div>
+</div>
+<div style="padding:8px 0;border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showCoordDetail('Mario Castellanos')">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+    <span style="font-size:12px;font-weight:600">Mario Castellanos</span>
+    <span style="font-size:12px;font-weight:700;color:#072061">21 visits</span>
+  </div>
+  <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden;display:flex;">
+    <div style="width:91%;background:#072061;border-radius:3px 0 0 3px;"></div>
+    <div style="width:5%;background:#059669;border-radius:0 3px 3px 0;"></div>
+  </div>
+  <div style="display:flex;gap:8px;margin-top:3px;">
+    <span style="font-size:10px;color:#072061;">PHL: 20</span>
+    <span style="font-size:10px;color:#059669;">PNJ: 1</span>
+  </div>
+</div>
+<div style="padding:8px 0;border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showCoordDetail('Angelina McMullen')">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+    <span style="font-size:12px;font-weight:600">Angelina McMullen</span>
+    <span style="font-size:12px;font-weight:700;color:#059669">12 visits</span>
+  </div>
+  <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden;display:flex;">
+    <div style="width:18%;background:#072061;border-radius:3px 0 0 3px;"></div>
+    <div style="width:36%;background:#059669;border-radius:0 3px 3px 0;"></div>
+  </div>
+  <div style="display:flex;gap:8px;margin-top:3px;">
+    <span style="font-size:10px;color:#072061;">PHL: 4</span>
+    <span style="font-size:10px;color:#059669;">PNJ: 8</span>
+  </div>
+</div>
+<div style="padding:8px 0;border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showCoordDetail('Stacey Scott')">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+    <span style="font-size:12px;font-weight:600">Stacey Scott</span>
+    <span style="font-size:12px;font-weight:700;color:#072061">9 visits</span>
+  </div>
+  <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden;display:flex;">
+    <div style="width:41%;background:#072061;border-radius:3px 0 0 3px;"></div>
+    <div style="width:0%;background:#059669;border-radius:0 3px 3px 0;"></div>
+  </div>
+  <div style="display:flex;gap:8px;margin-top:3px;">
+    <span style="font-size:10px;color:#072061;">PHL: 9</span>
+    
+  </div>
+</div>
+<div style="padding:8px 0;border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showCoordDetail('Cady Chilensky')">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+    <span style="font-size:12px;font-weight:600">Cady Chilensky</span>
+    <span style="font-size:12px;font-weight:700;color:#059669">7 visits</span>
+  </div>
+  <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden;display:flex;">
+    <div style="width:0%;background:#072061;border-radius:3px 0 0 3px;"></div>
+    <div style="width:32%;background:#059669;border-radius:0 3px 3px 0;"></div>
+  </div>
+  <div style="display:flex;gap:8px;margin-top:3px;">
+    
+    <span style="font-size:10px;color:#059669;">PNJ: 7</span>
+  </div>
+</div></div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Investigator Workload</span>
+      </div>
+      <div id="sched-inv-list" style="padding:12px 16px;">
+        <p style="color:#94a3b8;font-size:12px">Loading investigator data...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recruiter Performance -->
+  <div class="card mb16 fade-in">
+    <div class="card-header">
+      <span class="card-title">🔍 Recruiter Performance · Last 2 Months</span>
+      <span class="badge badge-gray">Gaby · Ana · Vlado · Ema · Jana</span>
+    </div>
+    <div style="padding:0 16px 4px;display:grid;grid-template-columns:1fr 1fr;gap:0 24px;">
+<div style="padding:12px 0;border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showCoordDetail('Gabrijela Ateljevic')">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+    <span style="font-size:13px;font-weight:700;color:var(--navy)">Gaby</span>
+    <div style="display:flex;gap:6px;">
+      <span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#e0f2fe;color:#0369a1;font-weight:600;">15 upcoming</span>
+      <span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#fef3c7;color:#92400e;font-weight:600;">14 cancels</span>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:60px 1fr 28px;gap:3px 6px;align-items:center;font-size:10px;color:var(--muted);">
+    <span>Upcoming</span>
+    <div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;">
+      <div style="width:100%;height:100%;background:#072061;border-radius:3px;"></div>
+    </div>
+    <span style="text-align:right;font-weight:600;color:#072061">15</span>
+    <span>Cancels</span>
+    <div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;">
+      <div style="width:100%;height:100%;background:#f59e0b;border-radius:3px;"></div>
+    </div>
+    <span style="text-align:right;font-weight:600;color:#d97706">14</span>
+  </div>
+  <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">
+    <span style="font-size:10px;color:#6b7280;">No-shows: <b style="color:#374151">4 (29%)</b></span>
+    <span style="font-size:10px;color:#6b7280;">Screen fails: <b>1</b></span>
+    <span style="font-size:10px;color:#6b7280;">Undocumented: <b style="color:#d97706">4</b></span>
+  </div>
+</div>
+<div style="padding:12px 0;border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showCoordDetail('Ema Gunic')">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+    <span style="font-size:13px;font-weight:700;color:var(--navy)">Ema</span>
+    <div style="display:flex;gap:6px;">
+      <span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#e0f2fe;color:#0369a1;font-weight:600;">14 upcoming</span>
+      <span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#fef3c7;color:#92400e;font-weight:600;">13 cancels</span>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:60px 1fr 28px;gap:3px 6px;align-items:center;font-size:10px;color:var(--muted);">
+    <span>Upcoming</span>
+    <div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;">
+      <div style="width:93%;height:100%;background:#072061;border-radius:3px;"></div>
+    </div>
+    <span style="text-align:right;font-weight:600;color:#072061">14</span>
+    <span>Cancels</span>
+    <div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;">
+      <div style="width:93%;height:100%;background:#f59e0b;border-radius:3px;"></div>
+    </div>
+    <span style="text-align:right;font-weight:600;color:#d97706">13</span>
+  </div>
+  <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">
+    <span style="font-size:10px;color:#6b7280;">No-shows: <b style="color:#374151">5 (38%)</b></span>
+    <span style="font-size:10px;color:#6b7280;">Screen fails: <b>0</b></span>
+    <span style="font-size:10px;color:#6b7280;">Undocumented: <b style="color:#d97706">3</b></span>
+  </div>
+</div>
+<div style="padding:12px 0;border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showCoordDetail('Ana Lambic')">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+    <span style="font-size:13px;font-weight:700;color:var(--navy)">Ana</span>
+    <div style="display:flex;gap:6px;">
+      <span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#e0f2fe;color:#0369a1;font-weight:600;">14 upcoming</span>
+      <span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#fef3c7;color:#92400e;font-weight:600;">5 cancels</span>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:60px 1fr 28px;gap:3px 6px;align-items:center;font-size:10px;color:var(--muted);">
+    <span>Upcoming</span>
+    <div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;">
+      <div style="width:93%;height:100%;background:#072061;border-radius:3px;"></div>
+    </div>
+    <span style="text-align:right;font-weight:600;color:#072061">14</span>
+    <span>Cancels</span>
+    <div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;">
+      <div style="width:36%;height:100%;background:#f59e0b;border-radius:3px;"></div>
+    </div>
+    <span style="text-align:right;font-weight:600;color:#d97706">5</span>
+  </div>
+  <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">
+    <span style="font-size:10px;color:#6b7280;">No-shows: <b style="color:#374151">2 (40%)</b></span>
+    <span style="font-size:10px;color:#6b7280;">Screen fails: <b>1</b></span>
+    <span style="font-size:10px;color:#6b7280;">Undocumented: <b style="color:#374151">1</b></span>
+  </div>
+</div>
+<div style="padding:12px 0;border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showCoordDetail('Vlado Draganic')">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+    <span style="font-size:13px;font-weight:700;color:var(--navy)">Vlado</span>
+    <div style="display:flex;gap:6px;">
+      <span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#e0f2fe;color:#0369a1;font-weight:600;">4 upcoming</span>
+      <span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#fef3c7;color:#92400e;font-weight:600;">8 cancels</span>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:60px 1fr 28px;gap:3px 6px;align-items:center;font-size:10px;color:var(--muted);">
+    <span>Upcoming</span>
+    <div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;">
+      <div style="width:27%;height:100%;background:#072061;border-radius:3px;"></div>
+    </div>
+    <span style="text-align:right;font-weight:600;color:#072061">4</span>
+    <span>Cancels</span>
+    <div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;">
+      <div style="width:57%;height:100%;background:#f59e0b;border-radius:3px;"></div>
+    </div>
+    <span style="text-align:right;font-weight:600;color:#d97706">8</span>
+  </div>
+  <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">
+    <span style="font-size:10px;color:#6b7280;">No-shows: <b style="color:#374151">0 (0%)</b></span>
+    <span style="font-size:10px;color:#6b7280;">Screen fails: <b>0</b></span>
+    <span style="font-size:10px;color:#6b7280;">Undocumented: <b style="color:#374151">2</b></span>
+  </div>
+</div>
+<div style="padding:12px 0;border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showCoordDetail('Jana Milankovic')">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+    <span style="font-size:13px;font-weight:700;color:var(--navy)">Jana</span>
+    <div style="display:flex;gap:6px;">
+      <span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#e0f2fe;color:#0369a1;font-weight:600;">0 upcoming</span>
+      <span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#fef3c7;color:#92400e;font-weight:600;">39 cancels</span>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:60px 1fr 28px;gap:3px 6px;align-items:center;font-size:10px;color:var(--muted);">
+    <span>Upcoming</span>
+    <div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;">
+      <div style="width:0%;height:100%;background:#072061;border-radius:3px;"></div>
+    </div>
+    <span style="text-align:right;font-weight:600;color:#072061">0</span>
+    <span>Cancels</span>
+    <div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;">
+      <div style="width:100%;height:100%;background:#f59e0b;border-radius:3px;"></div>
+    </div>
+    <span style="text-align:right;font-weight:600;color:#d97706">39</span>
+  </div>
+  <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">
+    <span style="font-size:10px;color:#6b7280;">No-shows: <b style="color:#374151">9 (23%)</b></span>
+    <span style="font-size:10px;color:#6b7280;">Screen fails: <b>4</b></span>
+    <span style="font-size:10px;color:#6b7280;">Undocumented: <b style="color:#374151">0</b></span>
+  </div>
+</div>
+    </div>
+  </div>
+
+  <!-- Charts row: visit type + subject status -->
+  <div class="grid-2 mb16 fade-in">
+    <div class="card">
+      <div class="card-header"><span class="card-title">Visit Type Breakdown</span></div>
+      <div class="chart-wrap h180" style="margin-bottom:8px"><canvas id="visitTypeChart"></canvas></div>
+      <div id="visit-type-legend" style="padding:0 16px 12px;"></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">Subject Status</span></div>
+      <div class="chart-wrap h180" style="margin-bottom:8px"><canvas id="statusChart"></canvas></div>
+      <div id="status-legend" style="padding:0 16px 12px;"></div>
+    </div>
+  </div>
+
+  <!-- ── COORDINATOR DAILY GOALS ── -->
+  <div class="section-title" style="margin-top:24px">Coordinator Visit Tracker</div>
+  <div class="card fade-in">
+    <div style="padding:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div style="font-size:14px;font-weight:700;color:var(--navy)">Coordinator Visit Snapshot</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <button onclick="exportCoordHistory()" title="Export coordinator history as JSON" style="background:none;border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:11px;color:var(--muted);cursor:pointer">&#x2B07; Export</button>
+          <div style="font-size:11px;color:var(--muted)" id="coord-week-label">This Week</div>
+        </div>
+      </div>
+      <div id="coordGoalsGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px"></div>
+      <div style="margin-top:16px">
+        <div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">Monthly Snapshot — <span id="coord-month-label">March 2026</span></div>
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:12px" id="coordMonthTable">
+            <thead><tr style="background:var(--surface2);border-bottom:2px solid var(--border)">
+              <th style="padding:8px 12px;text-align:left;font-weight:700">Coordinator</th>
+              <th style="padding:8px 8px;text-align:center;font-weight:700">Visits</th>
+              <th style="padding:8px 8px;text-align:center;font-weight:700">Avg/Day</th>
+              <th style="padding:8px 8px;text-align:center;font-weight:700">Volume</th>
+              <th style="padding:8px 8px;text-align:center;font-weight:700">Period</th>
+            </tr></thead>
+            <tbody id="coordMonthBody"></tbody>
+          </table>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -3032,7 +3034,7 @@ const CRP_CONFIG = {
 
   // Expected CSV columns per data source — used by validateColumns() to warn on schema drift
   EXPECTED_COLUMNS: {
-    CRIO: ['Study Name','Study Key','Site Name','Scheduled Date','Subject Full Name',
+    CRIO: ['Study Name','Study Key','Scheduled Date','Subject Full Name',
            'Subject Key (Back End)','Full Name','Appointment Status','Name','Subject Status','Subject ID'],
     CANCELLATIONS: ['Study Name','Study Key','Site Name','Cancel Date','Scheduled Date',
                     'Subject Full Name','Subject Key (Back End)','Staff Full Name',
@@ -4970,7 +4972,7 @@ function _readinessBadge(mr, idx) {
   var colors = { ready:'#059669', partial:'#d97706', 'needs-action':'#dc2626' };
   var labels = { ready:'\u2713 Ready', partial:'\u26a0 ' + r.score + '/' + r.total, 'needs-action':'\u2717 ' + r.score + '/' + r.total };
   var c = colors[r.level];
-  return '<span onclick="showVisitReadiness(' + idx + ')" style="cursor:pointer;display:inline-block;margin-left:6px;font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:' + c + '20;color:' + c + ';vertical-align:middle" title="Click for details">' + labels[r.level] + '</span>';
+  return '<span onclick="showVisitReadiness(' + idx + ')" style="cursor:pointer;display:inline-block;margin-left:6px;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:' + c + '20;color:' + c + ';vertical-align:middle;border:1px solid ' + c + '40" title="Click for medical record details">' + labels[r.level] + '</span>';
 }
 
 function showVisitReadiness(idx) {
@@ -5040,7 +5042,7 @@ function injectScheduleMedRecords() {
     if (row.dataset.medInjected) return;
     // Only inject for upcoming visits (today onward)
     var dateStr = row.dataset.date;
-    if (dateStr) { var d = new Date(dateStr + 'T00:00:00'); if (d < today) return; }
+    if (dateStr) { var parts = dateStr.split('-'); var d = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2])); if (d < today) return; }
     var cells = row.querySelectorAll('td');
     // Account for the confirm button column (first td)
     var patIdx = cells.length >= 9 ? 4 : 3;
@@ -5131,9 +5133,11 @@ function toggleVisitConfirm(btn, key) {
 }
 function _updateConfirmBtn(btn, key) {
   var done = !!_confirmedVisits[key];
-  btn.innerHTML = done ? '\u2705' : '\u2b1c';
+  btn.innerHTML = done
+    ? '<span style="display:inline-block;width:18px;height:18px;border-radius:4px;background:#059669;color:#fff;font-size:13px;line-height:18px;text-align:center;font-weight:700">&#x2713;</span>'
+    : '<span style="display:inline-block;width:18px;height:18px;border-radius:4px;border:2px solid #cbd5e1;background:#fff;"></span>';
   btn.title = done ? 'Confirmed — click to undo' : 'Click to confirm visit';
-  btn.parentElement.parentElement.style.opacity = done ? '0.55' : '1';
+  btn.closest('tr').style.opacity = done ? '0.55' : '1';
 }
 function _updateConfirmCount() {
   var tbody = document.getElementById('upcoming-tbody');
@@ -5152,8 +5156,9 @@ function _updateConfirmCount() {
 function injectVisitConfirmButtons() {
   _loadConfirmedVisits();
   var tbody = document.getElementById('upcoming-tbody');
-  if (!tbody) return;
+  if (!tbody) { console.warn('injectVisitConfirmButtons: no upcoming-tbody'); return; }
   var rows = tbody.querySelectorAll('tr');
+  var injected = 0;
   rows.forEach(function(row) {
     if (row.dataset.confirmInjected) return;
     var key = _visitKey(row);
@@ -5161,14 +5166,16 @@ function injectVisitConfirmButtons() {
     var td = document.createElement('td');
     td.style.cssText = 'width:28px;text-align:center;padding:2px;';
     var btn = document.createElement('button');
-    btn.style.cssText = 'background:none;border:none;cursor:pointer;font-size:16px;padding:0;line-height:1;';
+    btn.style.cssText = 'background:none;border:none;cursor:pointer;padding:0;line-height:1;';
     btn.onclick = function() { toggleVisitConfirm(btn, key); };
     td.appendChild(btn);
     row.insertBefore(td, row.firstChild);
     _updateConfirmBtn(btn, key);
     row.dataset.confirmInjected = '1';
+    injected++;
   });
   _updateConfirmCount();
+  console.log('injectVisitConfirmButtons: injected ' + injected + '/' + rows.length + ' rows');
 }
 
 function buildStatusChart() {

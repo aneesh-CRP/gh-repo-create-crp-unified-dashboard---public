@@ -280,7 +280,7 @@ const CRP_CONFIG = {
 
   // Expected CSV columns per data source — used by validateColumns() to warn on schema drift
   EXPECTED_COLUMNS: {
-    CRIO: ['Study Name','Study Key','Site Name','Scheduled Date','Subject Full Name',
+    CRIO: ['Study Name','Study Key','Scheduled Date','Subject Full Name',
            'Subject Key (Back End)','Full Name','Appointment Status','Name','Subject Status','Subject ID'],
     CANCELLATIONS: ['Study Name','Study Key','Site Name','Cancel Date','Scheduled Date',
                     'Subject Full Name','Subject Key (Back End)','Staff Full Name',
@@ -2218,7 +2218,7 @@ function _readinessBadge(mr, idx) {
   var colors = { ready:'#059669', partial:'#d97706', 'needs-action':'#dc2626' };
   var labels = { ready:'\u2713 Ready', partial:'\u26a0 ' + r.score + '/' + r.total, 'needs-action':'\u2717 ' + r.score + '/' + r.total };
   var c = colors[r.level];
-  return '<span onclick="showVisitReadiness(' + idx + ')" style="cursor:pointer;display:inline-block;margin-left:6px;font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:' + c + '20;color:' + c + ';vertical-align:middle" title="Click for details">' + labels[r.level] + '</span>';
+  return '<span onclick="showVisitReadiness(' + idx + ')" style="cursor:pointer;display:inline-block;margin-left:6px;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:' + c + '20;color:' + c + ';vertical-align:middle;border:1px solid ' + c + '40" title="Click for medical record details">' + labels[r.level] + '</span>';
 }
 
 function showVisitReadiness(idx) {
@@ -2288,7 +2288,7 @@ function injectScheduleMedRecords() {
     if (row.dataset.medInjected) return;
     // Only inject for upcoming visits (today onward)
     var dateStr = row.dataset.date;
-    if (dateStr) { var d = new Date(dateStr + 'T00:00:00'); if (d < today) return; }
+    if (dateStr) { var parts = dateStr.split('-'); var d = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2])); if (d < today) return; }
     var cells = row.querySelectorAll('td');
     // Account for the confirm button column (first td)
     var patIdx = cells.length >= 9 ? 4 : 3;
@@ -2379,9 +2379,11 @@ function toggleVisitConfirm(btn, key) {
 }
 function _updateConfirmBtn(btn, key) {
   var done = !!_confirmedVisits[key];
-  btn.innerHTML = done ? '\u2705' : '\u2b1c';
+  btn.innerHTML = done
+    ? '<span style="display:inline-block;width:18px;height:18px;border-radius:4px;background:#059669;color:#fff;font-size:13px;line-height:18px;text-align:center;font-weight:700">&#x2713;</span>'
+    : '<span style="display:inline-block;width:18px;height:18px;border-radius:4px;border:2px solid #cbd5e1;background:#fff;"></span>';
   btn.title = done ? 'Confirmed — click to undo' : 'Click to confirm visit';
-  btn.parentElement.parentElement.style.opacity = done ? '0.55' : '1';
+  btn.closest('tr').style.opacity = done ? '0.55' : '1';
 }
 function _updateConfirmCount() {
   var tbody = document.getElementById('upcoming-tbody');
@@ -2400,8 +2402,9 @@ function _updateConfirmCount() {
 function injectVisitConfirmButtons() {
   _loadConfirmedVisits();
   var tbody = document.getElementById('upcoming-tbody');
-  if (!tbody) return;
+  if (!tbody) { console.warn('injectVisitConfirmButtons: no upcoming-tbody'); return; }
   var rows = tbody.querySelectorAll('tr');
+  var injected = 0;
   rows.forEach(function(row) {
     if (row.dataset.confirmInjected) return;
     var key = _visitKey(row);
@@ -2409,14 +2412,16 @@ function injectVisitConfirmButtons() {
     var td = document.createElement('td');
     td.style.cssText = 'width:28px;text-align:center;padding:2px;';
     var btn = document.createElement('button');
-    btn.style.cssText = 'background:none;border:none;cursor:pointer;font-size:16px;padding:0;line-height:1;';
+    btn.style.cssText = 'background:none;border:none;cursor:pointer;padding:0;line-height:1;';
     btn.onclick = function() { toggleVisitConfirm(btn, key); };
     td.appendChild(btn);
     row.insertBefore(td, row.firstChild);
     _updateConfirmBtn(btn, key);
     row.dataset.confirmInjected = '1';
+    injected++;
   });
   _updateConfirmCount();
+  console.log('injectVisitConfirmButtons: injected ' + injected + '/' + rows.length + ' rows');
 }
 
 function buildStatusChart() {
