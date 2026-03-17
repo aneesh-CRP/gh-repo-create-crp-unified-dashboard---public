@@ -199,8 +199,8 @@ const CRP_CONFIG = {
     // CRIO API — synced from CRIO Recruitment API by clickup-sync/Code.gs
     // After first syncAll() with CRIO_TOKEN, publish CRIO_Studies and CRIO_Subjects tabs as CSV
     // Then update the GIDs below (get GID from the sheet URL: #gid=XXXXXXX)
-    CRIO_STUDIES_CSV: '',  // Fill after first sync: ...pub?gid=XXXXXXX&single=true&output=csv
-    CRIO_SUBJECTS_CSV: '', // Fill after first sync: ...pub?gid=XXXXXXX&single=true&output=csv
+    CRIO_STUDIES_CSV: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTPrFpOKckIDKYtnV30EBkL9ryI4q4HHKXDLxzgu6ZqVzrALoGU0Tpf_MNYHzg2UxcPajaJWpOONBbP/pub?gid=932189572&single=true&output=csv',
+    CRIO_SUBJECTS_CSV: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTPrFpOKckIDKYtnV30EBkL9ryI4q4HHKXDLxzgu6ZqVzrALoGU0Tpf_MNYHzg2UxcPajaJWpOONBbP/pub?gid=941302257&single=true&output=csv',
     // Finance Master Sheet — published key + tab GIDs for CSV access
     FINANCE_PUB_KEY: '2PACX-1vQXxreb6lrZHej3luMOSI07ditFm6mmGHIHrxWu9BkTfsvk0OLk_gx7o_JIY34UIgroGIKgEYbVdC_V',
   },
