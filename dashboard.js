@@ -8602,7 +8602,8 @@ function renderCrioStudies() {
     if (SKIP[s.protocol_number]) return;
     var isPS = s.protocol_number.toLowerCase().indexOf('pre-screen') >= 0
       || s.protocol_number.toLowerCase().indexOf('pre screen') >= 0
-      || s.protocol_number === s.indication;
+      || s.protocol_number === s.indication
+      || !!PRESCREEN_OVERRIDES[s.study_key];
     if (!isPS) {
       var ind = s.indication.toLowerCase().trim();
       if (!protocolByInd[ind]) protocolByInd[ind] = [];
@@ -8615,13 +8616,15 @@ function renderCrioStudies() {
     if (SKIP[s.protocol_number]) return;
     var isPS = s.protocol_number.toLowerCase().indexOf('pre-screen') >= 0
       || s.protocol_number.toLowerCase().indexOf('pre screen') >= 0
-      || s.protocol_number === s.indication;
+      || s.protocol_number === s.indication
+      || !!PRESCREEN_OVERRIDES[s.study_key];
     if (!isPS) return;
 
     var subs = subsByStudy[s.study_key] || {};
     var total = s.subject_count;
     var preq = subs['PREQUALIFIED'] || 0;
-    var screening = (subs['SCREENING'] || 0) + (subs['SCHEDULED_V1'] || 0);
+    var screening = subs['SCREENING'] || 0;
+    var scheduledV1 = subs['SCHEDULED_V1'] || 0;
     var enrolled = subs['ENROLLED'] || 0;
     var sf = subs['SCREEN_FAIL'] || 0;
     var noshow = subs['SCHEDULED_V1_NO_SHOW_CANCELLED'] || 0;
@@ -8642,7 +8645,8 @@ function renderCrioStudies() {
       name: s.protocol_number, study_key: s.study_key,
       indication: s.indication, coordinator: cc(s.coordinator || ''),
       total: total, prequalified: preq, screening: screening,
-      enrolled: enrolled, screen_fail: sf, noshow: noshow,
+      scheduled_v1: scheduledV1, enrolled: enrolled,
+      screen_fail: sf, noshow: noshow,
       discontinued: disc, completed: comp,
       protocols: protocols
     });
@@ -8679,7 +8683,8 @@ function renderCrioStudies() {
     if (SKIP[s.protocol_number]) return;
     var isPS = s.protocol_number.toLowerCase().indexOf('pre-screen') >= 0
       || s.protocol_number.toLowerCase().indexOf('pre screen') >= 0
-      || s.protocol_number === s.indication;
+      || s.protocol_number === s.indication
+      || !!PRESCREEN_OVERRIDES[s.study_key];
     if (isPS) return;
     if (s.subject_count < 5) return;
 
@@ -8709,7 +8714,8 @@ function renderCrioStudies() {
     if (SKIP[s.protocol_number]) return;
     var isPS = s.protocol_number.toLowerCase().indexOf('pre-screen') >= 0
       || s.protocol_number.toLowerCase().indexOf('pre screen') >= 0
-      || s.protocol_number === s.indication;
+      || s.protocol_number === s.indication
+      || !!PRESCREEN_OVERRIDES[s.study_key];
     var subs = subsByStudy[s.study_key] || {};
     var noshow = subs['SCHEDULED_V1_NO_SHOW_CANCELLED'] || 0;
     if (noshow > 0) {
@@ -8728,7 +8734,8 @@ function renderCrioStudies() {
     if (SKIP[s.protocol_number]) return;
     var isPS = s.protocol_number.toLowerCase().indexOf('pre-screen') >= 0
       || s.protocol_number.toLowerCase().indexOf('pre screen') >= 0
-      || s.protocol_number === s.indication;
+      || s.protocol_number === s.indication
+      || !!PRESCREEN_OVERRIDES[s.study_key];
     if (isPS) return;
     var subs = subsByStudy[s.study_key] || {};
     var screening = subs['SCREENING'] || 0;
@@ -8747,7 +8754,7 @@ function renderCrioStudies() {
   var outreachNeeded = [];
   preScreenStudies.forEach(function(ps) {
     if (ps.prequalified > 0) {
-      var contacted = ps.screening + ps.enrolled + ps.screen_fail + ps.noshow + ps.discontinued + ps.completed;
+      var contacted = ps.screening + (ps.scheduled_v1 || 0) + ps.enrolled + ps.screen_fail + ps.noshow + ps.discontinued + ps.completed;
       var contactPct = ps.total > 0 ? Math.round((contacted / ps.total) * 100) : 0;
       outreachNeeded.push({
         name: ps.name, study_key: ps.study_key,
@@ -8867,9 +8874,9 @@ function renderCrioStudies() {
     preScreenStudies.forEach(function(ps) {
       if (ps.total === 0) return;
       var url = 'https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/' + ps.study_key + '/subjects';
-      var contacted = ps.screening + ps.enrolled + ps.screen_fail + ps.noshow + ps.discontinued + ps.completed;
+      var contacted = ps.screening + (ps.scheduled_v1 || 0) + ps.enrolled + ps.screen_fail + ps.noshow + ps.discontinued + ps.completed;
       var contactPct = ps.total > 0 ? Math.round((contacted / ps.total) * 100) : 0;
-      var qualPct = contacted > 0 ? Math.round(((ps.enrolled + ps.screening) / contacted) * 100) : 0;
+      var qualPct = contacted > 0 ? Math.round(((ps.enrolled + ps.screening + (ps.scheduled_v1 || 0)) / contacted) * 100) : 0;
 
       html += '<div style="padding:8px 10px;margin-bottom:8px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)">';
       html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
@@ -8879,6 +8886,7 @@ function renderCrioStudies() {
       var stages = [
         { label: 'Prequalified', count: ps.prequalified, color: '#3b82f6' },
         { label: 'Screening', count: ps.screening, color: '#d97706' },
+        { label: 'Scheduled V1', count: ps.scheduled_v1 || 0, color: '#7c3aed' },
         { label: 'Enrolled', count: ps.enrolled, color: '#059669' },
         { label: 'Screen Fail', count: ps.screen_fail, color: '#dc2626' },
         { label: 'No Show', count: ps.noshow, color: '#ef4444' },
