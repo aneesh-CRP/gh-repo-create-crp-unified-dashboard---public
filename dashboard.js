@@ -2200,23 +2200,31 @@ function buildUpcomingDetailTable(rows) {
 
 function _medReadiness(mr) {
   // Track: Medical release (Jotform) + Medical records received
+  // Any patient at/past screening is considered complete
   var rel = (mr.medical_release || '').trim();
   var rec = (mr.records_received || '').trim();
   var relL = rel.toLowerCase();
   var recL = rec.toLowerCase();
+  var st = (mr.status || '').toLowerCase();
 
-  // Release done: "Recieved", "Received", "Yes", or starts with "Not Applicable"
+  // Statuses at or past screening → records are complete
+  var POST_SCREENING = ['in screening','enrolled','complete','visit scheduled','screen fail','discontinued','withdrawn','randomized'];
+  var pastScreening = POST_SCREENING.indexOf(st) !== -1;
+
+  if (pastScreening) {
+    return { level:'complete', label:'\u2713 Complete', relOk:true, recOk:true,
+             relVal:rel, recVal:rec, status:mr.status||'' };
+  }
+
   var relOk = relL === 'recieved' || relL === 'received' || relL === 'signed' || relL === 'yes' || relL === 'complete' || relL.indexOf('not applicable') === 0;
-  // Records done: "Received", "Recieved", "Yes"
   var recOk = recL === 'received' || recL === 'recieved' || recL === 'yes' || recL === 'complete';
-  var relNA = relL.indexOf('not applicable') === 0;
 
   var level, label;
   if (relOk && recOk) {
     level = 'complete'; label = '\u2713 Complete';
-  } else if (recOk && !relOk) {
+  } else if (recOk) {
     level = 'complete'; label = '\u2713 Records';
-  } else if (relOk && !recOk) {
+  } else if (relOk) {
     level = 'pending'; label = 'Release \u2713 · Rec: ' + (rec || 'None');
   } else if (recL === 'pending' || relL === 'pending') {
     level = 'pending'; label = 'Pending';
@@ -2225,7 +2233,7 @@ function _medReadiness(mr) {
   } else {
     level = 'needs-action'; label = (rel || 'No Release') + ' · ' + (rec || 'No Records');
   }
-  return { level:level, label:label, relOk:relOk, recOk:recOk, relNA:relNA,
+  return { level:level, label:label, relOk:relOk, recOk:recOk,
            relVal:rel, recVal:rec, status:mr.status||'' };
 }
 
