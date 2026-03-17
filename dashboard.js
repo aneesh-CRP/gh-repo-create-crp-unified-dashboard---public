@@ -2409,15 +2409,24 @@ function injectVisitConfirmButtons() {
     if (row.dataset.confirmInjected) return;
     var key = _visitKey(row);
     if (!key) return;
-    // Find the pre-baked confirm-cell (first td with class confirm-cell)
     var td = row.querySelector('td.confirm-cell') || row.cells[0];
     if (!td) return;
-    var btn = document.createElement('button');
-    btn.style.cssText = 'background:none;border:none;cursor:pointer;padding:0;line-height:1;';
-    btn.onclick = function() { toggleVisitConfirm(btn, key); };
+    // Use native checkbox — universally visible
+    var cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = !!_confirmedVisits[key];
+    cb.style.cssText = 'width:16px;height:16px;cursor:pointer;accent-color:#059669;';
+    cb.title = cb.checked ? 'Confirmed — click to undo' : 'Click to confirm visit';
+    cb.onchange = function() {
+      if (cb.checked) { _confirmedVisits[key] = Date.now(); } else { delete _confirmedVisits[key]; }
+      _saveConfirmedVisits();
+      cb.title = cb.checked ? 'Confirmed — click to undo' : 'Click to confirm visit';
+      row.style.opacity = cb.checked ? '0.55' : '1';
+      _updateConfirmCount();
+    };
     td.innerHTML = '';
-    td.appendChild(btn);
-    _updateConfirmBtn(btn, key);
+    td.appendChild(cb);
+    if (cb.checked) row.style.opacity = '0.55';
     row.dataset.confirmInjected = '1';
     injected++;
   });
