@@ -2141,22 +2141,25 @@ function schedFilter(btn, filter) {
   document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
   const today = new Date(); today.setHours(0,0,0,0);
-  const rows = document.querySelectorAll('#upcoming-tbody .vis-row');
+  const rows = document.querySelectorAll('#upcoming-tbody tr');
   let shown = 0;
   rows.forEach(row => {
-    const d = new Date(row.dataset.date);
+    const ds = (row.dataset.date||'').split('-');
+    if (ds.length < 3) return;
+    const d = new Date(parseInt(ds[0]), parseInt(ds[1])-1, parseInt(ds[2]));
     const site = row.dataset.site || '';
     const days = (d - today) / 86400000;
-    let vis = true;
-    if (filter === '14')  vis = days <= 14;
-    else if (filter === '30')  vis = days <= 30;
-    else if (filter === 'phl') vis = !site.includes('Penn');
-    else if (filter === 'pnj') vis = site.includes('Penn');
+    let vis = days >= 0; // always hide past
+    if (vis && filter === '14')  vis = days <= 14;
+    else if (vis && filter === '30')  vis = days <= 30;
+    else if (vis && filter === 'phl') vis = !site.includes('Penn');
+    else if (vis && filter === 'pnj') vis = site.includes('Penn');
     row.style.display = vis ? '' : 'none';
     if (vis) shown++;
   });
   const badge = document.getElementById('sched-count');
   if (badge) badge.textContent = shown + ' visits';
+  safe(_updateConfirmCount, 'updateConfirmCount');
 }
 
 function filterSchedTable(filter, btn) { schedFilter(btn, filter); }
@@ -2317,7 +2320,8 @@ function hidePastVisits() {
   rows.forEach(function(row) {
     var dateStr = row.dataset.date;
     if (!dateStr) return;
-    var d = new Date(dateStr + 'T00:00:00');
+    var parts = dateStr.split('-');
+    var d = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2]));
     if (d < today) {
       row.style.display = 'none';
       hidden++;
@@ -2342,13 +2346,26 @@ function _saveConfirmedVisits() {
   try { localStorage.setItem('crp_confirmed_visits', JSON.stringify(_confirmedVisits)); } catch(e) {}
 }
 function _visitKey(row) {
+  // Use data-date attribute (stable) + patient name from data-date's row
+  var dateStr = row.dataset.date || '';
+  // Find patient cell — look for <a> with phiOriginal or font-weight:600
+  var patName = '';
   var cells = row.querySelectorAll('td');
-  if (cells.length < 4) return '';
-  // Use date + patient name as unique key
-  var date = (cells[0].textContent || '').trim();
-  var patient = cells[3] ? (cells[3].querySelector('a') || cells[3]) : cells[3];
-  var pName = patient ? (patient.dataset && patient.dataset.phiOriginal || patient.textContent || '').trim() : '';
-  return (date + '__' + pName).replace(/[^a-z0-9]/gi, '-').toLowerCase();
+  for (var i = 0; i < cells.length; i++) {
+    var a = cells[i].querySelector('a[data-phi-original]');
+    if (a) { patName = a.dataset.phiOriginal; break; }
+    // Fallback: look for a cell with font-weight:600 containing a name-like link
+    a = cells[i].querySelector('a[style*="font-weight:600"]');
+    if (a && a.textContent.trim().indexOf(' ') > 0) { patName = a.textContent.trim(); break; }
+  }
+  if (!patName) {
+    // Last resort: use textContent of cells that look like names
+    for (var j = 0; j < cells.length; j++) {
+      var txt = cells[j].textContent.trim();
+      if (txt.indexOf(' ') > 0 && txt.length > 5 && txt.length < 40 && /^[A-Z]/.test(txt)) { patName = txt; break; }
+    }
+  }
+  return (dateStr + '__' + patName).replace(/[^a-z0-9]/gi, '-').toLowerCase();
 }
 function toggleVisitConfirm(btn, key) {
   if (_confirmedVisits[key]) {
@@ -6792,10 +6809,10 @@ function renderAll() {
   safe(buildStatusLegend,        'buildStatusLegend');
   safe(buildSchedStudyBars,      'buildSchedStudyBars');
   safe(buildSchedCoordList,      'buildSchedCoordList');
-  safe(() => filterSchedTable('all', null), 'buildUpcomingDetailTable');
+  safe(backfillInvestigators, 'backfillInvestigators');
   safe(hidePastVisits, 'hidePastVisits');
   safe(injectVisitConfirmButtons, 'injectVisitConfirmButtons');
-  safe(backfillInvestigators, 'backfillInvestigators');
+  safe(() => filterSchedTable('all', null), 'schedFilter');
   safe(renderTrendsCharts,       'renderTrendsCharts');
 }
 
