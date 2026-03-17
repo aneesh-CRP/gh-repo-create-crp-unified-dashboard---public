@@ -5630,6 +5630,7 @@ function switchView(name, el) {
       safe(buildSchedCoordList,      'schedCoord');
       safe(hidePastVisits,           'hidePast');
       safe(injectVisitConfirmButtons,'confirmBtns');
+      if (MED_RECORDS_DATA && MED_RECORDS_DATA.length > 0) safe(injectScheduleMedRecords, 'medRec');
       safe(() => filterSchedTable('all', document.querySelector('.filter-btn.active')), 'schedTable');
       // KPIs
       const d = DATA;
@@ -9165,6 +9166,7 @@ function renderAll() {
   safe(backfillInvestigators, 'backfillInvestigators');
   safe(hidePastVisits, 'hidePastVisits');
   safe(injectVisitConfirmButtons, 'injectVisitConfirmButtons');
+  if (MED_RECORDS_DATA && MED_RECORDS_DATA.length > 0) safe(injectScheduleMedRecords, 'injectScheduleMedRecords');
   safe(() => filterSchedTable('all', null), 'schedFilter');
   safe(renderTrendsCharts,       'renderTrendsCharts');
 }
