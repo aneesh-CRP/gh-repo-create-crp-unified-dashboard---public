@@ -1067,6 +1067,39 @@ body {
     </div>
   </div>
 
+  <!-- Enrollment Pipeline KPIs (CRIO-sourced) -->
+  <div class="time-banner fade-in" style="margin-bottom:16px;background:linear-gradient(135deg,#f0fdf4 0%,#e8eeff 100%);display:none;" id="enrollment-kpi-banner">
+    <div class="tb-section">
+      <div class="tb-label">📊 Enrolled / Target</div>
+      <div class="tb-value" style="color:#059669" id="ov-kpi-enrolled">—</div>
+      <div class="tb-sub" id="ov-kpi-enrolled-sub">Across enrolling studies</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section">
+      <div class="tb-label">🔬 In Screening</div>
+      <div class="tb-value" style="color:#d97706" id="ov-kpi-screening">—</div>
+      <div class="tb-sub">Ready for V1 scheduling</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section">
+      <div class="tb-label">🔄 V1 No-Shows</div>
+      <div class="tb-value" style="color:#dc2626" id="ov-kpi-winback">—</div>
+      <div class="tb-sub">Win-back opportunities</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section">
+      <div class="tb-label">📋 Pre-Qualified</div>
+      <div class="tb-value" style="color:#3b82f6" id="ov-kpi-prequalified">—</div>
+      <div class="tb-sub">Awaiting outreach</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section">
+      <div class="tb-label">📉 Screen Fail Rate</div>
+      <div class="tb-value" id="ov-kpi-sfrate">—</div>
+      <div class="tb-sub" id="ov-kpi-sfrate-sub">Across all studies</div>
+    </div>
+  </div>
+
   <!-- Row 2: Trend Charts -->
   <div class="grid-2 fade-in">
     <div class="card">
@@ -4388,6 +4421,21 @@ function buildScheduleTable() {
     'screen failed':  {bg:'#ef444420',fg:'#ef4444'},
   };
   var esc = typeof escapeHTML === 'function' ? escapeHTML : function(s) { return s; };
+  // Build no-show history from past cancellations for risk badges
+  var noshowByPatient = {};
+  (DATA.allCancels || []).forEach(function(c) {
+    var key = (c.name || '').toLowerCase().trim();
+    if (!key) return;
+    if (c.type === 'No Show' || (c.category || '').toLowerCase().indexOf('no show') >= 0 || (c.category || '').toLowerCase().indexOf('no-show') >= 0) {
+      noshowByPatient[key] = (noshowByPatient[key] || 0) + 1;
+    }
+  });
+  // Also count total cancellations per patient for repeat-cancel warnings
+  var cancelsByPatient = {};
+  (DATA.allCancels || []).forEach(function(c) {
+    var key = (c.name || '').toLowerCase().trim();
+    if (key) cancelsByPatient[key] = (cancelsByPatient[key] || 0) + 1;
+  });
   var html = '';
   for (var i = 0; i < visits.length; i++) {
     var v = visits[i];
@@ -4397,6 +4445,18 @@ function buildScheduleTable() {
     // Status badge color
     var stLow = (v.status||'').toLowerCase();
     var sc = statusColors[stLow] || {bg:'#6b728020',fg:'#6b7280'};
+    // No-show risk badge
+    var patKey = (v.patient || '').toLowerCase().trim();
+    var nsCount = noshowByPatient[patKey] || 0;
+    var cxCount = cancelsByPatient[patKey] || 0;
+    var riskBadge = '';
+    if (nsCount >= 2) {
+      riskBadge = '<span title="' + nsCount + ' prior no-shows — confirm attendance" style="font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px;margin-left:4px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;cursor:help">⚠ ' + nsCount + 'x NO-SHOW</span>';
+    } else if (nsCount === 1) {
+      riskBadge = '<span title="1 prior no-show — confirm attendance" style="font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px;margin-left:4px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;cursor:help">⚠ NO-SHOW</span>';
+    } else if (cxCount >= 2) {
+      riskBadge = '<span title="' + cxCount + ' prior cancellations" style="font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px;margin-left:4px;background:#fff7ed;color:#d97706;border:1px solid #fed7aa;cursor:help">' + cxCount + 'x cancelled</span>';
+    }
     // Study cell (escaped)
     var studyText = esc(v.study||'—');
     var studyHtml = v.study_url
@@ -4415,7 +4475,7 @@ function buildScheduleTable() {
       + '<td style="font-weight:600;color:var(--blue);white-space:nowrap">' + esc(v.date||'—') + '</td>'
       + '<td style="font-size:11px">' + studyHtml + '</td>'
       + '<td style="font-size:11px;color:var(--muted)">' + esc(v.visit||'—') + '</td>'
-      + '<td style="font-weight:600">' + patHtml + '</td>'
+      + '<td style="font-weight:600">' + patHtml + riskBadge + '</td>'
       + '<td><span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:' + sc.bg + ';color:' + sc.fg + '">' + esc(v.status||'—') + '</span></td>'
       + '<td style="font-size:11px">' + esc(v.coord||'—') + '</td>'
       + '<td style="' + invStyle + '">' + invText + '</td>'
@@ -5470,6 +5530,32 @@ function buildInsights() {
         <div class="insight-title">${staleRefs} referrals stale for 14+ days</div>
         <div class="insight-desc">Review and update stale leads in the referral pipeline to prevent drop-off</div>
       </div></div>`
+    });
+  }
+
+  // Cancel rate by subject status — which funnel stages cancel most?
+  var cancelsBySubjectStatus = {};
+  (DATA.allCancels || []).forEach(function(c) {
+    var ss = (c.subject_status || '').trim();
+    if (!ss) ss = 'Unknown';
+    cancelsBySubjectStatus[ss] = (cancelsBySubjectStatus[ss] || 0) + 1;
+  });
+  var statusEntries = Object.keys(cancelsBySubjectStatus).map(function(k) {
+    return { status: k, count: cancelsBySubjectStatus[k] };
+  }).sort(function(a,b) { return b.count - a.count; });
+  if (statusEntries.length > 1) {
+    var totalCx = statusEntries.reduce(function(s,e) { return s + e.count; }, 0);
+    var topStatus = statusEntries[0];
+    var topPct = Math.round((topStatus.count / totalCx) * 100);
+    var breakdown = statusEntries.slice(0,4).map(function(e) {
+      return '<span style="font-size:10px;display:inline-block;margin-right:8px;"><b>' + e.count + '</b> ' + e.status + ' (' + Math.round(e.count/totalCx*100) + '%)</span>';
+    }).join('');
+    flagItems.push({
+      urgent: false,
+      html: '<div class="insight-item info"><span class="insight-icon">📊</span><div>' +
+        '<div class="insight-title">Cancellation breakdown by enrollment stage</div>' +
+        '<div class="insight-desc">' + breakdown + '</div>' +
+        '</div></div>'
     });
   }
 
@@ -8259,6 +8345,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
       url: patientUrl(r['Study Key'], r['Subject Key (Back End)'], r['Site Name']) || '',
       study: (r['Study Name']||'').split(' - ').pop().trim(),
       study_url: studyUrl(r['Study Key'], r['Site Name']) || '',
+      subject_status: r['Subject Status']||'',
       coord: cleanCoord(r['Staff Full Name'] || r['Full Name']),
       type: r['Appointment Cancellation Type']||'',
       reason: r['Cancel Reason']||'',
@@ -10695,6 +10782,7 @@ async function fetchCrioStudies() {
         console.log('CRIO Subjects loaded:', CRIO_SUBJECTS_DATA.length);
         safe(renderCrioStudies, 'renderCrioStudies');
         safe(mergeCrioIntoStudies, 'mergeCrioIntoStudies');
+        safe(buildEnrollmentKPIs, 'buildEnrollmentKPIs');
       }
     } catch(e) {
       console.warn('fetchCrioSubjects error:', e);
@@ -10950,6 +11038,40 @@ function renderCrioStudies() {
     html += '</div>';
   }
 
+  // ── Section 1b: Recent CTMS Cancels Not Rebooked ──
+  var pendingReschedules = (DATA && DATA.pendingReschedules) ? DATA.pendingReschedules : [];
+  if (pendingReschedules.length > 0) {
+    // Group by study
+    var prByStudy = {};
+    pendingReschedules.forEach(function(p) {
+      var s = p.study || 'Unknown';
+      if (!prByStudy[s]) prByStudy[s] = [];
+      prByStudy[s].push(p);
+    });
+    var prStudies = Object.keys(prByStudy).sort(function(a,b) { return prByStudy[b].length - prByStudy[a].length; });
+    html += '<div style="margin-bottom:14px">'
+      + '<div style="font-size:12px;font-weight:700;color:#c2410c;margin-bottom:6px">Recent Cancels — Not Rebooked (' + pendingReschedules.length + ' patients)</div>'
+      + '<div style="font-size:10px;color:#64748b;margin-bottom:8px">Cancelled in the last 2 months and said they would reschedule, but no new appointment found. Follow up to rebook.</div>';
+    prStudies.forEach(function(study) {
+      var pts = prByStudy[study];
+      var studyUrl = pts[0].study_url || '';
+      var studyLink = studyUrl
+        ? '<a href="' + esc(studyUrl) + '" target="_blank" style="color:#c2410c;font-weight:600;text-decoration:underline dotted">' + esc(study) + '</a>'
+        : '<b>' + esc(study) + '</b>';
+      html += '<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;margin-bottom:3px;border-left:3px solid #c2410c;background:#c2410c08;border-radius:0 6px 6px 0;font-size:11px">'
+        + '<span style="font-size:16px;font-weight:800;color:#c2410c;min-width:28px;text-align:right">' + pts.length + '</span>'
+        + '<div style="flex:1">'
+        + studyLink
+        + ' <span style="font-size:9px;color:#94a3b8">'
+        + pts.slice(0,3).map(function(p) { return typeof maskPHI === 'function' ? maskPHI(p.name) : p.name; }).join(', ')
+        + (pts.length > 3 ? ' +' + (pts.length - 3) + ' more' : '')
+        + '</span></div>'
+        + '<span style="font-size:10px;color:#64748b;white-space:nowrap">Rebook →</span>'
+        + '</div>';
+    });
+    html += '</div>';
+  }
+
   // ── Section 2: Qualified — Not Yet Scheduled ──
   if (qualNotSched.length > 0) {
     html += '<div style="margin-bottom:14px">'
@@ -10986,6 +11108,56 @@ function renderCrioStudies() {
         + (o.coord ? ' <span style="color:#94a3b8">· ' + esc(o.coord) + '</span>' : '')
         + '</div>'
         + '<span style="font-size:10px;color:#64748b;white-space:nowrap">' + o.contact_pct + '% contacted</span>'
+        + '</div>';
+    });
+    html += '</div>';
+  }
+
+  // ── Section 4: Enrolled with no upcoming visit (study-level gap) ──
+  var enrolledNoVisit = [];
+  var liveUpcoming = {};
+  if (DATA) {
+    (DATA.upcomingByStudyFull || DATA.upcomingByStudy || []).forEach(function(s) {
+      liveUpcoming[s.name] = s.count; if (s.full) liveUpcoming[s.full] = s.count;
+    });
+  }
+  CRIO_STUDIES_DATA.forEach(function(s) {
+    if (SKIP[s.protocol_number]) return;
+    var isPS = s.protocol_number.toLowerCase().indexOf('pre-screen') >= 0
+      || s.protocol_number.toLowerCase().indexOf('pre screen') >= 0
+      || s.protocol_number === s.indication
+      || !!PRESCREEN_OVERRIDES[s.study_key];
+    if (isPS) return;
+    if (s.status !== 'ENROLLING' && s.status !== 'MAINTENANCE') return;
+    var subs = subsByStudy[s.study_key] || {};
+    var enrolled = subs['ENROLLED'] || 0;
+    if (enrolled < 2) return;
+    var upcomingCount = liveUpcoming[s.protocol_number] || 0;
+    var gap = enrolled - upcomingCount;
+    if (gap >= 2 && upcomingCount < enrolled * 0.5) {
+      enrolledNoVisit.push({
+        study: s.protocol_number, key: s.study_key,
+        enrolled: enrolled, upcoming: upcomingCount, gap: gap,
+        coord: cc(s.coordinator || '')
+      });
+    }
+  });
+  enrolledNoVisit.sort(function(a,b) { return b.gap - a.gap; });
+
+  if (enrolledNoVisit.length > 0) {
+    html += '<div style="margin-bottom:14px">'
+      + '<div style="font-size:12px;font-weight:700;color:#7c3aed;margin-bottom:6px">Enrolled — No Upcoming Visit Scheduled</div>'
+      + '<div style="font-size:10px;color:#64748b;margin-bottom:8px">These studies have enrolled patients but few or no visits on the calendar. Patients may have quietly dropped out.</div>';
+    enrolledNoVisit.forEach(function(e) {
+      var url = 'https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/' + e.key + '/subjects';
+      html += '<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;margin-bottom:3px;border-left:3px solid #7c3aed;background:#7c3aed08;border-radius:0 6px 6px 0;font-size:11px">'
+        + '<span style="font-size:16px;font-weight:800;color:#7c3aed;min-width:28px;text-align:right">' + e.gap + '</span>'
+        + '<div style="flex:1">'
+        + '<a href="' + esc(url) + '" target="_blank" style="color:#7c3aed;font-weight:600;text-decoration:underline dotted">' + esc(e.study) + '</a>'
+        + ' <span style="font-size:9px;color:#94a3b8">' + e.enrolled + ' enrolled, ' + e.upcoming + ' upcoming</span>'
+        + (e.coord ? ' <span style="color:#94a3b8">· ' + esc(e.coord) + '</span>' : '')
+        + '</div>'
+        + '<span style="font-size:10px;color:#64748b;white-space:nowrap">Check retention →</span>'
         + '</div>';
     });
     html += '</div>';
@@ -11073,6 +11245,79 @@ function renderCrioStudies() {
   container.innerHTML = html;
   var badge = document.getElementById('crio-studies-badge');
   if (badge) badge.textContent = totalActions > 0 ? totalActions + ' action items' : 'Live';
+}
+
+// ══════════════════════════════════════════════════════════════
+// CRIO → OVERVIEW ENROLLMENT KPIs
+// Populates enrollment pipeline banner on Overview tab
+// ══════════════════════════════════════════════════════════════
+function buildEnrollmentKPIs() {
+  if (!CRIO_SUBJECTS_DATA || CRIO_SUBJECTS_DATA.length === 0) return;
+  var banner = document.getElementById('enrollment-kpi-banner');
+  if (!banner) return;
+
+  // Aggregate subject statuses across all studies
+  var totals = {};
+  CRIO_SUBJECTS_DATA.forEach(function(s) {
+    totals[s.status] = (totals[s.status] || 0) + 1;
+  });
+
+  var enrolled = totals['ENROLLED'] || 0;
+  var screening = totals['SCREENING'] || 0;
+  var scheduledV1 = totals['SCHEDULED_V1'] || 0;
+  var noshow = totals['SCHEDULED_V1_NO_SHOW_CANCELLED'] || 0;
+  var prequalified = totals['PREQUALIFIED'] || 0;
+  var screenFail = totals['SCREEN_FAIL'] || 0;
+  var completed = totals['COMPLETED'] || 0;
+  var discontinued = totals['DISCONTINUED'] || 0;
+
+  // Aggregate enrollment targets from enrollmentData
+  var totalTarget = 0, totalEnrolled = 0;
+  if (DATA && DATA.enrollmentData) {
+    DATA.enrollmentData.forEach(function(e) {
+      if (e.status === 'Enrolling' && e.target > 0) {
+        totalTarget += e.target;
+        totalEnrolled += e.enrolled || 0;
+      }
+    });
+  }
+
+  var overallPct = totalTarget > 0 ? Math.round((totalEnrolled / totalTarget) * 100) : 0;
+  var screened = enrolled + screenFail + discontinued + completed;
+  var sfRate = screened > 0 ? Math.round((screenFail / screened) * 100) : 0;
+  var sfColor = sfRate > 40 ? '#dc2626' : sfRate > 25 ? '#d97706' : '#059669';
+
+  // Populate KPIs
+  var elEnr = document.getElementById('ov-kpi-enrolled');
+  var elEnrSub = document.getElementById('ov-kpi-enrolled-sub');
+  if (elEnr) {
+    if (totalTarget > 0) {
+      elEnr.textContent = totalEnrolled + ' / ' + totalTarget;
+      elEnr.style.color = overallPct >= 75 ? '#059669' : overallPct >= 50 ? '#d97706' : '#dc2626';
+      elEnrSub.textContent = overallPct + '% of target · enrolling studies';
+    } else {
+      elEnr.textContent = enrolled;
+      elEnrSub.textContent = 'Enrolled across all studies';
+    }
+  }
+  var elScr = document.getElementById('ov-kpi-screening');
+  if (elScr) elScr.textContent = screening + (scheduledV1 > 0 ? ' + ' + scheduledV1 + ' V1' : '');
+
+  var elWB = document.getElementById('ov-kpi-winback');
+  if (elWB) elWB.textContent = noshow;
+
+  var elPQ = document.getElementById('ov-kpi-prequalified');
+  if (elPQ) elPQ.textContent = prequalified;
+
+  var elSF = document.getElementById('ov-kpi-sfrate');
+  var elSFSub = document.getElementById('ov-kpi-sfrate-sub');
+  if (elSF) {
+    elSF.textContent = sfRate + '%';
+    elSF.style.color = sfColor;
+  }
+  if (elSFSub) elSFSub.textContent = screenFail + ' of ' + screened + ' screened';
+
+  banner.style.display = '';
 }
 
 // ══════════════════════════════════════════════════════════════
