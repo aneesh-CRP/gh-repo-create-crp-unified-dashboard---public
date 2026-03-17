@@ -245,7 +245,7 @@ const CRP_CONFIG = {
   MASTER_SHEET_ID: '1LZWJeJE9EJqe1Th13sSazrWOI5k8I56mbZPieAHqoyo',
 
   // Coordinator visit goals
-  COORDINATORS: ['Mario Castellanos','Stacey Scott','Ruby Pereira','Cady Chilensky','Angelina Mcmullen'],
+  COORDINATORS: ['Mario Castellanos','Stacey Scott','Ruby Pereira','Cady Chilensky','Angelina McMullen'],
   INVESTIGATORS: ['Taher Modarressi','Eugene Andruczyk','Lolita Vaughan','Michael Tomeo','Joseph Heether','Brian Shaffer'],
   // Default PI for each study (fallback when audit log doesn't resolve investigator)
   STUDY_INVESTIGATORS: {
@@ -2139,12 +2139,22 @@ function buildScheduleTable() {
   }
   var linkSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-left:2px;opacity:0.4;vertical-align:middle"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>';
   var statusColors = {
-    'enrolled':   {bg:'#05966920',fg:'#059669'},
-    'screening':  {bg:'#d9770620',fg:'#d97706'},
-    'new':        {bg:'#3b82f620',fg:'#3b82f6'},
-    'randomized': {bg:'#05966920',fg:'#059669'},
-    'completed':  {bg:'#6b728020',fg:'#6b7280'},
+    'enrolled':       {bg:'#05966920',fg:'#059669'},
+    'randomized':     {bg:'#05966920',fg:'#059669'},
+    'active':         {bg:'#05966920',fg:'#059669'},
+    'screening':      {bg:'#d9770620',fg:'#d97706'},
+    'in screening':   {bg:'#d9770620',fg:'#d97706'},
+    'prequalified':   {bg:'#3b82f620',fg:'#3b82f6'},
+    'qualified':      {bg:'#3b82f620',fg:'#3b82f6'},
+    'new':            {bg:'#3b82f620',fg:'#3b82f6'},
+    'completed':      {bg:'#6b728020',fg:'#6b7280'},
+    'discontinued':   {bg:'#6b728020',fg:'#6b7280'},
+    'withdrawn':      {bg:'#6b728020',fg:'#6b7280'},
+    'inactive':       {bg:'#6b728020',fg:'#6b7280'},
+    'screen fail':    {bg:'#ef444420',fg:'#ef4444'},
+    'screen failed':  {bg:'#ef444420',fg:'#ef4444'},
   };
+  var esc = typeof escapeHTML === 'function' ? escapeHTML : function(s) { return s; };
   var html = '';
   for (var i = 0; i < visits.length; i++) {
     var v = visits[i];
@@ -2154,25 +2164,27 @@ function buildScheduleTable() {
     // Status badge color
     var stLow = (v.status||'').toLowerCase();
     var sc = statusColors[stLow] || {bg:'#6b728020',fg:'#6b7280'};
-    // Study cell
+    // Study cell (escaped)
+    var studyText = esc(v.study||'—');
     var studyHtml = v.study_url
-      ? '<a href="' + v.study_url + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="text-decoration:none;color:var(--navy);font-weight:600">' + (v.study||'—') + linkSvg + '</a>'
-      : (v.study||'—');
-    // Patient cell
+      ? '<a href="' + v.study_url + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="text-decoration:none;color:var(--navy);font-weight:600">' + studyText + linkSvg + '</a>'
+      : studyText;
+    // Patient cell (escaped)
+    var patText = esc(v.patient||'—');
     var patHtml = v.patient_url
-      ? '<a href="' + v.patient_url + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="text-decoration:none;color:var(--navy);font-weight:600">' + (v.patient||'—') + linkSvg + '</a>'
-      : (v.patient||'—');
+      ? '<a href="' + v.patient_url + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="text-decoration:none;color:var(--navy);font-weight:600">' + patText + linkSvg + '</a>'
+      : patText;
     // Investigator
-    var invText = v.investigator || '—';
+    var invText = esc(v.investigator || '—');
     var invStyle = v.investigator ? 'font-size:11px;color:#7c3aed' : 'font-size:11px;color:#cbd5e1';
-    html += '<tr data-date="' + (v.date_iso||'') + '" data-site="' + siteCode + '" data-coord="' + (v.coord||'') + '">'
+    html += '<tr data-date="' + (v.date_iso||'') + '" data-site="' + siteCode + '" data-coord="' + esc(v.coord||'') + '">'
       + '<td class="confirm-cell" style="width:80px;text-align:center;padding:4px;"><span style="font-size:9px;font-weight:700;padding:3px 8px;border-radius:4px;border:1.5px solid #e2e8f0;color:#cbd5e1;">Confirm</span></td>'
-      + '<td style="font-weight:600;color:var(--blue);white-space:nowrap">' + (v.date||'—') + '</td>'
+      + '<td style="font-weight:600;color:var(--blue);white-space:nowrap">' + esc(v.date||'—') + '</td>'
       + '<td style="font-size:11px">' + studyHtml + '</td>'
-      + '<td style="font-size:11px;color:var(--muted)">' + (v.visit||'—') + '</td>'
+      + '<td style="font-size:11px;color:var(--muted)">' + esc(v.visit||'—') + '</td>'
       + '<td style="font-weight:600">' + patHtml + '</td>'
-      + '<td><span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:' + sc.bg + ';color:' + sc.fg + '">' + (v.status||'—') + '</span></td>'
-      + '<td style="font-size:11px">' + (v.coord||'—') + '</td>'
+      + '<td><span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:' + sc.bg + ';color:' + sc.fg + '">' + esc(v.status||'—') + '</span></td>'
+      + '<td style="font-size:11px">' + esc(v.coord||'—') + '</td>'
       + '<td style="' + invStyle + '">' + invText + '</td>'
       + '<td><span style="font-size:9px;font-weight:700;padding:2px 5px;border-radius:3px;' + siteBg + '">' + siteCode + '</span></td>'
       + '</tr>';
