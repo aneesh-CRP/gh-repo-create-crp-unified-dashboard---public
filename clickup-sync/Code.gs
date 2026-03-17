@@ -80,6 +80,14 @@ function syncAll() {
   writeSheet(ss, 'MedicalRecords', MED_RECORDS_HEADERS, medRows);
   Logger.log('MedicalRecords: ' + medRows.length + ' rows');
 
+  // ── CRIO API Sync ──
+  var crioToken = props.getProperty('CRIO_TOKEN');
+  var crioData = syncCrioData(crioToken);
+  writeSheet(ss, 'CRIO_Studies', CRIO_STUDIES_HEADERS, crioData.studies);
+  Logger.log('CRIO_Studies: ' + crioData.studies.length + ' rows');
+  writeSheet(ss, 'CRIO_Subjects', CRIO_SUBJECTS_HEADERS, crioData.subjects);
+  Logger.log('CRIO_Subjects: ' + crioData.subjects.length + ' rows');
+
   // Write a sync timestamp to a metadata sheet
   var metaSheet = getOrCreateSheet(ss, '_SyncMeta');
   metaSheet.getRange('A1').setValue('last_sync');
@@ -90,6 +98,10 @@ function syncAll() {
   metaSheet.getRange('B3').setValue(campRows.length);
   metaSheet.getRange('A4').setValue('medrec_count');
   metaSheet.getRange('B4').setValue(medRows.length);
+  metaSheet.getRange('A5').setValue('crio_study_count');
+  metaSheet.getRange('B5').setValue(crioData.studies.length);
+  metaSheet.getRange('A6').setValue('crio_subject_count');
+  metaSheet.getRange('B6').setValue(crioData.subjects.length);
 }
 
 
@@ -312,6 +324,129 @@ function normalizeMedRecord(t, studyName) {
     isActive ? 'TRUE' : 'FALSE',
     isClosed ? 'TRUE' : 'FALSE',
   ];
+}
+
+
+// ============================================================
+// CRIO API SYNC — Studies & Subjects from CRIO Recruitment API
+// ============================================================
+var CRIO_API_BASE = 'https://api.clinicalresearch.io';
+var CRIO_SITE_ID  = '1679';   // Philadelphia, PA
+var CRIO_CLIENT_ID = '1329';  // CRP org ID
+
+var CRIO_STUDIES_HEADERS = [
+  'study_key','protocol_number','status','coordinator','investigator',
+  'indication','subject_count','date_created','last_updated','last_updated_ts'
+];
+
+var CRIO_SUBJECTS_HEADERS = [
+  'subject_id','study_key','protocol_number','status'
+];
+
+function syncCrioData(crioToken) {
+  if (!crioToken) {
+    Logger.log('CRIO: No token, skipping');
+    return { studies: [], subjects: [] };
+  }
+
+  // 1. Fetch site data to get all studies
+  var siteUrl = CRIO_API_BASE + '/api/v1/site/' + CRIO_SITE_ID
+    + '?client_id=' + CRIO_CLIENT_ID;
+  var siteResp = UrlFetchApp.fetch(siteUrl, {
+    method: 'get',
+    headers: {
+      'Authorization': 'Bearer ' + crioToken,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    },
+    muteHttpExceptions: true,
+  });
+  if (siteResp.getResponseCode() !== 200) {
+    Logger.log('CRIO site API error: ' + siteResp.getContentText().slice(0, 200));
+    return { studies: [], subjects: [] };
+  }
+  var site = JSON.parse(siteResp.getContentText());
+  var studies = site.studies || [];
+  Logger.log('CRIO: Found ' + studies.length + ' studies at site ' + CRIO_SITE_ID);
+
+  // 2. For each enrolling/maintenance study, fetch subject details
+  var studyRows = [];
+  var subjectRows = [];
+  var ACTIVE_STATUSES = ['ENROLLING', 'MAINTENANCE', 'STARTUP', 'PRECLOSED'];
+
+  for (var i = 0; i < studies.length; i++) {
+    var s = studies[i];
+    var isActive = ACTIVE_STATUSES.indexOf(s.status) !== -1;
+
+    // Only fetch full detail for active studies (to stay within rate limits)
+    var coordinator = '';
+    var investigator = '';
+    var indication = '';
+    var subjectCount = 0;
+    var dateCreated = '';
+    var lastUpdated = '';
+    var lastUpdatedTs = '';
+
+    if (isActive) {
+      var studyUrl = CRIO_API_BASE + '/api/v1/study/' + s.studyKey
+        + '/site/' + CRIO_SITE_ID + '?client_id=' + CRIO_CLIENT_ID;
+      var studyResp = UrlFetchApp.fetch(studyUrl, {
+        method: 'get',
+        headers: {
+          'Authorization': 'Bearer ' + crioToken,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        muteHttpExceptions: true,
+      });
+      if (studyResp.getResponseCode() === 200) {
+        var detail = JSON.parse(studyResp.getContentText());
+        var roles = detail.roles || [];
+        for (var r = 0; r < roles.length; r++) {
+          var contact = roles[r].contact || {};
+          var fullName = ((contact.firstName || '') + ' ' + (contact.lastName || '')).trim();
+          if (roles[r].role === 'coordinator') coordinator = fullName;
+          if (roles[r].role === 'investigator') investigator = fullName;
+        }
+        indication = (detail.indication || {}).name || '';
+        dateCreated = detail.dateCreated || '';
+        lastUpdated = detail.lastUpdated || '';
+        lastUpdatedTs = detail.lastUpdatedTS ? String(detail.lastUpdatedTS) : '';
+
+        var subjects = detail.subjects || [];
+        subjectCount = subjects.length;
+        for (var j = 0; j < subjects.length; j++) {
+          subjectRows.push([
+            subjects[j].id || '',
+            s.studyKey,
+            s.protocolNumber || '',
+            subjects[j].status || '',
+          ]);
+        }
+      } else {
+        Logger.log('CRIO study ' + s.studyKey + ' error: '
+          + studyResp.getContentText().slice(0, 100));
+      }
+      // Rate limit: 200ms between requests
+      Utilities.sleep(200);
+    }
+
+    studyRows.push([
+      s.studyKey,
+      s.protocolNumber || '',
+      s.status || '',
+      coordinator,
+      investigator,
+      indication,
+      subjectCount,
+      dateCreated,
+      lastUpdated,
+      lastUpdatedTs,
+    ]);
+  }
+
+  Logger.log('CRIO: ' + studyRows.length + ' studies, ' + subjectRows.length + ' subjects');
+  return { studies: studyRows, subjects: subjectRows };
 }
 
 

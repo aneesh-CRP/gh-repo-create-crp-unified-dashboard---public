@@ -196,6 +196,11 @@ const CRP_CONFIG = {
     // Medical Records — synced from ClickUp folder 90147290121 by clickup-sync/Code.gs
     // After first syncAll(), get the MedicalRecords sheet GID and update below
     MED_RECORDS_CSV: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTPrFpOKckIDKYtnV30EBkL9ryI4q4HHKXDLxzgu6ZqVzrALoGU0Tpf_MNYHzg2UxcPajaJWpOONBbP/pub?gid=1921715962&single=true&output=csv',
+    // CRIO API — synced from CRIO Recruitment API by clickup-sync/Code.gs
+    // After first syncAll() with CRIO_TOKEN, publish CRIO_Studies and CRIO_Subjects tabs as CSV
+    // Then update the GIDs below (get GID from the sheet URL: #gid=XXXXXXX)
+    CRIO_STUDIES_CSV: '',  // Fill after first sync: ...pub?gid=XXXXXXX&single=true&output=csv
+    CRIO_SUBJECTS_CSV: '', // Fill after first sync: ...pub?gid=XXXXXXX&single=true&output=csv
     // Finance Master Sheet — published key + tab GIDs for CSV access
     FINANCE_PUB_KEY: '2PACX-1vQXxreb6lrZHej3luMOSI07ditFm6mmGHIHrxWu9BkTfsvk0OLk_gx7o_JIY34UIgroGIKgEYbVdC_V',
   },
@@ -7705,6 +7710,8 @@ let REFERRAL_DATA = [];        // all referral tasks normalized
 let CAMPAIGN_DATA = [];        // central campaign aggregates
 let FB_CRM_DATA = [];          // Facebook CRM leads from Google Sheet
 let MED_RECORDS_DATA = [];     // Medical Records & Patient's Path (per-study patient tracking)
+let CRIO_STUDIES_DATA = [];    // CRIO API — study enrollment status, roles, subject counts
+let CRIO_SUBJECTS_DATA = [];   // CRIO API — individual subject IDs and statuses per study
 let PATIENT_NJ_DATA = [];      // Patient tracker NJ (Pennington site)
 let _referralsLoaded = false;
 let _referralByStudy = new Map();
@@ -7733,6 +7740,8 @@ function initReferrals() {
   if (FB_CRM_DATA.length === 0) fetchFacebookCRM().catch(e => console.warn('FB CRM:', e));
   // Delay med records fetch to avoid Google Sheets rate limiting (referrals+campaigns fetch first)
   if (MED_RECORDS_DATA.length === 0) setTimeout(function(){ fetchMedicalRecords().catch(e => console.warn('Med Records:', e)); }, 5000);
+  // CRIO API data — fetch after a delay to avoid rate limiting
+  if (CRIO_STUDIES_DATA.length === 0) setTimeout(function(){ fetchCrioStudies().catch(e => console.warn('CRIO Studies:', e)); }, 8000);
 }
 
 async function refreshReferrals() {
@@ -8504,6 +8513,141 @@ async function fetchMedicalRecords(attempt) {
       return fetchMedicalRecords(attempt + 1);
     }
   }
+}
+
+// ============================================================
+// CRIO API DATA — Study enrollment status & subject pipeline
+// ============================================================
+async function fetchCrioStudies() {
+  var studiesUrl = CRP_CONFIG.DATA_FEEDS.CRIO_STUDIES_CSV;
+  var subjectsUrl = CRP_CONFIG.DATA_FEEDS.CRIO_SUBJECTS_CSV;
+  if (!studiesUrl) { console.log('CRIO Studies CSV URL not configured'); return; }
+  try {
+    var rows = await fetchCSV(studiesUrl);
+    if (!rows || rows.length === 0) return;
+    CRIO_STUDIES_DATA = rows.map(function(r) {
+      return {
+        study_key: r.study_key || '',
+        protocol_number: r.protocol_number || '',
+        status: r.status || '',
+        coordinator: r.coordinator || '',
+        investigator: r.investigator || '',
+        indication: r.indication || '',
+        subject_count: parseInt(r.subject_count) || 0,
+        date_created: r.date_created || '',
+        last_updated: r.last_updated || '',
+      };
+    });
+    console.log('CRIO Studies loaded:', CRIO_STUDIES_DATA.length);
+    safe(renderCrioStudies, 'renderCrioStudies');
+  } catch(e) {
+    console.warn('fetchCrioStudies error:', e);
+  }
+  // Also fetch subjects if URL is configured
+  if (subjectsUrl) {
+    try {
+      var sRows = await fetchCSV(subjectsUrl);
+      if (sRows && sRows.length > 0) {
+        CRIO_SUBJECTS_DATA = sRows.map(function(r) {
+          return {
+            subject_id: r.subject_id || '',
+            study_key: r.study_key || '',
+            protocol_number: r.protocol_number || '',
+            status: r.status || '',
+          };
+        });
+        console.log('CRIO Subjects loaded:', CRIO_SUBJECTS_DATA.length);
+        safe(renderCrioStudies, 'renderCrioStudies');
+      }
+    } catch(e) {
+      console.warn('fetchCrioSubjects error:', e);
+    }
+  }
+}
+
+function renderCrioStudies() {
+  var container = document.getElementById('crio-studies-container');
+  if (!container || CRIO_STUDIES_DATA.length === 0) return;
+
+  // Group by status
+  var byStatus = {};
+  var totalSubjects = 0;
+  CRIO_STUDIES_DATA.forEach(function(s) {
+    if (!byStatus[s.status]) byStatus[s.status] = [];
+    byStatus[s.status].push(s);
+    totalSubjects += s.subject_count;
+  });
+
+  // Subject pipeline from CRIO_SUBJECTS_DATA
+  var subjectPipeline = {};
+  CRIO_SUBJECTS_DATA.forEach(function(s) {
+    var st = s.status || 'Unknown';
+    subjectPipeline[st] = (subjectPipeline[st] || 0) + 1;
+  });
+
+  var statusColors = {
+    'ENROLLING': '#059669', 'MAINTENANCE': '#3b82f6', 'STARTUP': '#d97706',
+    'PRECLOSED': '#6b7280', 'CONFIGURING': '#8b5cf6', 'CLOSED': '#ef4444',
+  };
+  var esc = typeof escapeHTML === 'function' ? escapeHTML : function(s){ return s; };
+
+  // Build KPI row
+  var enrolling = (byStatus['ENROLLING'] || []).length;
+  var maintenance = (byStatus['MAINTENANCE'] || []).length;
+  var html = '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px">';
+  html += '<div style="background:#05966915;padding:8px 14px;border-radius:8px;flex:1;min-width:100px;text-align:center">'
+    + '<div style="font-size:22px;font-weight:700;color:#059669">' + enrolling + '</div>'
+    + '<div style="font-size:10px;color:#64748b">Enrolling</div></div>';
+  html += '<div style="background:#3b82f615;padding:8px 14px;border-radius:8px;flex:1;min-width:100px;text-align:center">'
+    + '<div style="font-size:22px;font-weight:700;color:#3b82f6">' + maintenance + '</div>'
+    + '<div style="font-size:10px;color:#64748b">Maintenance</div></div>';
+  html += '<div style="background:#07206110;padding:8px 14px;border-radius:8px;flex:1;min-width:100px;text-align:center">'
+    + '<div style="font-size:22px;font-weight:700;color:#072061">' + CRIO_STUDIES_DATA.length + '</div>'
+    + '<div style="font-size:10px;color:#64748b">Total Studies</div></div>';
+  html += '<div style="background:#ff993315;padding:8px 14px;border-radius:8px;flex:1;min-width:100px;text-align:center">'
+    + '<div style="font-size:22px;font-weight:700;color:#ff9933">' + totalSubjects + '</div>'
+    + '<div style="font-size:10px;color:#64748b">Active Subjects</div></div>';
+  html += '</div>';
+
+  // Subject pipeline bar (if data available)
+  if (CRIO_SUBJECTS_DATA.length > 0) {
+    var pipeColors = {
+      'PREQUALIFIED':'#3b82f6','SCREENING':'#d97706','SCHEDULED_V1':'#8b5cf6',
+      'SCHEDULED_V1_NO_SHOW_CANCELLED':'#ef4444','ENROLLED':'#059669',
+    };
+    html += '<div style="margin-bottom:12px"><div style="font-size:11px;font-weight:600;color:#64748b;margin-bottom:4px">Subject Pipeline</div>';
+    html += '<div style="display:flex;gap:8px;flex-wrap:wrap">';
+    var sortedPipeline = Object.keys(subjectPipeline).sort(function(a,b){ return subjectPipeline[b] - subjectPipeline[a]; });
+    sortedPipeline.forEach(function(st) {
+      var c = pipeColors[st] || '#6b7280';
+      html += '<span style="font-size:11px;padding:3px 8px;border-radius:6px;background:' + c + '15;color:' + c + '">'
+        + esc(st.replace(/_/g,' ').toLowerCase()) + ': <b>' + subjectPipeline[st] + '</b></span>';
+    });
+    html += '</div></div>';
+  }
+
+  // Enrolling studies table
+  var enrollingStudies = (byStatus['ENROLLING'] || []).sort(function(a,b){ return b.subject_count - a.subject_count; });
+  if (enrollingStudies.length > 0) {
+    html += '<table style="width:100%;font-size:11px;border-collapse:collapse">';
+    html += '<thead><tr style="border-bottom:1px solid #e2e8f0">'
+      + '<th style="text-align:left;padding:4px 6px;color:#64748b;font-weight:500">Study</th>'
+      + '<th style="text-align:left;padding:4px 6px;color:#64748b;font-weight:500">Coordinator</th>'
+      + '<th style="text-align:left;padding:4px 6px;color:#64748b;font-weight:500">PI</th>'
+      + '<th style="text-align:center;padding:4px 6px;color:#64748b;font-weight:500">Subjects</th>'
+      + '</tr></thead><tbody>';
+    enrollingStudies.forEach(function(s) {
+      html += '<tr style="border-bottom:1px solid #f1f5f9">'
+        + '<td style="padding:4px 6px;font-weight:500">' + esc(s.protocol_number) + '</td>'
+        + '<td style="padding:4px 6px;color:#475569">' + esc(s.coordinator) + '</td>'
+        + '<td style="padding:4px 6px;color:#475569">' + esc(s.investigator) + '</td>'
+        + '<td style="padding:4px 6px;text-align:center;font-weight:600">' + s.subject_count + '</td>'
+        + '</tr>';
+    });
+    html += '</tbody></table>';
+  }
+
+  container.innerHTML = html;
 }
 
 let _medRecFilter = 'upcoming'; // 'upcoming' or 'all'
