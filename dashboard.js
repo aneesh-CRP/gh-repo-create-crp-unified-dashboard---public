@@ -2128,6 +2128,59 @@ function buildSchedCoordList() {
   }).join('');
 }
 
+// ── Dynamically build schedule table from live CRIO data ──
+function buildScheduleTable() {
+  var tbody = document.getElementById('upcoming-tbody');
+  if (!tbody) return;
+  var visits = (DATA && DATA.allVisitDetail) ? DATA.allVisitDetail : [];
+  if (!visits.length) {
+    console.log('buildScheduleTable: no allVisitDetail data, keeping static rows');
+    return;
+  }
+  var linkSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-left:2px;opacity:0.4;vertical-align:middle"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>';
+  var statusColors = {
+    'enrolled':   {bg:'#05966920',fg:'#059669'},
+    'screening':  {bg:'#d9770620',fg:'#d97706'},
+    'new':        {bg:'#3b82f620',fg:'#3b82f6'},
+    'randomized': {bg:'#05966920',fg:'#059669'},
+    'completed':  {bg:'#6b728020',fg:'#6b7280'},
+  };
+  var html = '';
+  for (var i = 0; i < visits.length; i++) {
+    var v = visits[i];
+    // Derive site code from study_url
+    var siteCode = (v.study_url && v.study_url.indexOf('pennington') !== -1) ? 'PNJ' : 'PHL';
+    var siteBg = siteCode === 'PNJ' ? 'background:#05996920;color:#059669' : 'background:#07206120;color:#072061';
+    // Status badge color
+    var stLow = (v.status||'').toLowerCase();
+    var sc = statusColors[stLow] || {bg:'#6b728020',fg:'#6b7280'};
+    // Study cell
+    var studyHtml = v.study_url
+      ? '<a href="' + v.study_url + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="text-decoration:none;color:var(--navy);font-weight:600">' + (v.study||'—') + linkSvg + '</a>'
+      : (v.study||'—');
+    // Patient cell
+    var patHtml = v.patient_url
+      ? '<a href="' + v.patient_url + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="text-decoration:none;color:var(--navy);font-weight:600">' + (v.patient||'—') + linkSvg + '</a>'
+      : (v.patient||'—');
+    // Investigator
+    var invText = v.investigator || '—';
+    var invStyle = v.investigator ? 'font-size:11px;color:#7c3aed' : 'font-size:11px;color:#cbd5e1';
+    html += '<tr data-date="' + (v.date_iso||'') + '" data-site="' + siteCode + '" data-coord="' + (v.coord||'') + '">'
+      + '<td class="confirm-cell" style="width:80px;text-align:center;padding:4px;"><span style="font-size:9px;font-weight:700;padding:3px 8px;border-radius:4px;border:1.5px solid #e2e8f0;color:#cbd5e1;">Confirm</span></td>'
+      + '<td style="font-weight:600;color:var(--blue);white-space:nowrap">' + (v.date||'—') + '</td>'
+      + '<td style="font-size:11px">' + studyHtml + '</td>'
+      + '<td style="font-size:11px;color:var(--muted)">' + (v.visit||'—') + '</td>'
+      + '<td style="font-weight:600">' + patHtml + '</td>'
+      + '<td><span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:' + sc.bg + ';color:' + sc.fg + '">' + (v.status||'—') + '</span></td>'
+      + '<td style="font-size:11px">' + (v.coord||'—') + '</td>'
+      + '<td style="' + invStyle + '">' + invText + '</td>'
+      + '<td><span style="font-size:9px;font-weight:700;padding:2px 5px;border-radius:3px;' + siteBg + '">' + siteCode + '</span></td>'
+      + '</tr>';
+  }
+  tbody.innerHTML = html;
+  console.log('buildScheduleTable: built ' + visits.length + ' rows from live CRIO data');
+}
+
 function buildSchedStudyBars() {
   const el = document.getElementById('upcoming-study-bars');
   if (!el) return;
@@ -3356,8 +3409,11 @@ function switchView(name, el) {
       safe(buildVisitTypeChart,      'visitChart');
       safe(buildStatusChart,         'statusChart');
       safe(buildStatusLegend,        'statusLegend');
+      safe(buildScheduleTable,       'buildSched');
       safe(buildSchedStudyBars,      'schedBars');
       safe(buildSchedCoordList,      'schedCoord');
+      safe(hidePastVisits,           'hidePast');
+      safe(injectVisitConfirmButtons,'confirmBtns');
       safe(() => filterSchedTable('all', document.querySelector('.filter-btn.active')), 'schedTable');
       // KPIs
       const d = DATA;
@@ -6894,6 +6950,7 @@ function renderAll() {
   safe(buildVisitTypeChart,      'buildVisitTypeChart');
   safe(buildStatusChart,         'buildStatusChart');
   safe(buildStatusLegend,        'buildStatusLegend');
+  safe(buildScheduleTable,       'buildScheduleTable');
   safe(buildSchedStudyBars,      'buildSchedStudyBars');
   safe(buildSchedCoordList,      'buildSchedCoordList');
   safe(backfillInvestigators, 'backfillInvestigators');
