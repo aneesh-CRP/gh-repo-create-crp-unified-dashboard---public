@@ -2199,39 +2199,44 @@ function buildUpcomingDetailTable(rows) {
 }
 
 function _medReadiness(mr) {
-  // Score visit readiness from MED_RECORDS_DATA record
+  // Primary indicator: "Medical records received?" = Received means complete
   var rel = (mr.medical_release || '').toLowerCase().trim();
   var rec = (mr.records_received || '').toLowerCase().trim();
   var crio = (mr.records_in_crio || '').toLowerCase().trim();
   var pi = (mr.investigator_approval || '').toLowerCase().trim();
-  // Match actual ClickUp field values (including typos like 'Recieved')
-  var relOk = rel === 'recieved' || rel === 'received' || rel === 'signed' || rel === 'yes' || rel === 'complete';
+
+  var relOk = rel === 'recieved' || rel === 'received' || rel === 'signed' || rel === 'yes' || rel === 'complete' || rel === 'not applicable' || rel === 'n/a';
   var recOk = rec === 'received' || rec === 'recieved' || rec === 'yes' || rec === 'complete';
-  var crioOk = crio === 'yes';
-  var piOk = pi.indexOf('confirmed') !== -1 || pi === 'approved' || pi === 'yes';
-  // N/A fields shouldn't count against the score
-  var total = 4;
-  var relNA = rel === 'not applicable' || rel === 'n/a';
-  var recNA = rec === 'not applicable' || rec === 'n/a';
-  var crioNA = crio === 'not applicable' || crio === 'n/a';
-  var piNA = pi === 'not applicable' || pi === 'n/a';
-  if (relNA) { relOk = true; }
-  if (recNA) { recOk = true; }
-  if (crioNA) { crioOk = true; }
-  if (piNA) { piOk = true; }
-  var score = 0;
-  if (relOk) score++; if (recOk) score++; if (crioOk) score++; if (piOk) score++;
-  var level = score === total ? 'ready' : score >= 2 ? 'partial' : 'needs-action';
-  return { score:score, total:total, level:level, relOk:relOk, recOk:recOk, crioOk:crioOk, piOk:piOk,
-           relVal:mr.medical_release, recVal:mr.records_received, crioVal:mr.records_in_crio, piVal:mr.investigator_approval };
+  var crioOk = crio === 'yes' || crio === 'not applicable' || crio === 'n/a';
+  var piOk = pi.indexOf('confirmed') !== -1 || pi === 'approved' || pi === 'yes' || pi === 'not applicable' || pi === 'n/a';
+
+  // records_received = 'Received' is the primary completion signal
+  var level, label;
+  if (recOk) {
+    level = 'complete';
+    label = 'Complete';
+  } else if (rec === 'pending') {
+    level = 'pending';
+    label = 'Pending';
+  } else if (relOk && !recOk) {
+    level = 'in-progress';
+    label = 'In Progress';
+  } else {
+    level = 'needs-records';
+    label = 'No Records';
+  }
+  return { level:level, label:label, relOk:relOk, recOk:recOk, crioOk:crioOk, piOk:piOk,
+           relVal:mr.medical_release||'', recVal:mr.records_received||'', crioVal:mr.records_in_crio||'', piVal:mr.investigator_approval||'',
+           status: mr.status||'' };
 }
 
 function _readinessBadge(mr, idx) {
   var r = _medReadiness(mr);
-  var colors = { ready:'#059669', partial:'#d97706', 'needs-action':'#dc2626' };
-  var labels = { ready:'\u2713 Ready', partial:'\u26a0 ' + r.score + '/' + r.total, 'needs-action':'\u2717 ' + r.score + '/' + r.total };
-  var c = colors[r.level];
-  return '<span onclick="showVisitReadiness(' + idx + ')" style="cursor:pointer;display:inline-block;margin-left:6px;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:' + c + '20;color:' + c + ';vertical-align:middle;border:1px solid ' + c + '40" title="Click for medical record details">' + labels[r.level] + '</span>';
+  var colors = { 'complete':'#059669', 'pending':'#d97706', 'in-progress':'#2563eb', 'needs-records':'#dc2626' };
+  var icons = { 'complete':'\u2713 ', 'pending':'\u23f3 ', 'in-progress':'\u21bb ', 'needs-records':'\u2717 ' };
+  var c = colors[r.level] || '#94a3b8';
+  var lbl = (icons[r.level] || '') + r.label;
+  return '<span onclick="showVisitReadiness(' + idx + ')" style="cursor:pointer;display:inline-block;margin-left:6px;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:' + c + '20;color:' + c + ';vertical-align:middle;border:1px solid ' + c + '40" title="Click for details">' + lbl + '</span>';
 }
 
 function showVisitReadiness(idx) {
