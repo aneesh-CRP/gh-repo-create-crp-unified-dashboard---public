@@ -54,6 +54,11 @@ var SOURCE_RENAME = { 'Practice': 'Princeton CardioMetabolic' };
 
 
 // ============================================================
+// ONE-TIME SETUP — run setupCrioToken() once from the Script Editor
+// ============================================================
+// setupCrioToken() — already run, token stored in Script Properties. Removed for security.
+
+// ============================================================
 // MAIN ENTRY POINT — call this from a 15-min trigger
 // ============================================================
 function syncAll() {
