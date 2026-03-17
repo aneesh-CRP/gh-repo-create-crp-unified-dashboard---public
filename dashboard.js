@@ -2199,32 +2199,34 @@ function buildUpcomingDetailTable(rows) {
 }
 
 function _medReadiness(mr) {
-  // Track only: Medical release (Jotform) + Medical records received
-  var rel = (mr.medical_release || '').toLowerCase().trim();
-  var rec = (mr.records_received || '').toLowerCase().trim();
+  // Track: Medical release (Jotform) + Medical records received
+  var rel = (mr.medical_release || '').trim();
+  var rec = (mr.records_received || '').trim();
+  var relL = rel.toLowerCase();
+  var recL = rec.toLowerCase();
 
-  var relOk = rel === 'recieved' || rel === 'received' || rel === 'signed' || rel === 'yes' || rel === 'complete';
-  var recOk = rec === 'received' || rec === 'recieved' || rec === 'yes' || rec === 'complete';
+  // Release done: "Recieved", "Received", "Yes", or starts with "Not Applicable"
+  var relOk = relL === 'recieved' || relL === 'received' || relL === 'signed' || relL === 'yes' || relL === 'complete' || relL.indexOf('not applicable') === 0;
+  // Records done: "Received", "Recieved", "Yes"
+  var recOk = recL === 'received' || recL === 'recieved' || recL === 'yes' || recL === 'complete';
+  var relNA = relL.indexOf('not applicable') === 0;
 
-  var score = (relOk ? 1 : 0) + (recOk ? 1 : 0);
   var level, label;
   if (relOk && recOk) {
-    level = 'complete'; label = 'Complete';
-  } else if (recOk) {
-    level = 'complete'; label = 'Records \u2713';
-  } else if (relOk && rec === 'pending') {
-    level = 'pending'; label = 'Release \u2713 · Records Pending';
-  } else if (relOk) {
-    level = 'pending'; label = 'Release \u2713 · No Records';
-  } else if (rec === 'pending') {
-    level = 'pending'; label = 'Records Pending';
-  } else if (rel === 'pending') {
-    level = 'needs-action'; label = 'Release Pending';
+    level = 'complete'; label = '\u2713 Complete';
+  } else if (recOk && !relOk) {
+    level = 'complete'; label = '\u2713 Records';
+  } else if (relOk && !recOk) {
+    level = 'pending'; label = 'Release \u2713 · Rec: ' + (rec || 'None');
+  } else if (recL === 'pending' || relL === 'pending') {
+    level = 'pending'; label = 'Pending';
+  } else if (relL === 'no' && (recL === 'no' || !rec)) {
+    level = 'needs-action'; label = 'Not Started';
   } else {
-    level = 'needs-action'; label = score + '/2';
+    level = 'needs-action'; label = (rel || 'No Release') + ' · ' + (rec || 'No Records');
   }
-  return { level:level, label:label, score:score, total:2, relOk:relOk, recOk:recOk,
-           relVal:mr.medical_release||'', recVal:mr.records_received||'', status:mr.status||'' };
+  return { level:level, label:label, relOk:relOk, recOk:recOk, relNA:relNA,
+           relVal:rel, recVal:rec, status:mr.status||'' };
 }
 
 function _readinessBadge(mr, idx) {
