@@ -4492,7 +4492,7 @@ function buildUpcomingDetailTable(rows) {
   }).join('');
 }
 
-function _medReadiness(mr) {
+function _medReadiness(mr, crioStatus) {
   // Track: Medical release (Jotform) + Medical records received
   // Any patient at/past screening is considered complete
   var rel = (mr.medical_release || '').trim();
@@ -4500,10 +4500,13 @@ function _medReadiness(mr) {
   var relL = rel.toLowerCase();
   var recL = rec.toLowerCase();
   var st = (mr.status || '').toLowerCase();
+  var cst = (crioStatus || '').toLowerCase();
 
   // Statuses at or past screening → records are complete
-  var POST_SCREENING = ['in screening','enrolled','complete','visit scheduled','screen fail','discontinued','withdrawn','randomized'];
-  var pastScreening = POST_SCREENING.indexOf(st) !== -1;
+  // Check BOTH ClickUp status AND CRIO Subject Status
+  var POST_SCREENING = ['in screening','enrolled','complete','visit scheduled','screen fail',
+    'discontinued','withdrawn','randomized','screening','active','randomized'];
+  var pastScreening = POST_SCREENING.indexOf(st) !== -1 || POST_SCREENING.indexOf(cst) !== -1;
 
   if (pastScreening) {
     return { level:'complete', label:'\u2713 Complete', relOk:true, recOk:true,
@@ -4531,8 +4534,8 @@ function _medReadiness(mr) {
            relVal:rel, recVal:rec, status:mr.status||'' };
 }
 
-function _readinessBadge(mr, idx) {
-  var r = _medReadiness(mr);
+function _readinessBadge(mr, idx, crioStatus) {
+  var r = _medReadiness(mr, crioStatus);
   var colors = { 'complete':'#059669', 'pending':'#d97706', 'needs-action':'#dc2626' };
   var c = colors[r.level] || '#94a3b8';
   return '<span onclick="showVisitReadiness(' + idx + ')" style="cursor:pointer;display:inline-block;margin-left:6px;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:' + c + '20;color:' + c + ';vertical-align:middle;border:1px solid ' + c + '40" title="Click for details">' + escapeHTML(r.label) + '</span>';
@@ -4622,10 +4625,13 @@ function injectScheduleMedRecords() {
     // Get study name from column 2 (study cell)
     var studyCell = cells[2];
     var studyName = studyCell ? (studyCell.textContent || '').trim() : '';
+    // Get CRIO subject status from column 5 (status badge)
+    var crioStatusCell = cells[5];
+    var crioStatus = crioStatusCell ? (crioStatusCell.textContent || '').trim() : '';
     var mrIdx = _findBestMedRecord(patName, studyName);
     if (mrIdx === -1) return;
     var mr = MED_RECORDS_DATA[mrIdx];
-    patCell.insertAdjacentHTML('beforeend', _readinessBadge(mr, mrIdx));
+    patCell.insertAdjacentHTML('beforeend', _readinessBadge(mr, mrIdx, crioStatus));
     row.dataset.medInjected = '1';
     if (mr.medical_release || mr.records_received) withData++;
     if (matched < 5) {
