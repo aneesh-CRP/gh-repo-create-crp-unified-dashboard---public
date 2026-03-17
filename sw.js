@@ -1,5 +1,5 @@
 // CRP Dashboard Service Worker — Offline Support
-const CACHE_NAME = 'crp-dashboard-v5';
+const CACHE_NAME = 'crp-dashboard-v6';
 const STATIC_ASSETS = [
   '/',
   '/index.html',

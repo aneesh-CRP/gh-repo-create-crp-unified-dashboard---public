@@ -1130,9 +1130,9 @@ function maskPHI(fullName) {
  * and any table cell with data-phi="patient".
  */
 function maskStaticPHI() {
-  // Schedule: upcoming-tbody patient column (index 3 = 4th column)
+  // Schedule: upcoming-tbody patient column (index 4 = 5th column, after confirm cell)
   var tables = [
-    { tbody: 'upcoming-tbody', col: 3 }
+    { tbody: 'upcoming-tbody', col: 4 }
   ];
   tables.forEach(function(t) {
     var tbody = document.getElementById(t.tbody);
@@ -1195,8 +1195,9 @@ function backfillInvestigators() {
   });
   var rows = tbody.querySelectorAll('tr');
   rows.forEach(function(row) {
-    if (row.cells.length < 7) return;
-    var dateCell = row.cells[0], studyCell = row.cells[1], patientCell = row.cells[3], invCell = row.cells[6];
+    if (row.cells.length < 8) return;
+    // Indices: 0=confirm, 1=date, 2=study, 3=visit, 4=patient, 5=status, 6=coordinator, 7=investigator, 8=site
+    var dateCell = row.cells[1], studyCell = row.cells[2], patientCell = row.cells[4], invCell = row.cells[7];
     // Only backfill if cell is empty or shows —
     if (invCell.textContent.trim() !== '—' && invCell.textContent.trim() !== '') return;
     var dateText = (dateCell.textContent||'').trim();
@@ -2290,9 +2291,8 @@ function injectScheduleMedRecords() {
     var dateStr = row.dataset.date;
     if (dateStr) { var parts = dateStr.split('-'); var d = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2])); if (d < today) return; }
     var cells = row.querySelectorAll('td');
-    // Account for the confirm button column (first td)
-    var patIdx = cells.length >= 9 ? 4 : 3;
-    var patCell = cells[patIdx];
+    // Patient is always at index 4 (after confirm, date, study, visit)
+    var patCell = cells[4];
     if (!patCell) return;
     var link = patCell.querySelector('a') || patCell;
     var patName = (link.dataset.phiOriginal || patCell.textContent || '').trim().toLowerCase();
@@ -2409,13 +2409,14 @@ function injectVisitConfirmButtons() {
     if (row.dataset.confirmInjected) return;
     var key = _visitKey(row);
     if (!key) return;
-    var td = document.createElement('td');
-    td.style.cssText = 'width:28px;text-align:center;padding:2px;';
+    // Find the pre-baked confirm-cell (first td with class confirm-cell)
+    var td = row.querySelector('td.confirm-cell') || row.cells[0];
+    if (!td) return;
     var btn = document.createElement('button');
     btn.style.cssText = 'background:none;border:none;cursor:pointer;padding:0;line-height:1;';
     btn.onclick = function() { toggleVisitConfirm(btn, key); };
+    td.innerHTML = '';
     td.appendChild(btn);
-    row.insertBefore(td, row.firstChild);
     _updateConfirmBtn(btn, key);
     row.dataset.confirmInjected = '1';
     injected++;
