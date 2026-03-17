@@ -5115,40 +5115,59 @@ function _fuzzyNameMatch(a, b) {
   return false;
 }
 
+function _findBestMedRecord(patName, studyName) {
+  // Find best matching medical record: prefer match by name+study with data, then name with data, then any name match
+  var candidates = [];
+  for (var i = 0; i < MED_RECORDS_DATA.length; i++) {
+    var mr = MED_RECORDS_DATA[i];
+    var mName = (mr.name || '').trim().toLowerCase();
+    if (!_fuzzyNameMatch(patName, mName)) continue;
+    var hasData = !!(mr.medical_release || mr.records_received);
+    var studyMatch = studyName && (mr.study || '').toLowerCase().indexOf(studyName.toLowerCase()) !== -1;
+    candidates.push({ idx: i, hasData: hasData, studyMatch: studyMatch });
+  }
+  if (candidates.length === 0) return -1;
+  // Sort: study+data first, then data, then study, then any
+  candidates.sort(function(a, b) {
+    var sa = (a.studyMatch ? 4 : 0) + (a.hasData ? 2 : 0);
+    var sb = (b.studyMatch ? 4 : 0) + (b.hasData ? 2 : 0);
+    return sb - sa;
+  });
+  return candidates[0].idx;
+}
+
 function injectScheduleMedRecords() {
   if (!MED_RECORDS_DATA || MED_RECORDS_DATA.length === 0) return;
   var tbody = document.getElementById('upcoming-tbody');
   if (!tbody) return;
   var today = new Date(); today.setHours(0,0,0,0);
   var rows = tbody.querySelectorAll('tr');
-  var matched = 0;
+  var matched = 0, withData = 0;
   rows.forEach(function(row) {
     if (row.dataset.medInjected) return;
-    // Only inject for upcoming visits (today onward)
     var dateStr = row.dataset.date;
     if (dateStr) { var parts = dateStr.split('-'); var d = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2])); if (d < today) return; }
     var cells = row.querySelectorAll('td');
-    // Patient is always at index 4 (after confirm, date, study, visit)
     var patCell = cells[4];
     if (!patCell) return;
     var link = patCell.querySelector('a') || patCell;
     var patName = (link.dataset.phiOriginal || patCell.textContent || '').trim().toLowerCase();
     if (!patName) return;
-    var mrIdx = -1;
-    for (var i = 0; i < MED_RECORDS_DATA.length; i++) {
-      var mName = (MED_RECORDS_DATA[i].name || '').trim().toLowerCase();
-      if (_fuzzyNameMatch(patName, mName)) { mrIdx = i; break; }
-    }
+    // Get study name from column 2 (study cell)
+    var studyCell = cells[2];
+    var studyName = studyCell ? (studyCell.textContent || '').trim() : '';
+    var mrIdx = _findBestMedRecord(patName, studyName);
     if (mrIdx === -1) return;
-    patCell.insertAdjacentHTML('beforeend', _readinessBadge(MED_RECORDS_DATA[mrIdx], mrIdx));
+    var mr = MED_RECORDS_DATA[mrIdx];
+    patCell.insertAdjacentHTML('beforeend', _readinessBadge(mr, mrIdx));
     row.dataset.medInjected = '1';
-    if (matched < 3) {
-      var _mr = MED_RECORDS_DATA[mrIdx];
-      console.log('MedRec sample [' + _mr.name + ']: release=' + JSON.stringify(_mr.medical_release) + ' records=' + JSON.stringify(_mr.records_received) + ' crio=' + JSON.stringify(_mr.records_in_crio) + ' pi=' + JSON.stringify(_mr.investigator_approval));
+    if (mr.medical_release || mr.records_received) withData++;
+    if (matched < 5) {
+      console.log('MedRec [' + mr.name + ' / ' + mr.study + ']: release="' + mr.medical_release + '" records="' + mr.records_received + '"');
     }
     matched++;
   });
-  console.log('Schedule med records: matched ' + matched + '/' + rows.length + ' upcoming rows');
+  console.log('Schedule med records: matched ' + matched + '/' + rows.length + ' rows (' + withData + ' with data)');
 }
 
 // ── Hide past visits (only show today onward) ──
