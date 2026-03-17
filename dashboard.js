@@ -8540,6 +8540,7 @@ async function fetchCrioStudies() {
     });
     console.log('CRIO Studies loaded:', CRIO_STUDIES_DATA.length);
     safe(renderCrioStudies, 'renderCrioStudies');
+    safe(mergeCrioIntoStudies, 'mergeCrioIntoStudies');
   } catch(e) {
     console.warn('fetchCrioStudies error:', e);
   }
@@ -8558,6 +8559,7 @@ async function fetchCrioStudies() {
         });
         console.log('CRIO Subjects loaded:', CRIO_SUBJECTS_DATA.length);
         safe(renderCrioStudies, 'renderCrioStudies');
+        safe(mergeCrioIntoStudies, 'mergeCrioIntoStudies');
       }
     } catch(e) {
       console.warn('fetchCrioSubjects error:', e);
@@ -8648,6 +8650,221 @@ function renderCrioStudies() {
   }
 
   container.innerHTML = html;
+}
+
+// ══════════════════════════════════════════════════════════════
+// CRIO → STUDIES TAB MERGE — Phase 1: Fill the Blind Spots
+// Merges CRIO API study data into enrollmentData + mergedStudies
+// so studies without visit data still appear in the Studies tab.
+// ══════════════════════════════════════════════════════════════
+
+function mergeCrioIntoStudies() {
+  if (!CRIO_STUDIES_DATA || CRIO_STUDIES_DATA.length === 0) return;
+  if (!DATA || !DATA.enrollmentData) return;
+
+  var STATUS_MAP = {
+    'ENROLLING':'Enrolling','MAINTENANCE':'Maintenance','STARTUP':'Startup',
+    'PRECLOSED':'Pre-Closed','CONFIGURING':'Configuring','CLOSED':'Closed'
+  };
+  var SKIP = {'Config Study':1,'Upload test':1,'EVENT':1};
+
+  // Build CRIO lookup by protocol_number
+  var crioByProto = {};
+  CRIO_STUDIES_DATA.forEach(function(s) {
+    crioByProto[s.protocol_number] = s;
+    // Auto-register CRIO links for new studies
+    if (s.study_key && typeof CRIO_LINKS !== 'undefined') {
+      var url = 'https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/' + s.study_key + '/subjects';
+      if (!CRIO_LINKS[s.study_key]) CRIO_LINKS[s.study_key] = url;
+      if (!CRIO_LINKS[s.protocol_number]) CRIO_LINKS[s.protocol_number] = url;
+    }
+  });
+
+  // Build subject-level stats per study_key from CRIO_SUBJECTS_DATA
+  var subsByStudy = {};
+  CRIO_SUBJECTS_DATA.forEach(function(s) {
+    var k = s.study_key;
+    if (!subsByStudy[k]) subsByStudy[k] = {};
+    var st = s.status || 'Unknown';
+    subsByStudy[k][st] = (subsByStudy[k][st] || 0) + 1;
+  });
+
+  // Track existing study names
+  var existing = {};
+  DATA.enrollmentData.forEach(function(e) { existing[e.study] = true; });
+
+  // 1) Enrich existing enrollmentData with CRIO data
+  DATA.enrollmentData.forEach(function(e) {
+    var crio = crioByProto[e.study];
+    if (!crio) return;
+    e.crio_coordinator = typeof cleanCoord === 'function' ? cleanCoord(crio.coordinator || '') : (crio.coordinator || '');
+    e.crio_investigator = crio.investigator || '';
+    e.crio_subject_count = crio.subject_count;
+    e.crio_study_key = crio.study_key;
+    e.crio_indication = crio.indication || '';
+    // Update study_url from CRIO if missing
+    if (!e.study_url && crio.study_key) {
+      e.study_url = 'https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/' + crio.study_key + '/subjects';
+    }
+    // Inject subject-level stats
+    var subs = subsByStudy[crio.study_key] || {};
+    if (Object.keys(subs).length > 0) {
+      e.crio_enrolled = subs['ENROLLED'] || 0;
+      e.crio_screening = (subs['SCREENING'] || 0) + (subs['SCHEDULED_V1'] || 0);
+      e.crio_prequalified = subs['PREQUALIFIED'] || 0;
+      e.crio_screen_fail = subs['SCREEN_FAIL'] || 0;
+      e.crio_noshow = subs['SCHEDULED_V1_NO_SHOW_CANCELLED'] || 0;
+      e.crio_completed = subs['COMPLETED'] || 0;
+      e.crio_discontinued = subs['DISCONTINUED'] || 0;
+    }
+  });
+
+  // 2) Add CRIO-only studies not yet in enrollmentData
+  var added = 0;
+  CRIO_STUDIES_DATA.forEach(function(s) {
+    if (existing[s.protocol_number] || SKIP[s.protocol_number]) return;
+    if (s.subject_count === 0 && s.status !== 'STARTUP') return; // skip empty non-startup
+    var subs = subsByStudy[s.study_key] || {};
+    var enrolled = subs['ENROLLED'] || 0;
+    var sf = subs['SCREEN_FAIL'] || 0;
+    var screening = (subs['SCREENING'] || 0) + (subs['SCHEDULED_V1'] || 0);
+    var screened = enrolled + sf + (subs['DISCONTINUED'] || 0) + (subs['COMPLETED'] || 0);
+    DATA.enrollmentData.push({
+      study: s.protocol_number,
+      full_name: s.protocol_number,
+      study_url: 'https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/' + s.study_key + '/subjects',
+      sites: ['PHL'],
+      status: STATUS_MAP[s.status] || s.status,
+      target: null,
+      enrolled: enrolled,
+      active: enrolled,
+      v1: subs['SCHEDULED_V1'] || 0,
+      screening: screening,
+      screened: screened,
+      screen_fail: sf,
+      screen_fail_pct: screened > 0 ? Math.round((sf / screened) * 100) : 0,
+      completed: subs['COMPLETED'] || 0,
+      discontinued: subs['DISCONTINUED'] || 0,
+      pct: 0, remaining: 0, over: enrolled,
+      crio_coordinator: typeof cleanCoord === 'function' ? cleanCoord(s.coordinator || '') : (s.coordinator || ''),
+      crio_investigator: s.investigator || '',
+      crio_subject_count: s.subject_count,
+      crio_study_key: s.study_key,
+      crio_indication: s.indication || '',
+      crio_only: true
+    });
+    existing[s.protocol_number] = true;
+    added++;
+  });
+
+  // 3) Rebuild mergedStudies using DATA.cancelByStudy / upcomingByStudy / riskMatrix
+  var liveCancels = {};
+  (DATA.cancelByStudy || []).forEach(function(s) { liveCancels[s.name] = s.count; if (s.full) liveCancels[s.full] = s.count; });
+  var liveUpcoming = {}, liveStudyUrl = {}, liveSites = {};
+  (DATA.upcomingByStudyFull || DATA.upcomingByStudy || []).forEach(function(s) {
+    liveUpcoming[s.name] = s.count; if (s.full) liveUpcoming[s.full] = s.count;
+    liveStudyUrl[s.name] = s.study_url; if (s.full) liveStudyUrl[s.full] = s.study_url;
+    if (s.site) { if (!liveSites[s.name]) liveSites[s.name] = new Set(); liveSites[s.name].add(s.site.includes('Penn') ? 'PNJ' : 'PHL'); }
+  });
+  var riskLookup = {};
+  (DATA.riskMatrix || []).forEach(function(r) { riskLookup[r.study] = r; if (r.full) riskLookup[r.full] = r; });
+
+  DATA.mergedStudies = DATA.enrollmentData.map(function(e) {
+    var sn = e.study;
+    var c = liveCancels[sn] || 0;
+    var u = liveUpcoming[sn] || 0;
+    var rm = riskLookup[sn] || {};
+    return {
+      study: sn,
+      study_url: liveStudyUrl[sn] || e.study_url || '',
+      sites: e.sites || (liveSites[sn] ? Array.from(liveSites[sn]) : ['PHL']),
+      enroll_status: e.status || 'Enrolling',
+      cancels: c,
+      upcoming: u,
+      risk_score: rm.score || 0,
+      risk_level: rm.level || (e.status !== 'Enrolling' ? 'n/a' : 'low'),
+      target: e.target,
+      enrolled: e.enrolled || 0,
+      pct: e.pct || 0,
+      remaining: e.remaining || 0,
+      over: e.over || 0,
+      screening: e.screening || 0,
+      screened: e.screened || 0,
+      screen_fail: e.screen_fail || 0,
+      screen_fail_pct: e.screen_fail_pct || 0,
+      active: e.active || 0,
+      completed: e.completed || 0,
+      crio_coordinator: e.crio_coordinator || '',
+      crio_investigator: e.crio_investigator || '',
+      crio_subject_count: e.crio_subject_count || 0,
+      crio_indication: e.crio_indication || '',
+      crio_only: e.crio_only || false
+    };
+  }).sort(function(a,b) { return b.risk_score - a.risk_score; });
+
+  // 4) Update active studies KPI
+  var kpiEl = document.getElementById('kpi-studies');
+  if (kpiEl) kpiEl.textContent = DATA.enrollmentData.length;
+
+  // 5) Build scheduling gap alerts
+  safe(buildSchedulingGapAlerts, 'buildSchedulingGapAlerts');
+
+  // 6) Re-render studies tab if visible
+  safe(renderStudiesTable, 'renderStudiesTable');
+
+  console.log('CRIO merge: ' + DATA.enrollmentData.length + ' total studies (' + added + ' new from CRIO)');
+}
+
+function buildSchedulingGapAlerts() {
+  var el = document.getElementById('scheduling-gap-list');
+  var badge = document.getElementById('sched-gap-badge');
+  if (!el) return;
+  if (!CRIO_STUDIES_DATA || CRIO_STUDIES_DATA.length === 0) {
+    el.innerHTML = '<div style="padding:12px;color:#94a3b8;font-size:12px;">Waiting for CRIO data...</div>';
+    return;
+  }
+
+  // Find CRIO studies that are ENROLLING or STARTUP with subjects but zero upcoming visits
+  var liveUpcoming = {};
+  (DATA.upcomingByStudyFull || DATA.upcomingByStudy || []).forEach(function(s) {
+    liveUpcoming[s.name] = s.count; if (s.full) liveUpcoming[s.full] = s.count;
+  });
+
+  var SKIP = {'Config Study':1,'Upload test':1,'EVENT':1};
+  var gaps = CRIO_STUDIES_DATA.filter(function(s) {
+    if (SKIP[s.protocol_number]) return false;
+    if (s.status !== 'ENROLLING' && s.status !== 'STARTUP') return false;
+    if (s.subject_count < 1) return false;
+    var up = liveUpcoming[s.protocol_number] || 0;
+    return up === 0;
+  }).sort(function(a,b) { return b.subject_count - a.subject_count; });
+
+  if (badge) {
+    badge.textContent = gaps.length;
+    badge.style.display = gaps.length > 0 ? '' : 'none';
+  }
+
+  if (gaps.length === 0) {
+    el.innerHTML = '<div style="padding:12px;color:#059669;font-size:12px;">All enrolling studies have upcoming visits scheduled.</div>';
+    return;
+  }
+
+  var esc = typeof escapeHTML === 'function' ? escapeHTML : function(s){ return s; };
+  var html = '';
+  gaps.forEach(function(s) {
+    var url = 'https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/' + s.study_key + '/subjects';
+    var coord = typeof cleanCoord === 'function' ? cleanCoord(s.coordinator || '') : (s.coordinator || '');
+    var statusColor = s.status === 'STARTUP' ? '#d97706' : '#3b82f6';
+    var statusLabel = s.status === 'STARTUP' ? 'Startup' : 'Enrolling';
+    html += '<div style="padding:8px 12px;border-left:3px solid #d97706;margin-bottom:6px;background:#fffbeb;border-radius:0 6px 6px 0;font-size:12px;">'
+      + '<a href="' + esc(url) + '" target="_blank" rel="noopener" style="color:#d97706;font-weight:600;text-decoration:underline dotted;">' + esc(s.protocol_number) + '</a>'
+      + ' <span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;background:' + statusColor + '20;color:' + statusColor + '">' + statusLabel + '</span>'
+      + ' — <b>' + s.subject_count + '</b> subjects, <b>0</b> upcoming visits'
+      + (coord ? ' · <span style="color:#64748b">' + esc(coord) + '</span>' : '')
+      + (s.indication ? ' · <span style="color:#94a3b8;font-style:italic">' + esc(s.indication) + '</span>' : '')
+      + '</div>';
+  });
+  el.innerHTML = html;
 }
 
 let _medRecFilter = 'upcoming'; // 'upcoming' or 'all'
@@ -9335,6 +9552,8 @@ function renderStudiesTable() {
     if (_studyFilter === 'enrolling') return s.enroll_status === 'Enrolling';
     if (_studyFilter === 'goal_met') return s.pct !== null && s.pct >= 100;
     if (_studyFilter === 'behind') return s.enroll_status === 'Enrolling' && s.target && s.pct !== null && s.pct < 50;
+    if (_studyFilter === 'crio_only') return s.crio_only === true;
+    if (_studyFilter === 'no_visits') return s.upcoming === 0 && s.cancels === 0;
     return true;
   });
 
@@ -9370,7 +9589,9 @@ function renderStudiesTable() {
     const studyCell = `<span style="font-weight:700;color:var(--navy);cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px;" data-action="studyUnified" data-study="${escapeHTML(s.study)}">${escapeHTML(s.study)}</span>` +
       (s.study_url ? `<a href="${escapeHTML(s.study_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="margin-left:4px;opacity:0.4;vertical-align:middle"><svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>` : '');
     const statusBadge = s.enroll_status
-      ? `<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;margin-left:5px;background:${s.enroll_status==='Enrolling'?'#e8eeff':s.enroll_status==='Maintenance'?'#f0fdf4':'#f1f5f9'};color:${s.enroll_status==='Enrolling'?'#1843ad':s.enroll_status==='Maintenance'?'#059669':'#94a3b8'}">${s.enroll_status}</span>` : '';
+      ? `<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;margin-left:5px;background:${s.enroll_status==='Enrolling'?'#e8eeff':s.enroll_status==='Maintenance'?'#f0fdf4':s.enroll_status==='Startup'?'#fffbeb':'#f1f5f9'};color:${s.enroll_status==='Enrolling'?'#1843ad':s.enroll_status==='Maintenance'?'#059669':s.enroll_status==='Startup'?'#d97706':'#94a3b8'}">${s.enroll_status}</span>` : '';
+    const crioOnlyBadge = s.crio_only ? '<span style="font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px;margin-left:3px;background:#dbeafe;color:#3b82f6">CRIO</span>' : '';
+    const indicationTag = s.crio_indication ? `<div style="font-size:9px;color:#94a3b8;margin-top:1px">${escapeHTML(s.crio_indication)}</div>` : '';
 
     const enrollCell = hasTarget
       ? `<div style="min-width:140px">
@@ -9383,7 +9604,7 @@ function renderStudiesTable() {
           </div>
           <div style="font-size:9px;color:${pct>=100?'#059669':'#94a3b8'};margin-top:2px">${pct>=100?'✓ Goal reached':`${s.remaining} needed`}</div>
         </div>`
-      : `<span style="font-size:11px;color:var(--muted)">${s.enrolled > 0 ? s.enrolled+' enrolled' : '—'}</span>`;
+      : `<span style="font-size:11px;color:var(--muted)">${s.enrolled > 0 ? s.enrolled+' enrolled' : s.crio_subject_count > 0 ? s.crio_subject_count+' subjects' : '—'}</span>`;
 
     const siteTags = (s.sites||[]).map(st =>
       `<span style="font-size:9px;font-weight:700;padding:1px 4px;border-radius:3px;background:${st==='PNJ'?'#05996920':'#07206120'};color:${st==='PNJ'?'#059669':'#072061'}">${st}</span>`
@@ -9410,7 +9631,7 @@ function renderStudiesTable() {
     const sfColor = s.screen_fail_pct > 60 ? '#dc2626' : s.screen_fail_pct > 40 ? '#d97706' : 'var(--muted)';
 
     return `<tr style="border-bottom:1px solid var(--border);transition:background .1s" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
-      <td style="padding:10px 12px;min-width:160px">${studyCell}${statusBadge}</td>
+      <td style="padding:10px 12px;min-width:160px">${studyCell}${statusBadge}${crioOnlyBadge}${indicationTag}</td>
       <td style="padding:10px 8px;text-align:center">${riskScoreCell}</td>
       <td style="padding:10px 8px;text-align:center">${cancelsCell}</td>
       <td style="padding:10px 8px;text-align:center">${upcomingCell}</td>
@@ -9418,6 +9639,8 @@ function renderStudiesTable() {
       <td style="padding:10px 8px;text-align:center;font-size:11px;color:var(--muted)">${s.screened||0}</td>
       <td style="padding:10px 8px;text-align:center;font-size:11px;color:${s.screening>0?'#7c3aed':'var(--muted)'};font-weight:${s.screening>0?'700':'400'}">${s.screening||0}</td>
       <td style="padding:10px 8px;text-align:center;font-size:11px;color:${sfColor};font-weight:600">${s.screen_fail_pct > 0 ? s.screen_fail_pct+'%' : '—'}</td>
+      <td style="padding:10px 8px;font-size:11px;color:#475569;white-space:nowrap">${escapeHTML(s.crio_coordinator||'')}</td>
+      <td style="padding:10px 8px;font-size:11px;color:#475569;white-space:nowrap">${escapeHTML(s.crio_investigator||'')}</td>
       <td style="padding:10px 8px;text-align:center">${siteTags}</td>
       <td style="padding:10px 8px;text-align:center">${buildPipelineCell(s.study, safeStudy)}</td>
       <td style="padding:10px 8px;text-align:center">${buildFBLeadCell(s.study)}</td>
