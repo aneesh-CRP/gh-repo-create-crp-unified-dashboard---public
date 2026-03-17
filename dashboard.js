@@ -2200,18 +2200,30 @@ function buildUpcomingDetailTable(rows) {
 
 function _medReadiness(mr) {
   // Score visit readiness from MED_RECORDS_DATA record
-  var rel = (mr.medical_release || '').toLowerCase();
-  var rec = (mr.records_received || '').toLowerCase();
-  var crio = (mr.records_in_crio || '').toLowerCase();
-  var pi = (mr.investigator_approval || '').toLowerCase();
-  var relOk = rel === 'signed' || rel === 'yes' || rel === 'complete' || rel === 'received';
+  var rel = (mr.medical_release || '').toLowerCase().trim();
+  var rec = (mr.records_received || '').toLowerCase().trim();
+  var crio = (mr.records_in_crio || '').toLowerCase().trim();
+  var pi = (mr.investigator_approval || '').toLowerCase().trim();
+  // Match actual ClickUp field values (including typos like 'Recieved')
+  var relOk = rel === 'recieved' || rel === 'received' || rel === 'signed' || rel === 'yes' || rel === 'complete';
   var recOk = rec === 'received' || rec === 'recieved' || rec === 'yes' || rec === 'complete';
   var crioOk = crio === 'yes';
-  var piOk = pi.indexOf('confirmed') !== -1;
-  var score = 0; var total = 4;
+  var piOk = pi.indexOf('confirmed') !== -1 || pi === 'approved' || pi === 'yes';
+  // N/A fields shouldn't count against the score
+  var total = 4;
+  var relNA = rel === 'not applicable' || rel === 'n/a';
+  var recNA = rec === 'not applicable' || rec === 'n/a';
+  var crioNA = crio === 'not applicable' || crio === 'n/a';
+  var piNA = pi === 'not applicable' || pi === 'n/a';
+  if (relNA) { relOk = true; }
+  if (recNA) { recOk = true; }
+  if (crioNA) { crioOk = true; }
+  if (piNA) { piOk = true; }
+  var score = 0;
   if (relOk) score++; if (recOk) score++; if (crioOk) score++; if (piOk) score++;
   var level = score === total ? 'ready' : score >= 2 ? 'partial' : 'needs-action';
-  return { score:score, total:total, level:level, relOk:relOk, recOk:recOk, crioOk:crioOk, piOk:piOk };
+  return { score:score, total:total, level:level, relOk:relOk, recOk:recOk, crioOk:crioOk, piOk:piOk,
+           relVal:mr.medical_release, recVal:mr.records_received, crioVal:mr.records_in_crio, piVal:mr.investigator_approval };
 }
 
 function _readinessBadge(mr, idx) {
@@ -2305,6 +2317,10 @@ function injectScheduleMedRecords() {
     if (mrIdx === -1) return;
     patCell.insertAdjacentHTML('beforeend', _readinessBadge(MED_RECORDS_DATA[mrIdx], mrIdx));
     row.dataset.medInjected = '1';
+    if (matched < 3) {
+      var _mr = MED_RECORDS_DATA[mrIdx];
+      console.log('MedRec sample [' + _mr.name + ']: release=' + JSON.stringify(_mr.medical_release) + ' records=' + JSON.stringify(_mr.records_received) + ' crio=' + JSON.stringify(_mr.records_in_crio) + ' pi=' + JSON.stringify(_mr.investigator_approval));
+    }
     matched++;
   });
   console.log('Schedule med records: matched ' + matched + '/' + rows.length + ' upcoming rows');
@@ -2399,6 +2415,29 @@ function _updateConfirmCount() {
   var badge = document.getElementById('sched-confirm-count');
   if (badge) badge.textContent = confirmed + '/' + total + ' confirmed';
 }
+function _makeConfirmBtn(key, row) {
+  var done = !!_confirmedVisits[key];
+  var btn = document.createElement('button');
+  btn.className = 'visit-confirm-btn';
+  btn.dataset.key = key;
+  function _render() {
+    var d = !!_confirmedVisits[key];
+    btn.innerHTML = d ? '&#x2713; Confirmed' : 'Confirm';
+    btn.style.cssText = d
+      ? 'font-size:9px;font-weight:700;padding:3px 8px;border-radius:4px;border:none;cursor:pointer;background:#059669;color:#fff;white-space:nowrap;'
+      : 'font-size:9px;font-weight:700;padding:3px 8px;border-radius:4px;border:1.5px solid #94a3b8;cursor:pointer;background:#fff;color:#64748b;white-space:nowrap;';
+    row.style.opacity = d ? '0.5' : '1';
+    row.style.background = d ? '#f0fdf4' : '';
+  }
+  btn.onclick = function() {
+    if (_confirmedVisits[key]) { delete _confirmedVisits[key]; } else { _confirmedVisits[key] = Date.now(); }
+    _saveConfirmedVisits();
+    _render();
+    _updateConfirmCount();
+  };
+  _render();
+  return btn;
+}
 function injectVisitConfirmButtons() {
   _loadConfirmedVisits();
   var tbody = document.getElementById('upcoming-tbody');
@@ -2411,22 +2450,9 @@ function injectVisitConfirmButtons() {
     if (!key) return;
     var td = row.querySelector('td.confirm-cell') || row.cells[0];
     if (!td) return;
-    // Use native checkbox — universally visible
-    var cb = document.createElement('input');
-    cb.type = 'checkbox';
-    cb.checked = !!_confirmedVisits[key];
-    cb.style.cssText = 'width:16px;height:16px;cursor:pointer;accent-color:#059669;';
-    cb.title = cb.checked ? 'Confirmed — click to undo' : 'Click to confirm visit';
-    cb.onchange = function() {
-      if (cb.checked) { _confirmedVisits[key] = Date.now(); } else { delete _confirmedVisits[key]; }
-      _saveConfirmedVisits();
-      cb.title = cb.checked ? 'Confirmed — click to undo' : 'Click to confirm visit';
-      row.style.opacity = cb.checked ? '0.55' : '1';
-      _updateConfirmCount();
-    };
     td.innerHTML = '';
-    td.appendChild(cb);
-    if (cb.checked) row.style.opacity = '0.55';
+    td.style.cssText = 'width:80px;text-align:center;padding:4px;';
+    td.appendChild(_makeConfirmBtn(key, row));
     row.dataset.confirmInjected = '1';
     injected++;
   });
