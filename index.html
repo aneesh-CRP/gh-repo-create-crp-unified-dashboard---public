@@ -4008,38 +4008,58 @@ function maskStaticPHI() {
 function backfillInvestigators() {
   var tbody = document.getElementById('upcoming-tbody');
   if (!tbody || !DATA || !DATA.allVisitDetail || !DATA.allVisitDetail.length) return;
-  // Build lookup: "date|study" -> investigator
+  // Build lookups: "date|study" -> investigator, "date|patient" -> investigator, "study" -> investigator
   var invMap = {};
+  var studyInvMap = {};
   DATA.allVisitDetail.forEach(function(v) {
     if (!v.investigator) return;
     var key = (v.date||'') + '|' + (v.study||'');
     invMap[key] = v.investigator;
-    // Also map by patient for more precise matching
     var key2 = (v.date||'') + '|' + (v.patient||'').toLowerCase().trim();
     invMap[key2] = v.investigator;
+    // Build study → most common investigator map
+    var st = (v.study||'').trim();
+    if (st) {
+      if (!studyInvMap[st]) studyInvMap[st] = {};
+      studyInvMap[st][v.investigator] = (studyInvMap[st][v.investigator] || 0) + 1;
+    }
+  });
+  // Resolve study → primary investigator (most frequent)
+  var studyPI = {};
+  Object.keys(studyInvMap).forEach(function(study) {
+    var best = '', bestCount = 0;
+    Object.keys(studyInvMap[study]).forEach(function(inv) {
+      if (studyInvMap[study][inv] > bestCount) { best = inv; bestCount = studyInvMap[study][inv]; }
+    });
+    if (best) studyPI[study] = best;
   });
   var rows = tbody.querySelectorAll('tr');
+  var filled = 0;
   rows.forEach(function(row) {
     if (row.cells.length < 8) return;
-    // Indices: 0=confirm, 1=date, 2=study, 3=visit, 4=patient, 5=status, 6=coordinator, 7=investigator, 8=site
     var dateCell = row.cells[1], studyCell = row.cells[2], patientCell = row.cells[4], invCell = row.cells[7];
-    // Only backfill if cell is empty or shows —
     if (invCell.textContent.trim() !== '—' && invCell.textContent.trim() !== '') return;
     var dateText = (dateCell.textContent||'').trim();
-    var studyText = (studyCell.textContent||'').trim();
-    // Get original patient name (may be masked)
-    var patientText = patientCell.dataset && patientCell.dataset.phiOriginal ? patientCell.dataset.phiOriginal : '';
-    if (!patientText) {
-      var link = patientCell.querySelector('a');
-      patientText = link ? (link.dataset.phiOriginal || link.textContent) : patientCell.textContent;
-    }
-    var inv = invMap[dateText + '|' + studyText] || invMap[dateText + '|' + (patientText||'').toLowerCase().trim()];
+    var studyLink = studyCell.querySelector('a');
+    var studyText = studyLink ? studyLink.textContent.trim() : (studyCell.textContent||'').trim();
+    var patientText = '';
+    var patLink = patientCell.querySelector('a');
+    if (patLink) patientText = patLink.dataset.phiOriginal || patLink.textContent || '';
+    else patientText = patientCell.textContent || '';
+    patientText = patientText.trim();
+    // Try exact date+study, then date+patient, then study-level PI
+    var inv = invMap[dateText + '|' + studyText]
+           || invMap[dateText + '|' + patientText.toLowerCase().trim()]
+           || studyPI[studyText]
+           || '';
     if (inv) {
       invCell.textContent = inv;
       invCell.style.color = '#7c3aed';
       invCell.style.fontSize = '11px';
+      filled++;
     }
   });
+  if (filled) console.log('backfillInvestigators: filled ' + filled + ' rows');
 }
 
 function togglePHIMask() {
@@ -5278,7 +5298,6 @@ function _makeConfirmBtn(key, row) {
     btn.style.cssText = d
       ? 'font-size:9px;font-weight:700;padding:3px 8px;border-radius:4px;border:none;cursor:pointer;background:#059669;color:#fff;white-space:nowrap;'
       : 'font-size:9px;font-weight:700;padding:3px 8px;border-radius:4px;border:1.5px solid #94a3b8;cursor:pointer;background:#fff;color:#64748b;white-space:nowrap;';
-    row.style.opacity = d ? '0.5' : '1';
     row.style.background = d ? '#f0fdf4' : '';
   }
   btn.onclick = function() {
