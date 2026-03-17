@@ -2258,53 +2258,148 @@ function showVisitReadiness(idx) {
   openModal(maskPHI(mr.name), 'Visit Readiness — ' + escapeHTML(mr.study), body);
 }
 
+function _fuzzyNameMatch(a, b) {
+  // Exact match
+  if (a === b) return true;
+  // Substring match
+  if (a.includes(b) || b.includes(a)) return true;
+  // Split into parts and check if first+last name match
+  var pa = a.split(/\s+/), pb = b.split(/\s+/);
+  if (pa.length >= 2 && pb.length >= 2) {
+    // First name + last name match (handles middle names, suffixes)
+    if (pa[0] === pb[0] && pa[pa.length-1] === pb[pb.length-1]) return true;
+    // Last name match + first name starts with same letter
+    if (pa[pa.length-1] === pb[pb.length-1] && pa[0][0] === pb[0][0] && (pa[0].length <= 2 || pb[0].length <= 2)) return true;
+  }
+  return false;
+}
+
 function injectScheduleMedRecords() {
-  var dbg = [];
-  dbg.push('MED_RECORDS_DATA: ' + (MED_RECORDS_DATA ? MED_RECORDS_DATA.length : 'null'));
-  if (!MED_RECORDS_DATA || MED_RECORDS_DATA.length === 0) { dbg.push('BAIL: no data'); _schedMedDebug(dbg); return; }
+  if (!MED_RECORDS_DATA || MED_RECORDS_DATA.length === 0) return;
   var tbody = document.getElementById('upcoming-tbody');
-  dbg.push('tbody: ' + (tbody ? 'found' : 'NOT FOUND'));
-  if (!tbody) { _schedMedDebug(dbg); return; }
+  if (!tbody) return;
+  var today = new Date(); today.setHours(0,0,0,0);
   var rows = tbody.querySelectorAll('tr');
-  dbg.push('rows: ' + rows.length);
   var matched = 0;
-  var samples = [];
   rows.forEach(function(row) {
     if (row.dataset.medInjected) return;
+    // Only inject for upcoming visits (today onward)
+    var dateStr = row.dataset.date;
+    if (dateStr) { var d = new Date(dateStr + 'T00:00:00'); if (d < today) return; }
     var cells = row.querySelectorAll('td');
-    if (cells.length < 4) return;
-    var patCell = cells[3];
+    // Account for the confirm button column (first td)
+    var patIdx = cells.length >= 9 ? 4 : 3;
+    var patCell = cells[patIdx];
+    if (!patCell) return;
     var link = patCell.querySelector('a') || patCell;
     var patName = (link.dataset.phiOriginal || patCell.textContent || '').trim().toLowerCase();
     if (!patName) return;
-    if (samples.length < 3) samples.push(patName);
     var mrIdx = -1;
     for (var i = 0; i < MED_RECORDS_DATA.length; i++) {
       var mName = (MED_RECORDS_DATA[i].name || '').trim().toLowerCase();
-      if (mName === patName || mName.includes(patName) || patName.includes(mName)) { mrIdx = i; break; }
+      if (_fuzzyNameMatch(patName, mName)) { mrIdx = i; break; }
     }
     if (mrIdx === -1) return;
     patCell.insertAdjacentHTML('beforeend', _readinessBadge(MED_RECORDS_DATA[mrIdx], mrIdx));
     row.dataset.medInjected = '1';
     matched++;
   });
-  dbg.push('matched: ' + matched + '/' + rows.length);
-  dbg.push('samples: ' + samples.join(', '));
-  _schedMedDebug(dbg);
+  console.log('Schedule med records: matched ' + matched + '/' + rows.length + ' upcoming rows');
 }
-function _schedMedDebug(lines) {
-  console.log('injectScheduleMedRecords:', lines.join(' | '));
-  var el = document.getElementById('sched-med-debug');
-  if (!el) {
-    var tbody = document.getElementById('upcoming-tbody');
-    if (tbody && tbody.parentElement) {
-      el = document.createElement('div');
-      el.id = 'sched-med-debug';
-      el.style.cssText = 'padding:6px 12px;font-size:11px;color:#64748b;background:#f1f5f9;border-radius:6px;margin:6px 0';
-      tbody.parentElement.parentElement.insertBefore(el, tbody.parentElement.nextSibling);
+
+// ── Hide past visits (only show today onward) ──
+function hidePastVisits() {
+  var tbody = document.getElementById('upcoming-tbody');
+  if (!tbody) return;
+  var today = new Date(); today.setHours(0,0,0,0);
+  var rows = tbody.querySelectorAll('tr');
+  var hidden = 0, shown = 0;
+  rows.forEach(function(row) {
+    var dateStr = row.dataset.date;
+    if (!dateStr) return;
+    var d = new Date(dateStr + 'T00:00:00');
+    if (d < today) {
+      row.style.display = 'none';
+      hidden++;
+    } else {
+      shown++;
     }
+  });
+  var badge = document.getElementById('sched-count');
+  if (badge) badge.textContent = shown + ' visits';
+  console.log('hidePastVisits: hidden=' + hidden + ', shown=' + shown);
+}
+
+// ── Visit Confirmation (localStorage-persisted per-visit checkboxes) ──
+var _confirmedVisits = {};
+function _loadConfirmedVisits() {
+  try { _confirmedVisits = JSON.parse(localStorage.getItem('crp_confirmed_visits') || '{}'); } catch(e) { _confirmedVisits = {}; }
+  // Prune entries older than 90 days
+  var now = Date.now(), cutoff = 90 * 86400000;
+  Object.keys(_confirmedVisits).forEach(function(k) { if (now - (_confirmedVisits[k] || 0) > cutoff) delete _confirmedVisits[k]; });
+}
+function _saveConfirmedVisits() {
+  try { localStorage.setItem('crp_confirmed_visits', JSON.stringify(_confirmedVisits)); } catch(e) {}
+}
+function _visitKey(row) {
+  var cells = row.querySelectorAll('td');
+  if (cells.length < 4) return '';
+  // Use date + patient name as unique key
+  var date = (cells[0].textContent || '').trim();
+  var patient = cells[3] ? (cells[3].querySelector('a') || cells[3]) : cells[3];
+  var pName = patient ? (patient.dataset && patient.dataset.phiOriginal || patient.textContent || '').trim() : '';
+  return (date + '__' + pName).replace(/[^a-z0-9]/gi, '-').toLowerCase();
+}
+function toggleVisitConfirm(btn, key) {
+  if (_confirmedVisits[key]) {
+    delete _confirmedVisits[key];
+  } else {
+    _confirmedVisits[key] = Date.now();
   }
-  if (el) el.textContent = 'Med Records Cross-Ref: ' + lines.join(' | ');
+  _saveConfirmedVisits();
+  _updateConfirmBtn(btn, key);
+  _updateConfirmCount();
+}
+function _updateConfirmBtn(btn, key) {
+  var done = !!_confirmedVisits[key];
+  btn.innerHTML = done ? '\u2705' : '\u2b1c';
+  btn.title = done ? 'Confirmed — click to undo' : 'Click to confirm visit';
+  btn.parentElement.parentElement.style.opacity = done ? '0.55' : '1';
+}
+function _updateConfirmCount() {
+  var tbody = document.getElementById('upcoming-tbody');
+  if (!tbody) return;
+  var rows = tbody.querySelectorAll('tr');
+  var total = 0, confirmed = 0;
+  rows.forEach(function(row) {
+    if (row.style.display === 'none') return;
+    total++;
+    var key = _visitKey(row);
+    if (key && _confirmedVisits[key]) confirmed++;
+  });
+  var badge = document.getElementById('sched-confirm-count');
+  if (badge) badge.textContent = confirmed + '/' + total + ' confirmed';
+}
+function injectVisitConfirmButtons() {
+  _loadConfirmedVisits();
+  var tbody = document.getElementById('upcoming-tbody');
+  if (!tbody) return;
+  var rows = tbody.querySelectorAll('tr');
+  rows.forEach(function(row) {
+    if (row.dataset.confirmInjected) return;
+    var key = _visitKey(row);
+    if (!key) return;
+    var td = document.createElement('td');
+    td.style.cssText = 'width:28px;text-align:center;padding:2px;';
+    var btn = document.createElement('button');
+    btn.style.cssText = 'background:none;border:none;cursor:pointer;font-size:16px;padding:0;line-height:1;';
+    btn.onclick = function() { toggleVisitConfirm(btn, key); };
+    td.appendChild(btn);
+    row.insertBefore(td, row.firstChild);
+    _updateConfirmBtn(btn, key);
+    row.dataset.confirmInjected = '1';
+  });
+  _updateConfirmCount();
 }
 
 function buildStatusChart() {
@@ -6698,6 +6793,8 @@ function renderAll() {
   safe(buildSchedStudyBars,      'buildSchedStudyBars');
   safe(buildSchedCoordList,      'buildSchedCoordList');
   safe(() => filterSchedTable('all', null), 'buildUpcomingDetailTable');
+  safe(hidePastVisits, 'hidePastVisits');
+  safe(injectVisitConfirmButtons, 'injectVisitConfirmButtons');
   safe(backfillInvestigators, 'backfillInvestigators');
   safe(renderTrendsCharts,       'renderTrendsCharts');
 }
