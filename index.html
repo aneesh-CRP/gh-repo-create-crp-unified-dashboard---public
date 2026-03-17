@@ -1150,8 +1150,6 @@ body {
       <button onclick="filterStudies('enrolling',this)" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Enrolling</button>
       <button onclick="filterStudies('goal_met',this)" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">✅ Goal Met</button>
       <button onclick="filterStudies('behind',this)" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">⚠ Behind Goal</button>
-      <button onclick="filterStudies('crio_only',this)" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">🔵 CRIO Only</button>
-      <button onclick="filterStudies('no_visits',this)" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">⚪ No Visits</button>
     </div>
   </div>
 
@@ -1647,10 +1645,10 @@ body {
     </div>
   </div>
 
-  <!-- CRIO Study Enrollment Status -->
+  <!-- CRIO Recruitment Intelligence -->
   <div class="card fade-in" style="margin-bottom:16px;">
     <div class="card-header">
-      <span class="card-title">CRIO Study Enrollment</span>
+      <span class="card-title">CRIO Recruitment Intelligence</span>
       <span class="badge badge-blue" id="crio-studies-badge">Loading...</span>
     </div>
     <div id="crio-studies-container" style="padding:12px;">
@@ -10707,92 +10705,372 @@ async function fetchCrioStudies() {
 function renderCrioStudies() {
   var container = document.getElementById('crio-studies-container');
   if (!container || CRIO_STUDIES_DATA.length === 0) return;
-
-  // Group by status
-  var byStatus = {};
-  var totalSubjects = 0;
-  CRIO_STUDIES_DATA.forEach(function(s) {
-    if (!byStatus[s.status]) byStatus[s.status] = [];
-    byStatus[s.status].push(s);
-    totalSubjects += s.subject_count;
-  });
-
-  // Subject pipeline from CRIO_SUBJECTS_DATA
-  var subjectPipeline = {};
-  CRIO_SUBJECTS_DATA.forEach(function(s) {
-    var st = s.status || 'Unknown';
-    subjectPipeline[st] = (subjectPipeline[st] || 0) + 1;
-  });
-
-  var statusColors = {
-    'ENROLLING': '#059669', 'MAINTENANCE': '#3b82f6', 'STARTUP': '#d97706',
-    'PRECLOSED': '#6b7280', 'CONFIGURING': '#8b5cf6', 'CLOSED': '#ef4444',
-  };
   var esc = typeof escapeHTML === 'function' ? escapeHTML : function(s){ return s; };
+  var cc = typeof cleanCoord === 'function' ? cleanCoord : function(s){ return s; };
 
-  // Build KPI row
-  var enrolling = (byStatus['ENROLLING'] || []).length;
-  var maintenance = (byStatus['MAINTENANCE'] || []).length;
-  var html = '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px">';
-  html += '<div style="background:#05966915;padding:8px 14px;border-radius:8px;flex:1;min-width:100px;text-align:center">'
-    + '<div style="font-size:22px;font-weight:700;color:#059669">' + enrolling + '</div>'
-    + '<div style="font-size:10px;color:#64748b">Enrolling</div></div>';
-  html += '<div style="background:#3b82f615;padding:8px 14px;border-radius:8px;flex:1;min-width:100px;text-align:center">'
-    + '<div style="font-size:22px;font-weight:700;color:#3b82f6">' + maintenance + '</div>'
-    + '<div style="font-size:10px;color:#64748b">Maintenance</div></div>';
-  html += '<div style="background:#07206110;padding:8px 14px;border-radius:8px;flex:1;min-width:100px;text-align:center">'
-    + '<div style="font-size:22px;font-weight:700;color:#072061">' + CRIO_STUDIES_DATA.length + '</div>'
-    + '<div style="font-size:10px;color:#64748b">Total Studies</div></div>';
-  html += '<div style="background:#ff993315;padding:8px 14px;border-radius:8px;flex:1;min-width:100px;text-align:center">'
-    + '<div style="font-size:22px;font-weight:700;color:#ff9933">' + totalSubjects + '</div>'
-    + '<div style="font-size:10px;color:#64748b">Active Subjects</div></div>';
-  html += '</div>';
+  // ── Build subject stats per study_key ──
+  var subsByStudy = {};
+  CRIO_SUBJECTS_DATA.forEach(function(s) {
+    var k = s.study_key;
+    if (!subsByStudy[k]) subsByStudy[k] = {};
+    subsByStudy[k][s.status || 'Unknown'] = (subsByStudy[k][s.status || 'Unknown'] || 0) + 1;
+  });
 
-  // Subject pipeline bar (if data available)
-  if (CRIO_SUBJECTS_DATA.length > 0) {
-    var pipeColors = {
-      'PREQUALIFIED':'#3b82f6','SCREENING':'#d97706','SCHEDULED_V1':'#8b5cf6',
-      'SCHEDULED_V1_NO_SHOW_CANCELLED':'#ef4444','ENROLLED':'#059669',
-    };
-    html += '<div style="margin-bottom:12px"><div style="font-size:11px;font-weight:600;color:#64748b;margin-bottom:4px">Subject Pipeline</div>';
-    html += '<div style="display:flex;gap:8px;flex-wrap:wrap">';
-    var sortedPipeline = Object.keys(subjectPipeline).sort(function(a,b){ return subjectPipeline[b] - subjectPipeline[a]; });
-    sortedPipeline.forEach(function(st) {
-      var c = pipeColors[st] || '#6b7280';
-      html += '<span style="font-size:11px;padding:3px 8px;border-radius:6px;background:' + c + '15;color:' + c + '">'
-        + esc(st.replace(/_/g,' ').toLowerCase()) + ': <b>' + subjectPipeline[st] + '</b></span>';
+  // ── Identify pre-screening / generic-name studies ──
+  var SKIP = {'Config Study':1,'Upload test':1,'EVENT':1,'2025_COVID_FLU_RSV_DETECTION STUDY':1};
+  // Manual pre-screening → protocol overrides (indication text doesn't match)
+  var PRESCREEN_OVERRIDES = {
+    '100455': ['154462','161620','188815'],  // Cardiology → D7960C00015, D6973C00001, J2O-MC-EKBG
+    '38926':  ['86826','135648'],            // Migraine → M23-714, C4951063
+    '148951': ['135157'],                    // Obesity → J2A-MC-GZPO
+    '35892':  ['109260'],                    // Contraceptives → MR-130A-01-TD-3001
+    '55102':  ['177553'],                    // Lupus → 80202135SLE3001
+    '140400': ['136289'],                    // Plaque Psoriasis → 77242113PSO3006
+  };
+
+  var crioByKey = {};
+  CRIO_STUDIES_DATA.forEach(function(s) { crioByKey[s.study_key] = s; });
+
+  // Auto-detect pre-screening by matching indication
+  var protocolByInd = {};
+  CRIO_STUDIES_DATA.forEach(function(s) {
+    if (SKIP[s.protocol_number]) return;
+    var isPS = s.protocol_number.toLowerCase().indexOf('pre-screen') >= 0
+      || s.protocol_number.toLowerCase().indexOf('pre screen') >= 0
+      || s.protocol_number === s.indication;
+    if (!isPS) {
+      var ind = s.indication.toLowerCase().trim();
+      if (!protocolByInd[ind]) protocolByInd[ind] = [];
+      protocolByInd[ind].push(s);
+    }
+  });
+
+  var preScreenStudies = [];
+  CRIO_STUDIES_DATA.forEach(function(s) {
+    if (SKIP[s.protocol_number]) return;
+    var isPS = s.protocol_number.toLowerCase().indexOf('pre-screen') >= 0
+      || s.protocol_number.toLowerCase().indexOf('pre screen') >= 0
+      || s.protocol_number === s.indication;
+    if (!isPS) return;
+
+    var subs = subsByStudy[s.study_key] || {};
+    var total = s.subject_count;
+    var preq = subs['PREQUALIFIED'] || 0;
+    var screening = (subs['SCREENING'] || 0) + (subs['SCHEDULED_V1'] || 0);
+    var enrolled = subs['ENROLLED'] || 0;
+    var sf = subs['SCREEN_FAIL'] || 0;
+    var noshow = subs['SCHEDULED_V1_NO_SHOW_CANCELLED'] || 0;
+    var disc = subs['DISCONTINUED'] || 0;
+    var comp = subs['COMPLETED'] || 0;
+
+    // Find matching protocol studies
+    var overrides = PRESCREEN_OVERRIDES[s.study_key];
+    var protocols = [];
+    if (overrides) {
+      overrides.forEach(function(pk) { if (crioByKey[pk]) protocols.push(crioByKey[pk]); });
+    } else {
+      var ind = s.indication.toLowerCase().trim();
+      protocols = protocolByInd[ind] || [];
+    }
+
+    preScreenStudies.push({
+      name: s.protocol_number, study_key: s.study_key,
+      indication: s.indication, coordinator: cc(s.coordinator || ''),
+      total: total, prequalified: preq, screening: screening,
+      enrolled: enrolled, screen_fail: sf, noshow: noshow,
+      discontinued: disc, completed: comp,
+      protocols: protocols
     });
-    html += '</div></div>';
+  });
+  preScreenStudies.sort(function(a,b) { return b.total - a.total; });
+
+  // ── Build data corrections list ──
+  var corrections = [];
+  var STATUS_MAP = {'ENROLLING':'Enrolling','MAINTENANCE':'Maintenance','STARTUP':'Startup','PRECLOSED':'Pre-Closed'};
+  if (DATA && DATA.enrollmentData) {
+    DATA.enrollmentData.forEach(function(e) {
+      var crio = null;
+      CRIO_STUDIES_DATA.forEach(function(s) { if (s.protocol_number === e.study) crio = s; });
+      if (!crio) return;
+      var crioStatus = STATUS_MAP[crio.status] || crio.status;
+      if (e.status && crioStatus && e.status !== crioStatus) {
+        corrections.push({ study: e.study, field: 'Status', old: e.status, new_val: crioStatus });
+      }
+      var subs = subsByStudy[crio.study_key] || {};
+      var crioEnrolled = subs['ENROLLED'] || 0;
+      if (e.enrolled !== undefined && e.enrolled !== crioEnrolled && (e.enrolled > 0 || crioEnrolled > 0)) {
+        corrections.push({ study: e.study, field: 'Enrolled', old: String(e.enrolled), new_val: String(crioEnrolled) });
+      }
+      var crioSF = subs['SCREEN_FAIL'] || 0;
+      if (e.screen_fail !== undefined && e.screen_fail !== crioSF && (e.screen_fail > 0 || crioSF > 0)) {
+        corrections.push({ study: e.study, field: 'Screen Fail', old: String(e.screen_fail), new_val: String(crioSF) });
+      }
+    });
   }
 
-  // Enrolling studies table
-  var enrollingStudies = (byStatus['ENROLLING'] || []).sort(function(a,b){ return b.subject_count - a.subject_count; });
-  if (enrollingStudies.length > 0) {
-    html += '<table style="width:100%;font-size:11px;border-collapse:collapse">';
-    html += '<thead><tr style="border-bottom:1px solid #e2e8f0">'
-      + '<th style="text-align:left;padding:4px 6px;color:#64748b;font-weight:500">Study</th>'
-      + '<th style="text-align:left;padding:4px 6px;color:#64748b;font-weight:500">Coordinator</th>'
-      + '<th style="text-align:left;padding:4px 6px;color:#64748b;font-weight:500">PI</th>'
-      + '<th style="text-align:center;padding:4px 6px;color:#64748b;font-weight:500">Subjects</th>'
-      + '</tr></thead><tbody>';
-    enrollingStudies.forEach(function(s) {
-      html += '<tr style="border-bottom:1px solid #f1f5f9">'
-        + '<td style="padding:4px 6px;font-weight:500">' + esc(s.protocol_number) + '</td>'
-        + '<td style="padding:4px 6px;color:#475569">' + esc(s.coordinator) + '</td>'
-        + '<td style="padding:4px 6px;color:#475569">' + esc(s.investigator) + '</td>'
-        + '<td style="padding:4px 6px;text-align:center;font-weight:600">' + s.subject_count + '</td>'
-        + '</tr>';
+  // ── Build no-show / screen-fail alerts for protocol studies ──
+  var alerts = [];
+  CRIO_STUDIES_DATA.forEach(function(s) {
+    if (SKIP[s.protocol_number]) return;
+    var isPS = s.protocol_number.toLowerCase().indexOf('pre-screen') >= 0
+      || s.protocol_number.toLowerCase().indexOf('pre screen') >= 0
+      || s.protocol_number === s.indication;
+    if (isPS) return;
+    if (s.subject_count < 5) return;
+
+    var subs = subsByStudy[s.study_key] || {};
+    var sf = subs['SCREEN_FAIL'] || 0;
+    var noshow = subs['SCHEDULED_V1_NO_SHOW_CANCELLED'] || 0;
+    var total = s.subject_count;
+    var sfPct = Math.round((sf / total) * 100);
+    var nsPct = Math.round((noshow / total) * 100);
+
+    if (sfPct >= 40) {
+      alerts.push({ study: s.protocol_number, key: s.study_key, type: 'screen_fail',
+        value: sf, pct: sfPct, total: total, coord: cc(s.coordinator || '') });
+    }
+    if (nsPct >= 30) {
+      alerts.push({ study: s.protocol_number, key: s.study_key, type: 'noshow',
+        value: noshow, pct: nsPct, total: total, coord: cc(s.coordinator || '') });
+    }
+  });
+  alerts.sort(function(a,b) { return b.pct - a.pct; });
+
+  // ── Build actionable insight lists ──
+
+  // 1. Win-back: All studies with V1 no-shows/cancels (these patients qualified — follow up)
+  var winbacks = [];
+  CRIO_STUDIES_DATA.forEach(function(s) {
+    if (SKIP[s.protocol_number]) return;
+    var isPS = s.protocol_number.toLowerCase().indexOf('pre-screen') >= 0
+      || s.protocol_number.toLowerCase().indexOf('pre screen') >= 0
+      || s.protocol_number === s.indication;
+    var subs = subsByStudy[s.study_key] || {};
+    var noshow = subs['SCHEDULED_V1_NO_SHOW_CANCELLED'] || 0;
+    if (noshow > 0) {
+      winbacks.push({
+        study: s.protocol_number, key: s.study_key, noshow: noshow,
+        coord: cc(s.coordinator || ''), is_prescreen: isPS,
+        total: s.subject_count
+      });
+    }
+  });
+  winbacks.sort(function(a,b) { return b.noshow - a.noshow; });
+
+  // 2. Qualified not yet scheduled: patients in SCREENING status per protocol study
+  var qualNotSched = [];
+  CRIO_STUDIES_DATA.forEach(function(s) {
+    if (SKIP[s.protocol_number]) return;
+    var isPS = s.protocol_number.toLowerCase().indexOf('pre-screen') >= 0
+      || s.protocol_number.toLowerCase().indexOf('pre screen') >= 0
+      || s.protocol_number === s.indication;
+    if (isPS) return;
+    var subs = subsByStudy[s.study_key] || {};
+    var screening = subs['SCREENING'] || 0;
+    var scheduledV1 = subs['SCHEDULED_V1'] || 0;
+    if (screening > 0) {
+      qualNotSched.push({
+        study: s.protocol_number, key: s.study_key,
+        screening: screening, scheduled_v1: scheduledV1,
+        coord: cc(s.coordinator || '')
+      });
+    }
+  });
+  qualNotSched.sort(function(a,b) { return b.screening - a.screening; });
+
+  // 3. Never contacted: pre-screening PREQUALIFIED patients with low contact rate
+  var outreachNeeded = [];
+  preScreenStudies.forEach(function(ps) {
+    if (ps.prequalified > 0) {
+      var contacted = ps.screening + ps.enrolled + ps.screen_fail + ps.noshow + ps.discontinued + ps.completed;
+      var contactPct = ps.total > 0 ? Math.round((contacted / ps.total) * 100) : 0;
+      outreachNeeded.push({
+        name: ps.name, study_key: ps.study_key,
+        prequalified: ps.prequalified, total: ps.total,
+        contact_pct: contactPct, coord: ps.coordinator,
+        protocols: ps.protocols
+      });
+    }
+  });
+  outreachNeeded.sort(function(a,b) { return b.prequalified - a.prequalified; });
+
+  // Total action items
+  var totalWinback = winbacks.reduce(function(s,w) { return s + w.noshow; }, 0);
+  var totalQualNS = qualNotSched.reduce(function(s,q) { return s + q.screening; }, 0);
+  var totalOutreach = outreachNeeded.reduce(function(s,o) { return s + o.prequalified; }, 0);
+  var totalActions = totalWinback + totalQualNS;
+
+  // ── Render ──
+  var html = '';
+
+  // KPI row: actionable counts
+  html += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">';
+  html += '<div style="background:#dc262612;padding:6px 12px;border-radius:8px;flex:1;min-width:90px;text-align:center">'
+    + '<div style="font-size:20px;font-weight:700;color:#dc2626">' + totalWinback + '</div>'
+    + '<div style="font-size:10px;color:#64748b">V1 No-Shows</div>'
+    + '<div style="font-size:9px;color:#dc2626">Win-back</div></div>';
+  html += '<div style="background:#d9770612;padding:6px 12px;border-radius:8px;flex:1;min-width:90px;text-align:center">'
+    + '<div style="font-size:20px;font-weight:700;color:#d97706">' + totalQualNS + '</div>'
+    + '<div style="font-size:10px;color:#64748b">In Screening</div>'
+    + '<div style="font-size:9px;color:#d97706">Schedule V1</div></div>';
+  html += '<div style="background:#3b82f612;padding:6px 12px;border-radius:8px;flex:1;min-width:90px;text-align:center">'
+    + '<div style="font-size:20px;font-weight:700;color:#3b82f6">' + totalOutreach + '</div>'
+    + '<div style="font-size:10px;color:#64748b">Pre-Qualified</div>'
+    + '<div style="font-size:9px;color:#3b82f6">Needs Outreach</div></div>';
+  html += '<div style="background:#05966912;padding:6px 12px;border-radius:8px;flex:1;min-width:90px;text-align:center">'
+    + '<div style="font-size:20px;font-weight:700;color:#059669">' + corrections.length + '</div>'
+    + '<div style="font-size:10px;color:#64748b">Data Fixes</div>'
+    + '<div style="font-size:9px;color:#059669">Auto-corrected</div></div>';
+  html += '</div>';
+
+  // ── Section 1: Win-Back Opportunities ──
+  if (winbacks.length > 0) {
+    html += '<div style="margin-bottom:14px">'
+      + '<div style="font-size:12px;font-weight:700;color:#dc2626;margin-bottom:6px">Win-Back Opportunities — V1 No-Shows / Cancellations</div>'
+      + '<div style="font-size:10px;color:#64748b;margin-bottom:8px">These patients were scheduled for Visit 1 but did not complete it. They already qualified — follow up to reschedule.</div>';
+    winbacks.forEach(function(w) {
+      var url = 'https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/' + w.key + '/subjects';
+      var tag = w.is_prescreen ? ' <span style="font-size:8px;background:#dbeafe;color:#3b82f6;padding:1px 4px;border-radius:3px;vertical-align:middle">Pre-Screen</span>' : '';
+      html += '<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;margin-bottom:3px;border-left:3px solid #dc2626;background:#dc262608;border-radius:0 6px 6px 0;font-size:11px">'
+        + '<span style="font-size:16px;font-weight:800;color:#dc2626;min-width:28px;text-align:right">' + w.noshow + '</span>'
+        + '<div style="flex:1">'
+        + '<a href="' + esc(url) + '" target="_blank" style="color:#dc2626;font-weight:600;text-decoration:underline dotted">' + esc(w.study) + '</a>' + tag
+        + (w.coord ? ' <span style="color:#94a3b8">· ' + esc(w.coord) + '</span>' : '')
+        + '</div>'
+        + '<span style="font-size:10px;color:#64748b;white-space:nowrap">Follow up →</span>'
+        + '</div>';
     });
-    html += '</tbody></table>';
+    html += '</div>';
+  }
+
+  // ── Section 2: Qualified — Not Yet Scheduled ──
+  if (qualNotSched.length > 0) {
+    html += '<div style="margin-bottom:14px">'
+      + '<div style="font-size:12px;font-weight:700;color:#d97706;margin-bottom:6px">Qualified — Not Yet Scheduled for V1</div>'
+      + '<div style="font-size:10px;color:#64748b;margin-bottom:8px">Patients currently in Screening who could be moved to Scheduled V1. Review and schedule where ready.</div>';
+    qualNotSched.forEach(function(q) {
+      var url = 'https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/' + q.key + '/subjects';
+      html += '<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;margin-bottom:3px;border-left:3px solid #d97706;background:#d9770608;border-radius:0 6px 6px 0;font-size:11px">'
+        + '<span style="font-size:16px;font-weight:800;color:#d97706;min-width:28px;text-align:right">' + q.screening + '</span>'
+        + '<div style="flex:1">'
+        + '<a href="' + esc(url) + '" target="_blank" style="color:#d97706;font-weight:600;text-decoration:underline dotted">' + esc(q.study) + '</a>'
+        + (q.scheduled_v1 > 0 ? ' <span style="font-size:9px;color:#059669">(' + q.scheduled_v1 + ' already scheduled)</span>' : '')
+        + (q.coord ? ' <span style="color:#94a3b8">· ' + esc(q.coord) + '</span>' : '')
+        + '</div>'
+        + '<span style="font-size:10px;color:#64748b;white-space:nowrap">Schedule V1 →</span>'
+        + '</div>';
+    });
+    html += '</div>';
+  }
+
+  // ── Section 3: Pre-Screening Outreach Needed ──
+  if (outreachNeeded.length > 0) {
+    html += '<div style="margin-bottom:14px">'
+      + '<div style="font-size:12px;font-weight:700;color:#3b82f6;margin-bottom:6px">Pre-Screening — Outreach Needed</div>'
+      + '<div style="font-size:10px;color:#64748b;margin-bottom:8px">Patients marked Pre-Qualified who may not have been contacted yet. Review for initial outreach or disposition.</div>';
+    outreachNeeded.forEach(function(o) {
+      var url = 'https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/' + o.study_key + '/subjects';
+      var protoNames = o.protocols.map(function(p) { return p.protocol_number; }).join(', ');
+      html += '<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;margin-bottom:3px;border-left:3px solid #3b82f6;background:#3b82f608;border-radius:0 6px 6px 0;font-size:11px">'
+        + '<span style="font-size:16px;font-weight:800;color:#3b82f6;min-width:28px;text-align:right">' + o.prequalified + '</span>'
+        + '<div style="flex:1">'
+        + '<a href="' + esc(url) + '" target="_blank" style="color:#3b82f6;font-weight:600;text-decoration:underline dotted">' + esc(o.name) + '</a>'
+        + (protoNames ? ' <span style="font-size:9px;color:#94a3b8">→ ' + esc(protoNames) + '</span>' : '')
+        + (o.coord ? ' <span style="color:#94a3b8">· ' + esc(o.coord) + '</span>' : '')
+        + '</div>'
+        + '<span style="font-size:10px;color:#64748b;white-space:nowrap">' + o.contact_pct + '% contacted</span>'
+        + '</div>';
+    });
+    html += '</div>';
+  }
+
+  // ── Data corrections (collapsed by default) ──
+  if (corrections.length > 0) {
+    html += '<details style="margin-bottom:14px"><summary style="font-size:11px;font-weight:600;color:#64748b;cursor:pointer;margin-bottom:4px">Data Corrections — ' + corrections.length + ' auto-fixed (CRIO → Dashboard)</summary>';
+    corrections.forEach(function(c) {
+      html += '<div style="font-size:11px;padding:3px 8px;margin-bottom:2px;background:#fef2f220;border-left:2px solid #d97706;border-radius:0 4px 4px 0">'
+        + '<b>' + esc(c.study) + '</b> ' + esc(c.field) + ': '
+        + '<span style="color:#dc2626;text-decoration:line-through">' + esc(c.old) + '</span>'
+        + ' → <span style="color:#059669;font-weight:600">' + esc(c.new_val) + '</span></div>';
+    });
+    html += '</details>';
+  }
+
+  // ── Pre-screening pipeline funnels (collapsed by default) ──
+  if (preScreenStudies.length > 0) {
+    html += '<details style="margin-bottom:14px"><summary style="font-size:11px;font-weight:600;color:#64748b;cursor:pointer;margin-bottom:6px">Pre-Screening Pipeline — ' + preScreenStudies.length + ' funnels</summary>';
+    preScreenStudies.forEach(function(ps) {
+      if (ps.total === 0) return;
+      var url = 'https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/' + ps.study_key + '/subjects';
+      var contacted = ps.screening + ps.enrolled + ps.screen_fail + ps.noshow + ps.discontinued + ps.completed;
+      var contactPct = ps.total > 0 ? Math.round((contacted / ps.total) * 100) : 0;
+      var qualPct = contacted > 0 ? Math.round(((ps.enrolled + ps.screening) / contacted) * 100) : 0;
+
+      html += '<div style="padding:8px 10px;margin-bottom:8px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)">';
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
+        + '<a href="' + esc(url) + '" target="_blank" rel="noopener" style="font-weight:600;font-size:12px;color:var(--navy);text-decoration:underline dotted">' + esc(ps.name) + '</a>'
+        + '<span style="font-size:10px;color:#64748b">' + esc(ps.coordinator) + '</span></div>';
+
+      var stages = [
+        { label: 'Prequalified', count: ps.prequalified, color: '#3b82f6' },
+        { label: 'Screening', count: ps.screening, color: '#d97706' },
+        { label: 'Enrolled', count: ps.enrolled, color: '#059669' },
+        { label: 'Screen Fail', count: ps.screen_fail, color: '#dc2626' },
+        { label: 'No Show', count: ps.noshow, color: '#ef4444' },
+      ];
+      html += '<div style="display:flex;height:16px;border-radius:4px;overflow:hidden;margin-bottom:4px;background:#e2e8f0">';
+      stages.forEach(function(st) {
+        if (st.count <= 0 || ps.total <= 0) return;
+        var w = Math.max((st.count / ps.total) * 100, 2);
+        html += '<div title="' + st.label + ': ' + st.count + '" style="width:' + w + '%;background:' + st.color + ';min-width:2px"></div>';
+      });
+      html += '</div>';
+
+      html += '<div style="display:flex;gap:8px;flex-wrap:wrap;font-size:10px">';
+      stages.forEach(function(st) {
+        if (st.count <= 0) return;
+        html += '<span style="color:' + st.color + '"><b>' + st.count + '</b> ' + st.label + '</span>';
+      });
+      html += '</div>';
+
+      html += '<div style="font-size:10px;color:#64748b;margin-top:4px">'
+        + 'Contacted: <b>' + contactPct + '%</b> (' + contacted + '/' + ps.total + ')'
+        + ' · Qualifying: <b>' + qualPct + '%</b> of contacted';
+      if (ps.protocols.length > 0) {
+        var protoNames = ps.protocols.map(function(p) { return p.protocol_number; }).join(', ');
+        html += ' · Feeds: <b>' + esc(protoNames) + '</b>';
+      }
+      html += '</div></div>';
+    });
+    html += '</details>';
+  }
+
+  // ── Screen Fail & No-Show Alerts ──
+  if (alerts.length > 0) {
+    html += '<details style="margin-bottom:8px"><summary style="font-size:11px;font-weight:600;color:#64748b;cursor:pointer;margin-bottom:4px">High-Rate Screen Fail & No-Show Studies — ' + alerts.length + ' alerts</summary>';
+    alerts.forEach(function(a) {
+      var icon = a.type === 'screen_fail' ? '🚫' : '📵';
+      var label = a.type === 'screen_fail' ? 'Screen Fail' : 'No-Show/Cancel V1';
+      var color = a.type === 'screen_fail' ? '#dc2626' : '#ef4444';
+      var url = 'https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/' + a.key + '/subjects';
+      html += '<div style="padding:5px 8px;margin-bottom:3px;border-left:2px solid ' + color + ';background:' + color + '08;border-radius:0 4px 4px 0;font-size:11px">'
+        + icon + ' <a href="' + esc(url) + '" target="_blank" style="color:' + color + ';font-weight:600;text-decoration:underline dotted">' + esc(a.study) + '</a>'
+        + ' — <b>' + a.pct + '%</b> ' + label + ' (' + a.value + '/' + a.total + ')'
+        + (a.coord ? ' · ' + esc(a.coord) : '')
+        + '</div>';
+    });
+    html += '</details>';
   }
 
   container.innerHTML = html;
+  var badge = document.getElementById('crio-studies-badge');
+  if (badge) badge.textContent = totalActions > 0 ? totalActions + ' action items' : 'Live';
 }
 
 // ══════════════════════════════════════════════════════════════
-// CRIO → STUDIES TAB MERGE — Phase 1: Fill the Blind Spots
-// Merges CRIO API study data into enrollmentData + mergedStudies
-// so studies without visit data still appear in the Studies tab.
+// CRIO → ENRICHMENT — Auto-update enrollment data from CRIO API
+// Updates existing studies with live CRIO numbers (enrolled,
+// screen fail, status). Does NOT add pre-screening as new rows.
 // ══════════════════════════════════════════════════════════════
 
 function mergeCrioIntoStudies() {
@@ -10803,13 +11081,12 @@ function mergeCrioIntoStudies() {
     'ENROLLING':'Enrolling','MAINTENANCE':'Maintenance','STARTUP':'Startup',
     'PRECLOSED':'Pre-Closed','CONFIGURING':'Configuring','CLOSED':'Closed'
   };
-  var SKIP = {'Config Study':1,'Upload test':1,'EVENT':1};
 
   // Build CRIO lookup by protocol_number
   var crioByProto = {};
   CRIO_STUDIES_DATA.forEach(function(s) {
     crioByProto[s.protocol_number] = s;
-    // Auto-register CRIO links for new studies
+    // Auto-register CRIO links
     if (s.study_key && typeof CRIO_LINKS !== 'undefined') {
       var url = 'https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/' + s.study_key + '/subjects';
       if (!CRIO_LINKS[s.study_key]) CRIO_LINKS[s.study_key] = url;
@@ -10817,84 +11094,80 @@ function mergeCrioIntoStudies() {
     }
   });
 
-  // Build subject-level stats per study_key from CRIO_SUBJECTS_DATA
+  // Build subject-level stats per study_key
   var subsByStudy = {};
   CRIO_SUBJECTS_DATA.forEach(function(s) {
     var k = s.study_key;
     if (!subsByStudy[k]) subsByStudy[k] = {};
-    var st = s.status || 'Unknown';
-    subsByStudy[k][st] = (subsByStudy[k][st] || 0) + 1;
+    subsByStudy[k][s.status || 'Unknown'] = (subsByStudy[k][s.status || 'Unknown'] || 0) + 1;
   });
 
-  // Track existing study names
-  var existing = {};
-  DATA.enrollmentData.forEach(function(e) { existing[e.study] = true; });
-
-  // 1) Enrich existing enrollmentData with CRIO data
+  // Enrich existing enrollmentData with CRIO data — no new rows added
+  var updated = 0;
   DATA.enrollmentData.forEach(function(e) {
     var crio = crioByProto[e.study];
     if (!crio) return;
+    updated++;
+
+    // Coordinator & PI
     e.crio_coordinator = typeof cleanCoord === 'function' ? cleanCoord(crio.coordinator || '') : (crio.coordinator || '');
     e.crio_investigator = crio.investigator || '';
     e.crio_subject_count = crio.subject_count;
     e.crio_study_key = crio.study_key;
     e.crio_indication = crio.indication || '';
-    // Update study_url from CRIO if missing
+
+    // Fix study_url if missing
     if (!e.study_url && crio.study_key) {
       e.study_url = 'https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/' + crio.study_key + '/subjects';
     }
-    // Inject subject-level stats
+
+    // Auto-correct status from CRIO (authoritative)
+    var crioStatus = STATUS_MAP[crio.status] || crio.status;
+    if (crioStatus && e.status !== crioStatus) {
+      e.status = crioStatus;
+    }
+
+    // Update enrollment numbers from CRIO subjects (authoritative)
     var subs = subsByStudy[crio.study_key] || {};
     if (Object.keys(subs).length > 0) {
-      e.crio_enrolled = subs['ENROLLED'] || 0;
-      e.crio_screening = (subs['SCREENING'] || 0) + (subs['SCHEDULED_V1'] || 0);
+      var crioEnrolled = subs['ENROLLED'] || 0;
+      var crioSF = subs['SCREEN_FAIL'] || 0;
+      var crioScreening = (subs['SCREENING'] || 0) + (subs['SCHEDULED_V1'] || 0);
+      var crioNoshow = subs['SCHEDULED_V1_NO_SHOW_CANCELLED'] || 0;
+      var crioDisc = subs['DISCONTINUED'] || 0;
+      var crioComp = subs['COMPLETED'] || 0;
+      var crioScreened = crioEnrolled + crioSF + crioDisc + crioComp;
+      var crioSFPct = crioScreened > 0 ? Math.round((crioSF / crioScreened) * 100) : 0;
+
+      // Overwrite stale fallback data with live CRIO numbers
+      e.enrolled = crioEnrolled;
+      e.active = crioEnrolled;
+      e.screening = crioScreening;
+      e.screened = crioScreened;
+      e.screen_fail = crioSF;
+      e.screen_fail_pct = crioSFPct;
+      e.completed = crioComp;
+      e.discontinued = crioDisc;
+
+      // Recalculate enrollment progress if target exists
+      if (e.target && e.target > 0) {
+        e.pct = Math.round((crioEnrolled / e.target) * 100);
+        e.remaining = Math.max(0, e.target - crioEnrolled);
+        e.over = Math.max(0, crioEnrolled - e.target);
+      }
+
+      // Store extra CRIO fields for insights
+      e.crio_enrolled = crioEnrolled;
+      e.crio_screening = crioScreening;
       e.crio_prequalified = subs['PREQUALIFIED'] || 0;
-      e.crio_screen_fail = subs['SCREEN_FAIL'] || 0;
-      e.crio_noshow = subs['SCHEDULED_V1_NO_SHOW_CANCELLED'] || 0;
-      e.crio_completed = subs['COMPLETED'] || 0;
-      e.crio_discontinued = subs['DISCONTINUED'] || 0;
+      e.crio_screen_fail = crioSF;
+      e.crio_noshow = crioNoshow;
+      e.crio_completed = crioComp;
+      e.crio_discontinued = crioDisc;
     }
   });
 
-  // 2) Add CRIO-only studies not yet in enrollmentData
-  var added = 0;
-  CRIO_STUDIES_DATA.forEach(function(s) {
-    if (existing[s.protocol_number] || SKIP[s.protocol_number]) return;
-    if (s.subject_count === 0 && s.status !== 'STARTUP') return; // skip empty non-startup
-    var subs = subsByStudy[s.study_key] || {};
-    var enrolled = subs['ENROLLED'] || 0;
-    var sf = subs['SCREEN_FAIL'] || 0;
-    var screening = (subs['SCREENING'] || 0) + (subs['SCHEDULED_V1'] || 0);
-    var screened = enrolled + sf + (subs['DISCONTINUED'] || 0) + (subs['COMPLETED'] || 0);
-    DATA.enrollmentData.push({
-      study: s.protocol_number,
-      full_name: s.protocol_number,
-      study_url: 'https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/' + s.study_key + '/subjects',
-      sites: ['PHL'],
-      status: STATUS_MAP[s.status] || s.status,
-      target: null,
-      enrolled: enrolled,
-      active: enrolled,
-      v1: subs['SCHEDULED_V1'] || 0,
-      screening: screening,
-      screened: screened,
-      screen_fail: sf,
-      screen_fail_pct: screened > 0 ? Math.round((sf / screened) * 100) : 0,
-      completed: subs['COMPLETED'] || 0,
-      discontinued: subs['DISCONTINUED'] || 0,
-      pct: 0, remaining: 0, over: enrolled,
-      crio_coordinator: typeof cleanCoord === 'function' ? cleanCoord(s.coordinator || '') : (s.coordinator || ''),
-      crio_investigator: s.investigator || '',
-      crio_subject_count: s.subject_count,
-      crio_study_key: s.study_key,
-      crio_indication: s.indication || '',
-      crio_only: true
-    });
-    existing[s.protocol_number] = true;
-    added++;
-  });
-
-  // 3) Rebuild mergedStudies using DATA.cancelByStudy / upcomingByStudy / riskMatrix
+  // Rebuild mergedStudies with corrected data
   var liveCancels = {};
   (DATA.cancelByStudy || []).forEach(function(s) { liveCancels[s.name] = s.count; if (s.full) liveCancels[s.full] = s.count; });
   var liveUpcoming = {}, liveStudyUrl = {}, liveSites = {};
@@ -10916,8 +11189,7 @@ function mergeCrioIntoStudies() {
       study_url: liveStudyUrl[sn] || e.study_url || '',
       sites: e.sites || (liveSites[sn] ? Array.from(liveSites[sn]) : ['PHL']),
       enroll_status: e.status || 'Enrolling',
-      cancels: c,
-      upcoming: u,
+      cancels: c, upcoming: u,
       risk_score: rm.score || 0,
       risk_level: rm.level || (e.status !== 'Enrolling' ? 'n/a' : 'low'),
       target: e.target,
@@ -10934,22 +11206,14 @@ function mergeCrioIntoStudies() {
       crio_coordinator: e.crio_coordinator || '',
       crio_investigator: e.crio_investigator || '',
       crio_subject_count: e.crio_subject_count || 0,
-      crio_indication: e.crio_indication || '',
-      crio_only: e.crio_only || false
+      crio_indication: e.crio_indication || ''
     };
   }).sort(function(a,b) { return b.risk_score - a.risk_score; });
 
-  // 4) Update active studies KPI
-  var kpiEl = document.getElementById('kpi-studies');
-  if (kpiEl) kpiEl.textContent = DATA.enrollmentData.length;
-
-  // 5) Build scheduling gap alerts
-  safe(buildSchedulingGapAlerts, 'buildSchedulingGapAlerts');
-
-  // 6) Re-render studies tab if visible
+  // Re-render studies tab
   safe(renderStudiesTable, 'renderStudiesTable');
 
-  console.log('CRIO merge: ' + DATA.enrollmentData.length + ' total studies (' + added + ' new from CRIO)');
+  console.log('CRIO enrichment: ' + updated + '/' + DATA.enrollmentData.length + ' studies updated with live CRIO data');
 }
 
 function buildSchedulingGapAlerts() {
@@ -10961,19 +11225,25 @@ function buildSchedulingGapAlerts() {
     return;
   }
 
-  // Find CRIO studies that are ENROLLING or STARTUP with subjects but zero upcoming visits
+  // Only flag protocol studies (not pre-screening) that should have visits
+  var SKIP = {'Config Study':1,'Upload test':1,'EVENT':1,'2025_COVID_FLU_RSV_DETECTION STUDY':1};
   var liveUpcoming = {};
   (DATA.upcomingByStudyFull || DATA.upcomingByStudy || []).forEach(function(s) {
     liveUpcoming[s.name] = s.count; if (s.full) liveUpcoming[s.full] = s.count;
   });
 
-  var SKIP = {'Config Study':1,'Upload test':1,'EVENT':1};
+  var esc = typeof escapeHTML === 'function' ? escapeHTML : function(s){ return s; };
+  var cc = typeof cleanCoord === 'function' ? cleanCoord : function(s){ return s; };
+
   var gaps = CRIO_STUDIES_DATA.filter(function(s) {
     if (SKIP[s.protocol_number]) return false;
+    // Skip pre-screening and generic-name studies
+    if (s.protocol_number.toLowerCase().indexOf('pre-screen') >= 0) return false;
+    if (s.protocol_number.toLowerCase().indexOf('pre screen') >= 0) return false;
+    if (s.protocol_number === s.indication) return false;
     if (s.status !== 'ENROLLING' && s.status !== 'STARTUP') return false;
     if (s.subject_count < 1) return false;
-    var up = liveUpcoming[s.protocol_number] || 0;
-    return up === 0;
+    return (liveUpcoming[s.protocol_number] || 0) === 0;
   }).sort(function(a,b) { return b.subject_count - a.subject_count; });
 
   if (badge) {
@@ -10982,23 +11252,17 @@ function buildSchedulingGapAlerts() {
   }
 
   if (gaps.length === 0) {
-    el.innerHTML = '<div style="padding:12px;color:#059669;font-size:12px;">All enrolling studies have upcoming visits scheduled.</div>';
+    el.innerHTML = '<div style="padding:12px;color:#059669;font-size:12px;">All protocol studies have upcoming visits scheduled.</div>';
     return;
   }
 
-  var esc = typeof escapeHTML === 'function' ? escapeHTML : function(s){ return s; };
   var html = '';
   gaps.forEach(function(s) {
     var url = 'https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/' + s.study_key + '/subjects';
-    var coord = typeof cleanCoord === 'function' ? cleanCoord(s.coordinator || '') : (s.coordinator || '');
-    var statusColor = s.status === 'STARTUP' ? '#d97706' : '#3b82f6';
-    var statusLabel = s.status === 'STARTUP' ? 'Startup' : 'Enrolling';
     html += '<div style="padding:8px 12px;border-left:3px solid #d97706;margin-bottom:6px;background:#fffbeb;border-radius:0 6px 6px 0;font-size:12px;">'
       + '<a href="' + esc(url) + '" target="_blank" rel="noopener" style="color:#d97706;font-weight:600;text-decoration:underline dotted;">' + esc(s.protocol_number) + '</a>'
-      + ' <span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;background:' + statusColor + '20;color:' + statusColor + '">' + statusLabel + '</span>'
-      + ' — <b>' + s.subject_count + '</b> subjects, <b>0</b> upcoming visits'
-      + (coord ? ' · <span style="color:#64748b">' + esc(coord) + '</span>' : '')
-      + (s.indication ? ' · <span style="color:#94a3b8;font-style:italic">' + esc(s.indication) + '</span>' : '')
+      + ' — <b>' + s.subject_count + '</b> subjects, no upcoming visits'
+      + (s.coordinator ? ' · ' + esc(cc(s.coordinator)) : '')
       + '</div>';
   });
   el.innerHTML = html;
@@ -11689,8 +11953,6 @@ function renderStudiesTable() {
     if (_studyFilter === 'enrolling') return s.enroll_status === 'Enrolling';
     if (_studyFilter === 'goal_met') return s.pct !== null && s.pct >= 100;
     if (_studyFilter === 'behind') return s.enroll_status === 'Enrolling' && s.target && s.pct !== null && s.pct < 50;
-    if (_studyFilter === 'crio_only') return s.crio_only === true;
-    if (_studyFilter === 'no_visits') return s.upcoming === 0 && s.cancels === 0;
     return true;
   });
 
@@ -11727,7 +11989,6 @@ function renderStudiesTable() {
       (s.study_url ? `<a href="${escapeHTML(s.study_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="margin-left:4px;opacity:0.4;vertical-align:middle"><svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>` : '');
     const statusBadge = s.enroll_status
       ? `<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;margin-left:5px;background:${s.enroll_status==='Enrolling'?'#e8eeff':s.enroll_status==='Maintenance'?'#f0fdf4':s.enroll_status==='Startup'?'#fffbeb':'#f1f5f9'};color:${s.enroll_status==='Enrolling'?'#1843ad':s.enroll_status==='Maintenance'?'#059669':s.enroll_status==='Startup'?'#d97706':'#94a3b8'}">${s.enroll_status}</span>` : '';
-    const crioOnlyBadge = s.crio_only ? '<span style="font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px;margin-left:3px;background:#dbeafe;color:#3b82f6">CRIO</span>' : '';
     const indicationTag = s.crio_indication ? `<div style="font-size:9px;color:#94a3b8;margin-top:1px">${escapeHTML(s.crio_indication)}</div>` : '';
 
     const enrollCell = hasTarget
@@ -11768,7 +12029,7 @@ function renderStudiesTable() {
     const sfColor = s.screen_fail_pct > 60 ? '#dc2626' : s.screen_fail_pct > 40 ? '#d97706' : 'var(--muted)';
 
     return `<tr style="border-bottom:1px solid var(--border);transition:background .1s" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
-      <td style="padding:10px 12px;min-width:160px">${studyCell}${statusBadge}${crioOnlyBadge}${indicationTag}</td>
+      <td style="padding:10px 12px;min-width:160px">${studyCell}${statusBadge}${indicationTag}</td>
       <td style="padding:10px 8px;text-align:center">${riskScoreCell}</td>
       <td style="padding:10px 8px;text-align:center">${cancelsCell}</td>
       <td style="padding:10px 8px;text-align:center">${upcomingCell}</td>
