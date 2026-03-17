@@ -5024,44 +5024,39 @@ function buildUpcomingDetailTable(rows) {
 }
 
 function _medReadiness(mr) {
-  // Primary indicator: "Medical records received?" = Received means complete
+  // Track only: Medical release (Jotform) + Medical records received
   var rel = (mr.medical_release || '').toLowerCase().trim();
   var rec = (mr.records_received || '').toLowerCase().trim();
-  var crio = (mr.records_in_crio || '').toLowerCase().trim();
-  var pi = (mr.investigator_approval || '').toLowerCase().trim();
 
-  var relOk = rel === 'recieved' || rel === 'received' || rel === 'signed' || rel === 'yes' || rel === 'complete' || rel === 'not applicable' || rel === 'n/a';
+  var relOk = rel === 'recieved' || rel === 'received' || rel === 'signed' || rel === 'yes' || rel === 'complete';
   var recOk = rec === 'received' || rec === 'recieved' || rec === 'yes' || rec === 'complete';
-  var crioOk = crio === 'yes' || crio === 'not applicable' || crio === 'n/a';
-  var piOk = pi.indexOf('confirmed') !== -1 || pi === 'approved' || pi === 'yes' || pi === 'not applicable' || pi === 'n/a';
 
-  // records_received = 'Received' is the primary completion signal
+  var score = (relOk ? 1 : 0) + (recOk ? 1 : 0);
   var level, label;
-  if (recOk) {
-    level = 'complete';
-    label = 'Complete';
+  if (relOk && recOk) {
+    level = 'complete'; label = 'Complete';
+  } else if (recOk) {
+    level = 'complete'; label = 'Records \u2713';
+  } else if (relOk && rec === 'pending') {
+    level = 'pending'; label = 'Release \u2713 · Records Pending';
+  } else if (relOk) {
+    level = 'pending'; label = 'Release \u2713 · No Records';
   } else if (rec === 'pending') {
-    level = 'pending';
-    label = 'Pending';
-  } else if (relOk && !recOk) {
-    level = 'in-progress';
-    label = 'In Progress';
+    level = 'pending'; label = 'Records Pending';
+  } else if (rel === 'pending') {
+    level = 'needs-action'; label = 'Release Pending';
   } else {
-    level = 'needs-records';
-    label = 'No Records';
+    level = 'needs-action'; label = score + '/2';
   }
-  return { level:level, label:label, relOk:relOk, recOk:recOk, crioOk:crioOk, piOk:piOk,
-           relVal:mr.medical_release||'', recVal:mr.records_received||'', crioVal:mr.records_in_crio||'', piVal:mr.investigator_approval||'',
-           status: mr.status||'' };
+  return { level:level, label:label, score:score, total:2, relOk:relOk, recOk:recOk,
+           relVal:mr.medical_release||'', recVal:mr.records_received||'', status:mr.status||'' };
 }
 
 function _readinessBadge(mr, idx) {
   var r = _medReadiness(mr);
-  var colors = { 'complete':'#059669', 'pending':'#d97706', 'in-progress':'#2563eb', 'needs-records':'#dc2626' };
-  var icons = { 'complete':'\u2713 ', 'pending':'\u23f3 ', 'in-progress':'\u21bb ', 'needs-records':'\u2717 ' };
+  var colors = { 'complete':'#059669', 'pending':'#d97706', 'needs-action':'#dc2626' };
   var c = colors[r.level] || '#94a3b8';
-  var lbl = (icons[r.level] || '') + r.label;
-  return '<span onclick="showVisitReadiness(' + idx + ')" style="cursor:pointer;display:inline-block;margin-left:6px;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:' + c + '20;color:' + c + ';vertical-align:middle;border:1px solid ' + c + '40" title="Click for details">' + lbl + '</span>';
+  return '<span onclick="showVisitReadiness(' + idx + ')" style="cursor:pointer;display:inline-block;margin-left:6px;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:' + c + '20;color:' + c + ';vertical-align:middle;border:1px solid ' + c + '40" title="Click for details">' + escapeHTML(r.label) + '</span>';
 }
 
 function showVisitReadiness(idx) {
@@ -5073,8 +5068,6 @@ function showVisitReadiness(idx) {
   var rows = '';
   rows += '<tr><td style="font-weight:600">Medical Release</td><td>' + dot(r.relOk) + ' ' + escapeHTML(mr.medical_release || 'Not set') + '</td></tr>';
   rows += '<tr><td style="font-weight:600">Records Received</td><td>' + dot(r.recOk) + ' ' + escapeHTML(mr.records_received || 'Not set') + '</td></tr>';
-  rows += '<tr><td style="font-weight:600">Records in CRIO</td><td>' + dot(r.crioOk) + ' ' + escapeHTML(mr.records_in_crio || 'Not set') + '</td></tr>';
-  rows += '<tr><td style="font-weight:600">PI Approval</td><td>' + dot(r.piOk) + ' ' + escapeHTML(mr.investigator_approval || 'Not set') + '</td></tr>';
   rows += '<tr><td colspan="2" style="border-top:2px solid #e2e8f0;padding-top:8px;font-weight:700;color:#64748b">Additional Details</td></tr>';
   rows += '<tr><td>Status</td><td>' + escapeHTML(mr.status || '—') + '</td></tr>';
   rows += '<tr><td>Assignee</td><td>' + escapeHTML(mr.assignee || '—') + '</td></tr>';
