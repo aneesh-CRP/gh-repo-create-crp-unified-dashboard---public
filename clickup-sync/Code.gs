@@ -342,13 +342,12 @@ var CRIO_CLIENT_ID = '1329';  // CRP org ID
 var CRIO_STUDIES_HEADERS = [
   'study_key','protocol_number','study_name','status','coordinator','investigator',
   'indication','subject_count','target_enrollment','sponsor','phase',
-  'date_created','last_updated','last_updated_ts','start_date','end_date'
+  'date_created','last_updated','last_updated_ts','start_date','end_date',
+  'external_study_number','specialty','trial_id','site_name','site_key','study_arms'
 ];
 
 var CRIO_SUBJECTS_HEADERS = [
-  'subject_id','subject_number','full_name','study_key','protocol_number','status',
-  'site_key','source','enrollment_date','screening_date','randomization_date',
-  'status_date','date_of_birth'
+  'subject_id','study_key','protocol_number','status'
 ];
 
 function syncCrioData(crioToken) {
@@ -382,6 +381,11 @@ function syncCrioData(crioToken) {
   var subjectRows = [];
   var ACTIVE_STATUSES = ['ENROLLING', 'MAINTENANCE', 'STARTUP', 'PRECLOSED'];
 
+  var _crioDebugDone = false;
+  if (studies.length > 0) {
+    Logger.log('CRIO DEBUG site study[0] keys: ' + Object.keys(studies[0]).join(', '));
+    Logger.log('CRIO DEBUG site study[0]: ' + JSON.stringify(studies[0]).slice(0, 500));
+  }
   for (var i = 0; i < studies.length; i++) {
     var s = studies[i];
     var isActive = ACTIVE_STATUSES.indexOf(s.status) !== -1;
@@ -400,6 +404,12 @@ function syncCrioData(crioToken) {
     var startDate = '';
     var endDate = '';
     var studyName = s.name || s.protocolNumber || '';
+    var externalStudyNumber = '';
+    var specialty = '';
+    var trialId = '';
+    var siteName = '';
+    var siteKey = '';
+    var studyArmsStr = '';
 
     if (isActive) {
       var studyUrl = CRIO_API_BASE + '/api/v1/study/' + s.studyKey
@@ -416,8 +426,9 @@ function syncCrioData(crioToken) {
       if (studyResp.getResponseCode() === 200) {
         var detail = JSON.parse(studyResp.getContentText());
 
-        // Debug: log full structure of first study to discover available fields
-        if (i === 0) {
+        // Debug: log full structure of first active study to discover available fields
+        if (!_crioDebugDone) {
+          _crioDebugDone = true;
           var topKeys = Object.keys(detail);
           Logger.log('CRIO DEBUG study keys: ' + topKeys.join(', '));
           if (detail.subjects && detail.subjects[0]) {
@@ -426,6 +437,18 @@ function syncCrioData(crioToken) {
           }
           if (detail.roles && detail.roles[0]) {
             Logger.log('CRIO DEBUG role[0]: ' + JSON.stringify(detail.roles[0]).slice(0, 300));
+          }
+          if (detail.indication) {
+            Logger.log('CRIO DEBUG indication: ' + JSON.stringify(detail.indication).slice(0, 300));
+          }
+          if (detail.specialty) {
+            Logger.log('CRIO DEBUG specialty: ' + JSON.stringify(detail.specialty).slice(0, 300));
+          }
+          if (detail.finances) {
+            Logger.log('CRIO DEBUG finances: ' + JSON.stringify(detail.finances).slice(0, 500));
+          }
+          if (detail.studyArms) {
+            Logger.log('CRIO DEBUG studyArms: ' + JSON.stringify(detail.studyArms).slice(0, 500));
           }
         }
 
@@ -437,15 +460,23 @@ function syncCrioData(crioToken) {
           if (roles[r].role === 'investigator') investigator = fullName;
         }
         indication = (detail.indication || {}).name || '';
-        studyName = detail.name || detail.protocolNumber || studyName;
-        sponsor = detail.sponsor || detail.sponsorName || '';
+        studyName = detail.protocolNumber || studyName;
+        sponsor = detail.sponsor || '';
         phase = detail.phase || '';
-        targetEnrollment = detail.targetEnrollment || detail.enrollmentTarget || '';
+        targetEnrollment = detail.targetEnrollment || '';
         startDate = detail.startDate || '';
         endDate = detail.endDate || '';
         dateCreated = detail.dateCreated || '';
         lastUpdated = detail.lastUpdated || '';
         lastUpdatedTs = detail.lastUpdatedTS ? String(detail.lastUpdatedTS) : '';
+        externalStudyNumber = detail.externalStudyNumber || '';
+        specialty = (typeof detail.specialty === 'object' && detail.specialty) ? (detail.specialty.name || JSON.stringify(detail.specialty)) : (detail.specialty || '');
+        trialId = detail.trialId || '';
+        siteName = detail.siteName || '';
+        siteKey = detail.siteKey || '';
+        if (detail.studyArms && detail.studyArms.length) {
+          studyArmsStr = detail.studyArms.map(function(a) { return a.name || a.armName || JSON.stringify(a); }).join(' | ');
+        }
 
         var subjects = detail.subjects || [];
         subjectCount = subjects.length;
@@ -453,18 +484,9 @@ function syncCrioData(crioToken) {
           var subj = subjects[j];
           subjectRows.push([
             subj.id || '',
-            subj.subjectNumber || subj.subjectId || '',
-            ((subj.firstName || '') + ' ' + (subj.lastName || '')).trim() || subj.fullName || subj.name || '',
             s.studyKey,
             s.protocolNumber || '',
             subj.status || '',
-            subj.siteKey || subj.site || '',
-            subj.source || subj.referralSource || '',
-            subj.enrollmentDate || subj.enrolledDate || '',
-            subj.screeningDate || subj.screenedDate || '',
-            subj.randomizationDate || subj.randomizedDate || '',
-            subj.statusDate || subj.lastStatusDate || '',
-            subj.dateOfBirth || subj.dob || '',
           ]);
         }
       } else {
@@ -492,6 +514,12 @@ function syncCrioData(crioToken) {
       lastUpdatedTs,
       startDate,
       endDate,
+      externalStudyNumber,
+      specialty,
+      trialId,
+      siteName,
+      siteKey,
+      studyArmsStr,
     ]);
   }
 

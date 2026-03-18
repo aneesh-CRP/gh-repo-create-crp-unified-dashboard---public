@@ -8726,21 +8726,12 @@ async function fetchMedicalRecords(attempt) {
         is_closed: r.is_closed === 'TRUE' || CLOSED.indexOf(status) !== -1,
       };
     });
-    // Try to resolve empty study fields from CRIO subjects / referral data
+    // Try to resolve empty study fields from referral data
+    // Note: CRIO subjects API only returns id+status (no names), so cross-ref not possible
     var _mrUnknown = 0;
     MED_RECORDS_DATA.forEach(function(mr) {
       if (mr.study) return;
       var nameKey = mr.name.toLowerCase().trim();
-      // Try CRIO subjects (uses full_name field synced from CRIO API)
-      if (typeof CRIO_SUBJECTS_DATA !== 'undefined' && CRIO_SUBJECTS_DATA.length) {
-        var match = CRIO_SUBJECTS_DATA.find(function(s) { return (s.full_name||'').toLowerCase().trim() === nameKey; });
-        if (match) {
-          // Resolve study name from protocol_number via CRIO_STUDIES_DATA
-          var crioStudy = CRIO_STUDIES_DATA.find(function(st) { return st.study_key === match.study_key; });
-          var studyLabel = crioStudy ? (crioStudy.study_name || crioStudy.protocol_number) : match.protocol_number;
-          if (studyLabel) { mr.study = studyLabel.split(' - ').pop().trim(); mr._studySource = 'CRIO'; return; }
-        }
-      }
       // Try referral data
       if (typeof REFERRAL_DATA !== 'undefined' && REFERRAL_DATA.length) {
         var ref = REFERRAL_DATA.find(function(r) { return r.name.toLowerCase().trim() === nameKey; });
@@ -8798,6 +8789,12 @@ async function fetchCrioStudies() {
             last_updated: r.last_updated || '',
             start_date: r.start_date || '',
             end_date: r.end_date || '',
+            external_study_number: r.external_study_number || '',
+            specialty: r.specialty || '',
+            trial_id: r.trial_id || '',
+            site_name: r.site_name || '',
+            site_key: r.site_key || '',
+            study_arms: r.study_arms || '',
           };
         });
         console.log('CRIO Studies loaded:', CRIO_STUDIES_DATA.length);
@@ -8818,18 +8815,9 @@ async function fetchCrioStudies() {
           CRIO_SUBJECTS_DATA = sRows.map(function(r) {
             return {
               subject_id: r.subject_id || '',
-              subject_number: r.subject_number || '',
-              full_name: r.full_name || '',
               study_key: r.study_key || '',
               protocol_number: r.protocol_number || '',
               status: r.status || '',
-              site_key: r.site_key || '',
-              source: r.source || '',
-              enrollment_date: r.enrollment_date || '',
-              screening_date: r.screening_date || '',
-              randomization_date: r.randomization_date || '',
-              status_date: r.status_date || '',
-              date_of_birth: r.date_of_birth || '',
             };
           });
           console.log('CRIO Subjects loaded:', CRIO_SUBJECTS_DATA.length);
