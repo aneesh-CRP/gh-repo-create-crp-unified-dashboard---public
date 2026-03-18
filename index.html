@@ -10904,6 +10904,8 @@ async function fetchCrioStudies() {
             site_name: r.site_name || '',
             site_key: r.site_key || '',
             study_arms: r.study_arms || '',
+            total_revenue: parseFloat(r.total_revenue) || 0,
+            revenue_subjects: parseInt(r.revenue_subjects) || 0,
           };
         });
         console.log('CRIO Studies loaded:', CRIO_STUDIES_DATA.length);

@@ -343,7 +343,8 @@ var CRIO_STUDIES_HEADERS = [
   'study_key','protocol_number','study_name','status','coordinator','investigator',
   'indication','subject_count','target_enrollment','sponsor','phase',
   'date_created','last_updated','last_updated_ts','start_date','end_date',
-  'external_study_number','specialty','trial_id','site_name','site_key','study_arms'
+  'external_study_number','specialty','trial_id','site_name','site_key','study_arms',
+  'total_revenue','revenue_subjects'
 ];
 
 var CRIO_SUBJECTS_HEADERS = [
@@ -410,6 +411,8 @@ function syncCrioData(crioToken) {
     var siteName = '';
     var siteKey = '';
     var studyArmsStr = '';
+    var totalRevenue = 0;
+    var revenueSubjects = 0;
 
     if (isActive) {
       var studyUrl = CRIO_API_BASE + '/api/v1/study/' + s.studyKey
@@ -478,6 +481,15 @@ function syncCrioData(crioToken) {
           studyArmsStr = detail.studyArms.map(function(a) { return a.name || a.armName || JSON.stringify(a); }).join(' | ');
         }
 
+        // Extract per-subject revenue from finances array
+        var finances = detail.finances || [];
+        for (var f = 0; f < finances.length; f++) {
+          if (finances[f].amount) {
+            totalRevenue += finances[f].amount;
+            revenueSubjects++;
+          }
+        }
+
         var subjects = detail.subjects || [];
         subjectCount = subjects.length;
         for (var j = 0; j < subjects.length; j++) {
@@ -520,6 +532,8 @@ function syncCrioData(crioToken) {
       siteName,
       siteKey,
       studyArmsStr,
+      totalRevenue ? totalRevenue.toFixed(2) : '',
+      revenueSubjects ? String(revenueSubjects) : '',
     ]);
   }
 
