@@ -10831,10 +10831,15 @@ async function fetchMedicalRecords(attempt) {
     MED_RECORDS_DATA.forEach(function(mr) {
       if (mr.study) return;
       var nameKey = mr.name.toLowerCase().trim();
-      // Try CRIO subjects
+      // Try CRIO subjects (uses full_name field synced from CRIO API)
       if (typeof CRIO_SUBJECTS_DATA !== 'undefined' && CRIO_SUBJECTS_DATA.length) {
         var match = CRIO_SUBJECTS_DATA.find(function(s) { return (s.full_name||'').toLowerCase().trim() === nameKey; });
-        if (match && match.study_name) { mr.study = match.study_name.split(' - ').pop().trim(); mr._studySource = 'CRIO'; return; }
+        if (match) {
+          // Resolve study name from protocol_number via CRIO_STUDIES_DATA
+          var crioStudy = CRIO_STUDIES_DATA.find(function(st) { return st.study_key === match.study_key; });
+          var studyLabel = crioStudy ? (crioStudy.study_name || crioStudy.protocol_number) : match.protocol_number;
+          if (studyLabel) { mr.study = studyLabel.split(' - ').pop().trim(); mr._studySource = 'CRIO'; return; }
+        }
       }
       // Try referral data
       if (typeof REFERRAL_DATA !== 'undefined' && REFERRAL_DATA.length) {
@@ -10878,13 +10883,19 @@ async function fetchCrioStudies() {
           return {
             study_key: r.study_key || '',
             protocol_number: r.protocol_number || '',
+            study_name: r.study_name || '',
             status: r.status || '',
             coordinator: r.coordinator || '',
             investigator: r.investigator || '',
             indication: r.indication || '',
             subject_count: parseInt(r.subject_count) || 0,
+            target_enrollment: parseInt(r.target_enrollment) || 0,
+            sponsor: r.sponsor || '',
+            phase: r.phase || '',
             date_created: r.date_created || '',
             last_updated: r.last_updated || '',
+            start_date: r.start_date || '',
+            end_date: r.end_date || '',
           };
         });
         console.log('CRIO Studies loaded:', CRIO_STUDIES_DATA.length);
@@ -10903,9 +10914,18 @@ async function fetchCrioStudies() {
           CRIO_SUBJECTS_DATA = sRows.map(function(r) {
             return {
               subject_id: r.subject_id || '',
+              subject_number: r.subject_number || '',
+              full_name: r.full_name || '',
               study_key: r.study_key || '',
               protocol_number: r.protocol_number || '',
               status: r.status || '',
+              site_key: r.site_key || '',
+              source: r.source || '',
+              enrollment_date: r.enrollment_date || '',
+              screening_date: r.screening_date || '',
+              randomization_date: r.randomization_date || '',
+              status_date: r.status_date || '',
+              date_of_birth: r.date_of_birth || '',
             };
           });
           console.log('CRIO Subjects loaded:', CRIO_SUBJECTS_DATA.length);
@@ -11669,6 +11689,13 @@ function mergeCrioIntoStudies() {
     e.crio_subject_count = crio.subject_count;
     e.crio_study_key = crio.study_key;
     e.crio_indication = crio.indication || '';
+    e.crio_sponsor = crio.sponsor || '';
+    e.crio_phase = crio.phase || '';
+    e.crio_study_name = crio.study_name || '';
+    // Use CRIO target enrollment if dashboard doesn't have one
+    if (crio.target_enrollment > 0 && (!e.target || e.target === 0)) {
+      e.target = crio.target_enrollment;
+    }
 
     // Always use CRIO study_key for study_url (CRIO is authoritative for PHL site)
     if (crio.study_key) {

@@ -340,12 +340,15 @@ var CRIO_SITE_ID  = '1679';   // Philadelphia, PA
 var CRIO_CLIENT_ID = '1329';  // CRP org ID
 
 var CRIO_STUDIES_HEADERS = [
-  'study_key','protocol_number','status','coordinator','investigator',
-  'indication','subject_count','date_created','last_updated','last_updated_ts'
+  'study_key','protocol_number','study_name','status','coordinator','investigator',
+  'indication','subject_count','target_enrollment','sponsor','phase',
+  'date_created','last_updated','last_updated_ts','start_date','end_date'
 ];
 
 var CRIO_SUBJECTS_HEADERS = [
-  'subject_id','study_key','protocol_number','status'
+  'subject_id','subject_number','full_name','study_key','protocol_number','status',
+  'site_key','source','enrollment_date','screening_date','randomization_date',
+  'status_date','date_of_birth'
 ];
 
 function syncCrioData(crioToken) {
@@ -388,9 +391,15 @@ function syncCrioData(crioToken) {
     var investigator = '';
     var indication = '';
     var subjectCount = 0;
+    var targetEnrollment = '';
+    var sponsor = '';
+    var phase = '';
     var dateCreated = '';
     var lastUpdated = '';
     var lastUpdatedTs = '';
+    var startDate = '';
+    var endDate = '';
+    var studyName = s.name || s.protocolNumber || '';
 
     if (isActive) {
       var studyUrl = CRIO_API_BASE + '/api/v1/study/' + s.studyKey
@@ -406,6 +415,20 @@ function syncCrioData(crioToken) {
       });
       if (studyResp.getResponseCode() === 200) {
         var detail = JSON.parse(studyResp.getContentText());
+
+        // Debug: log full structure of first study to discover available fields
+        if (i === 0) {
+          var topKeys = Object.keys(detail);
+          Logger.log('CRIO DEBUG study keys: ' + topKeys.join(', '));
+          if (detail.subjects && detail.subjects[0]) {
+            Logger.log('CRIO DEBUG subject[0] keys: ' + Object.keys(detail.subjects[0]).join(', '));
+            Logger.log('CRIO DEBUG subject[0]: ' + JSON.stringify(detail.subjects[0]).slice(0, 500));
+          }
+          if (detail.roles && detail.roles[0]) {
+            Logger.log('CRIO DEBUG role[0]: ' + JSON.stringify(detail.roles[0]).slice(0, 300));
+          }
+        }
+
         var roles = detail.roles || [];
         for (var r = 0; r < roles.length; r++) {
           var contact = roles[r].contact || {};
@@ -414,6 +437,12 @@ function syncCrioData(crioToken) {
           if (roles[r].role === 'investigator') investigator = fullName;
         }
         indication = (detail.indication || {}).name || '';
+        studyName = detail.name || detail.protocolNumber || studyName;
+        sponsor = detail.sponsor || detail.sponsorName || '';
+        phase = detail.phase || '';
+        targetEnrollment = detail.targetEnrollment || detail.enrollmentTarget || '';
+        startDate = detail.startDate || '';
+        endDate = detail.endDate || '';
         dateCreated = detail.dateCreated || '';
         lastUpdated = detail.lastUpdated || '';
         lastUpdatedTs = detail.lastUpdatedTS ? String(detail.lastUpdatedTS) : '';
@@ -421,11 +450,21 @@ function syncCrioData(crioToken) {
         var subjects = detail.subjects || [];
         subjectCount = subjects.length;
         for (var j = 0; j < subjects.length; j++) {
+          var subj = subjects[j];
           subjectRows.push([
-            subjects[j].id || '',
+            subj.id || '',
+            subj.subjectNumber || subj.subjectId || '',
+            ((subj.firstName || '') + ' ' + (subj.lastName || '')).trim() || subj.fullName || subj.name || '',
             s.studyKey,
             s.protocolNumber || '',
-            subjects[j].status || '',
+            subj.status || '',
+            subj.siteKey || subj.site || '',
+            subj.source || subj.referralSource || '',
+            subj.enrollmentDate || subj.enrolledDate || '',
+            subj.screeningDate || subj.screenedDate || '',
+            subj.randomizationDate || subj.randomizedDate || '',
+            subj.statusDate || subj.lastStatusDate || '',
+            subj.dateOfBirth || subj.dob || '',
           ]);
         }
       } else {
@@ -439,14 +478,20 @@ function syncCrioData(crioToken) {
     studyRows.push([
       s.studyKey,
       s.protocolNumber || '',
+      studyName,
       s.status || '',
       coordinator,
       investigator,
       indication,
       subjectCount,
+      targetEnrollment ? String(targetEnrollment) : '',
+      sponsor,
+      phase,
       dateCreated,
       lastUpdated,
       lastUpdatedTs,
+      startDate,
+      endDate,
     ]);
   }
 
