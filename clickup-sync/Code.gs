@@ -451,11 +451,6 @@ function syncCrioData(crioToken) {
   var subjectRows = [];
   var ACTIVE_STATUSES = ['ENROLLING', 'MAINTENANCE', 'STARTUP', 'PRECLOSED'];
 
-  var _crioDebugDone = false;
-  if (studies.length > 0) {
-    Logger.log('CRIO DEBUG site study[0] keys: ' + Object.keys(studies[0]).join(', '));
-    Logger.log('CRIO DEBUG site study[0]: ' + JSON.stringify(studies[0]).slice(0, 500));
-  }
   for (var i = 0; i < studies.length; i++) {
     var s = studies[i];
     var isActive = ACTIVE_STATUSES.indexOf(s.status) !== -1;
@@ -498,32 +493,6 @@ function syncCrioData(crioToken) {
       });
       if (studyResp.getResponseCode() === 200) {
         var detail = JSON.parse(studyResp.getContentText());
-
-        // Debug: log full structure of first active study to discover available fields
-        if (!_crioDebugDone) {
-          _crioDebugDone = true;
-          var topKeys = Object.keys(detail);
-          Logger.log('CRIO DEBUG study keys: ' + topKeys.join(', '));
-          if (detail.subjects && detail.subjects[0]) {
-            Logger.log('CRIO DEBUG subject[0] keys: ' + Object.keys(detail.subjects[0]).join(', '));
-            Logger.log('CRIO DEBUG subject[0]: ' + JSON.stringify(detail.subjects[0]).slice(0, 500));
-          }
-          if (detail.roles && detail.roles[0]) {
-            Logger.log('CRIO DEBUG role[0]: ' + JSON.stringify(detail.roles[0]).slice(0, 300));
-          }
-          if (detail.indication) {
-            Logger.log('CRIO DEBUG indication: ' + JSON.stringify(detail.indication).slice(0, 300));
-          }
-          if (detail.specialty) {
-            Logger.log('CRIO DEBUG specialty: ' + JSON.stringify(detail.specialty).slice(0, 300));
-          }
-          if (detail.finances) {
-            Logger.log('CRIO DEBUG finances: ' + JSON.stringify(detail.finances).slice(0, 500));
-          }
-          if (detail.studyArms) {
-            Logger.log('CRIO DEBUG studyArms: ' + JSON.stringify(detail.studyArms).slice(0, 500));
-          }
-        }
 
         var roles = detail.roles || [];
         for (var r = 0; r < roles.length; r++) {

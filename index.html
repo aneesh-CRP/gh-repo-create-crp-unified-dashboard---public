@@ -2501,7 +2501,7 @@ const CRP_CONFIG = {
   },
 
   // CRIO Study Keys for Pennington site — add new Pennington studies here
-  PENNINGTON_STUDY_KEYS: [161619, 162446, 167755, 167794, 172389, 173164],
+  PENNINGTON_STUDY_KEYS: [161619, 162446, 167755, 167794, 172389, 173164, 189260],
 
   // Expected CSV columns per data source — used by validateColumns() to warn on schema drift
   EXPECTED_COLUMNS: {
@@ -11324,7 +11324,7 @@ function renderCrioStudies() {
   var SKIP = {'Config Study':1,'Upload test':1,'EVENT':1,'2025_COVID_FLU_RSV_DETECTION STUDY':1};
   // Manual pre-screening → protocol overrides (indication text doesn't match)
   var PRESCREEN_OVERRIDES = {
-    '100455': ['154462','161620','188815'],  // Cardiology → D7960C00015, D6973C00001, J2O-MC-EKBG
+    '100455': ['154462','161620','188815','189260'],  // Cardiology → D7960C00015, D6973C00001, J2O-MC-EKBG (PHL+PNJ)
     '38926':  ['86826','135648'],            // Migraine → M23-714, C4951063
     '148951': ['135157'],                    // Obesity → J2A-MC-GZPO
     '35892':  ['109260'],                    // Contraceptives → MR-130A-01-TD-3001
