@@ -6163,6 +6163,8 @@ function processLiveData(allRows, legacyCancels, auditLog) {
     }).map(r => {
       const sk = r['Study Key'], subk = r['Subject Key (Back End)'];
       const d = parseDate(r['Scheduled Date']||'');
+      // Resolve site: use CSV Site Name if present, otherwise derive from Study Key via PENNINGTON_KEYS
+      const resolvedSite = r['Site Name'] || (siteSlug(sk, '') === PNJ ? 'Pennington, NJ' : 'Philadelphia, PA');
       return {
         date: d ? d.toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '—',
         date_iso: r['Scheduled Date']||'',
@@ -6174,7 +6176,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
         status: r['Subject Status']||'',
         coord: cleanCoord(r['Full Name']),
         investigator: cleanCoord(resolveInvestigator(r)),
-        site: r['Site Name']||'',
+        site: resolvedSite,
       };
     }),
     allCancels: recentCancels.map(r => ({
@@ -6188,7 +6190,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
       reason: r['Cancel Reason']||'',
       category: r._category || categorizeReason(r['Cancel Reason'], r['Appointment Cancellation Type']),
       cancel_date: (() => { try { const d=new Date(r['Cancel Date']);return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});}catch(e){return '';}})(),
-      site: r['Site Name']||'',
+      site: r['Site Name'] || (siteSlug(r['Study Key'], '') === PNJ ? 'Pennington, NJ' : 'Philadelphia, PA'),
     })),
     rescheduledVisits: rescheduledVisits.map(r => {
       const sk=r['Study Key'], subk=r['Subject Key (Back End)'];
@@ -6210,7 +6212,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
         reason: r['Cancel Reason']||'',
         cancel_date: (() => { try { const d=new Date(r['Cancel Date']);return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});}catch(e){return '';}})(),
         new_date: newDate ? newDate.toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '—',
-        site: r['Site Name']||'',
+        site: r['Site Name'] || (siteSlug(sk, '') === PNJ ? 'Pennington, NJ' : 'Philadelphia, PA'),
       };
     }),
     pendingReschedules: pendingReschedules.map(r => {
@@ -6223,7 +6225,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
         coord: cleanCoord(r['Staff Full Name'] || r['Full Name']),
         reason: r['Cancel Reason']||'',
         cancel_date: (() => { try { const d=new Date(r['Cancel Date']);return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});}catch(e){return '';}})(),
-        site: r['Site Name']||'',
+        site: r['Site Name'] || (siteSlug(sk, '') === PNJ ? 'Pennington, NJ' : 'Philadelphia, PA'),
       };
     }),
     // ── Preserve enrollmentData from SAMPLE and rebuild mergedStudies with live counts ──
