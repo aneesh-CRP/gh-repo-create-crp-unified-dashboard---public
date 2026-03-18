@@ -1212,6 +1212,11 @@ body {
             <th style="padding:10px 8px;text-align:left;font-weight:700;color:var(--text);white-space:nowrap;">Coordinator</th>
             <th style="padding:10px 8px;text-align:left;font-weight:700;color:var(--text);white-space:nowrap;">PI</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Site</th>
+            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Phase</th>
+            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">SIV</th>
+            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Enroll Start</th>
+            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">FPS</th>
+            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">IRB</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Referrals</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">FB Leads</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Total Leads</th>
@@ -2376,6 +2381,8 @@ const CRP_CONFIG = {
     // Then update the GIDs below (get GID from the sheet URL: #gid=XXXXXXX)
     CRIO_STUDIES_CSV: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTPrFpOKckIDKYtnV30EBkL9ryI4q4HHKXDLxzgu6ZqVzrALoGU0Tpf_MNYHzg2UxcPajaJWpOONBbP/pub?gid=932189572&single=true&output=csv',
     CRIO_SUBJECTS_CSV: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTPrFpOKckIDKYtnV30EBkL9ryI4q4HHKXDLxzgu6ZqVzrALoGU0Tpf_MNYHzg2UxcPajaJWpOONBbP/pub?gid=941302257&single=true&output=csv',
+    // Looker — Study Status & Key Dates (published Google Sheet)
+    LOOKER_STUDY_STATUS_CSV: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQrwoQwKCAiyv5xx_z0uXMQLHS5d2CUbzOj_qjxkZJYYe3Yxdu3i2T-rdQ9vtlDCBRTKfA1jDW_W0YW/pub?output=csv',
     // Finance Master Sheet — published key + tab GIDs for CSV access
     FINANCE_PUB_KEY: '2PACX-1vQXxreb6lrZHej3luMOSI07ditFm6mmGHIHrxWu9BkTfsvk0OLk_gx7o_JIY34UIgroGIKgEYbVdC_V',
   },
@@ -8389,6 +8396,7 @@ async function refreshData() {
       fetchPatientDB().catch(e => console.warn('Patient DB refresh failed:', e));
       fetchFacebookCRM().catch(() => {});
       fetchCrioStudies().catch(e => console.warn('CRIO refresh failed:', e));
+      fetchLookerStudyStatus().catch(e => console.warn('Looker refresh failed:', e));
     }, 1500);
   } catch(e) {
     if (badge) badge.textContent = 'Refresh failed — click to retry';
@@ -10016,6 +10024,8 @@ function initReferrals() {
   if (MED_RECORDS_DATA.length === 0) setTimeout(function(){ fetchMedicalRecords().catch(e => console.warn('Med Records:', e)); }, 5000);
   // CRIO API data — fetch after a delay to avoid rate limiting
   if (CRIO_STUDIES_DATA.length === 0) setTimeout(function(){ fetchCrioStudies().catch(e => console.warn('CRIO Studies:', e)); }, 8000);
+  // Looker study status — fetch after CRIO (needs study keys for merge)
+  if (Object.keys(LOOKER_STUDY_STATUS).length === 0) setTimeout(function(){ fetchLookerStudyStatus().catch(e => console.warn('Looker Status:', e)); }, 10000);
 }
 
 async function refreshReferrals() {
@@ -10928,6 +10938,52 @@ async function fetchMedicalRecords(attempt) {
       await new Promise(function(r){ setTimeout(r, delay); });
       return fetchMedicalRecords(attempt + 1);
     }
+  }
+}
+
+// ============================================================
+// LOOKER — Study Status & Key Dates
+// ============================================================
+var LOOKER_STUDY_STATUS = {};  // Indexed by study_key (string)
+async function fetchLookerStudyStatus() {
+  var url = CRP_CONFIG.DATA_FEEDS.LOOKER_STUDY_STATUS_CSV;
+  if (!url) return;
+  try {
+    var rows = await fetchCSV(url);
+    if (!rows || rows.length === 0) return;
+    LOOKER_STUDY_STATUS = {};
+    rows.forEach(function(r) {
+      var key = (r['Study Key (Back End)'] || '').trim();
+      if (!key || key === '0') return;
+      LOOKER_STUDY_STATUS[key] = {
+        study_name: (r['Study Name'] || '').trim(),
+        study_key: key,
+        phase: (r['Phase'] || '').trim(),
+        status: (r['Study Status'] || '').trim(),
+        enrollment_start: (r['Enrollment Start Date'] || '').trim(),
+        enrollment_close: (r['Enrollment Close Date'] || '').trim(),
+        first_patient_screened: (r['First Patient Screened Date'] || '').trim(),
+        first_patient_randomized: (r['First Patient Randomized Date'] || '').trim(),
+        site_initiation: (r['Site Initiation Date'] || '').trim(),
+        irb_approval: (r['Irb Approval Date'] || '').trim(),
+        irb_renewal: (r['Irb Renewal Date'] || '').trim(),
+        contract_signed: (r['Contract Signed Date'] || '').trim(),
+        regulatory_confirmed: (r['Regulatory Confirmed Date'] || '').trim(),
+        closeout: (r['Closeout Date'] || '').trim(),
+        last_updated: (r['Last Updated Date'] || '').trim(),
+        investigator_meeting: (r['Investigator Meeting Date'] || '').trim(),
+        presite_selection: (r['Presite Selection Date'] || '').trim(),
+      };
+    });
+    console.log('Looker Study Status loaded:', Object.keys(LOOKER_STUDY_STATUS).length, 'studies');
+    setHealthChip('dh-looker-status', Object.keys(LOOKER_STUDY_STATUS).length > 0 ? 'ok' : 'warn', 'Looker Status (' + Object.keys(LOOKER_STUDY_STATUS).length + ')');
+    // Re-merge if CRIO data already loaded
+    if (CRIO_STUDIES_DATA && CRIO_STUDIES_DATA.length > 0) {
+      safe(mergeCrioIntoStudies, 'mergeCrioIntoStudies');
+    }
+  } catch(e) {
+    console.warn('fetchLookerStudyStatus error:', e);
+    setHealthChip('dh-looker-status', 'fail', 'Looker Status (failed)');
   }
 }
 
@@ -11899,10 +11955,33 @@ function mergeCrioIntoStudies() {
       e.study_url = 'https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/' + crio.study_key + '/subjects';
     }
 
-    // Auto-correct status from CRIO (authoritative)
+    // Auto-correct status from CRIO
     var crioStatus = STATUS_MAP[crio.status] || crio.status;
     if (crioStatus && e.status !== crioStatus) {
       e.status = crioStatus;
+    }
+
+    // Looker study status overrides CRIO (user-curated, authoritative)
+    // Look up by primary study_key, then by extra keys (multi-site)
+    var lk = LOOKER_STUDY_STATUS[crio.study_key];
+    if (!lk && crio._extra_keys) {
+      for (var eki = 0; eki < crio._extra_keys.length; eki++) {
+        lk = LOOKER_STUDY_STATUS[crio._extra_keys[eki]];
+        if (lk) break;
+      }
+    }
+    if (lk) {
+      if (lk.status) e.status = lk.status;
+      if (lk.phase && lk.phase !== 'Unknown') e.crio_phase = lk.phase;
+      e.looker_siv = lk.site_initiation || '';
+      e.looker_enrollment_start = lk.enrollment_start || '';
+      e.looker_enrollment_close = lk.enrollment_close || '';
+      e.looker_fps = lk.first_patient_screened || '';
+      e.looker_fpr = lk.first_patient_randomized || '';
+      e.looker_irb_approval = lk.irb_approval || '';
+      e.looker_contract_signed = lk.contract_signed || '';
+      e.looker_closeout = lk.closeout || '';
+      e.looker_last_updated = lk.last_updated || '';
     }
 
     // Update enrollment numbers from CRIO subjects (authoritative)
@@ -11991,7 +12070,17 @@ function mergeCrioIntoStudies() {
       crio_coordinator: e.crio_coordinator || '',
       crio_investigator: e.crio_investigator || '',
       crio_subject_count: e.crio_subject_count || 0,
-      crio_indication: e.crio_indication || ''
+      crio_indication: e.crio_indication || '',
+      crio_end_date: e.crio_end_date || '',
+      phase: e.crio_phase || '',
+      siv_date: e.looker_siv || '',
+      enrollment_start: e.looker_enrollment_start || '',
+      enrollment_close: e.looker_enrollment_close || '',
+      fps_date: e.looker_fps || '',
+      irb_approval: e.looker_irb_approval || '',
+      contract_signed: e.looker_contract_signed || '',
+      closeout_date: e.looker_closeout || '',
+      last_updated: e.looker_last_updated || ''
     };
   }).sort(function(a,b) { return b.risk_score - a.risk_score; });
 
@@ -12941,6 +13030,11 @@ function renderStudiesTable() {
       <td style="padding:10px 8px;font-size:11px;color:#475569;white-space:nowrap">${escapeHTML(s.crio_coordinator||'')}</td>
       <td style="padding:10px 8px;font-size:11px;color:#475569;white-space:nowrap">${escapeHTML(s.crio_investigator||'')}</td>
       <td style="padding:10px 8px;text-align:center">${siteTags}</td>
+      <td style="padding:10px 8px;text-align:center;font-size:10px;color:var(--muted);white-space:nowrap">${s.phase ? escapeHTML(s.phase) : '—'}</td>
+      <td style="padding:10px 8px;text-align:center;font-size:10px;color:var(--muted);white-space:nowrap">${s.siv_date ? escapeHTML(s.siv_date) : '—'}</td>
+      <td style="padding:10px 8px;text-align:center;font-size:10px;color:var(--muted);white-space:nowrap">${s.enrollment_start ? escapeHTML(s.enrollment_start) : '—'}</td>
+      <td style="padding:10px 8px;text-align:center;font-size:10px;color:var(--muted);white-space:nowrap">${s.fps_date ? escapeHTML(s.fps_date) : '—'}</td>
+      <td style="padding:10px 8px;text-align:center;font-size:10px;color:var(--muted);white-space:nowrap">${s.irb_approval ? escapeHTML(s.irb_approval) : '—'}</td>
       <td style="padding:10px 8px;text-align:center">${buildPipelineCell(s.study, safeStudy)}</td>
       <td style="padding:10px 8px;text-align:center">${buildFBLeadCell(s.study)}</td>
       <td style="padding:10px 8px;text-align:center">${buildTotalLeadsCell(s.study, safeStudy)}</td>
@@ -13777,6 +13871,7 @@ async function _crpInit() {
     // Phase 3: Supplemental (staggered after finance)
     fetchPatientDB().catch(() => {});
     fetchCrioStudies().catch(() => {});
+    fetchLookerStudyStatus().catch(() => {});
     setTimeout(() => {
       if (_referralsLoaded) refreshReferrals().catch(() => {});
       fetchFacebookCRM().catch(() => {});
