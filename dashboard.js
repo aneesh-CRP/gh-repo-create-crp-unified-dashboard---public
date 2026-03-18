@@ -2067,8 +2067,7 @@ function buildSiteChart() {
         const site = DATA.sites[idx];
         const isPenn = site.site.toLowerCase().includes('penn');
         showCancels(r => {
-          const cl = (r.coord||'').toLowerCase();
-          const rPenn = ['angelina mcmullen','cady chilensky'].includes(cl);
+          const rPenn = (r.site||'').includes('Penn');
           return isPenn ? rPenn : !rPenn;
         }, site.site + ' — Cancellations', site.cancels + ' records');
       },
@@ -2278,9 +2277,10 @@ function buildScheduleTable() {
   var html = '';
   for (var i = 0; i < visits.length; i++) {
     var v = visits[i];
-    // Derive site code from study_url
-    var siteCode = (v.study_url && v.study_url.indexOf('pennington') !== -1) ? 'PNJ' : 'PHL';
-    var siteBg = siteCode === 'PNJ' ? 'background:#05996920;color:#059669' : 'background:#07206120;color:#072061';
+    // Derive site from actual CRIO Site Name field (not URL)
+    var isPNJ = (v.site||'').indexOf('Penn') !== -1;
+    var siteCode = isPNJ ? 'PNJ' : 'PHL';
+    var siteBg = isPNJ ? 'background:#05996920;color:#059669' : 'background:#07206120;color:#072061';
     // Status badge color
     var stLow = (v.status||'').toLowerCase();
     var sc = statusColors[stLow] || {bg:'#6b728020',fg:'#6b7280'};
@@ -2309,7 +2309,7 @@ function buildScheduleTable() {
     // Investigator
     var invText = esc(v.investigator || '—');
     var invStyle = v.investigator ? 'font-size:11px;color:#7c3aed' : 'font-size:11px;color:#cbd5e1';
-    html += '<tr data-date="' + (v.date_iso||'') + '" data-site="' + siteCode + '" data-coord="' + esc(v.coord||'') + '">'
+    html += '<tr data-date="' + (v.date_iso||'') + '" data-site="' + esc(v.site||'') + '" data-coord="' + esc(v.coord||'') + '">'
       + '<td class="confirm-cell" style="width:80px;text-align:center;padding:4px;"><span style="font-size:9px;font-weight:700;padding:3px 8px;border-radius:4px;border:1.5px solid #e2e8f0;color:#cbd5e1;">Confirm</span></td>'
       + '<td style="font-weight:600;color:var(--blue);white-space:nowrap">' + esc(v.date||'—') + '</td>'
       + '<td style="font-size:11px">' + studyHtml + '</td>'
@@ -6187,7 +6187,8 @@ function processLiveData(allRows, legacyCancels, auditLog) {
       type: r['Appointment Cancellation Type']||'',
       reason: r['Cancel Reason']||'',
       category: r._category || categorizeReason(r['Cancel Reason'], r['Appointment Cancellation Type']),
-      cancel_date: (() => { try { const d=new Date(r['Cancel Date']);return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});}catch(e){return '';}})()
+      cancel_date: (() => { try { const d=new Date(r['Cancel Date']);return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});}catch(e){return '';}})(),
+      site: r['Site Name']||'',
     })),
     rescheduledVisits: rescheduledVisits.map(r => {
       const sk=r['Study Key'], subk=r['Subject Key (Back End)'];
@@ -7249,6 +7250,7 @@ function showCancels(filterFn, title, sub) {
     <th onclick="sortDetailTable(this)">Sched Date</th>
     <th onclick="sortDetailTable(this)">Reason</th>
     <th onclick="sortDetailTable(this)">Coordinator</th>
+    <th onclick="sortDetailTable(this)">Site</th>
   </tr></thead><tbody>` +
   rows.map(r => `<tr>
     <td>${extLink(r.name, r.study_url||r.url||'')}</td>
@@ -7258,6 +7260,7 @@ function showCancels(filterFn, title, sub) {
     <td style="font-size:11px;color:#64748b;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
         title="${(r.reason||'').replace(/"/g,"'")}">${r.reason||'<em style="color:#dc2626">Missing</em>'}</td>
     <td style="font-size:11px">${r.coord||'—'}</td>
+    <td>${siteBadge(r.site)}</td>
   </tr>`).join('') + `</tbody></table>`;
   openModal(title, sub || rows.length + ' records', body);
 }
@@ -7312,7 +7315,7 @@ function showRescheduled() {
     body += '<div style="font-size:12px;font-weight:700;color:#059669;margin-bottom:8px;border-bottom:1px solid #e2e8f0;padding-bottom:4px;">✅ Confirmed Rescheduled (' + confirmed.length + ')</div>' +
       '<div style="margin-bottom:6px;font-size:11px;color:#64748b">Cancelled but have a new appointment booked in the same study.</div>' +
       '<table class="detail-table"><thead><tr>' +
-      '<th>Patient</th><th>Study</th><th>Cancelled</th><th>New Date</th><th>Original Reason</th><th>Coordinator</th>' +
+      '<th>Patient</th><th>Study</th><th>Cancelled</th><th>New Date</th><th>Original Reason</th><th>Coordinator</th><th>Site</th>' +
       '</tr></thead><tbody>' +
       confirmed.map(function(r) {
         return '<tr>' +
@@ -7322,6 +7325,7 @@ function showRescheduled() {
           '<td style="font-size:11px;font-weight:600;color:#059669">' + escapeHTML(r.new_date||'—') + '</td>' +
           '<td style="font-size:11px;color:#64748b;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHTML(r.reason||'') + '">' + escapeHTML(r.reason||'Not documented') + '</td>' +
           '<td style="font-size:11px">' + escapeHTML(r.coord||'—') + '</td>' +
+          '<td>' + siteBadge(r.site) + '</td>' +
           '</tr>';
       }).join('') + '</tbody></table>';
   }
@@ -7331,7 +7335,7 @@ function showRescheduled() {
     body += '<div style="font-size:12px;font-weight:700;color:#d97706;margin:' + (confirmed.length ? '20px' : '0') + ' 0 8px;border-bottom:1px solid #e2e8f0;padding-bottom:4px;">⚠️ Pending — No New Appointment (' + pending.length + ')</div>' +
       '<div style="margin-bottom:6px;font-size:11px;color:#64748b">Cancel reason mentions reschedule but no new appointment found. These patients may have dropped out.</div>' +
       '<table class="detail-table"><thead><tr>' +
-      '<th>Patient</th><th>Study</th><th>Cancelled</th><th>Reason</th><th>Coordinator</th>' +
+      '<th>Patient</th><th>Study</th><th>Cancelled</th><th>Reason</th><th>Coordinator</th><th>Site</th>' +
       '</tr></thead><tbody>' +
       pending.map(function(r) {
         return '<tr style="background:#fffbeb">' +
@@ -7340,6 +7344,7 @@ function showRescheduled() {
           '<td style="font-size:11px;color:#dc2626">' + escapeHTML(r.cancel_date||'—') + '</td>' +
           '<td style="font-size:11px;color:#64748b;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHTML(r.reason||'') + '">' + escapeHTML(r.reason||'Not documented') + '</td>' +
           '<td style="font-size:11px">' + escapeHTML(r.coord||'—') + '</td>' +
+          '<td>' + siteBadge(r.site) + '</td>' +
           '</tr>';
       }).join('') + '</tbody></table>';
   }
