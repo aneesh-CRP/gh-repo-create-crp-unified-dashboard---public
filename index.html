@@ -11300,65 +11300,6 @@ function renderCrioStudies() {
     + '<div style="font-size:9px;color:#059669">Auto-corrected</div></div>';
   html += '</div>';
 
-  // ── CRIO Revenue Dashboard ──
-  var _hasRevenue = CRIO_STUDIES_DATA.some(function(s){return s.total_revenue > 0;});
-  if (_hasRevenue) {
-    var pnlByStudy = (typeof QB_DATA !== 'undefined' && QB_DATA.loaded) ? (QB_DATA.pnlByStudy || {}) : {};
-    var revRows = [];
-    var totalCrioRev = 0, totalQbRev = 0, totalGap = 0, revStudyCount = 0, totalProjected = 0;
-    CRIO_STUDIES_DATA.forEach(function(s) {
-      if (SKIP[s.protocol_number] || s.total_revenue <= 0) return;
-      var subs = subsByStudy[s.study_key] || {};
-      var enrolled = subs['ENROLLED'] || 0;
-      var completed = subs['COMPLETED'] || 0;
-      var revPerCompleted = s.revenue_subjects > 0 ? s.total_revenue / s.revenue_subjects : 0;
-      var projected = enrolled > 0 ? enrolled * revPerCompleted : 0;
-      // Match QB
-      var qbMatch = pnlByStudy[s.protocol_number];
-      var qbRev = qbMatch ? qbMatch.total : 0;
-      var gap = s.total_revenue - qbRev;
-      totalCrioRev += s.total_revenue;
-      totalQbRev += qbRev;
-      totalGap += gap;
-      totalProjected += projected;
-      revStudyCount++;
-      revRows.push({ proto: s.protocol_number, crioRev: s.total_revenue, qbRev: qbRev, gap: gap, revPerCompleted: revPerCompleted, enrolled: enrolled, completed: completed, projected: projected, revSubjects: s.revenue_subjects });
-    });
-    revRows.sort(function(a,b){return b.crioRev - a.crioRev;});
-    var _fmtK = function(v){return v>=1000?'$'+Math.round(v/1000).toLocaleString()+'K':'$'+Math.round(v).toLocaleString();};
-
-    html += '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:14px;margin-bottom:14px;">';
-    html += '<div style="font-size:13px;font-weight:700;color:#065f46;margin-bottom:10px;">CRIO Revenue Intelligence</div>';
-    html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:12px;">';
-    html += '<div style="text-align:center;padding:6px;background:#fff;border-radius:8px;"><div style="font-size:18px;font-weight:800;color:#059669;">' + _fmtK(totalCrioRev) + '</div><div style="font-size:9px;color:#64748b;">CRIO Revenue</div></div>';
-    if (totalQbRev > 0) {
-      html += '<div style="text-align:center;padding:6px;background:#fff;border-radius:8px;"><div style="font-size:18px;font-weight:800;color:#3b82f6;">' + _fmtK(totalQbRev) + '</div><div style="font-size:9px;color:#64748b;">QB Recognized</div></div>';
-      html += '<div style="text-align:center;padding:6px;background:#fff;border-radius:8px;"><div style="font-size:18px;font-weight:800;color:' + (totalGap > 0 ? '#f59e0b' : '#059669') + ';">' + _fmtK(Math.abs(totalGap)) + '</div><div style="font-size:9px;color:#64748b;">' + (totalGap > 0 ? 'Uninvoiced' : 'Over QB') + '</div></div>';
-    }
-    html += '<div style="text-align:center;padding:6px;background:#fff;border-radius:8px;"><div style="font-size:18px;font-weight:800;color:#6366f1;">' + _fmtK(totalProjected) + '</div><div style="font-size:9px;color:#64748b;">Projected (Enrolled)</div></div>';
-    html += '<div style="text-align:center;padding:6px;background:#fff;border-radius:8px;"><div style="font-size:18px;font-weight:800;color:#1e293b;">' + revStudyCount + '</div><div style="font-size:9px;color:#64748b;">Revenue Studies</div></div>';
-    html += '</div>';
-
-    // Revenue table
-    html += '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:10px;">';
-    html += '<thead><tr style="border-bottom:2px solid #d1fae5;text-align:center;"><th style="text-align:left;padding:4px 6px;">Study</th><th style="padding:4px 6px;">CRIO Rev</th>';
-    if (totalQbRev > 0) html += '<th style="padding:4px 6px;">QB Rev</th><th style="padding:4px 6px;">Gap</th>';
-    html += '<th style="padding:4px 6px;">Rev/Completed</th><th style="padding:4px 6px;">Enrolled</th><th style="padding:4px 6px;">Projected</th></tr></thead><tbody>';
-    revRows.slice(0, 15).forEach(function(r) {
-      var gapColor = r.gap > 0 ? '#f59e0b' : '#059669';
-      html += '<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:3px 6px;font-weight:600;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + esc(r.proto) + '">' + esc(r.proto) + '</td>';
-      html += '<td style="padding:3px 6px;text-align:center;font-weight:700;color:#059669;">' + _fmtK(r.crioRev) + '</td>';
-      if (totalQbRev > 0) {
-        html += '<td style="padding:3px 6px;text-align:center;">' + (r.qbRev > 0 ? _fmtK(r.qbRev) : '<span style="color:#94a3b8;">—</span>') + '</td>';
-        html += '<td style="padding:3px 6px;text-align:center;color:' + gapColor + ';font-weight:600;">' + (r.gap !== 0 ? _fmtK(Math.abs(r.gap)) : '—') + '</td>';
-      }
-      html += '<td style="padding:3px 6px;text-align:center;">' + (r.revPerCompleted > 0 ? _fmtK(r.revPerCompleted) : '—') + '</td>';
-      html += '<td style="padding:3px 6px;text-align:center;font-weight:700;">' + r.enrolled + '</td>';
-      html += '<td style="padding:3px 6px;text-align:center;color:#6366f1;font-weight:600;">' + (r.projected > 0 ? _fmtK(r.projected) : '—') + '</td></tr>';
-    });
-    html += '</tbody></table></div></div>';
-  }
-
   // ── Section 1: Win-Back Opportunities ──
   if (winbacks.length > 0) {
     // Build per-patient cancel details from allCancels by matching study + V1/Screening visits
