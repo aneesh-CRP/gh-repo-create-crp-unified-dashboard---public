@@ -11722,6 +11722,8 @@ function buildSchedulingGapAlerts() {
 
   // Only flag protocol studies (not pre-screening) that should have visits
   var SKIP = {'Config Study':1,'Upload test':1,'EVENT':1,'2025_COVID_FLU_RSV_DETECTION STUDY':1};
+  // Studies to exclude from scheduling gap alerts (visits scheduled externally or not applicable)
+  var GAP_SKIP = {'MR-130A-01-TD-3001':1,'Contraceptives':1};
   var liveUpcoming = {};
   (DATA.upcomingByStudyFull || DATA.upcomingByStudy || []).forEach(function(s) {
     liveUpcoming[s.name] = s.count; if (s.full) liveUpcoming[s.full] = s.count;
@@ -11731,7 +11733,7 @@ function buildSchedulingGapAlerts() {
   var cc = typeof cleanCoord === 'function' ? cleanCoord : function(s){ return s; };
 
   var gaps = CRIO_STUDIES_DATA.filter(function(s) {
-    if (SKIP[s.protocol_number]) return false;
+    if (SKIP[s.protocol_number] || GAP_SKIP[s.protocol_number]) return false;
     // Skip pre-screening and generic-name studies
     if (s.protocol_number.toLowerCase().indexOf('pre-screen') >= 0) return false;
     if (s.protocol_number.toLowerCase().indexOf('pre screen') >= 0) return false;
