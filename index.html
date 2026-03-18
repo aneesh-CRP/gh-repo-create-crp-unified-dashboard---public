@@ -4207,54 +4207,6 @@ function mkChart(id, config) {
   charts[id] = new Chart(ctx, config);
 }
 
-function buildCancelTrend() {
-  mkChart('cancelTrendChart', {
-    type: 'bar',
-    data: {
-      labels: DATA.cancelWeekly.map(d => d.week),
-      datasets: [{
-        data: DATA.cancelWeekly.map(d => d.count),
-        backgroundColor: DATA.cancelWeekly.map(d => d.count >= 30 ? '#fca5a5' : d.count >= 18 ? '#fde68a' : '#bfdbfe'),
-        borderColor: DATA.cancelWeekly.map(d => d.count >= 30 ? '#dc2626' : d.count >= 18 ? '#d97706' : '#072061'),
-        borderWidth: 1.5, borderRadius: 4,
-      }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false },
-        tooltip: { callbacks: { title: (i) => 'Week of ' + i[0].label, label: (i) => i.raw + ' cancellations' } }
-      },
-      scales: {
-        x: { grid: { display: false } },
-        y: { grid: { color: '#f1f5f9' }, beginAtZero: true }
-      }
-    }
-  });
-}
-
-function buildUpcomingTrend() {
-  mkChart('upcomingTrendChart', {
-    type: 'line',
-    data: {
-      labels: DATA.upcomingWeekly.map(d => d.week),
-      datasets: [{
-        data: DATA.upcomingWeekly.map(d => d.count),
-        borderColor: '#072061', backgroundColor: 'rgba(37,99,235,0.08)',
-        borderWidth: 2, pointRadius: 4, pointBackgroundColor: '#072061',
-        fill: true, tension: 0.3,
-      }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { grid: { display: false } },
-        y: { grid: { color: '#f1f5f9' }, beginAtZero: true }
-      }
-    }
-  });
-}
-
 function buildReasonChart() {
   const top6 = DATA.cancelReasons.slice(0, 6);
   mkChart('reasonChart', {
@@ -4436,24 +4388,6 @@ function buildWeeklyBySiteChart() {
       }
     }
   });
-}
-
-function buildVisitTypeChart() {
-  const d = DATA.visitTypes || [];
-  const colors = ['#072061','#059669','#94a3b8','#7c3aed','#d97706'];
-  mkChart('visitTypeChart', {
-    type: 'doughnut',
-    data: {
-      labels: d.map(x => x.type),
-      datasets: [{ data: d.map(x => x.count), backgroundColor: colors, borderWidth: 2, borderColor: '#fff', hoverOffset: 6 }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false } }
-    }
-  });
-  const leg = document.getElementById('visit-type-legend');
-  if (leg) leg.innerHTML = d.map((x,i) => `<div class="legend-row"><div class="legend-dot" style="background:${colors[i]}"></div><span class="legend-label">${escapeHTML(x.type)}</span><span class="legend-val">${x.count}</span></div>`).join('');
 }
 
 function buildSchedCoordList() {
@@ -4924,21 +4858,6 @@ function injectVisitConfirmButtons() {
   });
   _updateConfirmCount();
   _log('injectVisitConfirmButtons: injected ' + injected + '/' + rows.length + ' rows');
-}
-
-function buildStatusChart() {
-  const d = DATA.subjectStatus;
-  mkChart('statusChart', {
-    type: 'doughnut',
-    data: {
-      labels: d.map(x => x.status),
-      datasets: [{ data: d.map(x => x.count), backgroundColor: ['#059669','#072061','#d97706','#10b981','#dc2626','#94a3b8'], borderWidth: 2, borderColor: '#fff' }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { position: 'right', labels: { usePointStyle: true, padding: 10, font: { size: 11 } } } }
-    }
-  });
 }
 
 // ═══════════════════════════════════════════════════
@@ -5437,9 +5356,10 @@ function renderCoordWorkloadBalance() {
     var cancels = DATA.allCancels.filter(function(c){return c.coord===name;});
     var patients = {};
     var studies = {};
-    visits.forEach(function(v) { patients[v.patient]=1; studies[v.study]=1; });
+    var phl = 0, pnj = 0;
+    visits.forEach(function(v) { patients[v.patient]=1; studies[v.study]=1; if ((v.site||'').indexOf('Penn')!==-1) pnj++; else phl++; });
     var cancelRate = (visits.length+cancels.length) > 0 ? Math.round(cancels.length/(visits.length+cancels.length)*100) : 0;
-    return { name:name, visits:visits.length, cancels:cancels.length, patients:Object.keys(patients).length, studies:Object.keys(studies).length, cancelRate:cancelRate };
+    return { name:name, visits:visits.length, cancels:cancels.length, patients:Object.keys(patients).length, studies:Object.keys(studies).length, cancelRate:cancelRate, phl:phl, pnj:pnj };
   }).sort(function(a,b){return b.visits-a.visits;});
 
   var maxVisits = Math.max.apply(null, coordStats.map(function(c){return c.visits;}).concat([0])) || 1;
@@ -5477,15 +5397,17 @@ function renderCoordWorkloadBalance() {
     if (c.visits > avgVisits * 1.5 && avgVisits > 0 && c.cancelRate < 10) alerts.push({text:'Top Performer', bg:'#f0fdf4', color:'#059669'});
     var alertHtml = alerts.length > 0 ? ' ' + alerts.map(function(a){ return '<span style="font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px;background:'+a.bg+';color:'+a.color+';">'+a.text+'</span>'; }).join(' ') : '';
 
-    html += '<div style="display:grid;grid-template-columns:120px 1fr 60px 50px 50px;align-items:center;gap:6px;font-size:11px;cursor:pointer;" onclick="showCoordDetail(\''+c.name.replace(/'/g,"\\'")+'\')">';
+    var siteBadge = c.pnj > 0 && c.phl > 0 ? '<span style="font-size:8px;color:#072061;">'+c.phl+'</span>/<span style="font-size:8px;color:#059669;">'+c.pnj+'</span>' : c.pnj > 0 ? '<span style="font-size:8px;padding:1px 4px;border-radius:3px;background:#05966920;color:#059669;font-weight:600;">PNJ</span>' : '<span style="font-size:8px;padding:1px 4px;border-radius:3px;background:#07206120;color:#072061;font-weight:600;">PHL</span>';
+    html += '<div style="display:grid;grid-template-columns:110px 1fr 40px 50px 50px 40px;align-items:center;gap:5px;font-size:11px;cursor:pointer;" onclick="showCoordDetail(\''+jsAttr(c.name)+'\')">';
     html += '<div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+c.name.split(' ')[0]+alertHtml+'</div>';
     html += '<div style="background:#e2e8f0;border-radius:4px;height:14px;overflow:hidden;position:relative;">';
     html += '<div style="height:100%;width:'+pct+'%;background:linear-gradient(90deg,#1843AD,#3b82f6);border-radius:4px;"></div>';
     html += '<div style="position:absolute;left:'+Math.min(pct,50)+'%;top:0;transform:translateX(4px);font-size:9px;font-weight:700;color:#1e293b;line-height:14px;">'+c.visits+'</div>';
     html += '</div>';
+    html += '<div style="text-align:center;">'+siteBadge+'</div>';
+    html += '<div style="text-align:center;font-size:10px;color:'+crColor+';font-weight:600;">'+c.cancelRate+'%</div>';
     html += '<div style="text-align:center;font-size:10px;color:'+devColor+';font-weight:700;">'+(devPct>0?'+':'')+devPct+'%</div>';
-    html += '<div style="text-align:center;font-size:10px;color:'+crColor+';font-weight:600;">'+c.cancelRate+'% CR</div>';
-    html += '<div style="text-align:center;font-size:10px;color:#64748b;">'+c.patients+' pts</div>';
+    html += '<div style="text-align:center;font-size:10px;color:#64748b;">'+c.patients+'p</div>';
     html += '</div>';
   });
   html += '</div>';
@@ -5542,19 +5464,23 @@ function renderInvCapacity() {
   invStats.forEach(function(inv) {
     var pct = Math.round(inv.visits / maxVisits * 100);
     var utilColor = inv.utilPct >= 80 ? '#059669' : inv.utilPct >= 50 ? '#f59e0b' : '#94a3b8';
-    html += '<div style="display:grid;grid-template-columns:100px 1fr 45px 45px 45px;align-items:center;gap:6px;font-size:11px;cursor:pointer;" onclick="showInvDetail(\''+inv.name.replace(/'/g,"\\'")+'\')">';
-    html += '<div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+inv.name.split(' ')[0]+'</div>';
+    var parts = inv.name.split(' ');
+    var shortName = parts[0] + (parts.length > 1 ? ' ' + parts[parts.length-1][0] + '.' : '');
+    var costHtml = inv.costPerVisit > 0 ? '<div style="text-align:center;font-size:10px;color:#059669;font-weight:600;">$'+inv.costPerVisit+'</div>' : '<div style="text-align:center;font-size:10px;color:#cbd5e1;">—</div>';
+    html += '<div style="display:grid;grid-template-columns:100px 1fr 40px 35px 35px 40px;align-items:center;gap:5px;font-size:11px;cursor:pointer;" onclick="showInvDetail(\''+jsAttr(inv.name)+'\')">';
+    html += '<div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+jsAttr(inv.name)+'">'+escapeHTML(shortName)+'</div>';
     html += '<div style="background:#e2e8f0;border-radius:4px;height:14px;overflow:hidden;position:relative;">';
     html += '<div style="height:100%;width:'+pct+'%;background:linear-gradient(90deg,#7c3aed,#a78bfa);border-radius:4px;"></div>';
     html += '<div style="position:absolute;left:'+Math.min(pct,50)+'%;top:0;transform:translateX(4px);font-size:9px;font-weight:700;color:#1e293b;line-height:14px;">'+inv.visits+'</div>';
     html += '</div>';
     html += '<div style="text-align:center;font-size:10px;color:'+utilColor+';font-weight:700;">'+inv.utilPct+'%</div>';
-    html += '<div style="text-align:center;font-size:10px;color:#6366f1;font-weight:600;">'+inv.studies+' st</div>';
-    html += '<div style="text-align:center;font-size:10px;color:#64748b;">'+inv.avgPerDay+'/d</div>';
+    html += '<div style="text-align:center;font-size:10px;color:#6366f1;font-weight:600;">'+inv.studies+'</div>';
+    html += '<div style="text-align:center;font-size:10px;color:#64748b;">'+inv.avgPerDay+'</div>';
+    html += costHtml;
     html += '</div>';
   });
   html += '</div>';
-  html += '<div style="margin-top:6px;font-size:9px;color:#94a3b8;text-align:right;">Util = days active / available days · st = studies · /d = avg visits per day</div>';
+  html += '<div style="margin-top:6px;font-size:9px;color:#94a3b8;text-align:right;">Util% · Studies · Avg/Day · $/Visit</div>';
   el.innerHTML = html;
 }
 
@@ -11016,7 +10942,6 @@ async function fetchCrioStudies() {
         setHealthChip('dh-crio-api', CRIO_STUDIES_DATA.length > 0 ? 'ok' : 'warn', 'CRIO Studies (' + CRIO_STUDIES_DATA.length + ')');
         safe(renderCrioStudies, 'renderCrioStudies');
         safe(mergeCrioIntoStudies, 'mergeCrioIntoStudies');
-        safe(buildSchedulingGapAlerts, 'buildSchedulingGapAlerts');
       }
     } catch(e) {
       console.warn('fetchCrioStudies error:', e);
@@ -11040,7 +10965,6 @@ async function fetchCrioStudies() {
           safe(renderCrioStudies, 'renderCrioStudies');
           safe(mergeCrioIntoStudies, 'mergeCrioIntoStudies');
           safe(buildEnrollmentKPIs, 'buildEnrollmentKPIs');
-          safe(buildSchedulingGapAlerts, 'buildSchedulingGapAlerts');
         }
       } catch(e) {
         console.warn('fetchCrioSubjects error:', e);
@@ -12016,60 +11940,6 @@ function mergeCrioIntoStudies() {
   _log('CRIO enrichment: ' + updated + '/' + DATA.enrollmentData.length + ' studies updated with live CRIO data');
 }
 
-function buildSchedulingGapAlerts() {
-  var el = document.getElementById('scheduling-gap-list');
-  var badge = document.getElementById('sched-gap-badge');
-  if (!el) return;
-  if (!CRIO_STUDIES_DATA || CRIO_STUDIES_DATA.length === 0) {
-    el.innerHTML = '<div style="padding:12px;color:#94a3b8;font-size:12px;">Waiting for CRIO data...</div>';
-    return;
-  }
-
-  // Only flag protocol studies (not pre-screening) that should have visits
-  var SKIP = {'Config Study':1,'Upload test':1,'EVENT':1,'2025_COVID_FLU_RSV_DETECTION STUDY':1};
-  // Studies to exclude from scheduling gap alerts (visits scheduled externally or not applicable)
-  var GAP_SKIP = {'MR-130A-01-TD-3001':1,'Contraceptives':1};
-  var liveUpcoming = {};
-  (DATA.upcomingByStudyFull || DATA.upcomingByStudy || []).forEach(function(s) {
-    liveUpcoming[s.name] = s.count; if (s.full) liveUpcoming[s.full] = s.count;
-  });
-
-  var esc = typeof escapeHTML === 'function' ? escapeHTML : function(s){ return s; };
-  var cc = typeof cleanCoord === 'function' ? cleanCoord : function(s){ return s; };
-
-  var gaps = CRIO_STUDIES_DATA.filter(function(s) {
-    if (SKIP[s.protocol_number] || GAP_SKIP[s.protocol_number]) return false;
-    // Skip pre-screening and generic-name studies
-    if (s.protocol_number.toLowerCase().indexOf('pre-screen') >= 0) return false;
-    if (s.protocol_number.toLowerCase().indexOf('pre screen') >= 0) return false;
-    if (s.protocol_number === s.indication) return false;
-    if (s.status !== 'ENROLLING' && s.status !== 'STARTUP') return false;
-    if (s.subject_count < 1) return false;
-    return (liveUpcoming[s.protocol_number] || 0) === 0;
-  }).sort(function(a,b) { return b.subject_count - a.subject_count; });
-
-  if (badge) {
-    badge.textContent = gaps.length;
-    badge.style.display = gaps.length > 0 ? '' : 'none';
-  }
-
-  if (gaps.length === 0) {
-    el.innerHTML = '<div style="padding:12px;color:#059669;font-size:12px;">All protocol studies have upcoming visits scheduled.</div>';
-    return;
-  }
-
-  var html = '';
-  gaps.forEach(function(s) {
-    var url = 'https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/' + s.study_key + '/subjects';
-    html += '<div style="padding:8px 12px;border-left:3px solid #d97706;margin-bottom:6px;background:#fffbeb;border-radius:0 6px 6px 0;font-size:12px;">'
-      + '<a href="' + esc(url) + '" target="_blank" rel="noopener" style="color:#d97706;font-weight:600;text-decoration:underline dotted;">' + esc(s.protocol_number) + '</a>'
-      + ' — <b>' + s.subject_count + '</b> subjects, no upcoming visits'
-      + (s.coordinator ? ' · ' + esc(cc(s.coordinator)) : '')
-      + '</div>';
-  });
-  el.innerHTML = html;
-}
-
 let _medRecFilter = 'upcoming'; // 'upcoming' or 'all'
 
 function renderMedicalRecords() {
@@ -12396,8 +12266,8 @@ function filterTrendsByRange(allTrends, days, baseDate) {
   var base = baseDate || new Date();
   var start = new Date(base); start.setDate(base.getDate() - days);
   var end = new Date(base); end.setDate(base.getDate() + days);
-  var startISO = start.toISOString().slice(0,10);
-  var endISO = end.toISOString().slice(0,10);
+  var startISO = localISO(start);
+  var endISO = localISO(end);
   return allTrends.filter(function(t) { return t.date >= startISO && t.date <= endISO; });
 }
 
@@ -12586,9 +12456,6 @@ function loadLongitudinalData() {
     else status.textContent = 'No data available yet. Wait for live data to load.';
   }
 }
-
-// Alias for backward compatibility (trend charts moved to Insights dual-axis)
-function buildWeeklyTrendChart() {}
 
 
 // ══════════════════════════════════════════════════════════════
