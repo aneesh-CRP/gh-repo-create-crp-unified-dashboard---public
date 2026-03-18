@@ -7870,10 +7870,22 @@ async function refreshReferrals() {
     // Build study→referrals index for O(1) lookups in cell builders
     _referralByStudy = new Map();
     REFERRAL_DATA.forEach(function(r) {
-      var sn = (r.study||'').toLowerCase().trim();
+      var sn = (r.study||'').toLowerCase().trim().replace(/^"+|"+$/g, '');
+      r._studyNorm = sn;  // cache normalized study name
       if (!_referralByStudy.has(sn)) _referralByStudy.set(sn, []);
       _referralByStudy.get(sn).push(r);
     });
+    // Also index by resolved alias so protocol lookups hit directly
+    if (typeof REFERRAL_STUDY_MAP !== 'undefined') {
+      Object.keys(REFERRAL_STUDY_MAP).forEach(function(alias) {
+        var proto = REFERRAL_STUDY_MAP[alias];
+        var aliasRefs = _referralByStudy.get(alias);
+        if (aliasRefs && aliasRefs.length > 0) {
+          if (!_referralByStudy.has(proto)) _referralByStudy.set(proto, []);
+          aliasRefs.forEach(function(r) { _referralByStudy.get(proto).push(r); });
+        }
+      });
+    }
     if (badge) badge.textContent = `✅ ${REFERRAL_DATA.length} referrals · ${new Date().toLocaleTimeString()}`;
     _log(`CRP Referrals: Loaded ${REFERRAL_DATA.length} referrals, ${CAMPAIGN_DATA.length} campaigns from Google Sheets`);
 
@@ -8237,16 +8249,53 @@ function buildPatientJourneyFunnel() {
 }
 
 
+// ── Referral study nickname → protocol number mapping ───────────────
+// Referral CSV uses short nicknames; merged studies use full protocol numbers.
+// This map resolves known aliases. Fuzzy matching handles the rest (e.g., "EZEF" ⊂ "J3L-MC-EZEF").
+var REFERRAL_STUDY_MAP = {
+  'prevent-hf-az-d6973 baxduo': 'd6973c00001',
+  'az-baxduo':                   'd6973c00001',
+  'ocean(a)':                    'efc17599',
+  'sjogren\'s disease':          '80202135sjs3001',
+  'psa-2001':                    '88545223psa2001',
+  'mash prescreening':           'masld',
+  'aqua':                        'efc17600 (estuary)',
+};
+
+// Values in the referral study column that are NOT study names (doctor names, sources, dates, blanks)
+var REFERRAL_STUDY_SKIP = {'': 1, 'taher modarressi': 1, 'center for primary care medicine': 1,
+  'connolly dermatology': 1, 'dr. savita singh': 1};
+function isReferralStudyGarbage(rs) {
+  if (REFERRAL_STUDY_SKIP[rs]) return true;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(rs)) return true;  // date values
+  return false;
+}
+
 // ── Study ↔ Referral Pipeline helper (for Studies tab) ──────────────
 function getStudyReferralPipeline(studyName) {
   if (!REFERRAL_DATA || REFERRAL_DATA.length === 0) return null;
   const sn = studyName.toLowerCase().trim();
-  // Try O(1) exact lookup first, fall back to fuzzy filter
+  // Try O(1) exact lookup first
   var matches = _referralByStudy.get(sn);
+  // Try alias map (referral nickname → protocol)
   if (!matches || matches.length === 0) {
-    matches = REFERRAL_DATA.filter(r => {
-      const rs = (r.study||'').toLowerCase().trim();
-      return rs.includes(sn) || sn.includes(rs);
+    // Check if any alias maps TO this study
+    Object.keys(REFERRAL_STUDY_MAP).forEach(function(alias) {
+      if (REFERRAL_STUDY_MAP[alias] === sn) {
+        var aliasMatches = _referralByStudy.get(alias);
+        if (aliasMatches && aliasMatches.length > 0) {
+          matches = (matches || []).concat(aliasMatches);
+        }
+      }
+    });
+  }
+  // Fuzzy fallback: referral nickname is substring of protocol (e.g., "ezef" in "j3l-mc-ezef")
+  if (!matches || matches.length === 0) {
+    matches = REFERRAL_DATA.filter(function(r) {
+      var rs = (r.study||'').toLowerCase().trim().replace(/^"+|"+$/g, '');
+      if (rs.length < 3 || isReferralStudyGarbage(rs)) return false;
+      // Only check if referral nickname is substring of protocol (not reverse — avoids false positives)
+      return sn.includes(rs);
     });
   }
   if (matches.length === 0) return null;
