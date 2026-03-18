@@ -1,6 +1,6 @@
 # CRP Dashboard — Ground Truth
 
-> Last verified: March 17, 2026 | Version 2.9.6 | 1,959 CRIO subjects across 50 studies | Referral matching fixed
+> Last verified: March 18, 2026 | 1,959 CRIO subjects across 50 studies | Site assignment fixed
 
 This document is the single reference for all dashboard data mappings, formulas, configurations, and verified counts. Use it to validate that the dashboard is rendering correctly.
 
@@ -12,7 +12,7 @@ This document is the single reference for all dashboard data mappings, formulas,
 |-----|---------|----------|
 | Overview | `view-overview` | KPI banners, enrollment pipeline, trends, charts |
 | Studies | `view-studies` | Merged study table, CRIO Recruitment Intelligence, Scheduling Gaps, Re-enrollment |
-| Schedule | `view-schedule` | At-Risk Patients, Medical Records, visit table, cancellations, coordinator goals, Action Plan |
+| Schedule | `view-schedule` | KPI row, visit table, At-Risk Patients, Medical Records, cancellations, coordinator goals, Action Plan |
 | Referrals | `view-referrals` | ClickUp pipeline, campaigns, Facebook leads, Patient Pipeline, Contact Quality Alerts |
 | Admin | `view-admin` | Trends, data export (PIN-protected) |
 | Finance (6) | `view-fin-*` | PIN-protected: Finance, Collections, Aging AR, Revenue, Accruals, CRIO vs QB |
@@ -87,6 +87,47 @@ Published key: `2PACX-1vQXxreb6lrZHej3luMOSI07ditFm6mmGHIHrxWu9BkTfsvk0OLk_gx7o_
 |--------|-------|
 | CRIO App URL | `https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/{study_key}/subjects` |
 | Pennington Study Keys | `161619, 162446, 167755, 167794, 172389, 173164` |
+
+### Site Resolution
+
+The upcoming visits CSV (LIVE_URL1) has **no `Site Name` column**. Only the cancellations CSV (LIVE_URL2_LEGACY) has it. Site is resolved as follows:
+
+1. `processLiveData()` backfills `r['Site Name']` on every raw row immediately after parsing
+2. If `r['Site Name']` already exists (cancellations) → keep it
+3. If missing (upcoming visits) → derive from `siteSlug(studyKey)` via `PENNINGTON_KEYS`
+4. All downstream code reads `r['Site Name']` directly — single source of truth
+
+**Verified Study Key → Site mapping (from cancellations CSV):**
+
+| Study Key | Study | Site Name | Notes |
+|-----------|-------|-----------|-------|
+| `161619` | D6973C00001 | Pennington, NJ | PNJ version |
+| `161620` | D6973C00001 | Philadelphia, PA | PHL version (same study, different site) |
+| `167755` | N1T-MC-MALO | Pennington, NJ | |
+| `167794` | 20230222 | Pennington, NJ | |
+| `172389` | J3F-MC-EZCC | Pennington, NJ | |
+| `173164` | Hypertriglyceridemia | (no cancel data) | PNJ per coordinator pattern |
+| `162446` | (no data) | — | Stale key, no active visits or cancels |
+| `150548` | 80202135SJS3001 | Philadelphia, PA | PHL despite PNJ coordinator (Angelina McMullen) |
+
+**Active visit counts (verified March 18, 2026):** 256 total — 23 PNJ + 233 PHL
+
+### Coordinators (10)
+
+| Name | Site | In Config |
+|------|------|-----------|
+| Stacey Scott | PHL | ✅ |
+| Ruby Pereira | PHL | ✅ |
+| Mario Castellanos | PHL | ✅ |
+| Ana Lambic | PHL | ✅ |
+| Jana Milankovic | PHL | ✅ |
+| Angelina McMullen | PNJ | ✅ |
+| Cady Chilensky | PNJ | ✅ |
+| Ema Gunic | PNJ | ✅ |
+| Vlado Draganic | PNJ | ✅ |
+| Gabrijela Ateljevic | PNJ | ✅ |
+
+**Note:** Coordinator site is informational only. Site assignment is determined by Study Key, not coordinator. Angelina McMullen coordinates SJS (150548) which is a PHL study.
 
 ### PRESCREEN_OVERRIDES (8 entries)
 

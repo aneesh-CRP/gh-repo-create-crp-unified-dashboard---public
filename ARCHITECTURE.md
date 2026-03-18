@@ -128,7 +128,7 @@ Export button (⬇) in Coordinator Visit Snapshot header downloads merged histor
 5. Update `CLASPRC_JSON` secret: `gh secret set CLASPRC_JSON --repo aneesh-CRP/gh-repo-create-crp-unified-dashboard---public < ~/.clasprc.json`
 6. Everything else auto-deploys via GitHub Actions
 
-## Known Issues / Status (as of March 17, 2026)
+## Known Issues / Status (as of March 18, 2026)
 
 - **GitHub Pages dashboard:** ✅ Fully working, verified live
 - **Apps Script dashboard:** ❌ Not working reliably. **Recommendation:** Embed the GitHub Pages URL in a Google Sites page restricted to `phillyresearch.com` instead.
@@ -240,3 +240,35 @@ Implemented all 5 phases of the enhancement plan:
 - Aliases pre-indexed into `_referralByStudy` Map for O(1) lookups
 
 **Commits:** `3ad09e3`, `0ba34b2`, `2cecc49`, `3bb1809`, `ab9f441`, `ce39eb7`, `4273214`, `cba8bae`, `2c8e5a2`, `88e3563`
+
+### March 18, 2026
+**Site Assignment Fix — PHL/PNJ Misclassification:**
+
+The upcoming visits CSV (LIVE_URL1) has no `Site Name` column. Previously, site was derived from URL strings or hardcoded coordinator names, causing all PNJ visits to show as PHL and the PNJ filter to return zero results.
+
+**Root cause fixes:**
+1. **Site Name backfill at parse time** — `processLiveData()` now injects `Site Name` into every raw CSV row using `PENNINGTON_KEYS` + `siteSlug()` right after parsing, before any downstream code runs. Single injection point means all views get correct site data automatically.
+2. **buildScheduleTable** — uses `v.site` (actual Site Name) instead of `study_url.indexOf('pennington')` heuristic
+3. **schedFilter** — `data-site` attribute now stores full site name ("Pennington, NJ") so `site.includes('Penn')` works correctly
+4. **Cancel chart click handler** — uses `r.site` instead of hardcoded coordinator-name-to-site proxy
+5. **Overview enrollment pipeline** — uses `v.site` instead of `patient_url.includes('pennington')`
+6. **Site Name added to EXPECTED_COLUMNS.CRIO** — warns if column appears in future CSV
+
+**Site column added to popups:** Cancellations, Rescheduled Visits (confirmed + pending)
+
+**Coordinator config updated:**
+- `COORDINATORS`: Added Ema Gunic, Vlado Draganic, Gabrijela Ateljevic, Ana Lambic, Jana Milankovic
+- `SITES.PHL.coordinators`: Added Ana Lambic, Jana Milankovic
+- `SITES.PNJ.coordinators`: Added Ema Gunic, Vlado Draganic, Gabrijela Ateljevic
+- Coordinator workload views now use `CRP_CONFIG.COORDINATORS` instead of hardcoded 5-name lists
+
+**Schedule tab layout:** Moved upcoming visits table directly under KPI row (was below Medical Records)
+
+**Data verification (live CSV):**
+- Upcoming visits: 256 active, 23 PNJ + 233 PHL
+- PENNINGTON_KEYS confirmed against cancellation CSV (has authoritative Site Name): 161619, 167755, 167794, 172389 all verified "Pennington, NJ"
+- 162446: stale (no data), harmless
+- SJS study (150548): confirmed PHL despite PNJ coordinator — correct classification
+- D6973C00001 has two study keys: 161619 (PNJ) and 161620 (PHL) — both correctly resolved
+
+**Commits:** `f04d516`, `c3f4baf`, `ed91b31`, `9eebc5f`, `4f99eca`, `574edd7`, `377bf22`
