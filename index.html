@@ -1178,9 +1178,10 @@ body {
 <div id="view-studies" class="view">
 
   <!-- Header + filters -->
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;flex-wrap:wrap;gap:8px;">
     <div><span class="card-title" style="font-size:16px;">All Studies</span> <span id="studies-count-badge" style="font-size:12px;font-weight:500;color:var(--muted);margin-left:6px"></span></div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;" id="studies-filter-bar">
+  </div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;position:relative;z-index:10;" id="studies-filter-bar">
       <button onclick="filterStudies('all',this)" class="sched-filter active" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid #1843ad;background:#e8eeff;color:#1843ad;cursor:pointer">All</button>
       <button onclick="filterStudies('critical',this)" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">🔴 Critical</button>
       <button onclick="filterStudies('high',this)" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">🟠 High Risk</button>
@@ -1192,7 +1193,6 @@ body {
       <button onclick="filterStudies('behind',this)" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Behind Goal</button>
       <button onclick="filterStudies('phl',this)" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">PHL</button>
       <button onclick="filterStudies('pnj',this)" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">PNJ</button>
-    </div>
   </div>
 
   <!-- Studies table -->
