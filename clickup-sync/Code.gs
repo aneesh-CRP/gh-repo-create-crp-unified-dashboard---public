@@ -336,7 +336,7 @@ function normalizeMedRecord(t, studyName) {
 // CRIO API SYNC — Studies & Subjects from CRIO Recruitment API
 // ============================================================
 var CRIO_API_BASE = 'https://api.clinicalresearch.io';
-var CRIO_SITE_IDS = ['1679', '1680'];  // 1679=Philadelphia, 1680=Pennington (to discover: run listCrioSites)
+var CRIO_SITE_IDS = ['1679', '5545'];  // 1679=Philadelphia, 5545=Pennington
 var CRIO_CLIENT_ID = '1329';  // CRP org ID
 
 var CRIO_STUDIES_HEADERS = [
@@ -358,17 +358,35 @@ function listCrioSites() {
   if (!token) { Logger.log('No CRIO_TOKEN'); return; }
   // Try site IDs 1 through 5000 in batches (or use a known range)
   // Alternative: if CRIO has a /sites endpoint, use that
-  for (var id = 1675; id <= 1685; id++) {
-    try {
-      var resp = UrlFetchApp.fetch(CRIO_API_BASE + '/api/v1/site/' + id + '?client_id=' + CRIO_CLIENT_ID, {
-        method: 'get', headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json' }, muteHttpExceptions: true
-      });
-      if (resp.getResponseCode() === 200) {
-        var data = JSON.parse(resp.getContentText());
-        Logger.log('Site ' + id + ': ' + (data.siteName || data.name || 'unnamed') + ' — ' + (data.studies || []).length + ' studies');
-      }
-    } catch(e) {}
-    Utilities.sleep(100);
+  // Try client endpoint first
+  try {
+    var clientResp = UrlFetchApp.fetch(CRIO_API_BASE + '/api/v1/client/' + CRIO_CLIENT_ID, {
+      method: 'get', headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json' }, muteHttpExceptions: true
+    });
+    Logger.log('Client endpoint (' + clientResp.getResponseCode() + '): ' + clientResp.getContentText().slice(0, 1000));
+  } catch(e) { Logger.log('Client endpoint failed: ' + e.message); }
+  // Try sites list endpoint
+  try {
+    var sitesResp = UrlFetchApp.fetch(CRIO_API_BASE + '/api/v1/sites?client_id=' + CRIO_CLIENT_ID, {
+      method: 'get', headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json' }, muteHttpExceptions: true
+    });
+    Logger.log('Sites endpoint (' + sitesResp.getResponseCode() + '): ' + sitesResp.getContentText().slice(0, 1000));
+  } catch(e) { Logger.log('Sites endpoint failed: ' + e.message); }
+  // Scan a range of IDs around known site 1679
+  var ranges = [[1,50],[100,200],[500,600],[1000,1100],[1600,1750],[1800,2000],[2500,2600],[3000,3100]];
+  for (var ri = 0; ri < ranges.length; ri++) {
+    for (var id = ranges[ri][0]; id <= ranges[ri][1]; id++) {
+      try {
+        var resp = UrlFetchApp.fetch(CRIO_API_BASE + '/api/v1/site/' + id + '?client_id=' + CRIO_CLIENT_ID, {
+          method: 'get', headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json' }, muteHttpExceptions: true
+        });
+        if (resp.getResponseCode() === 200) {
+          var data = JSON.parse(resp.getContentText());
+          Logger.log('FOUND Site ' + id + ': ' + (data.siteName || data.name || 'unnamed') + ' — ' + (data.studies || []).length + ' studies');
+        }
+      } catch(e) {}
+      Utilities.sleep(50);
+    }
   }
 }
 
@@ -378,32 +396,55 @@ function syncCrioData(crioToken) {
     return { studies: [], subjects: [] };
   }
 
-  // 1. Fetch all sites and combine studies
+  // 1. Fetch all sites via /sites endpoint, then supplement with individual site details
   var studies = [];
   var studySiteMap = {};  // studyKey → siteId
-  for (var si = 0; si < CRIO_SITE_IDS.length; si++) {
-    var siteId = CRIO_SITE_IDS[si];
-    var siteUrl = CRIO_API_BASE + '/api/v1/site/' + siteId + '?client_id=' + CRIO_CLIENT_ID;
-    try {
-      var siteResp = UrlFetchApp.fetch(siteUrl, {
-        method: 'get',
-        headers: { 'Authorization': 'Bearer ' + crioToken, 'Content-Type': 'application/json', 'Accept': 'application/json' },
-        muteHttpExceptions: true,
-      });
-      if (siteResp.getResponseCode() === 200) {
-        var site = JSON.parse(siteResp.getContentText());
+  var siteNames = {};     // siteId → name
+
+  // Try bulk /sites endpoint first (returns all sites for this client)
+  var bulkOk = false;
+  try {
+    var sitesResp = UrlFetchApp.fetch(CRIO_API_BASE + '/api/v1/sites?client_id=' + CRIO_CLIENT_ID, {
+      method: 'get',
+      headers: { 'Authorization': 'Bearer ' + crioToken, 'Accept': 'application/json' },
+      muteHttpExceptions: true,
+    });
+    if (sitesResp.getResponseCode() === 200) {
+      var allSites = JSON.parse(sitesResp.getContentText());
+      allSites.forEach(function(site) {
+        var sid = String(site.siteId);
+        siteNames[sid] = site.name || '';
         var siteStudies = site.studies || [];
-        Logger.log('CRIO: Found ' + siteStudies.length + ' studies at site ' + siteId + ' (' + (site.siteName || '') + ')');
-        siteStudies.forEach(function(s) { studySiteMap[s.studyKey] = siteId; });
+        Logger.log('CRIO: Found ' + siteStudies.length + ' studies at site ' + sid + ' (' + siteNames[sid] + ')');
+        siteStudies.forEach(function(s) { studySiteMap[s.studyKey] = sid; });
         studies = studies.concat(siteStudies);
-      } else {
-        Logger.log('CRIO site ' + siteId + ' error: ' + siteResp.getContentText().slice(0, 200));
-      }
-    } catch(e) {
-      Logger.log('CRIO site ' + siteId + ' fetch failed: ' + e.message);
+      });
+      bulkOk = true;
+    }
+  } catch(e) { Logger.log('CRIO /sites failed: ' + e.message); }
+
+  // Fallback: fetch each site individually
+  if (!bulkOk) {
+    for (var si = 0; si < CRIO_SITE_IDS.length; si++) {
+      var siteId = CRIO_SITE_IDS[si];
+      try {
+        var siteResp = UrlFetchApp.fetch(CRIO_API_BASE + '/api/v1/site/' + siteId + '?client_id=' + CRIO_CLIENT_ID, {
+          method: 'get',
+          headers: { 'Authorization': 'Bearer ' + crioToken, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          muteHttpExceptions: true,
+        });
+        if (siteResp.getResponseCode() === 200) {
+          var site = JSON.parse(siteResp.getContentText());
+          var siteStudies = site.studies || [];
+          siteNames[siteId] = site.siteName || site.name || '';
+          Logger.log('CRIO: Found ' + siteStudies.length + ' studies at site ' + siteId + ' (' + siteNames[siteId] + ')');
+          siteStudies.forEach(function(s) { studySiteMap[s.studyKey] = siteId; });
+          studies = studies.concat(siteStudies);
+        }
+      } catch(e) { Logger.log('CRIO site ' + siteId + ' failed: ' + e.message); }
     }
   }
-  Logger.log('CRIO: ' + studies.length + ' total studies across ' + CRIO_SITE_IDS.length + ' sites');
+  Logger.log('CRIO: ' + studies.length + ' total studies across ' + Object.keys(siteNames).length + ' sites');
 
   // 2. For each enrolling/maintenance study, fetch subject details
   var studyRows = [];
