@@ -3125,7 +3125,7 @@ function mergeCoordGoalsWithSnapshot(goals) {
 
 function computeCoordGoals() {
   // Compute from allVisitDetail if coordGoals not pre-computed
-  var COORDS = CRP_CONFIG.COORDINATORS || [];
+  var COORDS = CRP_CONFIG.SCHEDULE_COORDINATORS || CRP_CONFIG.COORDINATORS || [];
   var COORD_LOWER = COORDS.map(function(c) { return c.toLowerCase(); });
   var goals = { byDay: {}, byMonth: {} };
   COORDS.forEach(function(c) { goals.byDay[c] = {}; goals.byMonth[c] = 0; });
@@ -3157,7 +3157,7 @@ function renderCoordinatorGoals() {
   // Merge with localStorage snapshot so past days are preserved
   goals = mergeCoordGoalsWithSnapshot(goals);
   if (!goals) return;
-  const COORDS = CRP_CONFIG.COORDINATORS || [];
+  const COORDS = CRP_CONFIG.SCHEDULE_COORDINATORS || CRP_CONFIG.COORDINATORS || [];
   const DAILY_GOAL = CRP_CONFIG.COORD_DAILY_GOAL || 2;
   const grid = document.getElementById('coordGoalsGrid');
   const monthBody = document.getElementById('coordMonthBody');
@@ -6033,16 +6033,20 @@ function processLiveData(allRows, legacyCancels, auditLog) {
   // ── Trends: per-week aggregation for longitudinal charts ──
   // Groups ALL visits (active + cancelled) by week of their scheduled/cancel date
   // Past weeks show actual cancel rates; future weeks show scheduled volume
+  // ── Trends: ±2 weeks from today for targeted insights ──
   const weeklyTrends = (() => {
     const byWeek = {};
+    const trendStart = new Date(today); trendStart.setDate(today.getDate() - 14);
+    const trendEnd   = new Date(today); trendEnd.setDate(today.getDate() + 14);
     function weekKey(d) {
       const mon = new Date(d); mon.setDate(d.getDate() - ((d.getDay() + 6) % 7));
       return localISO(mon);
     }
+    function inWindow(d) { return d >= trendStart && d <= trendEnd; }
     // All rows from the main report (includes both active and cancelled)
     allRows.forEach(r => {
       const d = parseDate(r['Scheduled Date'] || r['Cancel Date']);
-      if (!d || isExcludedStudy(r['Study Name'])) return;
+      if (!d || !inWindow(d) || isExcludedStudy(r['Study Name'])) return;
       const wk = weekKey(d);
       if (!byWeek[wk]) byWeek[wk] = { upcoming: 0, cancelled: 0, byStudy: {}, byCoord: {} };
       const status = (r['Appointment Status'] || '').trim().toLowerCase();
@@ -6066,7 +6070,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
     if (legacyCancels && legacyCancels.length) {
       legacyCancels.forEach(r => {
         const d = parseDate(r['Cancel Date'] || r['Scheduled Date']);
-        if (!d || isExcludedStudy(r['Study Name'])) return;
+        if (!d || !inWindow(d) || isExcludedStudy(r['Study Name'])) return;
         const wk = weekKey(d);
         if (!byWeek[wk]) byWeek[wk] = { upcoming: 0, cancelled: 0, byStudy: {}, byCoord: {} };
         byWeek[wk].cancelled++;
