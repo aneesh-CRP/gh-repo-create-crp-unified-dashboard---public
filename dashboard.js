@@ -1389,7 +1389,7 @@ function switchTab(name, el) {
   if (navWrap) navWrap.classList.remove('open');
 
   // Performance tabs → delegate to switchView (handles lazy building)
-  const PERF_TABS = ['overview','studies','schedule','actions','referrals','admin'];
+  const PERF_TABS = ['overview','studies','schedule','referrals','admin'];
   if (PERF_TABS.includes(name)) {
     // Hide finance+insights views first
     document.querySelectorAll('[id^="view-fin-"], #view-insights').forEach(v => {
@@ -3531,9 +3531,6 @@ function switchView(name, el) {
     showAuthModal('admin');
     return;
   }
-  if (name === 'actions') {
-    setTimeout(() => buildRiskFlagCards(), 50);
-  }
   // Trends tab: show charts if data already loaded
   if (name === 'studies') {
     setTimeout(() => buildStudiesView(), 50);
@@ -3568,6 +3565,7 @@ function switchView(name, el) {
       safe(buildStatusChart,         'statusChart');
       safe(buildStatusLegend,        'statusLegend');
       safe(buildScheduleTable,       'buildSched');
+      safe(buildRiskFlagCards,       'riskCards');
       safe(buildSchedStudyBars,      'schedBars');
       safe(buildSchedCoordList,      'schedCoord');
       safe(hidePastVisits,           'hidePast');
@@ -6304,11 +6302,22 @@ async function refreshData() {
     setTimeout(() => {
       fetchPatientDB().catch(e => console.warn('Patient DB refresh failed:', e));
       fetchFacebookCRM().catch(() => {});
+      fetchCrioStudies().catch(e => console.warn('CRIO refresh failed:', e));
     }, 1500);
   } catch(e) {
     if (badge) badge.textContent = 'Refresh failed — click to retry';
     console.error(e);
   } finally { _refreshInFlight = false; }
+}
+
+async function manualRefresh() {
+  var btn = document.getElementById('refresh-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '↻ Refreshing...'; }
+  try {
+    await refreshData();
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '↻ Refresh'; }
+  }
 }
 
 // ═══════════════════════════════════════════════════
@@ -8572,10 +8581,13 @@ async function fetchMedicalRecords(attempt) {
 // ============================================================
 // CRIO API DATA — Study enrollment status & subject pipeline
 // ============================================================
+var _crioFetchInFlight = false;
 async function fetchCrioStudies() {
+  if (_crioFetchInFlight) return;
+  _crioFetchInFlight = true;
   var studiesUrl = CRP_CONFIG.DATA_FEEDS.CRIO_STUDIES_CSV;
   var subjectsUrl = CRP_CONFIG.DATA_FEEDS.CRIO_SUBJECTS_CSV;
-  if (!studiesUrl) { console.log('CRIO Studies CSV URL not configured'); return; }
+  if (!studiesUrl) { console.log('CRIO Studies CSV URL not configured'); _crioFetchInFlight = false; return; }
   try {
     var rows = await fetchCSV(studiesUrl);
     if (!rows || rows.length === 0) return;
@@ -8595,6 +8607,7 @@ async function fetchCrioStudies() {
     console.log('CRIO Studies loaded:', CRIO_STUDIES_DATA.length);
     safe(renderCrioStudies, 'renderCrioStudies');
     safe(mergeCrioIntoStudies, 'mergeCrioIntoStudies');
+    safe(buildSchedulingGapAlerts, 'buildSchedulingGapAlerts');
   } catch(e) {
     console.warn('fetchCrioStudies error:', e);
   }
@@ -8615,11 +8628,13 @@ async function fetchCrioStudies() {
         safe(renderCrioStudies, 'renderCrioStudies');
         safe(mergeCrioIntoStudies, 'mergeCrioIntoStudies');
         safe(buildEnrollmentKPIs, 'buildEnrollmentKPIs');
+        safe(buildSchedulingGapAlerts, 'buildSchedulingGapAlerts');
       }
     } catch(e) {
       console.warn('fetchCrioSubjects error:', e);
     }
   }
+  _crioFetchInFlight = false;
 }
 
 function renderCrioStudies() {
@@ -9076,9 +9091,93 @@ function renderCrioStudies() {
     html += '</details>';
   }
 
+  // ── Section 5: Re-Enrollment Opportunities (screen fails & completes → other enrolling studies) ──
+  var reenrollByInd = {};
+  CRIO_STUDIES_DATA.forEach(function(s) {
+    if (SKIP[s.protocol_number]) return;
+    var isPS = s.protocol_number.toLowerCase().indexOf('pre-screen') >= 0
+      || s.protocol_number.toLowerCase().indexOf('pre screen') >= 0
+      || s.protocol_number === s.indication
+      || !!PRESCREEN_OVERRIDES[s.study_key];
+    if (isPS) return;
+    var ind = (s.indication || '').toLowerCase().trim();
+    if (!ind) return;
+    var subs = subsByStudy[s.study_key] || {};
+    var sf = subs['SCREEN_FAIL'] || 0;
+    var comp = subs['COMPLETED'] || 0;
+    var disc = subs['DISCONTINUED'] || 0;
+    var pool = sf + comp + disc;
+    if (!reenrollByInd[ind]) reenrollByInd[ind] = { pool: 0, sf: 0, comp: 0, disc: 0, sources: [], enrolling: [] };
+    if (pool > 0) {
+      reenrollByInd[ind].pool += pool;
+      reenrollByInd[ind].sf += sf;
+      reenrollByInd[ind].comp += comp;
+      reenrollByInd[ind].disc += disc;
+      reenrollByInd[ind].sources.push({ study: s.protocol_number, key: s.study_key, sf: sf, comp: comp, disc: disc });
+    }
+    if (s.status === 'ENROLLING') {
+      reenrollByInd[ind].enrolling.push({ study: s.protocol_number, key: s.study_key });
+    }
+  });
+
+  var reenrollOps = [];
+  Object.keys(reenrollByInd).forEach(function(ind) {
+    var r = reenrollByInd[ind];
+    if (r.pool > 0 && r.enrolling.length > 0) {
+      // Only show opportunities where patients from one study could go to a DIFFERENT enrolling study
+      var sourceKeys = r.sources.map(function(s) { return s.key; });
+      var altEnrolling = r.enrolling.filter(function(e) { return sourceKeys.indexOf(e.key) === -1 || r.enrolling.length > 1; });
+      if (altEnrolling.length > 0 || r.sources.length > 1) {
+        reenrollOps.push({
+          indication: ind.charAt(0).toUpperCase() + ind.slice(1),
+          pool: r.pool, sf: r.sf, comp: r.comp, disc: r.disc,
+          sources: r.sources, enrolling: r.enrolling
+        });
+      }
+    }
+  });
+  reenrollOps.sort(function(a,b) { return b.pool - a.pool; });
+
+  if (reenrollOps.length > 0) {
+    var reenrollTotal = reenrollOps.reduce(function(sum, o) { return sum + o.pool; }, 0);
+    html += '<div style="margin-bottom:14px">'
+      + '<div style="font-size:12px;font-weight:700;color:#059669;margin-bottom:6px">Re-Enrollment Opportunities — ' + reenrollTotal + ' potential candidates</div>'
+      + '<div style="font-size:10px;color:#64748b;margin-bottom:8px">Patients who screen-failed, completed, or discontinued from one study may qualify for another enrolling study in the same therapeutic area. Counts are study-level aggregates (individual patient eligibility requires chart review).</div>';
+    reenrollOps.forEach(function(o) {
+      html += '<div style="padding:8px 10px;margin-bottom:6px;background:#05966908;border-left:3px solid #059669;border-radius:0 6px 6px 0">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">'
+        + '<span style="font-weight:700;font-size:12px;color:#059669">' + esc(o.indication) + '</span>'
+        + '<span style="font-size:10px;color:#64748b">' + o.pool + ' candidates</span></div>';
+
+      // Source studies breakdown
+      html += '<div style="font-size:10px;color:#64748b;margin-bottom:3px">From: ';
+      o.sources.forEach(function(src, i) {
+        if (i > 0) html += ', ';
+        var parts = [];
+        if (src.sf > 0) parts.push(src.sf + ' SF');
+        if (src.comp > 0) parts.push(src.comp + ' completed');
+        if (src.disc > 0) parts.push(src.disc + ' discontinued');
+        var url = 'https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/' + src.key + '/subjects';
+        html += '<a href="' + esc(url) + '" target="_blank" style="color:#1843ad;text-decoration:underline dotted">' + esc(src.study) + '</a> (' + parts.join(', ') + ')';
+      });
+      html += '</div>';
+
+      // Target enrolling studies
+      html += '<div style="font-size:10px;color:#059669;font-weight:600">Could enroll in: ';
+      o.enrolling.forEach(function(e, i) {
+        if (i > 0) html += ', ';
+        var url = 'https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/' + e.key + '/subjects';
+        html += '<a href="' + esc(url) + '" target="_blank" style="color:#059669;text-decoration:underline dotted">' + esc(e.study) + '</a>';
+      });
+      html += '</div></div>';
+    });
+    html += '</div>';
+  }
+
   container.innerHTML = html;
   var badge = document.getElementById('crio-studies-badge');
-  if (badge) badge.textContent = totalActions > 0 ? totalActions + ' action items' : 'Live';
+  var actionCount = totalActions + reenrollOps.length;
+  if (badge) badge.textContent = actionCount > 0 ? actionCount + ' action items' : 'Live';
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -10649,6 +10748,7 @@ document.addEventListener('visibilitychange', function() {
 window.addEventListener('hashchange', function() {
   var hash = location.hash.replace('#', '');
   if (!hash) return;
+  if (hash === 'actions') hash = 'schedule'; // Actions tab removed
   var tab = document.querySelector(".nav-tab[onclick*='" + hash + "']");
   switchTab(hash, tab || null);
 });
@@ -10679,7 +10779,8 @@ async function _crpInit() {
   var _initTab = 'overview';
   if (location.hash) {
     var _hashTab = location.hash.replace('#', '');
-    var _allTabs = ['overview','studies','schedule','actions','referrals','admin','fin-overview','fin-collections','fin-aging','fin-revenue','fin-accruals','insights'];
+    if (_hashTab === 'actions') _hashTab = 'schedule'; // Actions tab removed — redirect to Schedule
+    var _allTabs = ['overview','studies','schedule','referrals','admin','fin-overview','fin-collections','fin-aging','fin-revenue','fin-accruals','insights'];
     if (_allTabs.indexOf(_hashTab) !== -1) _initTab = _hashTab;
   }
   var _initTabEl = document.querySelector(".nav-tab[onclick*='" + _initTab + "']");
@@ -10933,6 +11034,7 @@ async function _crpInit() {
 
     // Phase 3: Supplemental (staggered after finance)
     fetchPatientDB().catch(() => {});
+    fetchCrioStudies().catch(() => {});
     setTimeout(() => {
       if (_referralsLoaded) refreshReferrals().catch(() => {});
       fetchFacebookCRM().catch(() => {});
