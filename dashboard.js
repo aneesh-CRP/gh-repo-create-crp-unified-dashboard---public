@@ -3339,6 +3339,436 @@ function renderInvCapacity() {
   el.innerHTML = html;
 }
 
+// ═══════════════════════════════════════════════════════════════
+// FEATURE: Screen Fail Analysis by Study
+// ═══════════════════════════════════════════════════════════════
+function renderScreenFailAnalysis() {
+  var el = document.getElementById('sf-analysis-container');
+  var badge = document.getElementById('sf-analysis-badge');
+  if (!el || !CRIO_SUBJECTS_DATA || CRIO_SUBJECTS_DATA.length === 0) return;
+
+  var SKIP = {'Config Study':1,'Upload test':1,'EVENT':1,'2025_COVID_FLU_RSV_DETECTION STUDY':1};
+  var crioByKey = {};
+  CRIO_STUDIES_DATA.forEach(function(s) { crioByKey[s.study_key] = s; });
+
+  // Aggregate per study: enrolled, screen_fail, total screened
+  var studyStats = {};
+  CRIO_SUBJECTS_DATA.forEach(function(s) {
+    var cs = crioByKey[s.study_key];
+    if (!cs || SKIP[cs.protocol_number]) return;
+    var isPS = cs.protocol_number.toLowerCase().indexOf('pre-screen') >= 0 || cs.protocol_number === cs.indication;
+    if (isPS) return;
+    if (!studyStats[s.study_key]) studyStats[s.study_key] = { proto: cs.protocol_number, enrolled: 0, sf: 0, disc: 0, completed: 0, total: 0 };
+    var st = studyStats[s.study_key];
+    st.total++;
+    if (s.status === 'ENROLLED') st.enrolled++;
+    else if (s.status === 'SCREEN_FAIL') st.sf++;
+    else if (s.status === 'DISCONTINUED') st.disc++;
+    else if (s.status === 'COMPLETED') st.completed++;
+  });
+
+  // Filter to studies with screen fails, sort by SF count desc
+  var studies = Object.keys(studyStats).map(function(k) { return studyStats[k]; })
+    .filter(function(s) { return s.sf > 0; })
+    .sort(function(a, b) { return b.sf - a.sf; });
+
+  if (studies.length === 0) {
+    el.innerHTML = '<div style="padding:16px;text-align:center;color:#94a3b8;font-size:12px;">No screen fails recorded</div>';
+    return;
+  }
+
+  var totalSF = studies.reduce(function(s, r) { return s + r.sf; }, 0);
+  var totalScreened = studies.reduce(function(s, r) { return s + r.enrolled + r.sf + r.disc + r.completed; }, 0);
+  var overallRate = totalScreened > 0 ? Math.round(totalSF / totalScreened * 100) : 0;
+  if (badge) { badge.textContent = totalSF + ' fails'; badge.style.display = ''; }
+
+  var html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:14px;">';
+  html += '<div style="padding:8px;background:#fef2f2;border-radius:8px;text-align:center;"><div style="font-size:18px;font-weight:800;color:#dc2626;">'+totalSF+'</div><div style="font-size:9px;color:#dc2626;font-weight:600;">Total Screen Fails</div></div>';
+  html += '<div style="padding:8px;background:#eff6ff;border-radius:8px;text-align:center;"><div style="font-size:18px;font-weight:800;color:#3b82f6;">'+totalScreened+'</div><div style="font-size:9px;color:#3b82f6;font-weight:600;">Total Screened</div></div>';
+  var rColor = overallRate > 40 ? '#dc2626' : overallRate > 25 ? '#d97706' : '#059669';
+  html += '<div style="padding:8px;background:#f8fafc;border-radius:8px;text-align:center;"><div style="font-size:18px;font-weight:800;color:'+rColor+';">'+overallRate+'%</div><div style="font-size:9px;color:'+rColor+';font-weight:600;">Overall SF Rate</div></div>';
+  html += '<div style="padding:8px;background:#f0fdf4;border-radius:8px;text-align:center;"><div style="font-size:18px;font-weight:800;color:#059669;">'+studies.length+'</div><div style="font-size:9px;color:#059669;font-weight:600;">Studies w/ Fails</div></div>';
+  html += '</div>';
+
+  html += '<div style="overflow-x:auto;"><table class="fin-table" style="width:100%;font-size:11px;"><thead><tr>';
+  html += '<th style="text-align:left;padding:8px;">Study</th><th style="text-align:center;">Screen Fails</th><th style="text-align:center;">Enrolled</th>';
+  html += '<th style="text-align:center;">Total Screened</th><th style="text-align:center;">SF Rate</th><th style="text-align:center;">SF Share</th>';
+  html += '</tr></thead><tbody>';
+  studies.forEach(function(s) {
+    var screened = s.enrolled + s.sf + s.disc + s.completed;
+    var rate = screened > 0 ? Math.round(s.sf / screened * 100) : 0;
+    var share = totalSF > 0 ? Math.round(s.sf / totalSF * 100) : 0;
+    var rc = rate > 40 ? '#dc2626' : rate > 25 ? '#d97706' : '#059669';
+    html += '<tr><td style="padding:6px 8px;font-weight:600;">'+escapeHTML(s.proto)+'</td>';
+    html += '<td style="text-align:center;color:#dc2626;font-weight:700;">'+s.sf+'</td>';
+    html += '<td style="text-align:center;color:#059669;">'+s.enrolled+'</td>';
+    html += '<td style="text-align:center;">'+screened+'</td>';
+    html += '<td style="text-align:center;color:'+rc+';font-weight:700;">'+rate+'%</td>';
+    html += '<td style="text-align:center;"><div style="display:flex;align-items:center;justify-content:center;gap:4px;"><div style="width:'+Math.max(share,2)+'%;max-width:60px;height:8px;background:#dc2626;border-radius:4px;"></div><span style="font-size:10px;">'+share+'%</span></div></td>';
+    html += '</tr>';
+  });
+  html += '</tbody></table></div>';
+  el.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FEATURE: Revenue KPI in Overview
+// ═══════════════════════════════════════════════════════════════
+function buildRevenueKPI() {
+  var banner = document.getElementById('revenue-kpi-banner');
+  if (!banner || !CRIO_STUDIES_DATA || CRIO_STUDIES_DATA.length === 0) return;
+
+  var totalRevenue = 0, totalEnrolled = 0, revenueStudies = 0;
+  CRIO_STUDIES_DATA.forEach(function(s) {
+    if (s.total_revenue > 0) { totalRevenue += s.total_revenue; revenueStudies++; }
+  });
+  CRIO_SUBJECTS_DATA.forEach(function(s) {
+    if (s.status === 'ENROLLED') totalEnrolled++;
+  });
+
+  var totalLabor = 0;
+  if (typeof QB_DATA !== 'undefined' && QB_DATA.loaded && QB_DATA.studyHoursAll) {
+    Object.values(QB_DATA.studyHoursAll).forEach(function(sh) {
+      if (sh.cost) totalLabor += sh.cost;
+    });
+  }
+
+  var costPerEnrolled = totalEnrolled > 0 ? Math.round(totalLabor / totalEnrolled) : 0;
+  var revPerEnrolled = totalEnrolled > 0 ? Math.round(totalRevenue / totalEnrolled) : 0;
+  var net = totalRevenue - totalLabor;
+  var margin = totalRevenue > 0 ? Math.round(net / totalRevenue * 100) : 0;
+  var marginColor = margin >= 30 ? '#059669' : margin >= 10 ? '#d97706' : '#dc2626';
+
+  var el = function(id) { return document.getElementById(id); };
+  if (el('ov-kpi-revenue')) el('ov-kpi-revenue').textContent = '$' + Math.round(totalRevenue).toLocaleString();
+  if (el('ov-kpi-revenue-sub')) el('ov-kpi-revenue-sub').textContent = revenueStudies + ' studies with revenue data';
+  if (el('ov-kpi-costenroll')) {
+    el('ov-kpi-costenroll').textContent = costPerEnrolled > 0 ? '$' + costPerEnrolled.toLocaleString() : '—';
+    if (costPerEnrolled > 0) el('ov-kpi-costenroll').style.color = costPerEnrolled > 5000 ? '#dc2626' : costPerEnrolled > 2000 ? '#d97706' : '#059669';
+  }
+  if (el('ov-kpi-costenroll-sub')) el('ov-kpi-costenroll-sub').textContent = totalEnrolled + ' enrolled · $' + Math.round(totalLabor).toLocaleString() + ' labor';
+  if (el('ov-kpi-margin')) {
+    el('ov-kpi-margin').textContent = margin + '%';
+    el('ov-kpi-margin').style.color = marginColor;
+  }
+  if (el('ov-kpi-margin-sub')) el('ov-kpi-margin-sub').textContent = (net >= 0 ? '+' : '') + '$' + Math.round(net).toLocaleString() + ' net';
+  if (el('ov-kpi-revenroll')) el('ov-kpi-revenroll').textContent = revPerEnrolled > 0 ? '$' + revPerEnrolled.toLocaleString() : '—';
+
+  if (totalRevenue > 0) banner.style.display = '';
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FEATURE: Investigator Approval Tracker
+// ═══════════════════════════════════════════════════════════════
+function renderPIApprovalTracker() {
+  var el = document.getElementById('pi-approval-container');
+  var badge = document.getElementById('pi-approval-badge');
+  if (!el || !MED_RECORDS_DATA || MED_RECORDS_DATA.length === 0) return;
+
+  var today = new Date();
+  var pending = MED_RECORDS_DATA.filter(function(r) {
+    return r.is_active && r.investigator_approval && r.investigator_approval.indexOf('Confirmed') === -1
+      && r.investigator_approval !== 'Not Applicable' && r.investigator_approval !== '';
+  });
+  var confirmed = MED_RECORDS_DATA.filter(function(r) {
+    return r.investigator_approval && r.investigator_approval.indexOf('Confirmed') !== -1;
+  });
+
+  if (pending.length === 0 && confirmed.length === 0) {
+    el.innerHTML = '<div style="padding:16px;text-align:center;color:#94a3b8;font-size:12px;">No investigator approval data available</div>';
+    return;
+  }
+  if (badge) { badge.textContent = pending.length + ' pending'; badge.style.display = ''; }
+
+  // Group pending by study
+  var byStudy = {};
+  pending.forEach(function(r) {
+    if (!byStudy[r.study]) byStudy[r.study] = [];
+    byStudy[r.study].push(r);
+  });
+
+  var html = '<div style="padding:12px 16px;">';
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:14px;">';
+  html += '<div style="padding:8px;background:#f5f3ff;border-radius:8px;text-align:center;"><div style="font-size:18px;font-weight:800;color:#8b5cf6;">'+confirmed.length+'</div><div style="font-size:9px;color:#8b5cf6;font-weight:600;">Confirmed</div></div>';
+  html += '<div style="padding:8px;background:#fffbeb;border-radius:8px;text-align:center;"><div style="font-size:18px;font-weight:800;color:#d97706;">'+pending.length+'</div><div style="font-size:9px;color:#d97706;font-weight:600;">Pending</div></div>';
+  html += '<div style="padding:8px;background:#eff6ff;border-radius:8px;text-align:center;"><div style="font-size:18px;font-weight:800;color:#3b82f6;">'+Object.keys(byStudy).length+'</div><div style="font-size:9px;color:#3b82f6;font-weight:600;">Studies w/ Pending</div></div>';
+  var totalActive = MED_RECORDS_DATA.filter(function(r){return r.is_active;}).length;
+  var approvalRate = totalActive > 0 ? Math.round(confirmed.length / totalActive * 100) : 0;
+  var arColor = approvalRate >= 70 ? '#059669' : approvalRate >= 40 ? '#d97706' : '#dc2626';
+  html += '<div style="padding:8px;background:#f8fafc;border-radius:8px;text-align:center;"><div style="font-size:18px;font-weight:800;color:'+arColor+';">'+approvalRate+'%</div><div style="font-size:9px;color:'+arColor+';font-weight:600;">Approval Rate</div></div>';
+  html += '</div>';
+
+  if (pending.length > 0) {
+    html += '<div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:8px;">Pending Approvals by Study</div>';
+    html += '<div style="display:grid;gap:6px;">';
+    Object.keys(byStudy).sort(function(a,b){return byStudy[b].length-byStudy[a].length;}).forEach(function(study) {
+      var patients = byStudy[study];
+      var daysWaiting = patients.map(function(p) {
+        return p.date_updated ? Math.floor((today - new Date(p.date_updated)) / 86400000) : 999;
+      });
+      var maxDays = Math.max.apply(null, daysWaiting);
+      var urgColor = maxDays > 14 ? '#dc2626' : maxDays > 7 ? '#d97706' : '#059669';
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:#f8fafc;border-radius:6px;border-left:3px solid '+urgColor+';">';
+      html += '<div><span style="font-weight:700;font-size:11px;">'+escapeHTML(study)+'</span> <span style="font-size:10px;color:#94a3b8;">'+patients.length+' patient'+(patients.length>1?'s':'')+'</span></div>';
+      html += '<div style="font-size:10px;font-weight:700;color:'+urgColor+';">'+maxDays+'d waiting</div>';
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FEATURE: Vendor Performance Comparison
+// ═══════════════════════════════════════════════════════════════
+function renderVendorAnalytics() {
+  var el = document.getElementById('vendor-analytics-container');
+  var badge = document.getElementById('vendor-analytics-badge');
+  if (!el || !CAMPAIGN_DATA || CAMPAIGN_DATA.length === 0) return;
+
+  var vendors = {};
+  CAMPAIGN_DATA.forEach(function(c) {
+    var v = (c.vendor || 'Unknown').trim();
+    if (!v) v = 'Unknown';
+    if (!vendors[v]) vendors[v] = { contacts: 0, referrals: 0, scheduled: 0, campaigns: 0 };
+    vendors[v].contacts += (c.first_contact || 0) + (c.second_contact || 0) + (c.third_contact || 0);
+    vendors[v].referrals += c.new_referrals || 0;
+    vendors[v].scheduled += c.scheduled || 0;
+    vendors[v].campaigns++;
+  });
+
+  var vendorList = Object.keys(vendors).map(function(name) {
+    var v = vendors[name];
+    v.name = name;
+    v.contactToRef = v.contacts > 0 ? Math.round(v.referrals / v.contacts * 100) : 0;
+    v.refToSched = v.referrals > 0 ? Math.round(v.scheduled / v.referrals * 100) : 0;
+    v.contactToSched = v.contacts > 0 ? Math.round(v.scheduled / v.contacts * 100) : 0;
+    return v;
+  }).sort(function(a, b) { return b.contacts - a.contacts; });
+
+  if (vendorList.length === 0) {
+    el.innerHTML = '<div style="text-align:center;padding:16px;color:#94a3b8;font-size:12px;">No vendor data</div>';
+    return;
+  }
+  if (badge) { badge.textContent = vendorList.length + ' vendors'; badge.style.display = ''; }
+
+  var maxContacts = Math.max.apply(null, vendorList.map(function(v){return v.contacts;})) || 1;
+  var html = '<div style="overflow-x:auto;"><table class="fin-table" style="width:100%;font-size:11px;"><thead><tr>';
+  html += '<th style="text-align:left;padding:8px;">Vendor</th><th style="text-align:center;">Campaigns</th>';
+  html += '<th style="text-align:center;">Total Contacts</th><th style="text-align:center;">Referrals</th>';
+  html += '<th style="text-align:center;">Scheduled</th><th style="text-align:center;">Contact→Ref</th>';
+  html += '<th style="text-align:center;">Ref→Sched</th><th style="text-align:center;">Volume</th>';
+  html += '</tr></thead><tbody>';
+  vendorList.forEach(function(v) {
+    var crColor = v.contactToRef >= 10 ? '#059669' : v.contactToRef >= 5 ? '#d97706' : '#dc2626';
+    var rsColor = v.refToSched >= 30 ? '#059669' : v.refToSched >= 15 ? '#d97706' : '#dc2626';
+    var barPct = Math.round(v.contacts / maxContacts * 100);
+    html += '<tr><td style="padding:6px 8px;font-weight:700;"><span style="padding:2px 8px;border-radius:4px;background:#e8eeff;color:#1843ad;">'+escapeHTML(v.name)+'</span></td>';
+    html += '<td style="text-align:center;">'+v.campaigns+'</td>';
+    html += '<td style="text-align:center;font-weight:700;">'+v.contacts.toLocaleString()+'</td>';
+    html += '<td style="text-align:center;color:#059669;font-weight:700;">'+v.referrals+'</td>';
+    html += '<td style="text-align:center;color:#8b5cf6;font-weight:700;">'+v.scheduled+'</td>';
+    html += '<td style="text-align:center;color:'+crColor+';font-weight:700;">'+v.contactToRef+'%</td>';
+    html += '<td style="text-align:center;color:'+rsColor+';font-weight:700;">'+v.refToSched+'%</td>';
+    html += '<td style="text-align:center;"><div style="background:#e2e8f0;border-radius:4px;height:8px;overflow:hidden;width:60px;display:inline-block;"><div style="height:100%;width:'+barPct+'%;background:#3b82f6;border-radius:4px;"></div></div></td>';
+    html += '</tr>';
+  });
+  html += '</tbody></table></div>';
+  el.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FEATURE: Contact Sequence Effectiveness
+// ═══════════════════════════════════════════════════════════════
+function renderContactSequence() {
+  var el = document.getElementById('contact-sequence-container');
+  if (!el || !CAMPAIGN_DATA || CAMPAIGN_DATA.length === 0) return;
+
+  var total1 = 0, total2 = 0, total3 = 0, totalRef = 0, totalSched = 0;
+  CAMPAIGN_DATA.forEach(function(c) {
+    total1 += c.first_contact || 0;
+    total2 += c.second_contact || 0;
+    total3 += c.third_contact || 0;
+    totalRef += c.new_referrals || 0;
+    totalSched += c.scheduled || 0;
+  });
+  var totalContacts = total1 + total2 + total3;
+  if (totalContacts === 0) {
+    el.innerHTML = '<div style="text-align:center;padding:16px;color:#94a3b8;font-size:12px;">No contact data</div>';
+    return;
+  }
+
+  var steps = [
+    { label: '1st Contact', count: total1, color: '#3b82f6' },
+    { label: '2nd Contact', count: total2, color: '#8b5cf6' },
+    { label: '3rd Contact', count: total3, color: '#ec4899' },
+    { label: 'Referrals', count: totalRef, color: '#059669' },
+    { label: 'Scheduled', count: totalSched, color: '#d97706' }
+  ];
+  var maxCount = Math.max.apply(null, steps.map(function(s){return s.count;})) || 1;
+
+  var html = '<div style="display:grid;gap:8px;">';
+  steps.forEach(function(step, i) {
+    var pct = Math.max(Math.round(step.count / maxCount * 100), 3);
+    var dropoff = i > 0 && steps[i-1].count > 0 ? Math.round((1 - step.count / steps[i-1].count) * 100) : 0;
+    html += '<div style="display:grid;grid-template-columns:100px 1fr 50px 60px;align-items:center;gap:8px;">';
+    html += '<div style="font-size:11px;font-weight:600;color:#475569;text-align:right;">'+step.label+'</div>';
+    html += '<div style="background:#f1f5f9;border-radius:4px;height:28px;overflow:hidden;position:relative;">';
+    html += '<div style="width:'+pct+'%;background:'+step.color+';height:100%;border-radius:4px;display:flex;align-items:center;justify-content:center;">';
+    html += '<span style="font-size:11px;font-weight:700;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.3);">'+step.count.toLocaleString()+'</span>';
+    html += '</div></div>';
+    html += '<div style="font-size:10px;font-weight:700;color:#94a3b8;text-align:center;">'+(i === 0 ? '—' : '-'+dropoff+'%')+'</div>';
+    html += '<div style="font-size:9px;color:#94a3b8;text-align:center;">'+(totalContacts > 0 && i < 3 ? Math.round(step.count/totalContacts*100)+'% of total' : i >= 3 && total1 > 0 ? Math.round(step.count/total1*100)+'% conv' : '')+'</div>';
+    html += '</div>';
+  });
+  html += '</div>';
+
+  // Summary insight
+  var contactToRef = totalContacts > 0 ? (totalRef / totalContacts * 100).toFixed(1) : 0;
+  var refToSched = totalRef > 0 ? (totalSched / totalRef * 100).toFixed(1) : 0;
+  html += '<div style="margin-top:12px;padding:8px 12px;background:#f0fdf4;border-radius:6px;font-size:11px;color:#059669;">';
+  html += '<strong>Funnel:</strong> '+totalContacts.toLocaleString()+' contacts → '+totalRef+' referrals ('+contactToRef+'%) → '+totalSched+' scheduled ('+refToSched+'% of referrals)';
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FEATURE: Referral-to-Enrollment Conversion by Source
+// ═══════════════════════════════════════════════════════════════
+function renderRefConversion() {
+  var el = document.getElementById('ref-conversion-container');
+  var badge = document.getElementById('ref-conversion-badge');
+  if (!el || !REFERRAL_DATA || REFERRAL_DATA.length === 0) return;
+
+  var CU = CRP_CONFIG.CLICKUP || {};
+  var SG = CU.STAGE_GROUPS || {};
+
+  // Group referrals by source
+  var sources = {};
+  REFERRAL_DATA.forEach(function(r) {
+    var src = r.source || r.tracker || 'Unknown';
+    if (!sources[src]) sources[src] = { total: 0, newLead: 0, contacted: 0, screening: 0, enrolled: 0, closed: 0, lost: 0 };
+    var s = sources[src];
+    s.total++;
+    if (r.stage === 'New Lead') s.newLead++;
+    else if (r.stage === 'Contacted') s.contacted++;
+    else if (SG.SCREENING && SG.SCREENING.has(r.stage)) s.screening++;
+    else if (SG.ENROLLED && SG.ENROLLED.has(r.stage)) s.enrolled++;
+    if (r.is_closed) s.closed++;
+    if (r.stage === 'Lost' || r.stage === 'DNQ' || r.stage === 'Screen Fail') s.lost++;
+  });
+
+  var sourceList = Object.keys(sources).map(function(name) {
+    var s = sources[name];
+    s.name = name;
+    s.convRate = s.total > 0 ? Math.round(s.enrolled / s.total * 100) : 0;
+    s.screenRate = s.total > 0 ? Math.round(s.screening / s.total * 100) : 0;
+    s.lostRate = s.total > 0 ? Math.round(s.lost / s.total * 100) : 0;
+    return s;
+  }).sort(function(a, b) { return b.total - a.total; });
+
+  if (sourceList.length === 0) return;
+  if (badge) { badge.textContent = sourceList.length + ' sources'; badge.style.display = ''; }
+
+  // Cross-ref with med records if available
+  var mrBySource = {};
+  if (MED_RECORDS_DATA && MED_RECORDS_DATA.length > 0) {
+    REFERRAL_DATA.forEach(function(r) {
+      var src = r.source || r.tracker || 'Unknown';
+      if (!mrBySource[src]) mrBySource[src] = 0;
+      var patName = (r.name || '').toLowerCase().trim();
+      if (patName) {
+        var match = MED_RECORDS_DATA.some(function(mr) { return (mr.name || '').toLowerCase().trim() === patName; });
+        if (match) mrBySource[src]++;
+      }
+    });
+  }
+
+  var html = '<div style="overflow-x:auto;"><table class="fin-table" style="width:100%;font-size:11px;"><thead><tr>';
+  html += '<th style="text-align:left;padding:8px;">Source</th><th style="text-align:center;">Total</th>';
+  html += '<th style="text-align:center;">New</th><th style="text-align:center;">Contacted</th>';
+  html += '<th style="text-align:center;">Screening</th><th style="text-align:center;">Enrolled</th>';
+  html += '<th style="text-align:center;">Conv %</th><th style="text-align:center;">Lost %</th>';
+  if (MED_RECORDS_DATA && MED_RECORDS_DATA.length > 0) html += '<th style="text-align:center;">In Med Rec</th>';
+  html += '</tr></thead><tbody>';
+  sourceList.forEach(function(s) {
+    var crColor = s.convRate >= 15 ? '#059669' : s.convRate >= 5 ? '#d97706' : '#dc2626';
+    var lrColor = s.lostRate > 50 ? '#dc2626' : s.lostRate > 30 ? '#d97706' : '#059669';
+    html += '<tr><td style="padding:6px 8px;font-weight:600;">'+escapeHTML(s.name)+'</td>';
+    html += '<td style="text-align:center;font-weight:700;">'+s.total+'</td>';
+    html += '<td style="text-align:center;color:#3b82f6;">'+s.newLead+'</td>';
+    html += '<td style="text-align:center;color:#8b5cf6;">'+s.contacted+'</td>';
+    html += '<td style="text-align:center;color:#d97706;">'+s.screening+'</td>';
+    html += '<td style="text-align:center;color:#059669;font-weight:700;">'+s.enrolled+'</td>';
+    html += '<td style="text-align:center;color:'+crColor+';font-weight:700;">'+s.convRate+'%</td>';
+    html += '<td style="text-align:center;color:'+lrColor+';">'+s.lostRate+'%</td>';
+    if (MED_RECORDS_DATA && MED_RECORDS_DATA.length > 0) {
+      var mr = mrBySource[s.name] || 0;
+      html += '<td style="text-align:center;color:#3b82f6;">'+mr+'</td>';
+    }
+    html += '</tr>';
+  });
+  html += '</tbody></table></div>';
+  el.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FEATURE: Medical Records Portal Filter
+// ═══════════════════════════════════════════════════════════════
+function renderMedRecPortalFilter() {
+  var container = document.getElementById('medrec-alerts-content');
+  if (!container || !MED_RECORDS_DATA || MED_RECORDS_DATA.length === 0) return;
+
+  // Count by portal
+  var portals = {};
+  MED_RECORDS_DATA.forEach(function(r) {
+    if (!r.is_active) return;
+    var p = (r.records_portal || '').trim();
+    if (!p) p = 'Not Set';
+    portals[p] = (portals[p] || 0) + 1;
+  });
+
+  var portalList = Object.keys(portals).sort(function(a,b){ return portals[b]-portals[a]; });
+  if (portalList.length <= 1) return; // Only "Not Set" — no useful filter
+
+  // Insert filter buttons at top of container (after existing content)
+  var existingFilter = container.querySelector('.medrec-portal-filter');
+  if (existingFilter) existingFilter.remove();
+
+  var filterDiv = document.createElement('div');
+  filterDiv.className = 'medrec-portal-filter';
+  filterDiv.style.cssText = 'padding:8px 16px;border-bottom:1px solid #e2e8f0;display:flex;gap:6px;flex-wrap:wrap;align-items:center;';
+  var label = '<span style="font-size:10px;font-weight:600;color:#94a3b8;margin-right:4px;">Portal:</span>';
+  var buttons = '<button onclick="filterMedRecByPortal(\'all\')" style="font-size:10px;padding:3px 8px;border-radius:4px;border:1px solid #e2e8f0;background:#1843AD;color:white;cursor:pointer;font-weight:600;">All</button>';
+  portalList.forEach(function(p) {
+    buttons += '<button onclick="filterMedRecByPortal(\''+p.replace(/'/g,"\\'")+'\')" style="font-size:10px;padding:3px 8px;border-radius:4px;border:1px solid #e2e8f0;background:white;cursor:pointer;">'+escapeHTML(p)+' ('+portals[p]+')</button>';
+  });
+  filterDiv.innerHTML = label + buttons;
+  container.insertBefore(filterDiv, container.firstChild);
+}
+
+function filterMedRecByPortal(portal) {
+  var container = document.getElementById('medrec-alerts-content');
+  if (!container) return;
+  // Update button styles
+  var btns = container.querySelectorAll('.medrec-portal-filter button');
+  btns.forEach(function(b) {
+    b.style.background = 'white';
+    b.style.color = '#475569';
+    b.style.fontWeight = '400';
+  });
+  var clicked = Array.from(btns).find(function(b) {
+    return (portal === 'all' && b.textContent === 'All') || b.textContent.indexOf(portal) === 0;
+  });
+  if (clicked) { clicked.style.background = '#1843AD'; clicked.style.color = 'white'; clicked.style.fontWeight = '600'; }
+
+  // Show/hide med record rows based on portal
+  // Since med rec content is rebuilt dynamically, we store the filter and re-render
+  window._medRecPortalFilter = portal === 'all' ? null : portal;
+  if (typeof buildMedRecAlerts === 'function') buildMedRecAlerts();
+}
+
 function toggleCoordDayDetail(coordName, date, el) {
   const card = el.closest('.coord-day-detail')?.parentElement || el.closest('[style*="background:#F9FAFB"]');
   if (!card) return;
@@ -4700,6 +5130,7 @@ function renderCRIOvsQB() {
   renderStaffEconomics();
   safe(renderStudyProfitability, 'renderStudyProfitability');
   safe(renderSitePnL, 'renderSitePnL');
+  safe(buildRevenueKPI, 'buildRevenueKPI');
 }
 
 function renderStaffEconomics() {
@@ -7483,6 +7914,8 @@ function renderAll() {
   safe(buildRecruitmentKPIs, 'buildRecruitmentKPIs');
   safe(buildPatientPipelineBySite, 'buildPatientPipelineBySite');
   safe(buildMedRecAlerts,    'buildMedRecAlerts');
+  safe(renderPIApprovalTracker, 'renderPIApprovalTracker');
+  safe(renderMedRecPortalFilter, 'renderMedRecPortalFilter');
   // Note: buildRiskTable/buildStudyCards removed — Studies tab now uses buildStudiesView (lazy-loaded on tab click)
   if (typeof buildRiskFlagCards === 'function')     safe(buildRiskFlagCards,     'buildRiskFlagCards');
   // Pre-build schedule so it's ready when tab is clicked
@@ -8579,6 +9012,10 @@ function renderReferralDashboard() {
 
   // Render cross-source patient journey funnel
   buildPatientJourneyFunnel();
+  // Render new analytics sections
+  safe(renderVendorAnalytics, 'renderVendorAnalytics');
+  safe(renderContactSequence, 'renderContactSequence');
+  safe(renderRefConversion, 'renderRefConversion');
 }
 
 function showJourneyFunnelDetail(key) {
@@ -9169,6 +9606,8 @@ async function fetchCrioStudies() {
           safe(renderCrioStudies, 'renderCrioStudies');
           safe(mergeCrioIntoStudies, 'mergeCrioIntoStudies');
           safe(buildEnrollmentKPIs, 'buildEnrollmentKPIs');
+          safe(buildRevenueKPI, 'buildRevenueKPI');
+          safe(renderScreenFailAnalysis, 'renderScreenFailAnalysis');
           safe(buildSchedulingGapAlerts, 'buildSchedulingGapAlerts');
         }
       } catch(e) {
@@ -9919,23 +10358,76 @@ function buildEnrollmentKPIs() {
     }
   }
   var elScr = document.getElementById('ov-kpi-screening');
-  if (elScr) elScr.textContent = screening + (scheduledV1 > 0 ? ' + ' + scheduledV1 + ' V1' : '');
+  if (elScr) {
+    elScr.textContent = screening + (scheduledV1 > 0 ? ' + ' + scheduledV1 + ' V1' : '');
+    elScr.style.cursor = 'pointer';
+    elScr.onclick = function(){ showCrioSubjectModal('SCREENING', 'In Screening Subjects'); };
+  }
 
   var elWB = document.getElementById('ov-kpi-winback');
-  if (elWB) elWB.textContent = noshow;
+  if (elWB) {
+    elWB.textContent = noshow;
+    elWB.style.cursor = 'pointer';
+    elWB.onclick = function(){ showCrioSubjectModal('SCHEDULED_V1_NO_SHOW_CANCELLED', 'V1 No-Show / Cancelled — Win-Back Opportunities'); };
+  }
 
   var elPQ = document.getElementById('ov-kpi-prequalified');
-  if (elPQ) elPQ.textContent = prequalified;
+  if (elPQ) {
+    elPQ.textContent = prequalified;
+    elPQ.style.cursor = 'pointer';
+    elPQ.onclick = function(){ showCrioSubjectModal('PREQUALIFIED', 'Pre-Qualified Subjects Awaiting Outreach'); };
+  }
 
   var elSF = document.getElementById('ov-kpi-sfrate');
   var elSFSub = document.getElementById('ov-kpi-sfrate-sub');
   if (elSF) {
     elSF.textContent = sfRate + '%';
     elSF.style.color = sfColor;
+    elSF.style.cursor = 'pointer';
+    elSF.onclick = function(){ showCrioSubjectModal('SCREEN_FAIL', 'Screen Fail Subjects by Study'); };
   }
   if (elSFSub) elSFSub.textContent = screenFail + ' of ' + screened + ' screened';
 
   banner.style.display = '';
+}
+
+// ══════════════════════════════════════════════════════════════
+// CRIO Subject Detail Modal — drill down from KPI numbers
+// ══════════════════════════════════════════════════════════════
+function showCrioSubjectModal(statusFilter, title) {
+  if (!CRIO_SUBJECTS_DATA || CRIO_SUBJECTS_DATA.length === 0) return;
+  var crioByKey = {};
+  CRIO_STUDIES_DATA.forEach(function(s) { crioByKey[s.study_key] = s; });
+
+  var subjects = CRIO_SUBJECTS_DATA.filter(function(s) {
+    return s.status === statusFilter;
+  });
+
+  // Group by study
+  var byStudy = {};
+  subjects.forEach(function(s) {
+    var cs = crioByKey[s.study_key];
+    var proto = cs ? cs.protocol_number : s.study_key;
+    if (!byStudy[proto]) byStudy[proto] = { count: 0, indication: cs ? cs.indication : '', coordinator: cs ? cs.coordinator : '' };
+    byStudy[proto].count++;
+  });
+
+  var html = '<div style="max-height:60vh;overflow-y:auto;padding:16px;">';
+  html += '<div style="margin-bottom:12px;font-size:12px;color:#64748b;">'+subjects.length+' subjects with status: <strong>'+escapeHTML(statusFilter)+'</strong></div>';
+  html += '<table class="fin-table" style="width:100%;font-size:11px;"><thead><tr>';
+  html += '<th style="text-align:left;padding:8px;">Study</th><th style="text-align:center;">Count</th>';
+  html += '<th style="text-align:left;">Indication</th><th style="text-align:left;">Coordinator</th>';
+  html += '</tr></thead><tbody>';
+  Object.keys(byStudy).sort(function(a,b){return byStudy[b].count-byStudy[a].count;}).forEach(function(proto) {
+    var s = byStudy[proto];
+    html += '<tr><td style="padding:6px 8px;font-weight:600;">'+escapeHTML(proto)+'</td>';
+    html += '<td style="text-align:center;font-weight:700;color:#1843AD;">'+s.count+'</td>';
+    html += '<td style="font-size:10px;">'+escapeHTML(s.indication)+'</td>';
+    html += '<td style="font-size:10px;">'+escapeHTML(s.coordinator)+'</td></tr>';
+  });
+  html += '</tbody></table></div>';
+
+  openModal(title || 'CRIO Subjects', html);
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -11485,6 +11977,35 @@ function exportCSV() {
   URL.revokeObjectURL(url);
   if (typeof logAudit === 'function') logAudit('export', 'CSV: ' + viewName);
   showToast('CSV exported successfully', 'success');
+}
+
+// Export a specific table by finding it inside a container element
+function exportTableById(containerId, filename) {
+  var container = document.getElementById(containerId);
+  if (!container) { showToast('No container found', 'warning'); return; }
+  var table = container.querySelector('table');
+  if (!table) { showToast('No table found to export', 'warning'); return; }
+  var rows = [];
+  table.querySelectorAll('tr').forEach(function(tr) {
+    var row = [];
+    tr.querySelectorAll('th, td').forEach(function(cell) {
+      var val = cell.textContent.trim().replace(/"/g, '""');
+      row.push('"' + val + '"');
+    });
+    rows.push(row.join(','));
+  });
+  var csv = rows.join('\n');
+  var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = (filename || 'crp-export') + '-' + new Date().toISOString().slice(0,10) + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  if (typeof logAudit === 'function') logAudit('export', 'CSV: ' + (filename || containerId));
+  showToast('CSV exported: ' + (filename || containerId), 'success');
 }
 
 // Inject export bar into each view header on first render
