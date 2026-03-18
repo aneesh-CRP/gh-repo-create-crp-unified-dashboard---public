@@ -2475,7 +2475,7 @@ const CRP_CONFIG = {
   MASTER_SHEET_ID: '1LZWJeJE9EJqe1Th13sSazrWOI5k8I56mbZPieAHqoyo',
 
   // Coordinator visit goals
-  COORDINATORS: ['Mario Castellanos','Stacey Scott','Ruby Pereira','Cady Chilensky','Angelina McMullen'],
+  COORDINATORS: ['Mario Castellanos','Stacey Scott','Ruby Pereira','Cady Chilensky','Angelina McMullen','Ema Gunic','Vlado Draganic','Gabrijela Ateljevic','Ana Lambic','Jana Milankovic'],
   INVESTIGATORS: ['Taher Modarressi','Eugene Andruczyk','Lolita Vaughan','Michael Tomeo','Joseph Heether','Brian Shaffer'],
   // Default PI for each study (fallback when audit log doesn't resolve investigator)
   STUDY_INVESTIGATORS: {
@@ -2504,8 +2504,8 @@ const CRP_CONFIG = {
 
   // Sites
   SITES: {
-    PHL: { name: 'Philadelphia, PA', coordinators: ['Stacey Scott', 'Ruby Pereira', 'Mario Castellanos'] },
-    PNJ: { name: 'Pennington, NJ', coordinators: ['Angelina McMullen', 'Cady Chilensky'] },
+    PHL: { name: 'Philadelphia, PA', coordinators: ['Stacey Scott', 'Ruby Pereira', 'Mario Castellanos', 'Ana Lambic', 'Jana Milankovic'] },
+    PNJ: { name: 'Pennington, NJ', coordinators: ['Angelina McMullen', 'Cady Chilensky', 'Ema Gunic', 'Vlado Draganic', 'Gabrijela Ateljevic'] },
   },
 
   // CRIO Study Keys for Pennington site — add new Pennington studies here
@@ -4349,7 +4349,7 @@ function buildVisitTypeChart() {
 function buildSchedCoordList() {
   const el = document.getElementById('sched-coord-list');
   if (!el || el.innerHTML.trim()) return; // already populated statically
-  const VALID = new Set(['Stacey Scott','Ruby Pereira','Mario Castellanos','Angelina McMullen','Cady Chilensky']);
+  const VALID = new Set(CRP_CONFIG.COORDINATORS || []);
   const coords = (DATA.coordinators || []).filter(c => VALID.has(c.name));
   const max = Math.max(...coords.map(c => c.upcoming), 1);
   el.innerHTML = coords.map(c => {
@@ -4990,10 +4990,8 @@ function buildCancelStudyBars() {
 function buildCoordList() {
   const el = document.getElementById('sched-coord-list') || document.getElementById('coord-list');
   if (!el) return;
-  const coords = (DATA.coordinators||[]).filter(c =>
-    ['stacey scott','ruby pereira','mario castellanos','angelina mcmullen','cady chilensky']
-      .includes((c.name||'').toLowerCase())
-  );
+  const VALID2 = new Set(CRP_CONFIG.COORDINATORS || []);
+  const coords = (DATA.coordinators||[]).filter(c => VALID2.has(c.name));
   if (!coords.length) { el.innerHTML = '<p style="color:#94a3b8;font-size:12px">No coordinator data</p>'; return; }
   const maxUp = Math.max(...coords.map(c => c.upcoming || 0), 1);
   const siteColors = { 'Philadelphia, PA': '#072061', 'Pennington, NJ': '#1843ad' };
