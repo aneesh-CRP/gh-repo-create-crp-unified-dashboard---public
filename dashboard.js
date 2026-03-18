@@ -2159,10 +2159,6 @@ function buildRiskFlagCards() {
 
 // buildWeeklyBySiteChart removed — canvas element no longer exists
 
-function buildSchedCoordList() {
-  // Merged into renderCoordWorkloadBalance — no-op
-}
-
 // ── Dynamically build schedule table from live CRIO data ──
 function buildScheduleTable() {
   var tbody = document.getElementById('upcoming-tbody');
@@ -2761,14 +2757,6 @@ function buildCancelStudyBars() {
   }).join('');
 }
 
-function buildCoordList() {
-  // Merged into renderCoordWorkloadBalance — no-op (target elements removed)
-}
-
-function buildInvestigatorList() {
-  // Merged into renderInvCapacity — no-op
-}
-
 function showInvDetail(invName) {
   const upcoming = (DATA.allVisitDetail||[]).filter(r => r.investigator === invName);
   let body = '';
@@ -3167,7 +3155,14 @@ function renderInvCapacity() {
     var avgPerDay = dayCount > 0 ? (iv.length / dayCount).toFixed(1) : '0';
     var sched = schedules[name] || {};
     var availDays = sched.daysPerWeek || 5;
-    var utilPct = dayCount > 0 && availDays > 0 ? Math.min(100, Math.round(dayCount / (availDays * 2) * 100)) : 0;
+    // Calculate actual weeks spanned by visit data for utilization
+    var allDates = visits.map(function(v){return v.date_iso;}).filter(Boolean).sort();
+    var dataWeeks = 2; // fallback
+    if (allDates.length >= 2) {
+      var spanMs = new Date(allDates[allDates.length-1]) - new Date(allDates[0]);
+      dataWeeks = Math.max(1, Math.round(spanMs / 604800000)); // 7 days in ms
+    }
+    var utilPct = dayCount > 0 && availDays > 0 ? Math.min(100, Math.round(dayCount / (availDays * dataWeeks) * 100)) : 0;
     var studies = {};
     iv.forEach(function(v){studies[v.study]=1;});
     var costPerVisit = 0;
@@ -3817,7 +3812,6 @@ function switchView(name, el) {
       safe(buildScheduleTable,       'buildSched');
       safe(buildRiskFlagCards,       'riskCards');
       safe(buildSchedStudyBars,      'schedBars');
-      safe(buildSchedCoordList,      'schedCoord');
       safe(renderCoordTrendChart,    'coordTrend');
       safe(hidePastVisits,           'hidePast');
       safe(injectVisitConfirmButtons,'confirmBtns');
@@ -7007,8 +7001,6 @@ function renderAll() {
   safe(buildReasonChart,     'buildReasonChart');
   safe(buildSiteChart,       'buildSiteChart');
   safe(buildCancelStudyBars, 'buildCancelStudyBars');
-  safe(buildCoordList,       'buildCoordList');
-  safe(buildInvestigatorList, 'buildInvestigatorList');
   safe(renderCoordinatorGoals, 'renderCoordinatorGoals');
   safe(renderCoordWorkloadBalance, 'renderCoordWorkloadBalance');
   safe(renderInvCapacity, 'renderInvCapacity');
@@ -7024,13 +7016,13 @@ function renderAll() {
   // Pre-build schedule so it's ready when tab is clicked
   safe(buildScheduleTable,       'buildScheduleTable');
   safe(buildSchedStudyBars,      'buildSchedStudyBars');
-  safe(buildSchedCoordList,      'buildSchedCoordList');
   safe(backfillInvestigators, 'backfillInvestigators');
   safe(hidePastVisits, 'hidePastVisits');
   safe(injectVisitConfirmButtons, 'injectVisitConfirmButtons');
   if (MED_RECORDS_DATA && MED_RECORDS_DATA.length > 0) safe(injectScheduleMedRecords, 'injectScheduleMedRecords');
   safe(() => filterSchedTable('all', null), 'schedFilter');
   safe(renderTrendsCharts,       'renderTrendsCharts');
+  safe(renderCoordTrendChart,    'renderCoordTrendChart');
 }
 
 function closeSetup() {
