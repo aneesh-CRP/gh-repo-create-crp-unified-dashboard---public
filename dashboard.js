@@ -7923,6 +7923,8 @@ async function refreshReferrals() {
       });
     }
     if (badge) badge.textContent = `✅ ${REFERRAL_DATA.length} referrals · ${new Date().toLocaleTimeString()}`;
+    setHealthChip('dh-referrals', REFERRAL_DATA.length > 0 ? 'ok' : 'warn', 'Referrals (' + REFERRAL_DATA.length + ')');
+    setHealthChip('dh-campaigns', CAMPAIGN_DATA.length > 0 ? 'ok' : 'warn', 'Campaigns (' + CAMPAIGN_DATA.length + ')');
     _log(`CRP Referrals: Loaded ${REFERRAL_DATA.length} referrals, ${CAMPAIGN_DATA.length} campaigns from Google Sheets`);
 
     renderReferralDashboard();
@@ -7940,6 +7942,8 @@ async function refreshReferrals() {
   } catch(e) {
     console.error('CRP Referrals: CSV fetch failed', e);
     if (badge) badge.textContent = '❌ Fetch failed';
+    setHealthChip('dh-referrals', 'fail', 'Referrals (failed)');
+    setHealthChip('dh-campaigns', 'fail', 'Campaigns (failed)');
   }
 }
 
@@ -8746,11 +8750,13 @@ async function fetchMedicalRecords(attempt) {
     });
     if (_mrUnknown > 0) console.warn('MedRecords: ' + _mrUnknown + ' patients still have no study assignment — update in ClickUp');
     console.log('MedRecords loaded:', MED_RECORDS_DATA.length, 'patients');
+    setHealthChip('dh-medrec', MED_RECORDS_DATA.length > 0 ? 'ok' : 'warn', 'Med Records (' + MED_RECORDS_DATA.length + ')');
     safe(renderMedicalRecords, 'renderMedicalRecords');
     safe(buildMedRecAlerts, 'buildMedRecAlerts');
     safe(injectScheduleMedRecords, 'injectScheduleMedRecords');
   } catch(e) {
     console.warn('fetchMedicalRecords error (attempt ' + attempt + '):', e);
+    if (attempt >= 3) setHealthChip('dh-medrec', 'fail', 'Med Records (failed)');
     // Retry up to 3 times with increasing delay (Google Sheets rate limiting)
     if (attempt < 3) {
       var delay = attempt * 3000;
@@ -8795,12 +8801,14 @@ async function fetchCrioStudies() {
           };
         });
         console.log('CRIO Studies loaded:', CRIO_STUDIES_DATA.length);
+        setHealthChip('dh-crio-api', CRIO_STUDIES_DATA.length > 0 ? 'ok' : 'warn', 'CRIO Studies (' + CRIO_STUDIES_DATA.length + ')');
         safe(renderCrioStudies, 'renderCrioStudies');
         safe(mergeCrioIntoStudies, 'mergeCrioIntoStudies');
         safe(buildSchedulingGapAlerts, 'buildSchedulingGapAlerts');
       }
     } catch(e) {
       console.warn('fetchCrioStudies error:', e);
+      setHealthChip('dh-crio-api', 'fail', 'CRIO Studies (failed)');
     }
     // Also fetch subjects if URL is configured
     if (subjectsUrl) {
@@ -8825,6 +8833,7 @@ async function fetchCrioStudies() {
             };
           });
           console.log('CRIO Subjects loaded:', CRIO_SUBJECTS_DATA.length);
+          setHealthChip('dh-crio-subjects', CRIO_SUBJECTS_DATA.length > 0 ? 'ok' : 'warn', 'CRIO Subjects (' + CRIO_SUBJECTS_DATA.length + ')');
           safe(renderCrioStudies, 'renderCrioStudies');
           safe(mergeCrioIntoStudies, 'mergeCrioIntoStudies');
           safe(buildEnrollmentKPIs, 'buildEnrollmentKPIs');
@@ -8832,6 +8841,7 @@ async function fetchCrioStudies() {
         }
       } catch(e) {
         console.warn('fetchCrioSubjects error:', e);
+        setHealthChip('dh-crio-subjects', 'fail', 'CRIO Subjects (failed)');
       }
     }
   } finally {
