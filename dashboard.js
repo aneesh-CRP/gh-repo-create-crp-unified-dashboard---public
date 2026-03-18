@@ -7209,78 +7209,66 @@ function buildMedRecAlerts() {
     </div>
   </div>`;
 
-  // ── SLA Tracking & Patient Journey Duration ──
+  // ── SLA Tracking: uses next_appointment (date) + retrieval_deadline (text category) ──
   const today = new Date();
-  const _slaOverdue = [], _slaAtRisk = [], _slaMet = [];
-  MED_RECORDS_DATA.filter(r => r.is_active && r.retrieval_deadline).forEach(r => {
-    const deadline = new Date(r.retrieval_deadline);
-    if (isNaN(deadline.getTime())) return;
-    const daysLeft = Math.floor((deadline - today) / 86400000);
-    const entry = { name: r.name, study: r.study, daysLeft: daysLeft, deadline: r.retrieval_deadline, url: r.url };
-    if (daysLeft < 0) _slaOverdue.push(entry);
-    else if (daysLeft <= 7) _slaAtRisk.push(entry);
-    else _slaMet.push(entry);
+  // Appointment-based SLA: patients with upcoming appointments and pending records
+  const _apptOverdue = [], _apptSoon = [];
+  MED_RECORDS_DATA.filter(r => r.is_active && r.next_appointment && r.records_received !== 'Received').forEach(r => {
+    const appt = new Date(r.next_appointment);
+    if (isNaN(appt.getTime())) return;
+    const daysUntil = Math.floor((appt - today) / 86400000);
+    const entry = { name: r.name, study: r.study, daysLeft: daysUntil, appt: r.next_appointment, records: r.records_received || 'Not Set', assignee: r.assignee };
+    if (daysUntil < 0) _apptOverdue.push(entry);
+    else if (daysUntil <= 14) _apptSoon.push(entry);
   });
-  const totalWithDeadline = _slaOverdue.length + _slaAtRisk.length + _slaMet.length;
-  const slaPct = totalWithDeadline > 0 ? Math.round((_slaMet.length + _slaAtRisk.length) / totalWithDeadline * 100) : 0;
-  const avgDaysLeft = totalWithDeadline > 0 ? Math.round((_slaOverdue.concat(_slaAtRisk, _slaMet).reduce((s,e)=>s+e.daysLeft,0)) / totalWithDeadline) : 0;
-
-  // Journey durations
-  const durations = [];
-  MED_RECORDS_DATA.forEach(r => {
-    if (!r.pre_screening_date && !r.screening_date) return;
-    const ps = r.pre_screening_date ? new Date(r.pre_screening_date) : null;
-    const sc = r.screening_date ? new Date(r.screening_date) : null;
-    const rand = r.randomization_date ? new Date(r.randomization_date) : null;
-    const created = r.date_created ? new Date(r.date_created) : null;
-    durations.push({
-      name: r.name, study: r.study,
-      createdToPrescreen: ps && created && !isNaN(ps) && !isNaN(created) ? Math.floor((ps - created) / 86400000) : null,
-      prescreenToScreen: ps && sc && !isNaN(ps) && !isNaN(sc) ? Math.floor((sc - ps) / 86400000) : null,
-      screenToRand: sc && rand && !isNaN(sc) && !isNaN(rand) ? Math.floor((rand - sc) / 86400000) : null,
-    });
+  // Retrieval deadline text categories
+  const _deadlineCats = {};
+  const activeWithDeadline = MED_RECORDS_DATA.filter(r => r.is_active && r.retrieval_deadline);
+  activeWithDeadline.forEach(r => {
+    const dl = (r.retrieval_deadline || '').trim();
+    if (!dl) return;
+    _deadlineCats[dl] = (_deadlineCats[dl] || 0) + 1;
   });
-  const avgPS = durations.filter(d => d.prescreenToScreen !== null && d.prescreenToScreen >= 0);
-  const avgSR = durations.filter(d => d.screenToRand !== null && d.screenToRand >= 0);
-  const avgCP = durations.filter(d => d.createdToPrescreen !== null && d.createdToPrescreen >= 0);
-  const meanPS = avgPS.length > 0 ? Math.round(avgPS.reduce((s,d)=>s+d.prescreenToScreen,0)/avgPS.length) : 0;
-  const meanSR = avgSR.length > 0 ? Math.round(avgSR.reduce((s,d)=>s+d.screenToRand,0)/avgSR.length) : 0;
-  const meanCP = avgCP.length > 0 ? Math.round(avgCP.reduce((s,d)=>s+d.createdToPrescreen,0)/avgCP.length) : 0;
+  // Average days since creation for active records (patient flow speed)
+  const activeDays = active.filter(r => r.date_created).map(r => {
+    const d = new Date(r.date_created);
+    return isNaN(d.getTime()) ? null : Math.floor((today - d) / 86400000);
+  }).filter(d => d !== null);
+  const avgActiveDays = activeDays.length > 0 ? Math.round(activeDays.reduce((s,d)=>s+d,0)/activeDays.length) : 0;
+  const needsRecords = active.filter(r => r.records_received !== 'Received' && r.records_received !== 'Not applicable').length;
 
-  if (totalWithDeadline > 0 || durations.length > 0) {
-    const slaColor = slaPct >= 90 ? '#059669' : slaPct >= 70 ? '#f59e0b' : '#dc2626';
+  if (_apptOverdue.length > 0 || _apptSoon.length > 0 || activeWithDeadline.length > 0 || active.length > 0) {
     html += `<div style="padding:12px 16px;border-bottom:1px solid #e2e8f0;">
-      <div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:8px;">SLA & Patient Journey</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:10px;">`;
-    if (totalWithDeadline > 0) {
-      html += `<div style="padding:6px;background:#fef2f2;border-radius:6px;text-align:center;cursor:pointer;" onclick="showMedRecSlaModal('overdue')">
-          <div style="font-size:16px;font-weight:800;color:#dc2626;">${_slaOverdue.length}</div>
-          <div style="font-size:8px;color:#dc2626;font-weight:600;">Overdue</div>
+      <div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:8px;">Records SLA & Patient Flow</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:10px;">
+        <div style="padding:6px;background:#fef2f2;border-radius:6px;text-align:center;cursor:pointer;" onclick="showMedRecSlaModal('overdue')">
+          <div style="font-size:16px;font-weight:800;color:#dc2626;">${_apptOverdue.length}</div>
+          <div style="font-size:8px;color:#dc2626;font-weight:600;">Appt Passed, No Records</div>
         </div>
         <div style="padding:6px;background:#fffbeb;border-radius:6px;text-align:center;cursor:pointer;" onclick="showMedRecSlaModal('atrisk')">
-          <div style="font-size:16px;font-weight:800;color:#f59e0b;">${_slaAtRisk.length}</div>
-          <div style="font-size:8px;color:#f59e0b;font-weight:600;">Due in 7 days</div>
+          <div style="font-size:16px;font-weight:800;color:#f59e0b;">${_apptSoon.length}</div>
+          <div style="font-size:8px;color:#f59e0b;font-weight:600;">Appt in 14d, No Records</div>
         </div>
-        <div style="padding:6px;background:#f0fdf4;border-radius:6px;text-align:center;">
-          <div style="font-size:16px;font-weight:800;color:${slaColor};">${slaPct}%</div>
-          <div style="font-size:8px;color:${slaColor};font-weight:600;">SLA Compliance</div>
-        </div>`;
+        <div style="padding:6px;background:#eff6ff;border-radius:6px;text-align:center;">
+          <div style="font-size:16px;font-weight:800;color:#3b82f6;">${needsRecords}</div>
+          <div style="font-size:8px;color:#3b82f6;font-weight:600;">Awaiting Records</div>
+        </div>
+        <div style="padding:6px;background:#f5f3ff;border-radius:6px;text-align:center;">
+          <div style="font-size:16px;font-weight:800;color:#8b5cf6;">${avgActiveDays}d</div>
+          <div style="font-size:8px;color:#8b5cf6;font-weight:600;">Avg Time in Pipeline</div>
+        </div>
+      </div>`;
+    // Deadline category breakdown
+    const dlEntries = Object.entries(_deadlineCats).sort((a,b) => b[1] - a[1]);
+    if (dlEntries.length > 0) {
+      html += `<div style="font-size:10px;color:#64748b;margin-bottom:4px;">Retrieval Deadlines (${activeWithDeadline.length} active):</div>`;
+      html += `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:4px;">`;
+      dlEntries.forEach(([cat, count]) => {
+        html += `<span style="font-size:9px;padding:2px 6px;background:#f1f5f9;border-radius:4px;color:#475569;">${escapeHTML(cat)} <strong>${count}</strong></span>`;
+      });
+      html += `</div>`;
     }
-    if (durations.length > 0) {
-      html += `<div style="padding:6px;background:#eff6ff;border-radius:6px;text-align:center;" title="Avg days: Created → Pre-screen">
-          <div style="font-size:16px;font-weight:800;color:#3b82f6;">${meanCP}d</div>
-          <div style="font-size:8px;color:#3b82f6;font-weight:600;">Intake → Pre-Scr</div>
-        </div>
-        <div style="padding:6px;background:#f5f3ff;border-radius:6px;text-align:center;" title="Avg days: Pre-screen → Screening">
-          <div style="font-size:16px;font-weight:800;color:#8b5cf6;">${meanPS}d</div>
-          <div style="font-size:8px;color:#8b5cf6;font-weight:600;">Pre-Scr → Screen</div>
-        </div>
-        <div style="padding:6px;background:#fdf2f8;border-radius:6px;text-align:center;" title="Avg days: Screening → Randomization">
-          <div style="font-size:16px;font-weight:800;color:#ec4899;">${meanSR}d</div>
-          <div style="font-size:8px;color:#ec4899;font-weight:600;">Screen → Rand</div>
-        </div>`;
-    }
-    html += `</div></div>`;
+    html += `</div>`;
   }
 
   // ── By-study breakdown ──
@@ -10229,22 +10217,22 @@ function showMedRecSlaModal(type) {
   var esc = typeof escapeHTML === 'function' ? escapeHTML : function(s){return s;};
   var today = new Date();
   var list = MED_RECORDS_DATA.filter(function(r) {
-    if (!r.is_active || !r.retrieval_deadline) return false;
-    var dl = new Date(r.retrieval_deadline);
-    if (isNaN(dl.getTime())) return false;
-    var days = Math.floor((dl - today) / 86400000);
+    if (!r.is_active || !r.next_appointment || r.records_received === 'Received') return false;
+    var appt = new Date(r.next_appointment);
+    if (isNaN(appt.getTime())) return false;
+    var days = Math.floor((appt - today) / 86400000);
     if (type === 'overdue') return days < 0;
-    if (type === 'atrisk') return days >= 0 && days <= 7;
+    if (type === 'atrisk') return days >= 0 && days <= 14;
     return false;
-  }).sort(function(a,b){ return new Date(a.retrieval_deadline) - new Date(b.retrieval_deadline); });
-  var title = type === 'overdue' ? 'Overdue Records (' + list.length + ')' : 'Due Within 7 Days (' + list.length + ')';
+  }).sort(function(a,b){ return new Date(a.next_appointment) - new Date(b.next_appointment); });
+  var title = type === 'overdue' ? 'Appointment Passed — Records Missing (' + list.length + ')' : 'Appointment in 14 Days — Records Missing (' + list.length + ')';
   var rows = list.map(function(r) {
-    var dl = new Date(r.retrieval_deadline);
-    var days = Math.floor((dl - today) / 86400000);
+    var appt = new Date(r.next_appointment);
+    var days = Math.floor((appt - today) / 86400000);
     var color = days < 0 ? '#dc2626' : days <= 3 ? '#f59e0b' : '#059669';
-    return '<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:6px 8px;">' + esc(maskPHI(r.name)) + '</td><td style="padding:6px 8px;">' + esc(r.study||'') + '</td><td style="padding:6px 8px;font-weight:700;color:' + color + ';">' + days + 'd</td><td style="padding:6px 8px;font-size:11px;color:#64748b;">' + esc(r.retrieval_deadline) + '</td><td style="padding:6px 8px;">' + esc(r.assignee||'') + '</td></tr>';
+    return '<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:6px 8px;">' + esc(maskPHI(r.name)) + '</td><td style="padding:6px 8px;">' + esc(r.study||'') + '</td><td style="padding:6px 8px;font-weight:700;color:' + color + ';">' + days + 'd</td><td style="padding:6px 8px;font-size:11px;color:#64748b;">' + esc(r.next_appointment) + '</td><td style="padding:6px 8px;">' + esc(r.records_received||'Not Set') + '</td><td style="padding:6px 8px;">' + esc(r.assignee||'') + '</td></tr>';
   }).join('');
-  openModal(title, '', '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr style="border-bottom:2px solid #e2e8f0;text-align:left;"><th style="padding:6px 8px;">Patient</th><th style="padding:6px 8px;">Study</th><th style="padding:6px 8px;">Days Left</th><th style="padding:6px 8px;">Deadline</th><th style="padding:6px 8px;">Assignee</th></tr></thead><tbody>' + rows + '</tbody></table></div>');
+  openModal(title, '', '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr style="border-bottom:2px solid #e2e8f0;text-align:left;"><th style="padding:6px 8px;">Patient</th><th style="padding:6px 8px;">Study</th><th style="padding:6px 8px;">Days</th><th style="padding:6px 8px;">Appointment</th><th style="padding:6px 8px;">Records</th><th style="padding:6px 8px;">Assignee</th></tr></thead><tbody>' + rows + '</tbody></table></div>');
 }
 
 function showMedRecFilteredModal(filterKey) {

@@ -336,7 +336,7 @@ function normalizeMedRecord(t, studyName) {
 // CRIO API SYNC — Studies & Subjects from CRIO Recruitment API
 // ============================================================
 var CRIO_API_BASE = 'https://api.clinicalresearch.io';
-var CRIO_SITE_ID  = '1679';   // Philadelphia, PA
+var CRIO_SITE_IDS = ['1679', '1680'];  // 1679=Philadelphia, 1680=Pennington (to discover: run listCrioSites)
 var CRIO_CLIENT_ID = '1329';  // CRP org ID
 
 var CRIO_STUDIES_HEADERS = [
@@ -351,31 +351,59 @@ var CRIO_SUBJECTS_HEADERS = [
   'subject_id','study_key','protocol_number','status'
 ];
 
+// Discovery function: run once to find all site IDs for your CRIO client
+function listCrioSites() {
+  var props = PropertiesService.getScriptProperties();
+  var token = props.getProperty('CRIO_TOKEN');
+  if (!token) { Logger.log('No CRIO_TOKEN'); return; }
+  // Try site IDs 1 through 5000 in batches (or use a known range)
+  // Alternative: if CRIO has a /sites endpoint, use that
+  for (var id = 1675; id <= 1685; id++) {
+    try {
+      var resp = UrlFetchApp.fetch(CRIO_API_BASE + '/api/v1/site/' + id + '?client_id=' + CRIO_CLIENT_ID, {
+        method: 'get', headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json' }, muteHttpExceptions: true
+      });
+      if (resp.getResponseCode() === 200) {
+        var data = JSON.parse(resp.getContentText());
+        Logger.log('Site ' + id + ': ' + (data.siteName || data.name || 'unnamed') + ' — ' + (data.studies || []).length + ' studies');
+      }
+    } catch(e) {}
+    Utilities.sleep(100);
+  }
+}
+
 function syncCrioData(crioToken) {
   if (!crioToken) {
     Logger.log('CRIO: No token, skipping');
     return { studies: [], subjects: [] };
   }
 
-  // 1. Fetch site data to get all studies
-  var siteUrl = CRIO_API_BASE + '/api/v1/site/' + CRIO_SITE_ID
-    + '?client_id=' + CRIO_CLIENT_ID;
-  var siteResp = UrlFetchApp.fetch(siteUrl, {
-    method: 'get',
-    headers: {
-      'Authorization': 'Bearer ' + crioToken,
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-    },
-    muteHttpExceptions: true,
-  });
-  if (siteResp.getResponseCode() !== 200) {
-    Logger.log('CRIO site API error: ' + siteResp.getContentText().slice(0, 200));
-    return { studies: [], subjects: [] };
+  // 1. Fetch all sites and combine studies
+  var studies = [];
+  var studySiteMap = {};  // studyKey → siteId
+  for (var si = 0; si < CRIO_SITE_IDS.length; si++) {
+    var siteId = CRIO_SITE_IDS[si];
+    var siteUrl = CRIO_API_BASE + '/api/v1/site/' + siteId + '?client_id=' + CRIO_CLIENT_ID;
+    try {
+      var siteResp = UrlFetchApp.fetch(siteUrl, {
+        method: 'get',
+        headers: { 'Authorization': 'Bearer ' + crioToken, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        muteHttpExceptions: true,
+      });
+      if (siteResp.getResponseCode() === 200) {
+        var site = JSON.parse(siteResp.getContentText());
+        var siteStudies = site.studies || [];
+        Logger.log('CRIO: Found ' + siteStudies.length + ' studies at site ' + siteId + ' (' + (site.siteName || '') + ')');
+        siteStudies.forEach(function(s) { studySiteMap[s.studyKey] = siteId; });
+        studies = studies.concat(siteStudies);
+      } else {
+        Logger.log('CRIO site ' + siteId + ' error: ' + siteResp.getContentText().slice(0, 200));
+      }
+    } catch(e) {
+      Logger.log('CRIO site ' + siteId + ' fetch failed: ' + e.message);
+    }
   }
-  var site = JSON.parse(siteResp.getContentText());
-  var studies = site.studies || [];
-  Logger.log('CRIO: Found ' + studies.length + ' studies at site ' + CRIO_SITE_ID);
+  Logger.log('CRIO: ' + studies.length + ' total studies across ' + CRIO_SITE_IDS.length + ' sites');
 
   // 2. For each enrolling/maintenance study, fetch subject details
   var studyRows = [];
@@ -415,8 +443,9 @@ function syncCrioData(crioToken) {
     var revenueSubjects = 0;
 
     if (isActive) {
+      var studySiteId = studySiteMap[s.studyKey] || CRIO_SITE_IDS[0];
       var studyUrl = CRIO_API_BASE + '/api/v1/study/' + s.studyKey
-        + '/site/' + CRIO_SITE_ID + '?client_id=' + CRIO_CLIENT_ID;
+        + '/site/' + studySiteId + '?client_id=' + CRIO_CLIENT_ID;
       var studyResp = UrlFetchApp.fetch(studyUrl, {
         method: 'get',
         headers: {
@@ -464,7 +493,7 @@ function syncCrioData(crioToken) {
         }
         indication = (detail.indication || {}).name || '';
         studyName = detail.protocolNumber || studyName;
-        sponsor = detail.sponsor || '';
+        sponsor = (typeof detail.sponsor === 'object' && detail.sponsor !== null) ? (detail.sponsor.name || '') : (detail.sponsor || '');
         phase = detail.phase || '';
         targetEnrollment = detail.targetEnrollment || '';
         startDate = detail.startDate || '';
@@ -517,9 +546,9 @@ function syncCrioData(crioToken) {
       coordinator,
       investigator,
       indication,
-      subjectCount,
+      String(subjectCount),
       targetEnrollment ? String(targetEnrollment) : '',
-      sponsor,
+      typeof sponsor === 'object' && sponsor !== null ? (sponsor.name || JSON.stringify(sponsor)) : (sponsor || ''),
       phase,
       dateCreated,
       lastUpdated,
