@@ -378,7 +378,7 @@ const CRP_CONFIG = {
 
   // Expected CSV columns per data source — used by validateColumns() to warn on schema drift
   EXPECTED_COLUMNS: {
-    CRIO: ['Study Name','Study Key','Scheduled Date','Subject Full Name',
+    CRIO: ['Study Name','Study Key','Site Name','Scheduled Date','Subject Full Name',
            'Subject Key (Back End)','Full Name','Appointment Status','Name','Subject Status','Subject ID'],
     CANCELLATIONS: ['Study Name','Study Key','Site Name','Cancel Date','Scheduled Date',
                     'Subject Full Name','Subject Key (Back End)','Staff Full Name',
