@@ -10241,10 +10241,11 @@ function renderTrendsCharts() {
   const snapCountEl = document.getElementById('trends-snapshot-count');
   if (snapCountEl) snapCountEl.textContent = trends.length;
 
-  const last4 = trends.slice(-4);
-  const first4 = trends.slice(0, Math.min(4, trends.length));
-  const recentAvgRate = last4.reduce((s, t) => s + t.cancelRate, 0) / (last4.length || 1);
-  const olderAvgRate = first4.reduce((s, t) => s + t.cancelRate, 0) / (first4.length || 1);
+  const mid = Math.max(1, Math.floor(trends.length / 2));
+  const olderHalf = trends.slice(0, mid);
+  const recentHalf = trends.slice(mid);
+  const recentAvgRate = recentHalf.reduce((s, t) => s + t.cancelRate, 0) / (recentHalf.length || 1);
+  const olderAvgRate = olderHalf.reduce((s, t) => s + t.cancelRate, 0) / (olderHalf.length || 1);
   const rateDirEl = document.getElementById('trends-rate-dir');
   if (rateDirEl) {
     const diff = recentAvgRate - olderAvgRate;
@@ -10255,10 +10256,10 @@ function renderTrendsCharts() {
   if (rateSub) rateSub.textContent = trends.length >= 2 ? 'recent vs. older weeks' : 'single week loaded';
 
   const avgCancelEl = document.getElementById('trends-avg-cancel');
-  if (avgCancelEl) avgCancelEl.textContent = Math.round(last4.reduce((s, t) => s + t.cancelled, 0) / (last4.length || 1));
+  if (avgCancelEl) avgCancelEl.textContent = Math.round(recentHalf.reduce((s, t) => s + t.cancelled, 0) / (recentHalf.length || 1));
 
   const avgUpEl = document.getElementById('trends-avg-upcoming');
-  if (avgUpEl) avgUpEl.textContent = Math.round(last4.reduce((s, t) => s + t.upcoming, 0) / (last4.length || 1));
+  if (avgUpEl) avgUpEl.textContent = Math.round(recentHalf.reduce((s, t) => s + t.upcoming, 0) / (recentHalf.length || 1));
 
   // ── Chart 1: Cancel Rate % Over Time ──
   mkChart('trendsCancelRateChart', {
