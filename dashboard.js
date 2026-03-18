@@ -11214,9 +11214,16 @@ function filterStudies(type, btn) {
   document.querySelectorAll('#studies-filter-bar .sched-filter').forEach(b => {
     b.style.background = 'var(--surface)'; b.style.color = 'var(--muted)'; b.style.borderColor = 'var(--border)';
   });
-  btn.style.background = '#e8eeff'; btn.style.color = '#1843ad'; btn.style.borderColor = '#1843ad';
+  if (btn) { btn.style.background = '#e8eeff'; btn.style.color = '#1843ad'; btn.style.borderColor = '#1843ad'; }
   renderStudiesTable();
 }
+
+// Event delegation for studies filter bar (avoids inline onclick blocking by extensions)
+document.addEventListener('click', function(e) {
+  var btn = e.target.closest('#studies-filter-bar [data-filter]');
+  if (!btn) return;
+  filterStudies(btn.getAttribute('data-filter'), btn);
+});
 
 function sortMergedTable(th, col) {
   if (_studySortCol === col) _studySortAsc = !_studySortAsc;

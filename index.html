@@ -1182,17 +1182,17 @@ body {
     <div><span class="card-title" style="font-size:16px;">All Studies</span> <span id="studies-count-badge" style="font-size:12px;font-weight:500;color:var(--muted);margin-left:6px"></span></div>
   </div>
   <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;position:relative;z-index:10;" id="studies-filter-bar">
-      <button onclick="filterStudies('all',this)" class="sched-filter active" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid #1843ad;background:#e8eeff;color:#1843ad;cursor:pointer">All</button>
-      <button onclick="filterStudies('critical',this)" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">🔴 Critical</button>
-      <button onclick="filterStudies('high',this)" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">🟠 High Risk</button>
-      <button onclick="filterStudies('enrolling',this)" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Enrolling</button>
-      <button onclick="filterStudies('maintenance',this)" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Maintenance</button>
-      <button onclick="filterStudies('startup',this)" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Startup</button>
-      <button onclick="filterStudies('preclosed',this)" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Pre-Closed</button>
-      <button onclick="filterStudies('goal_met',this)" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Goal Met</button>
-      <button onclick="filterStudies('behind',this)" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Behind Goal</button>
-      <button onclick="filterStudies('phl',this)" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">PHL</button>
-      <button onclick="filterStudies('pnj',this)" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">PNJ</button>
+      <button data-filter="all" class="sched-filter active" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid #1843ad;background:#e8eeff;color:#1843ad;cursor:pointer">All</button>
+      <button data-filter="critical" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Critical</button>
+      <button data-filter="high" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">High Risk</button>
+      <button data-filter="enrolling" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Enrolling</button>
+      <button data-filter="maintenance" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Maintenance</button>
+      <button data-filter="startup" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Startup</button>
+      <button data-filter="preclosed" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Pre-Closed</button>
+      <button data-filter="goal_met" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Goal Met</button>
+      <button data-filter="behind" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Behind Goal</button>
+      <button data-filter="phl" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">PHL</button>
+      <button data-filter="pnj" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">PNJ</button>
   </div>
 
   <!-- Studies table -->
@@ -13389,9 +13389,16 @@ function filterStudies(type, btn) {
   document.querySelectorAll('#studies-filter-bar .sched-filter').forEach(b => {
     b.style.background = 'var(--surface)'; b.style.color = 'var(--muted)'; b.style.borderColor = 'var(--border)';
   });
-  btn.style.background = '#e8eeff'; btn.style.color = '#1843ad'; btn.style.borderColor = '#1843ad';
+  if (btn) { btn.style.background = '#e8eeff'; btn.style.color = '#1843ad'; btn.style.borderColor = '#1843ad'; }
   renderStudiesTable();
 }
+
+// Event delegation for studies filter bar (avoids inline onclick blocking by extensions)
+document.addEventListener('click', function(e) {
+  var btn = e.target.closest('#studies-filter-bar [data-filter]');
+  if (!btn) return;
+  filterStudies(btn.getAttribute('data-filter'), btn);
+});
 
 function sortMergedTable(th, col) {
   if (_studySortCol === col) _studySortAsc = !_studySortAsc;
