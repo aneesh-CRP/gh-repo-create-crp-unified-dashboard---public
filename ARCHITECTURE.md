@@ -105,6 +105,7 @@ All data is fetched from Google Sheets published as CSV. On GitHub Pages, standa
 - `crp_dismissed_actions_v1` — Dismissed action items (60-day auto-prune)
 - `crp_coll_[invoice]` — Invoice collection status/notes
 - `crp_clickup_token` — ClickUp API token (user-entered)
+- `crp_confirmed_visits` — Confirmed visit checkboxes
 - `crp_fin_auth` (sessionStorage) — Finance PIN auth flag
 - `crp_theme` — Dark/light mode preference
 - `crp_audit_log` — Dashboard audit log (auto-pruned to 500 entries)
@@ -229,4 +230,7 @@ Implemented all 5 phases of the enhancement plan:
 - `buildSchedulingGapAlerts()` wired up (was dead code)
 - `manualRefresh()` wrapper with button disable during refresh
 
-**Commits:** `3ad09e3`, `0ba34b2`, `2cecc49`, `3bb1809`, `ab9f441`, `ce39eb7`, `4273214`, `cba8bae`
+**Chart.js Fix:**
+- `mkChart()` now adds explicit `type: 'category'` / `type: 'linear'` to all scale configs, suppressing Chart.js 4.x "Ignoring resolver" console warnings
+
+**Commits:** `3ad09e3`, `0ba34b2`, `2cecc49`, `3bb1809`, `ab9f441`, `ce39eb7`, `4273214`, `cba8bae`, `2c8e5a2`

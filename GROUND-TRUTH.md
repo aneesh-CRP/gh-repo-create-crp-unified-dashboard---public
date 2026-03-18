@@ -1,6 +1,6 @@
 # CRP Dashboard — Ground Truth
 
-> Last verified: March 17, 2026 | Version 2.9.6 | 1,959 CRIO subjects across 50 studies
+> Last verified: March 17, 2026 | Version 2.9.6 | 1,959 CRIO subjects across 50 studies | Chart.js warnings suppressed
 
 This document is the single reference for all dashboard data mappings, formulas, configurations, and verified counts. Use it to validate that the dashboard is rendering correctly.
 
@@ -436,3 +436,6 @@ git push
 - Detail modal reattaches sort handlers on every open
 - CRIO patient links require active CRIO login
 - Client-side PIN auth is bypassable
+
+**Resolved:**
+- ~~Chart.js 4.x "Ignoring resolver" scale warnings~~ — fixed in `mkChart()` by adding explicit scale types (`2c8e5a2`)
