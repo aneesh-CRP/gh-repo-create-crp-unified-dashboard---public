@@ -6196,6 +6196,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
       coord: cleanCoord(r['Staff Full Name'] || r['Full Name']),
       type: r['Appointment Cancellation Type']||'',
       reason: r['Cancel Reason']||'',
+      visit: r['Name']||r['Appointment Type']||'',
       category: r._category || categorizeReason(r['Cancel Reason'], r['Appointment Cancellation Type']),
       cancel_date: (() => { try { const d=new Date(r['Cancel Date']);return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});}catch(e){return '';}})(),
       site: r['Site Name'],
@@ -6341,6 +6342,21 @@ async function manualRefresh() {
 // ═══════════════════════════════════════════════════
 // RENDER ALL
 // ═══════════════════════════════════════════════════
+// ── Win-back status persistence ──
+var WB_STATUS_KEY = 'crp_winback_status_v1';
+function setWinbackStatus(pKey, status, btn) {
+  var wbStatus = {};
+  try { wbStatus = JSON.parse(localStorage.getItem(WB_STATUS_KEY) || '{}'); } catch(e) { wbStatus = {}; }
+  if (wbStatus[pKey] === status) {
+    delete wbStatus[pKey]; // toggle off
+  } else {
+    wbStatus[pKey] = status;
+  }
+  try { localStorage.setItem(WB_STATUS_KEY, JSON.stringify(wbStatus)); } catch(e) {}
+  // Re-render the CRIO section to reflect updated states
+  if (typeof renderCrioStudies === 'function') safe(renderCrioStudies, 'renderCrioStudies');
+}
+
 // ── Dismissed actions persistence ──
 var DISMISSED_ACTIONS_KEY = 'crp_dismissed_actions_v1';
 
@@ -8945,20 +8961,65 @@ function renderCrioStudies() {
 
   // ── Section 1: Win-Back Opportunities ──
   if (winbacks.length > 0) {
+    // Build per-patient cancel details from allCancels by matching study + V1/Screening visits
+    var allCx = (DATA && DATA.allCancels) ? DATA.allCancels : [];
+    var v1Pattern = /v1|visit.?1|screen/i;
+    var winbackCancelsByStudy = {};
+    allCx.forEach(function(c) {
+      if (!v1Pattern.test(c.visit || '')) return;
+      var sn = (c.study || '').toLowerCase().trim();
+      if (!winbackCancelsByStudy[sn]) winbackCancelsByStudy[sn] = [];
+      winbackCancelsByStudy[sn].push(c);
+    });
+    // Load persisted winback statuses from localStorage
+    var wbStatus = {};
+    try { wbStatus = JSON.parse(localStorage.getItem(WB_STATUS_KEY) || '{}'); } catch(e) { wbStatus = {}; }
+
     html += '<div style="margin-bottom:14px">'
       + '<div style="font-size:12px;font-weight:700;color:#dc2626;margin-bottom:6px">Win-Back Opportunities — V1 No-Shows / Cancellations</div>'
-      + '<div style="font-size:10px;color:#64748b;margin-bottom:8px">Cumulative V1 no-shows across all time. These patients were scheduled for Visit 1 but did not complete it. Prioritize recent no-shows for follow-up — click study link to see individual patient dates in CRIO.</div>';
+      + '<div style="font-size:10px;color:#64748b;margin-bottom:8px">Patients scheduled for Visit 1 / Screening who cancelled or no-showed. Mark each as Completed (follow-up done) or N/A (not applicable). Status is saved locally.</div>';
     winbacks.forEach(function(w) {
       var url = 'https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/' + w.key + '/subjects';
       var tag = w.is_prescreen ? ' <span style="font-size:8px;background:#dbeafe;color:#3b82f6;padding:1px 4px;border-radius:3px;vertical-align:middle">Pre-Screen</span>' : '';
-      html += '<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;margin-bottom:3px;border-left:3px solid #dc2626;background:#dc262608;border-radius:0 6px 6px 0;font-size:11px">'
+      var sn = w.study.toLowerCase().trim();
+      var patients = winbackCancelsByStudy[sn] || [];
+      // Sort by cancel date descending (most recent first)
+      patients.sort(function(a,b) { return (b.cancel_date||'').localeCompare(a.cancel_date||''); });
+
+      html += '<div style="margin-bottom:8px;border-left:3px solid #dc2626;background:#dc262608;border-radius:0 6px 6px 0;padding:6px 10px">'
+        + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'
         + '<span style="font-size:16px;font-weight:800;color:#dc2626;min-width:28px;text-align:right">' + w.noshow + '</span>'
         + '<div style="flex:1">'
-        + '<a href="' + esc(url) + '" target="_blank" style="color:#dc2626;font-weight:600;text-decoration:underline dotted">' + esc(w.study) + '</a>' + tag
-        + (w.coord ? ' <span style="color:#94a3b8">· ' + esc(w.coord) + '</span>' : '')
-        + '</div>'
-        + '<span style="font-size:10px;color:#64748b;white-space:nowrap">Follow up →</span>'
-        + '</div>';
+        + '<a href="' + esc(url) + '" target="_blank" style="color:#dc2626;font-weight:600;text-decoration:underline dotted;font-size:12px">' + esc(w.study) + '</a>' + tag
+        + (w.coord ? ' <span style="color:#94a3b8;font-size:11px">· ' + esc(w.coord) + '</span>' : '')
+        + '</div></div>';
+
+      if (patients.length > 0) {
+        html += '<div style="margin-left:36px">';
+        patients.forEach(function(p) {
+          var pKey = (w.key + '|' + (p.name||'')).toLowerCase().replace(/\s+/g,'_');
+          var st = wbStatus[pKey] || '';
+          var completedClass = st === 'completed' ? 'background:#05966920;border-color:#059669;color:#059669' : 'background:var(--surface2);border-color:var(--border);color:var(--muted)';
+          var naClass = st === 'na' ? 'background:#94a3b820;border-color:#94a3b8;color:#64748b' : 'background:var(--surface2);border-color:var(--border);color:var(--muted)';
+          var rowOpacity = st ? 'opacity:0.55;' : '';
+          var reasonText = p.reason ? esc(p.reason) : '<em style="color:#cbd5e1">No reason documented</em>';
+          var patName = typeof maskPHI === 'function' ? maskPHI(p.name) : p.name;
+          html += '<div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:11px;border-bottom:1px solid #f1f5f9;' + rowOpacity + '">'
+            + '<div style="flex:1;min-width:0">'
+            + '<span style="font-weight:600;color:var(--navy)">' + esc(patName) + '</span>'
+            + ' <span style="color:#94a3b8;font-size:10px">' + esc(p.cancel_date || '') + '</span>'
+            + (p.type ? ' <span style="font-size:9px;padding:1px 4px;border-radius:3px;background:#fef2f2;color:#dc2626">' + esc(p.type) + '</span>' : '')
+            + '<div style="font-size:10px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%" title="' + esc(p.reason || '') + '">' + reasonText + '</div>'
+            + '</div>'
+            + '<button onclick="setWinbackStatus(\'' + esc(pKey) + '\',\'completed\',this)" style="font-size:9px;font-weight:600;padding:2px 6px;border-radius:4px;border:1px solid;cursor:pointer;white-space:nowrap;' + completedClass + '">✓ Done</button>'
+            + '<button onclick="setWinbackStatus(\'' + esc(pKey) + '\',\'na\',this)" style="font-size:9px;font-weight:600;padding:2px 6px;border-radius:4px;border:1px solid;cursor:pointer;white-space:nowrap;' + naClass + '">N/A</button>'
+            + '</div>';
+        });
+        html += '</div>';
+      } else {
+        html += '<div style="margin-left:36px;font-size:10px;color:#94a3b8;padding:2px 0">No recent cancel details available — <a href="' + esc(url) + '" target="_blank" style="color:#dc2626;text-decoration:underline dotted">view in CRIO</a></div>';
+      }
+      html += '</div>';
     });
     html += '</div>';
   }
