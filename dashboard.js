@@ -9096,6 +9096,31 @@ function renderCrioStudies() {
   }
 
   // ── Section 5: Re-Enrollment Opportunities (screen fails & completes → other enrolling studies) ──
+  // Normalize fragmented CRIO indication strings into unified therapeutic areas
+  var INDICATION_ALIASES = {
+    'cardiovascular disease': 'cardiology',
+    'established/at risk ascvd': 'cardiology',
+    'ascvd / ckd with cv risk factors': 'cardiology',
+    'heart failure - prevention': 'cardiology',
+    'diabetes type 2': 'type 2 diabetes',
+    'type 2 diabetes and obesity or overweight at increased cardiovascular risk': 'type 2 diabetes',
+    'moderate to severe atopic dermatitis': 'atopic dermatitis',
+    'contraception': 'contraceptives',
+    'contraception (patch)': 'contraceptives',
+    'contraceptive efficacy & safety': 'contraceptives',
+    'menstrual migraine': 'migraine',
+    'moderate to severe plaque psoriasis': 'plaque psoriasis',
+    'obesity or overweight with and without type 2 diabetes': 'obesity',
+    'arthritis': 'rheumatoid arthritis',
+    'systemic lupus erythematosus': 'lupus',
+    'masld': 'mash',
+    'metabolic dysfunction-associated steatotic liver disease (masld)': 'mash',
+  };
+  function normalizeIndication(ind) {
+    var key = (ind || '').toLowerCase().trim();
+    return INDICATION_ALIASES[key] || key;
+  }
+
   var reenrollByInd = {};
   CRIO_STUDIES_DATA.forEach(function(s) {
     if (SKIP[s.protocol_number]) return;
@@ -9104,7 +9129,7 @@ function renderCrioStudies() {
       || s.protocol_number === s.indication
       || !!PRESCREEN_OVERRIDES[s.study_key];
     if (isPS) return;
-    var ind = (s.indication || '').toLowerCase().trim();
+    var ind = normalizeIndication(s.indication);
     if (!ind) return;
     var subs = subsByStudy[s.study_key] || {};
     var sf = subs['SCREEN_FAIL'] || 0;
@@ -9193,9 +9218,21 @@ function buildEnrollmentKPIs() {
   var banner = document.getElementById('enrollment-kpi-banner');
   if (!banner) return;
 
-  // Aggregate subject statuses across all studies
+  // Build set of pre-screening + placeholder study keys to exclude from protocol KPIs
+  var SKIP_PROTO = {'Config Study':1,'Upload test':1,'EVENT':1,'2025_COVID_FLU_RSV_DETECTION STUDY':1};
+  var psKeys = {};
+  CRIO_STUDIES_DATA.forEach(function(s) {
+    var isPS = s.protocol_number.toLowerCase().indexOf('pre-screen') >= 0
+      || s.protocol_number.toLowerCase().indexOf('pre screen') >= 0
+      || s.protocol_number === s.indication
+      || !!PRESCREEN_OVERRIDES[s.study_key];
+    if (isPS || SKIP_PROTO[s.protocol_number]) psKeys[s.study_key] = true;
+  });
+
+  // Aggregate subject statuses across protocol studies only (excluding pre-screening)
   var totals = {};
   CRIO_SUBJECTS_DATA.forEach(function(s) {
+    if (psKeys[s.study_key]) return;
     totals[s.status] = (totals[s.status] || 0) + 1;
   });
 
