@@ -8646,6 +8646,8 @@ function renderCrioStudies() {
     '35892':  ['109260'],                    // Contraceptives → MR-130A-01-TD-3001
     '55102':  ['177553'],                    // Lupus → 80202135SLE3001
     '140400': ['136289'],                    // Plaque Psoriasis → 77242113PSO3006
+    '49590':  ['50058','60296'],             // Type 2 Diabetes → I8F-MC-GPHE, J2A-MC-GZGS
+    '67088':  [],                            // Rheumatoid Arthritis — no protocol study yet
   };
 
   var crioByKey = {};
@@ -8854,7 +8856,7 @@ function renderCrioStudies() {
   if (winbacks.length > 0) {
     html += '<div style="margin-bottom:14px">'
       + '<div style="font-size:12px;font-weight:700;color:#dc2626;margin-bottom:6px">Win-Back Opportunities — V1 No-Shows / Cancellations</div>'
-      + '<div style="font-size:10px;color:#64748b;margin-bottom:8px">These patients were scheduled for Visit 1 but did not complete it. They already qualified — follow up to reschedule.</div>';
+      + '<div style="font-size:10px;color:#64748b;margin-bottom:8px">Cumulative V1 no-shows across all time. These patients were scheduled for Visit 1 but did not complete it. Prioritize recent no-shows for follow-up — click study link to see individual patient dates in CRIO.</div>';
     winbacks.forEach(function(w) {
       var url = 'https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/' + w.key + '/subjects';
       var tag = w.is_prescreen ? ' <span style="font-size:8px;background:#dbeafe;color:#3b82f6;padding:1px 4px;border-radius:3px;vertical-align:middle">Pre-Screen</span>' : '';
