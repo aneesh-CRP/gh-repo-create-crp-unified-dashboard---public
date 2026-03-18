@@ -1338,18 +1338,6 @@ body {
       <button data-filter="pnj" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">PNJ</button>
   </div>
 
-  <!-- Study Startup Milestones -->
-  <div class="card fade-in" style="margin-bottom:16px;" id="study-milestones-card" style="display:none;">
-    <div class="card-header" style="cursor:pointer;" onclick="var b=this.nextElementSibling;b.style.display=b.style.display==='none'?'block':'none';this.querySelector('.toggle-arrow').textContent=b.style.display==='none'?'▸':'▾'">
-      <span class="card-title">Study Startup Milestones</span>
-      <span class="toggle-arrow" style="margin-left:6px;font-size:10px;color:var(--muted)">▾</span>
-      <span id="milestone-kpi-strip" style="margin-left:12px;font-size:11px;color:var(--muted);"></span>
-    </div>
-    <div class="card-body" id="milestoneTimelineBody" style="padding:12px;overflow-x:auto;">
-      <div style="color:var(--muted);font-size:11px;">Waiting for Looker data…</div>
-    </div>
-  </div>
-
   <!-- Studies table -->
   <div class="card fade-in">
     <div style="overflow-x:auto;">
@@ -1368,10 +1356,13 @@ body {
             <th style="padding:10px 8px;text-align:left;font-weight:700;color:var(--text);white-space:nowrap;">PI</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Site</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Phase</th>
+            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">IRB</th>
+            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Contract</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">SIV</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Enroll Start</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">FPS</th>
-            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">IRB</th>
+            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">IRB→SIV</th>
+            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">SIV→FPS</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Referrals</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">FB Leads</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Total Leads</th>
@@ -1379,6 +1370,18 @@ body {
         </thead>
         <tbody id="merged-study-tbody"></tbody>
       </table>
+    </div>
+  </div>
+
+  <!-- Study Startup Milestones -->
+  <div class="card fade-in" style="margin-top:16px;margin-bottom:16px;" id="study-milestones-card" style="display:none;">
+    <div class="card-header" style="cursor:pointer;" onclick="var b=this.nextElementSibling;b.style.display=b.style.display==='none'?'block':'none';this.querySelector('.toggle-arrow').textContent=b.style.display==='none'?'▸':'▾'">
+      <span class="card-title">Study Startup Milestones</span>
+      <span class="toggle-arrow" style="margin-left:6px;font-size:10px;color:var(--muted)">▾</span>
+      <span id="milestone-kpi-strip" style="margin-left:12px;font-size:11px;color:var(--muted);"></span>
+    </div>
+    <div class="card-body" id="milestoneTimelineBody" style="padding:12px;overflow-x:auto;">
+      <div style="color:var(--muted);font-size:11px;">Waiting for Looker data…</div>
     </div>
   </div>
 
@@ -7715,52 +7718,53 @@ function processLiveData(allRows, legacyCancels, auditLog) {
   const twoMonthsAhead = new Date(today); twoMonthsAhead.setDate(today.getDate() + 61);
   const next14End      = new Date(today); next14End.setDate(today.getDate() + 14);
 
-  // ── Snapshot dedup: keep only the latest snapshot_date from each sheet ──
-  const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-  function latestSnapshotOnly(rows) {
-    let maxSnap = '';
-    rows.forEach(r => {
-      const s = (r.snapshot_date || '').trim();
-      if (DATE_RE.test(s) && s > maxSnap) maxSnap = s;
-    });
-    if (!maxSnap) return rows;                         // no snapshot col → pass through
-    return rows.filter(r => (r.snapshot_date || '').trim() === maxSnap);
-  }
+  // ════════════════════════════════════════════════════════════
+  // PHASE 1: Split report into upcoming vs cancels, dedup
+  // ════════════════════════════════════════════════════════════
+  var _splitResult = splitAndDedup(allRows, legacyCancels);
+  var upcoming = _splitResult.upcoming;
+  var cancels = _splitResult.cancels;
+  var upcomingAllSnapshots = _splitResult.upcomingAllSnapshots;
 
-  // ── Single-report split: upcoming report includes cancelled visits ──
-  // Split by Appointment Status into upcoming (active) vs cancels.
-  // Map field names so downstream code works: Full Name → Staff Full Name, Scheduled Date → Cancel Date
-  const upcomingAllSnapshots = allRows;   // keep full history for coord daily goals
-  const allLatest = latestSnapshotOnly(allRows);
-  let upcoming = allLatest.filter(r => {
-    const status = (r['Appointment Status'] || '').trim().toLowerCase();
-    return status !== 'cancelled' && status !== 'canceled';
-  });
-  // Extract cancels from the unified report
-  const derivedCancels = allLatest.filter(r => {
-    const status = (r['Appointment Status'] || '').trim().toLowerCase();
-    return status === 'cancelled' || status === 'canceled';
-  }).map(r => {
-    // Map fields so downstream cancel processing code works
-    // (it expects 'Staff Full Name', 'Cancel Date', 'Site Name')
-    r['Staff Full Name'] = r['Staff Full Name'] || r['Full Name'] || '';
-    r['Cancel Date'] = r['Cancel Date'] || r['Scheduled Date'] || '';
-    r['Site Name'] = r['Site Name'] || '';
-    return r;
-  });
-  // Merge with legacy cancels (if available) for richer history, dedup by patient+study+date
-  const _cancelSeen = new Set();
-  const allCancelSources = [...derivedCancels];
-  if (legacyCancels && legacyCancels.length) {
-    const legacyLatest = latestSnapshotOnly(legacyCancels);
-    legacyLatest.forEach(r => allCancelSources.push(r));
+  function splitAndDedup(allRows, legacyCancels) {
+    var DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+    function latestSnapshotOnly(rows) {
+      var maxSnap = '';
+      rows.forEach(function(r) {
+        var s = (r.snapshot_date || '').trim();
+        if (DATE_RE.test(s) && s > maxSnap) maxSnap = s;
+      });
+      if (!maxSnap) return rows;
+      return rows.filter(function(r) { return (r.snapshot_date || '').trim() === maxSnap; });
+    }
+    var upcomingAllSnapshots = allRows;
+    var allLatest = latestSnapshotOnly(allRows);
+    var upcoming = allLatest.filter(function(r) {
+      var status = (r['Appointment Status'] || '').trim().toLowerCase();
+      return status !== 'cancelled' && status !== 'canceled';
+    });
+    var derivedCancels = allLatest.filter(function(r) {
+      var status = (r['Appointment Status'] || '').trim().toLowerCase();
+      return status === 'cancelled' || status === 'canceled';
+    }).map(function(r) {
+      r['Staff Full Name'] = r['Staff Full Name'] || r['Full Name'] || '';
+      r['Cancel Date'] = r['Cancel Date'] || r['Scheduled Date'] || '';
+      r['Site Name'] = r['Site Name'] || '';
+      return r;
+    });
+    var _cancelSeen = new Set();
+    var allCancelSources = [].concat(derivedCancels);
+    if (legacyCancels && legacyCancels.length) {
+      latestSnapshotOnly(legacyCancels).forEach(function(r) { allCancelSources.push(r); });
+    }
+    var cancels = [];
+    allCancelSources.forEach(function(r) {
+      var key = buildKey(r['Subject Full Name'], r['Study Name'], r['Cancel Date']||r['Scheduled Date']);
+      if (!_cancelSeen.has(key)) { _cancelSeen.add(key); cancels.push(r); }
+    });
+    _log('CRP: Split report → upcoming', upcoming.length, ', derived cancels', derivedCancels.length, ', total cancels (merged+deduped)', cancels.length);
+    return { upcoming: upcoming, cancels: cancels, upcomingAllSnapshots: upcomingAllSnapshots };
   }
-  let cancels = [];
-  allCancelSources.forEach(r => {
-    const key = buildKey(r['Subject Full Name'], r['Study Name'], r['Cancel Date']||r['Scheduled Date']);
-    if (!_cancelSeen.has(key)) { _cancelSeen.add(key); cancels.push(r); }
-  });
-  _log('CRP: Split report → upcoming', upcoming.length, ', derived cancels', derivedCancels.length, ', total cancels (merged+deduped)', cancels.length);
 
   // ── Coordinator definitions (must be before audit log resolution) ──
   const EXCLUDE_STUDIES = new Set([]);
@@ -12972,6 +12976,15 @@ function renderMilestoneTimeline() {
   el.innerHTML = html;
 }
 
+// Days between two YYYY-MM-DD strings (shared by milestone timeline + studies table)
+function _daysBetween(a, b) {
+  if (!a || !b) return null;
+  var da = new Date(a), db = new Date(b);
+  if (isNaN(da) || isNaN(db)) return null;
+  var d = Math.round((db - da) / 86400000);
+  return d >= 0 ? d : null;
+}
+
 function renderStudiesTable() {
   const studies = (DATA.mergedStudies || []).filter(s => {
     if (_studyFilter === 'all') return true;
@@ -13107,10 +13120,13 @@ function renderStudiesTable() {
       <td style="padding:10px 8px;font-size:11px;color:#475569;white-space:nowrap">${escapeHTML(s.crio_investigator||'')}</td>
       <td style="padding:10px 8px;text-align:center">${siteTags}</td>
       <td style="padding:10px 8px;text-align:center;font-size:10px;color:var(--muted);white-space:nowrap">${s.phase ? escapeHTML(s.phase) : '—'}</td>
+      <td style="padding:10px 8px;text-align:center;font-size:10px;color:var(--muted);white-space:nowrap">${s.irb_approval ? escapeHTML(s.irb_approval) : '—'}</td>
+      <td style="padding:10px 8px;text-align:center;font-size:10px;color:var(--muted);white-space:nowrap">${s.contract_signed ? escapeHTML(s.contract_signed) : '—'}</td>
       <td style="padding:10px 8px;text-align:center;font-size:10px;color:var(--muted);white-space:nowrap">${s.siv_date ? escapeHTML(s.siv_date) : '—'}</td>
       <td style="padding:10px 8px;text-align:center;font-size:10px;color:var(--muted);white-space:nowrap">${s.enrollment_start ? escapeHTML(s.enrollment_start) : '—'}</td>
       <td style="padding:10px 8px;text-align:center;font-size:10px;color:var(--muted);white-space:nowrap">${s.fps_date ? escapeHTML(s.fps_date) : '—'}</td>
-      <td style="padding:10px 8px;text-align:center;font-size:10px;color:var(--muted);white-space:nowrap">${s.irb_approval ? escapeHTML(s.irb_approval) : '—'}</td>
+      <td style="padding:10px 8px;text-align:center;font-size:10px;font-weight:600;color:${(function(){var d=_daysBetween(s.irb_approval,s.siv_date);return d===null?'var(--muted)':d<=30?'#059669':d<=60?'#d97706':'#dc2626'})()};white-space:nowrap">${(function(){var d=_daysBetween(s.irb_approval,s.siv_date);return d!==null?d+'d':'—'})()}</td>
+      <td style="padding:10px 8px;text-align:center;font-size:10px;font-weight:600;color:${(function(){var d=_daysBetween(s.siv_date,s.fps_date);return d===null?'var(--muted)':d<=30?'#059669':d<=60?'#d97706':'#dc2626'})()};white-space:nowrap">${(function(){var d=_daysBetween(s.siv_date,s.fps_date);return d!==null?d+'d':'—'})()}</td>
       <td style="padding:10px 8px;text-align:center">${buildPipelineCell(s.study, safeStudy)}</td>
       <td style="padding:10px 8px;text-align:center">${buildFBLeadCell(s.study)}</td>
       <td style="padding:10px 8px;text-align:center">${buildTotalLeadsCell(s.study, safeStudy)}</td>
