@@ -13728,6 +13728,8 @@ function renderStudiesTable() {
       ? `<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;margin-left:5px;background:${s.enroll_status==='Enrolling'?'#e8eeff':s.enroll_status==='Maintenance'?'#f0fdf4':s.enroll_status==='Startup'?'#fffbeb':'#f1f5f9'};color:${s.enroll_status==='Enrolling'?'#1843ad':s.enroll_status==='Maintenance'?'#059669':s.enroll_status==='Startup'?'#d97706':'#94a3b8'}">${s.enroll_status}</span>` : '';
     const indicationTag = s.crio_indication ? `<div style="font-size:9px;color:#94a3b8;margin-top:1px">${escapeHTML(s.crio_indication)}${s.crio_end_date ? ' · End: '+escapeHTML(s.crio_end_date) : ''}</div>` : (s.crio_end_date ? `<div style="font-size:9px;color:#94a3b8;margin-top:1px">End: ${escapeHTML(s.crio_end_date)}</div>` : '');
 
+    const isEnrolling = s.enroll_status === 'Enrolling';
+
     // ── Automated study tags ──
     var tags = [];
     // Action alerts (red)
@@ -13741,7 +13743,8 @@ function renderStudiesTable() {
     // Opportunity alerts (green/blue)
     if (hasTarget && pct >= 80 && pct < 100) tags.push({text:'Close to Goal', color:'#059669', bg:'#f0fdf4'});
     if (s.screening > 3 && s.enrolled === 0) tags.push({text:'Screen→Enroll Gap', color:'#3b82f6', bg:'#eff6ff'});
-    var totalLeads = (s._refCount || 0) + (s._fbCount || 0);
+    var _refPipeline = typeof getStudyReferralPipeline === 'function' ? getStudyReferralPipeline(s.study) : null;
+    var totalLeads = (_refPipeline ? _refPipeline.total : 0);
     if (totalLeads > 5 && s.screening === 0) tags.push({text:'Leads Unused', color:'#8b5cf6', bg:'#f5f3ff'});
     var alertTags = tags.length > 0 ? '<div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:2px;">' + tags.map(function(t) {
       return '<span style="font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px;background:'+t.bg+';color:'+t.color+';">'+t.text+'</span>';
@@ -13770,7 +13773,6 @@ function renderStudiesTable() {
         ? `<span style="font-size:11px;font-weight:700;padding:3px 7px;border-radius:5px;background:${lb};color:${lc};cursor:pointer" data-action="studyDetailClick" data-study="${escapeHTML(s.study)}">${s.risk_score}</span>`
         : `<span style="font-size:11px;color:var(--muted)">—</span>`;
 
-    const isEnrolling = s.enroll_status === 'Enrolling';
     const cancelsCell = s.cancels > 0
       ? `<div style="display:flex;flex-direction:column;gap:2px">
            <span style="font-size:12px;font-weight:700;color:#dc2626;cursor:pointer" data-action="studyDetailClick" data-study="${escapeHTML(s.study)}">${s.cancels}</span>
@@ -14358,6 +14360,45 @@ window.addEventListener('beforeprint', function() {
   if (hdr) hdr.textContent = 'CRP Intelligence Dashboard — Printed ' + new Date().toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'});
 });
 
+// ═══ DATA HEALTH MONITORING (global — called by async fetch functions) ═══
+function setHealthChip(id, status, label) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.className = 'dh-chip ' + status;
+  const icon = status === 'ok' ? '✓' : status === 'warn' ? '⚠' : status === 'fail' ? '✗' : '⏳';
+  el.textContent = icon + ' ' + label;
+}
+
+function showHealthStrip() {
+  const strip = document.getElementById('data-health-strip');
+  if (strip) strip.style.display = 'flex';
+}
+
+function checkDataFreshness(rows) {
+  const freshEl = document.getElementById('dh-freshness');
+  if (!freshEl || !rows || rows.length === 0) return;
+  const snapDates = rows.map(r => (r['snapshot_date'] || r['Scheduled Date'] || '').trim()).filter(Boolean).sort();
+  if (snapDates.length === 0) return;
+  const latestSnap = snapDates[snapDates.length - 1];
+  const today = new Date(); today.setHours(0,0,0,0);
+  const snapDate = new Date(latestSnap); snapDate.setHours(0,0,0,0);
+  const ageMs = today - snapDate;
+  const ageDays = Math.floor(ageMs / 86400000);
+  if (ageDays <= 0) {
+    freshEl.textContent = 'Data from today';
+    freshEl.style.color = '#065F46';
+  } else if (ageDays === 1) {
+    freshEl.textContent = 'Data from yesterday';
+    freshEl.style.color = '#92400E';
+  } else if (ageDays <= 3) {
+    freshEl.textContent = 'Data is ' + ageDays + ' days old';
+    freshEl.style.color = '#92400E';
+  } else {
+    freshEl.textContent = '⚠ Data is ' + ageDays + ' days old — Looker may have stopped pushing';
+    freshEl.style.color = '#991B1B';
+  }
+}
+
 async function _crpInit() {
   // Load fallback data from external file before first render
   if (typeof loadFallbackData === 'function') await loadFallbackData();
@@ -14392,47 +14433,6 @@ async function _crpInit() {
   // Phase 1: Critical CRIO data (upcoming + cancels + audit) — loads first, renders immediately
   // Phase 2: Finance data — loads after Phase 1 completes (or after 2s timeout)
   // Phase 3: Supplemental data (Patient DB, Facebook CRM) — loads last, non-blocking
-  // ═══ DATA HEALTH MONITORING ═══
-  function setHealthChip(id, status, label) {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.className = 'dh-chip ' + status;
-    const icon = status === 'ok' ? '✓' : status === 'warn' ? '⚠' : status === 'fail' ? '✗' : '⏳';
-    el.textContent = icon + ' ' + label;
-  }
-
-  function showHealthStrip() {
-    const strip = document.getElementById('data-health-strip');
-    if (strip) strip.style.display = 'flex';
-  }
-
-  function checkDataFreshness(rows) {
-    // Check snapshot_date from CRIO data to detect stale Looker exports
-    const freshEl = document.getElementById('dh-freshness');
-    if (!freshEl || !rows || rows.length === 0) return;
-    const snapDates = rows.map(r => (r['snapshot_date'] || r['Scheduled Date'] || '').trim()).filter(Boolean).sort();
-    if (snapDates.length === 0) return;
-    // Find the most recent snapshot_date
-    const latestSnap = snapDates[snapDates.length - 1];
-    const today = new Date(); today.setHours(0,0,0,0);
-    const snapDate = new Date(latestSnap); snapDate.setHours(0,0,0,0);
-    const ageMs = today - snapDate;
-    const ageDays = Math.floor(ageMs / 86400000);
-    if (ageDays <= 0) {
-      freshEl.textContent = 'Data from today';
-      freshEl.style.color = '#065F46';
-    } else if (ageDays === 1) {
-      freshEl.textContent = 'Data from yesterday';
-      freshEl.style.color = '#92400E';
-    } else if (ageDays <= 3) {
-      freshEl.textContent = 'Data is ' + ageDays + ' days old';
-      freshEl.style.color = '#92400E';
-    } else {
-      freshEl.textContent = '⚠ Data is ' + ageDays + ' days old — Looker may have stopped pushing';
-      freshEl.style.color = '#991B1B';
-    }
-  }
-
   async function loadAllData() {
     const badge = document.getElementById('last-refresh-badge');
     const srcBadge = document.getElementById('data-source-badge');
