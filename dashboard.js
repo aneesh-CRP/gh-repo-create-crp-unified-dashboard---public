@@ -2157,30 +2157,7 @@ function buildRiskFlagCards() {
   }).join('');
 }
 
-function buildWeeklyBySiteChart() {
-  const d = DATA.weeklyBySite || [];
-  if (!document.getElementById('weeklyBySiteChart')) return;
-  mkChart('weeklyBySiteChart', {
-    type: 'bar',
-    data: {
-      labels: d.map(x => x.week),
-      datasets: [
-        { label: 'Philadelphia', data: d.map(x => x.philly), backgroundColor: '#bfdbfe', borderColor: '#072061', borderWidth: 1.5, borderRadius: 4 },
-        { label: 'Pennington', data: d.map(x => x.pennington), backgroundColor: '#bbf7d0', borderColor: '#059669', borderWidth: 1.5, borderRadius: 4 }
-      ]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { position: 'top', labels: { usePointStyle: true, font: { size: 11 } } },
-        tooltip: { callbacks: { footer: (items) => 'Total: ' + (items[0].raw + (items[1]?.raw||0)) }}
-      },
-      scales: {
-        x: { stacked: true, grid: { display: false } },
-        y: { stacked: true, grid: { color: '#f1f5f9' }, beginAtZero: true }
-      }
-    }
-  });
-}
+// buildWeeklyBySiteChart removed — canvas element no longer exists
 
 function buildSchedCoordList() {
   // Merged into renderCoordWorkloadBalance — no-op
@@ -2300,13 +2277,6 @@ function buildSchedStudyBars() {
       <span style="font-size:9px;font-weight:700;padding:2px 4px;border-radius:3px;background:${siteColor}20;color:${siteColor};text-align:center">${siteShort}</span>
     </div>`;
   }).join('');
-}
-
-function buildStatusLegend() {
-  const d = DATA.subjectStatus || [];
-  const colors = ['#059669','#072061','#d97706','#7c3aed','#94a3b8'];
-  const leg = document.getElementById('status-legend');
-  if (leg) leg.innerHTML = d.map((x,i) => `<div class="legend-row"><div class="legend-dot" style="background:${colors[i]}"></div><span class="legend-label">${escapeHTML(x.status)}</span><span class="legend-val">${x.count}</span></div>`).join('');
 }
 
 function schedFilter(btn, filter) {
@@ -2761,7 +2731,7 @@ function showHorizonDetail(type, weekLabel) {
   overlay.innerHTML = `<div style="background:#fff;border-radius:12px;max-width:800px;width:100%;max-height:80vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3)">
     <div style="padding:16px 20px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center">
       <div style="font-size:15px;font-weight:700;color:#1a202c">${escapeHTML(title)} <span style="font-weight:400;color:#64748b;font-size:13px">(${rows.length} records)</span></div>
-      <button onclick="document.getElementById('horizon-overlay').remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#94a3b8;padding:4px 8px">✕</button>
+      <button onclick="var _ho=document.getElementById('horizon-overlay');if(_ho)_ho.remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#94a3b8;padding:4px 8px">✕</button>
     </div>
     <div style="padding:16px 20px">${rows.length ? tableHTML : '<div style="text-align:center;padding:24px;color:#94a3b8">No records for this week</div>'}</div>
   </div>`;
@@ -2792,36 +2762,7 @@ function buildCancelStudyBars() {
 }
 
 function buildCoordList() {
-  const el = document.getElementById('sched-coord-list') || document.getElementById('coord-list');
-  if (!el) return;
-  const VALID2 = new Set(CRP_CONFIG.SCHEDULE_COORDINATORS || CRP_CONFIG.COORDINATORS || []);
-  const coords = (DATA.coordinators||[]).filter(c => VALID2.has(c.name));
-  if (!coords.length) { el.innerHTML = '<p style="color:#94a3b8;font-size:12px">No coordinator data</p>'; return; }
-  const maxUp = Math.max(...coords.map(c => c.upcoming || 0), 1);
-  const siteColors = { 'Philadelphia, PA': '#072061', 'Pennington, NJ': '#1843ad' };
-  el.innerHTML = coords.map(c => {
-    const pct = Math.round((c.upcoming||0) / maxUp * 100);
-    const siteColor = siteColors[c.site] || '#072061';
-    const cancelRate = c.upcoming ? Math.round((c.cancels||0)/(c.upcoming + (c.cancels||0))*100) : 0;
-    const rateColor = cancelRate >= 40 ? '#dc2626' : cancelRate >= 25 ? '#d97706' : '#059669';
-    return `<div class="coord-row" style="padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer"
-                 onclick="showCoordDetail('${escapeHTML(c.name)}')">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-        <div>
-          <span style="font-size:13px;font-weight:600;color:var(--text)">${escapeHTML(c.name)}</span>
-          <span style="font-size:10px;background:${siteColor}18;color:${siteColor};border-radius:3px;padding:1px 5px;margin-left:6px;font-weight:600">${c.site.includes('Penn')?'PNJ':'PHL'}</span>
-        </div>
-        <div style="text-align:right">
-          <span style="font-size:13px;font-weight:700;color:var(--blue)">${c.upcoming}</span>
-          <span style="font-size:10px;color:var(--muted)"> visits</span>
-          <span style="font-size:11px;font-weight:600;color:${rateColor};margin-left:8px">${cancelRate}% cancel</span>
-        </div>
-      </div>
-      <div style="height:6px;background:#e2e8f0;border-radius:3px;overflow:hidden">
-        <div style="height:100%;width:${pct}%;background:${siteColor};border-radius:3px;transition:width .4s"></div>
-      </div>
-    </div>`;
-  }).join('');
+  // Merged into renderCoordWorkloadBalance — no-op (target elements removed)
 }
 
 function buildInvestigatorList() {
@@ -3873,7 +3814,6 @@ function switchView(name, el) {
   // Build charts lazily for schedule view
   if (name === 'schedule') {
     setTimeout(() => {
-      safe(buildWeeklyBySiteChart,   'wkChart');
       safe(buildScheduleTable,       'buildSched');
       safe(buildRiskFlagCards,       'riskCards');
       safe(buildSchedStudyBars,      'schedBars');
@@ -7082,7 +7022,6 @@ function renderAll() {
   // Note: buildRiskTable/buildStudyCards removed — Studies tab now uses buildStudiesView (lazy-loaded on tab click)
   if (typeof buildRiskFlagCards === 'function')     safe(buildRiskFlagCards,     'buildRiskFlagCards');
   // Pre-build schedule so it's ready when tab is clicked
-  safe(buildWeeklyBySiteChart,   'buildWeeklyBySiteChart');
   safe(buildScheduleTable,       'buildScheduleTable');
   safe(buildSchedStudyBars,      'buildSchedStudyBars');
   safe(buildSchedCoordList,      'buildSchedCoordList');
