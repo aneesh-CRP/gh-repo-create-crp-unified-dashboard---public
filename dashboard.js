@@ -7872,6 +7872,7 @@ async function refreshReferrals() {
     REFERRAL_DATA.forEach(function(r) {
       var sn = (r.study||'').toLowerCase().trim().replace(/^"+|"+$/g, '');
       r._studyNorm = sn;  // cache normalized study name
+      if (sn.length < 2 || isReferralStudyGarbage(sn)) return;  // skip garbage entries from index
       if (!_referralByStudy.has(sn)) _referralByStudy.set(sn, []);
       _referralByStudy.get(sn).push(r);
     });
@@ -8274,30 +8275,31 @@ function isReferralStudyGarbage(rs) {
 // ── Study ↔ Referral Pipeline helper (for Studies tab) ──────────────
 function getStudyReferralPipeline(studyName) {
   if (!REFERRAL_DATA || REFERRAL_DATA.length === 0) return null;
-  const sn = studyName.toLowerCase().trim();
-  // Try O(1) exact lookup first
-  var matches = _referralByStudy.get(sn);
-  // Try alias map (referral nickname → protocol)
-  if (!matches || matches.length === 0) {
-    // Check if any alias maps TO this study
-    Object.keys(REFERRAL_STUDY_MAP).forEach(function(alias) {
-      if (REFERRAL_STUDY_MAP[alias] === sn) {
-        var aliasMatches = _referralByStudy.get(alias);
-        if (aliasMatches && aliasMatches.length > 0) {
-          matches = (matches || []).concat(aliasMatches);
-        }
-      }
-    });
-  }
-  // Fuzzy fallback: referral nickname is substring of protocol (e.g., "ezef" in "j3l-mc-ezef")
-  if (!matches || matches.length === 0) {
-    matches = REFERRAL_DATA.filter(function(r) {
-      var rs = (r.study||'').toLowerCase().trim().replace(/^"+|"+$/g, '');
-      if (rs.length < 3 || isReferralStudyGarbage(rs)) return false;
-      // Only check if referral nickname is substring of protocol (not reverse — avoids false positives)
-      return sn.includes(rs);
-    });
-  }
+  var sn = studyName.toLowerCase().trim();
+  var seen = {};
+  var matches = [];
+  function addMatch(r) { if (!seen[r.id]) { seen[r.id] = 1; matches.push(r); } }
+
+  // Strategy 1: exact lookup by protocol name
+  var exact = _referralByStudy.get(sn);
+  if (exact) exact.forEach(addMatch);
+
+  // Strategy 2: alias map (referral nickname → protocol)
+  Object.keys(REFERRAL_STUDY_MAP).forEach(function(alias) {
+    if (REFERRAL_STUDY_MAP[alias] === sn) {
+      var ar = _referralByStudy.get(alias);
+      if (ar) ar.forEach(addMatch);
+    }
+  });
+
+  // Strategy 3: fuzzy — referral nickname is substring of protocol (e.g., "ezef" in "j3l-mc-ezef")
+  REFERRAL_DATA.forEach(function(r) {
+    if (seen[r.id]) return;
+    var rs = (r._studyNorm || (r.study||'').toLowerCase().trim()).replace(/^"+|"+$/g, '');
+    if (rs.length < 3 || isReferralStudyGarbage(rs)) return;
+    if (sn.includes(rs)) addMatch(r);
+  });
+
   if (matches.length === 0) return null;
   const stages = {};
   let active = 0;
