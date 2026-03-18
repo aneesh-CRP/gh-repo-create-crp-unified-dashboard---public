@@ -1270,6 +1270,33 @@ body {
     </div>
   </div>
 
+  <!-- Full visit table — moved up under KPIs for quick access -->
+  <div class="card fade-in">
+    <div class="card-header" style="flex-wrap:wrap;gap:8px;">
+      <span class="card-title">📆 All Upcoming Visits</span>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+        <span class="badge badge-green" id="sched-count">— visits</span>
+        <span class="badge" id="sched-confirm-count" style="background:#059669;color:#fff;font-size:10px;padding:2px 8px;border-radius:10px;">0/0 confirmed</span>
+        <button class="filter-btn active" onclick="schedFilter(this,'all')"  style="font-size:11px;padding:3px 8px;">All</button>
+        <button class="filter-btn"        onclick="schedFilter(this,'14')"   style="font-size:11px;padding:3px 8px;">14 days</button>
+        <button class="filter-btn"        onclick="schedFilter(this,'30')"   style="font-size:11px;padding:3px 8px;">30 days</button>
+        <button class="filter-btn"        onclick="schedFilter(this,'phl')"  style="font-size:11px;padding:3px 8px;">PHL only</button>
+        <button class="filter-btn"        onclick="schedFilter(this,'pnj')"  style="font-size:11px;padding:3px 8px;">PNJ only</button>
+      </div>
+    </div>
+    <div style="max-height:600px;overflow-y:auto;border-radius:0 0 8px 8px;">
+      <table class="data-table sortable" id="vis-table">
+        <thead>
+          <tr><th style="width:80px;font-size:10px">Confirm</th><th onclick="sortTable(this)">Date</th><th onclick="sortTable(this)">Study</th><th onclick="sortTable(this)">Visit</th><th onclick="sortTable(this)">Patient</th><th onclick="sortTable(this)">Status</th><th onclick="sortTable(this)">Coordinator</th><th onclick="sortTable(this)">Investigator</th><th onclick="sortTable(this)">Site</th></tr>
+        </thead>
+        <tbody id="upcoming-tbody">
+<tr><td colspan="9" style="text-align:center;padding:24px;color:#94a3b8;font-size:12px">Loading schedule from CRIO...</td></tr>
+<!-- Dynamic rows built by buildScheduleTable() from live CRIO data -->
+</tbody>
+      </table>
+    </div>
+  </div>
+
   <!-- At-Risk Patients (moved from Actions) — most urgent, at top -->
   <div class="section-title" style="margin-bottom:10px;">🚨 At-Risk Patients — Immediate Action Required</div>
 
@@ -1340,34 +1367,6 @@ body {
       <div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">Loading medical records alerts...</div>
     </div>
   </div>
-
-  <!-- Full visit table -->
-  <div class="card fade-in">
-    <div class="card-header" style="flex-wrap:wrap;gap:8px;">
-      <span class="card-title">📆 All Upcoming Visits</span>
-      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-        <span class="badge badge-green" id="sched-count">— visits</span>
-        <span class="badge" id="sched-confirm-count" style="background:#059669;color:#fff;font-size:10px;padding:2px 8px;border-radius:10px;">0/0 confirmed</span>
-        <button class="filter-btn active" onclick="schedFilter(this,'all')"  style="font-size:11px;padding:3px 8px;">All</button>
-        <button class="filter-btn"        onclick="schedFilter(this,'14')"   style="font-size:11px;padding:3px 8px;">14 days</button>
-        <button class="filter-btn"        onclick="schedFilter(this,'30')"   style="font-size:11px;padding:3px 8px;">30 days</button>
-        <button class="filter-btn"        onclick="schedFilter(this,'phl')"  style="font-size:11px;padding:3px 8px;">PHL only</button>
-        <button class="filter-btn"        onclick="schedFilter(this,'pnj')"  style="font-size:11px;padding:3px 8px;">PNJ only</button>
-      </div>
-    </div>
-    <div style="max-height:600px;overflow-y:auto;border-radius:0 0 8px 8px;">
-      <table class="data-table sortable" id="vis-table">
-        <thead>
-          <tr><th style="width:80px;font-size:10px">Confirm</th><th onclick="sortTable(this)">Date</th><th onclick="sortTable(this)">Study</th><th onclick="sortTable(this)">Visit</th><th onclick="sortTable(this)">Patient</th><th onclick="sortTable(this)">Status</th><th onclick="sortTable(this)">Coordinator</th><th onclick="sortTable(this)">Investigator</th><th onclick="sortTable(this)">Site</th></tr>
-        </thead>
-        <tbody id="upcoming-tbody">
-<tr><td colspan="9" style="text-align:center;padding:24px;color:#94a3b8;font-size:12px">Loading schedule from CRIO...</td></tr>
-<!-- Dynamic rows built by buildScheduleTable() from live CRIO data -->
-</tbody>
-      </table>
-    </div>
-  </div>
-
 
   <!-- Study breakdown + coord workload -->
   <div class="grid-2 mb16 fade-in">
