@@ -2162,32 +2162,22 @@ body {
   <!-- Charts — hidden until longitudinal data available -->
   <div id="trends-charts" style="display:none;">
 
-    <!-- Cancel rate over time -->
-    <div class="card mb16 fade-in">
-      <div class="card-header">
-        <span class="card-title">📉 Weekly Cancellation Rate Over Time</span>
-        <span class="badge badge-gray" id="trends-cancel-rate-badge">Cancel Rate %</span>
-      </div>
-      <div class="chart-wrap h220">
-        <canvas id="trendsCancelRateChart"></canvas>
-      </div>
-    </div>
-
-    <!-- Cancel volume + upcoming volume side by side -->
+    <!-- Cancel volume (bars) + cancel rate (line) — dual axis -->
     <div class="grid-2 mb16 fade-in">
       <div class="card">
         <div class="card-header">
-          <span class="card-title">Cancellations per Week</span>
+          <span class="card-title">📉 Cancellations & Rate</span>
+          <span class="badge badge-gray">Bars = volume · Line = rate %</span>
         </div>
-        <div class="chart-wrap h200">
-          <canvas id="trendsCancelVolChart"></canvas>
+        <div class="chart-wrap h220">
+          <canvas id="trendsCancelDualChart"></canvas>
         </div>
       </div>
       <div class="card">
         <div class="card-header">
           <span class="card-title">Upcoming Visits per Week</span>
         </div>
-        <div class="chart-wrap h200">
+        <div class="chart-wrap h220">
           <canvas id="trendsUpcomingVolChart"></canvas>
         </div>
       </div>
@@ -5407,7 +5397,7 @@ function exportCoordHistory() {
  */
 function mergeCoordGoalsWithSnapshot(goals) {
   var snapshot = loadCoordSnapshot();
-  var COORDS = CRP_CONFIG.COORDINATORS || [];
+  var COORDS = CRP_CONFIG.SCHEDULE_COORDINATORS || CRP_CONFIG.COORDINATORS || [];
   var now = new Date();
   var monthStart = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-01';
 
@@ -12581,14 +12571,19 @@ function renderTrendsCharts() {
 
   const mid = Math.max(1, Math.floor(trends.length / 2));
   const olderHalf = trends.slice(0, mid);
-  const recentHalf = trends.slice(mid);
+  const recentHalf = trends.length > 1 ? trends.slice(mid) : trends;
   const recentAvgRate = recentHalf.reduce((s, t) => s + t.cancelRate, 0) / (recentHalf.length || 1);
   const olderAvgRate = olderHalf.reduce((s, t) => s + t.cancelRate, 0) / (olderHalf.length || 1);
   const rateDirEl = document.getElementById('trends-rate-dir');
   if (rateDirEl) {
-    const diff = recentAvgRate - olderAvgRate;
-    rateDirEl.textContent = (diff > 0 ? '+' : '') + diff.toFixed(1) + '%';
-    rateDirEl.style.color = diff > 0 ? 'var(--red)' : 'var(--green)';
+    if (trends.length < 2) {
+      rateDirEl.textContent = recentAvgRate.toFixed(1) + '%';
+      rateDirEl.style.color = 'var(--muted)';
+    } else {
+      const diff = recentAvgRate - olderAvgRate;
+      rateDirEl.textContent = (diff > 0 ? '+' : '') + diff.toFixed(1) + '%';
+      rateDirEl.style.color = diff > 0 ? 'var(--red)' : 'var(--green)';
+    }
   }
   const rateSub = document.getElementById('trends-rate-sub');
   if (rateSub) rateSub.textContent = trends.length >= 2 ? 'recent vs. older weeks' : 'single week loaded';
@@ -12599,44 +12594,48 @@ function renderTrendsCharts() {
   const avgUpEl = document.getElementById('trends-avg-upcoming');
   if (avgUpEl) avgUpEl.textContent = Math.round(recentHalf.reduce((s, t) => s + t.upcoming, 0) / (recentHalf.length || 1));
 
-  // ── Chart 1: Cancel Rate % Over Time ──
-  mkChart('trendsCancelRateChart', {
-    type: 'line',
-    data: {
-      labels: trends.map(t => t.label),
-      datasets: [{
-        label: 'Cancel Rate %',
-        data: trends.map(t => t.cancelRate),
-        borderColor: '#dc2626', backgroundColor: 'rgba(220,38,38,0.08)',
-        borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#dc2626',
-        fill: true, tension: 0.3
-      }]
-    },
-    options: { responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false }, tooltip: { callbacks: { label: i => i.raw + '% cancel rate' } } },
-      scales: { x: { grid: { display: false } }, y: { grid: { color: '#f1f5f9' }, beginAtZero: true, ticks: { callback: v => v + '%' } } }
-    }
-  });
-
-  // ── Chart 2: Cancel Volume per Snapshot ──
-  mkChart('trendsCancelVolChart', {
+  // ── Chart 1: Dual-axis — Cancel Volume (bars) + Cancel Rate % (line) ──
+  mkChart('trendsCancelDualChart', {
     type: 'bar',
     data: {
       labels: trends.map(t => t.label),
-      datasets: [{
-        data: trends.map(t => t.cancelled),
-        backgroundColor: trends.map(t => t.cancelled >= 30 ? '#fca5a5' : t.cancelled >= 18 ? '#fde68a' : '#bfdbfe'),
-        borderColor: trends.map(t => t.cancelled >= 30 ? '#dc2626' : t.cancelled >= 18 ? '#d97706' : '#072061'),
-        borderWidth: 1.5, borderRadius: 4
-      }]
+      datasets: [
+        {
+          label: 'Cancellations',
+          type: 'bar',
+          data: trends.map(t => t.cancelled),
+          backgroundColor: trends.map(t => t.cancelled >= 30 ? '#fca5a5' : t.cancelled >= 18 ? '#fde68a' : '#bfdbfe'),
+          borderColor: trends.map(t => t.cancelled >= 30 ? '#dc2626' : t.cancelled >= 18 ? '#d97706' : '#072061'),
+          borderWidth: 1.5, borderRadius: 4,
+          yAxisID: 'y',
+          order: 2
+        },
+        {
+          label: 'Cancel Rate %',
+          type: 'line',
+          data: trends.map(t => t.cancelRate),
+          borderColor: '#dc2626', backgroundColor: 'transparent',
+          borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#dc2626',
+          tension: 0.3, fill: false,
+          yAxisID: 'y1',
+          order: 1
+        }
+      ]
     },
     options: { responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false }, tooltip: { callbacks: { label: i => i.raw + ' cancellations' } } },
-      scales: { x: { grid: { display: false } }, y: { grid: { color: '#f1f5f9' }, beginAtZero: true } }
+      plugins: {
+        legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } },
+        tooltip: { callbacks: { label: function(i) { return i.dataset.label === 'Cancel Rate %' ? i.raw + '%' : i.raw + ' cancellations'; } } }
+      },
+      scales: {
+        x: { type: 'category', grid: { display: false } },
+        y: { type: 'linear', position: 'left', grid: { color: '#f1f5f9' }, beginAtZero: true, title: { display: true, text: 'Count', font: { size: 10 }, color: '#94a3b8' } },
+        y1: { type: 'linear', position: 'right', grid: { drawOnChartArea: false }, beginAtZero: true, ticks: { callback: v => v + '%' }, title: { display: true, text: 'Rate %', font: { size: 10 }, color: '#dc2626' } }
+      }
     }
   });
 
-  // ── Chart 3: Upcoming Volume per Snapshot ──
+  // ── Chart 2: Upcoming Volume per Snapshot ──
   mkChart('trendsUpcomingVolChart', {
     type: 'line',
     data: {
