@@ -2249,24 +2249,7 @@ function buildVisitTypeChart() {
 }
 
 function buildSchedCoordList() {
-  const el = document.getElementById('sched-coord-list');
-  if (!el || el.innerHTML.trim()) return; // already populated statically
-  const VALID = new Set(CRP_CONFIG.SCHEDULE_COORDINATORS || CRP_CONFIG.COORDINATORS || []);
-  const coords = (DATA.coordinators || []).filter(c => VALID.has(c.name));
-  const max = Math.max(...coords.map(c => c.upcoming), 1);
-  el.innerHTML = coords.map(c => {
-    const pct = Math.round(c.upcoming / max * 100);
-    const color = c.site && c.site.includes('Penn') ? '#059669' : '#072061';
-    return `<div style="padding:8px 0;border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showCoordDetail('${jsAttr(c.name)}')">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-        <span style="font-size:12px;font-weight:600">${escapeHTML(c.name)}</span>
-        <span style="font-size:12px;font-weight:700;color:${color}">${c.upcoming} visits</span>
-      </div>
-      <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden;">
-        <div style="width:${pct}%;height:100%;background:${color};border-radius:3px;"></div>
-      </div>
-    </div>`;
-  }).join('');
+  // Merged into renderCoordWorkloadBalance — no-op
 }
 
 // ── Dynamically build schedule table from live CRIO data ──
@@ -2923,29 +2906,7 @@ function buildCoordList() {
 }
 
 function buildInvestigatorList() {
-  const el = document.getElementById('sched-inv-list');
-  if (!el) return;
-  const invs = DATA.investigators || [];
-  if (!invs.length) { el.innerHTML = '<p style="color:#94a3b8;font-size:12px">No investigator data</p>'; return; }
-  const maxUp = Math.max(...invs.map(i => i.upcoming || 0), 1);
-  el.innerHTML = invs.map(inv => {
-    const pct = Math.round((inv.upcoming||0) / maxUp * 100);
-    const color = '#7c3aed';
-    return `<div style="padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer"
-                 onclick="showInvDetail('${jsAttr(inv.name)}')">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
-        <span style="font-size:13px;font-weight:600;color:var(--text)">${escapeHTML(inv.name)}</span>
-        <div style="text-align:right">
-          <span style="font-size:13px;font-weight:700;color:${color}">${inv.upcoming}</span>
-          <span style="font-size:10px;color:var(--muted)"> visits</span>
-          <span style="font-size:10px;color:#94a3b8;margin-left:6px">${inv.studyCount} studies</span>
-        </div>
-      </div>
-      <div style="height:5px;background:#e2e8f0;border-radius:3px;overflow:hidden">
-        <div style="height:100%;width:${pct}%;background:${color};border-radius:3px;transition:width .4s"></div>
-      </div>
-    </div>`;
-  }).join('');
+  // Merged into renderInvCapacity — no-op
 }
 
 function showInvDetail(invName) {
@@ -3308,7 +3269,7 @@ function renderCoordWorkloadBalance() {
     if (c.visits > avgVisits * 1.5 && avgVisits > 0 && c.cancelRate < 10) alerts.push({text:'Top Performer', bg:'#f0fdf4', color:'#059669'});
     var alertHtml = alerts.length > 0 ? ' ' + alerts.map(function(a){ return '<span style="font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px;background:'+a.bg+';color:'+a.color+';">'+a.text+'</span>'; }).join(' ') : '';
 
-    html += '<div style="display:grid;grid-template-columns:120px 1fr 60px 50px 50px;align-items:center;gap:6px;font-size:11px;">';
+    html += '<div style="display:grid;grid-template-columns:120px 1fr 60px 50px 50px;align-items:center;gap:6px;font-size:11px;cursor:pointer;" onclick="showCoordDetail(\''+c.name.replace(/'/g,"\\'")+'\')">';
     html += '<div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+c.name.split(' ')[0]+alertHtml+'</div>';
     html += '<div style="background:#e2e8f0;border-radius:4px;height:14px;overflow:hidden;position:relative;">';
     html += '<div style="height:100%;width:'+pct+'%;background:linear-gradient(90deg,#1843AD,#3b82f6);border-radius:4px;"></div>';
@@ -3343,10 +3304,9 @@ function renderInvCapacity() {
     var avgPerDay = dayCount > 0 ? (iv.length / dayCount).toFixed(1) : '0';
     var sched = schedules[name] || {};
     var availDays = sched.daysPerWeek || 5;
-    var utilPct = dayCount > 0 && availDays > 0 ? Math.min(100, Math.round(dayCount / (availDays * 2) * 100)) : 0; // 2 weeks of data
+    var utilPct = dayCount > 0 && availDays > 0 ? Math.min(100, Math.round(dayCount / (availDays * 2) * 100)) : 0;
     var studies = {};
     iv.forEach(function(v){studies[v.study]=1;});
-    // Cost from QB
     var costPerVisit = 0;
     if (typeof QB_DATA !== 'undefined' && QB_DATA.loaded && QB_DATA.pnlCostByName) {
       var pnlCost = 0;
@@ -3360,29 +3320,33 @@ function renderInvCapacity() {
   }).sort(function(a,b){return b.visits-a.visits;});
 
   var maxVisits = Math.max.apply(null, invStats.map(function(i){return i.visits;}).concat([0])) || 1;
-  var html = '<div style="display:grid;gap:10px;">';
+  var totalVisits = invStats.reduce(function(s,i){return s+i.visits;},0);
+  var avgUtil = invStats.length > 0 ? Math.round(invStats.reduce(function(s,i){return s+i.utilPct;},0)/invStats.length) : 0;
+  var avgUtilColor = avgUtil >= 70 ? '#059669' : avgUtil >= 40 ? '#f59e0b' : '#dc2626';
+
+  var html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(80px,1fr));gap:8px;margin-bottom:12px;">';
+  html += '<div style="padding:6px;background:#f5f3ff;border-radius:8px;text-align:center;"><div style="font-size:16px;font-weight:800;color:#7c3aed;">'+totalVisits+'</div><div style="font-size:9px;color:#7c3aed;font-weight:600;">Total Visits</div></div>';
+  html += '<div style="padding:6px;background:#eff6ff;border-radius:8px;text-align:center;"><div style="font-size:16px;font-weight:800;color:#3b82f6;">'+invStats.length+'</div><div style="font-size:9px;color:#3b82f6;font-weight:600;">Investigators</div></div>';
+  html += '<div style="padding:6px;background:'+(avgUtil>=70?'#f0fdf4':'#fffbeb')+';border-radius:8px;text-align:center;"><div style="font-size:16px;font-weight:800;color:'+avgUtilColor+';">'+avgUtil+'%</div><div style="font-size:9px;color:'+avgUtilColor+';font-weight:600;">Avg Util</div></div>';
+  html += '</div>';
+
+  html += '<div style="display:grid;gap:6px;">';
   invStats.forEach(function(inv) {
     var pct = Math.round(inv.visits / maxVisits * 100);
     var utilColor = inv.utilPct >= 80 ? '#059669' : inv.utilPct >= 50 ? '#f59e0b' : '#94a3b8';
-    html += '<div style="background:#f9fafb;border-radius:8px;padding:12px;border:1px solid #e5e7eb;">';
-    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">';
-    html += '<span style="font-weight:700;font-size:12px;">'+inv.name+'</span>';
-    html += '<span style="font-size:11px;font-weight:700;color:#1843AD;">'+inv.visits+' visits</span>';
+    html += '<div style="display:grid;grid-template-columns:100px 1fr 45px 45px 45px;align-items:center;gap:6px;font-size:11px;cursor:pointer;" onclick="showInvDetail(\''+inv.name.replace(/'/g,"\\'")+'\')">';
+    html += '<div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+inv.name.split(' ')[0]+'</div>';
+    html += '<div style="background:#e2e8f0;border-radius:4px;height:14px;overflow:hidden;position:relative;">';
+    html += '<div style="height:100%;width:'+pct+'%;background:linear-gradient(90deg,#7c3aed,#a78bfa);border-radius:4px;"></div>';
+    html += '<div style="position:absolute;left:'+Math.min(pct,50)+'%;top:0;transform:translateX(4px);font-size:9px;font-weight:700;color:#1e293b;line-height:14px;">'+inv.visits+'</div>';
     html += '</div>';
-    html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center;margin-bottom:6px;">';
-    html += '<div><div style="font-size:14px;font-weight:800;color:#1843AD;">'+inv.avgPerDay+'</div><div style="font-size:8px;color:#94a3b8;">Avg/Day</div></div>';
-    html += '<div><div style="font-size:14px;font-weight:800;color:'+utilColor+';">'+inv.utilPct+'%</div><div style="font-size:8px;color:#94a3b8;">Utilization</div></div>';
-    html += '<div><div style="font-size:14px;font-weight:800;color:#6366f1;">'+inv.studies+'</div><div style="font-size:8px;color:#94a3b8;">Studies</div></div>';
-    if (inv.costPerVisit > 0) {
-      html += '<div><div style="font-size:14px;font-weight:800;color:#059669;">$'+inv.costPerVisit+'</div><div style="font-size:8px;color:#94a3b8;">Cost/Visit</div></div>';
-    } else {
-      html += '<div><div style="font-size:14px;font-weight:800;color:#94a3b8;">—</div><div style="font-size:8px;color:#94a3b8;">Cost/Visit</div></div>';
-    }
-    html += '</div>';
-    html += '<div style="background:#e2e8f0;border-radius:4px;height:6px;overflow:hidden;"><div style="height:100%;width:'+pct+'%;background:#1843AD;border-radius:4px;"></div></div>';
+    html += '<div style="text-align:center;font-size:10px;color:'+utilColor+';font-weight:700;">'+inv.utilPct+'%</div>';
+    html += '<div style="text-align:center;font-size:10px;color:#6366f1;font-weight:600;">'+inv.studies+' st</div>';
+    html += '<div style="text-align:center;font-size:10px;color:#64748b;">'+inv.avgPerDay+'/d</div>';
     html += '</div>';
   });
   html += '</div>';
+  html += '<div style="margin-top:6px;font-size:9px;color:#94a3b8;text-align:right;">Util = days active / available days · st = studies · /d = avg visits per day</div>';
   el.innerHTML = html;
 }
 
@@ -8739,6 +8703,7 @@ async function fetchMedicalRecords(attempt) {
     safe(renderMedicalRecords, 'renderMedicalRecords');
     safe(buildMedRecAlerts, 'buildMedRecAlerts');
     safe(injectScheduleMedRecords, 'injectScheduleMedRecords');
+    safe(renderPIApprovalTracker, 'renderPIApprovalTracker');
   } catch(e) {
     console.warn('fetchMedicalRecords error (attempt ' + attempt + '):', e);
     if (attempt >= 3) setHealthChip('dh-medrec', 'fail', 'Med Records (failed)');
@@ -11395,11 +11360,38 @@ function setHealthChip(id, status, label) {
   el.className = 'dh-chip ' + status;
   const icon = status === 'ok' ? '✓' : status === 'warn' ? '⚠' : status === 'fail' ? '✗' : '⏳';
   el.textContent = icon + ' ' + label;
+  _updateHealthButton();
 }
 
 function showHealthStrip() {
-  const strip = document.getElementById('data-health-strip');
-  if (strip) strip.style.display = 'flex';
+  // Show the toggle button in nav instead of auto-expanding the strip
+  var btn = document.getElementById('dh-toggle-btn');
+  if (btn) btn.style.display = '';
+  _updateHealthButton();
+}
+
+function toggleHealthStrip() {
+  var strip = document.getElementById('data-health-strip');
+  if (!strip) return;
+  var isVisible = strip.style.display === 'flex';
+  strip.style.display = isVisible ? 'none' : 'flex';
+}
+
+function _updateHealthButton() {
+  var btn = document.getElementById('dh-toggle-btn');
+  if (!btn) return;
+  var chips = document.querySelectorAll('#data-health-strip .dh-chip');
+  var ok = 0, warn = 0, fail = 0, loading = 0;
+  chips.forEach(function(c) {
+    if (c.classList.contains('ok')) ok++;
+    else if (c.classList.contains('warn')) warn++;
+    else if (c.classList.contains('fail')) fail++;
+    else loading++;
+  });
+  if (fail > 0) { btn.textContent = '\u2717 ' + fail + ' failed'; btn.style.background = '#fef2f2'; btn.style.color = '#dc2626'; btn.style.borderColor = '#fecaca'; }
+  else if (warn > 0) { btn.textContent = '\u26A0 ' + warn + ' warning'; btn.style.background = '#fffbeb'; btn.style.color = '#d97706'; btn.style.borderColor = '#fde68a'; }
+  else if (loading > 0) { btn.textContent = '\u23F3 Loading...'; btn.style.background = 'var(--surface2)'; btn.style.color = 'var(--muted)'; btn.style.borderColor = 'var(--border)'; }
+  else { btn.textContent = '\u2713 All OK'; btn.style.background = '#f0fdf4'; btn.style.color = '#059669'; btn.style.borderColor = '#bbf7d0'; }
 }
 
 function checkDataFreshness(rows) {
