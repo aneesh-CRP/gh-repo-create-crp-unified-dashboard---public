@@ -1624,6 +1624,22 @@ body {
     </div>
   </div>
 
+  <!-- ── COORDINATOR WORKLOAD BALANCE ── -->
+  <div class="section-title" style="margin-top:24px">Coordinator Workload Balance</div>
+  <div class="card fade-in" style="margin-bottom:16px">
+    <div style="padding:16px" id="coordBalanceContainer">
+      <p style="color:#94a3b8;font-size:12px">Loading workload balance...</p>
+    </div>
+  </div>
+
+  <!-- ── INVESTIGATOR CAPACITY PLANNING ── -->
+  <div class="section-title" style="margin-top:16px">Investigator Capacity Planning</div>
+  <div class="card fade-in" style="margin-bottom:16px">
+    <div id="invCapacityContainer" style="padding:16px">
+      <p style="color:#94a3b8;font-size:12px">Loading investigator capacity...</p>
+    </div>
+  </div>
+
   <!-- Prioritized Action Plan (moved from Actions) -->
   <div class="section-title" style="margin-top:16px;">📋 Prioritized Action Plan</div>
   <div class="grid-2">
@@ -5331,6 +5347,123 @@ function renderCoordinatorGoals() {
   }).join('');
 }
 
+function renderCoordWorkloadBalance() {
+  var el = document.getElementById('coordBalanceContainer');
+  if (!el || !DATA.allVisitDetail || DATA.allVisitDetail.length === 0) return;
+  var COORDS = CRP_CONFIG.SCHEDULE_COORDINATORS || CRP_CONFIG.COORDINATORS || [];
+  if (COORDS.length === 0) return;
+
+  var coordStats = COORDS.map(function(name) {
+    var visits = DATA.allVisitDetail.filter(function(v){return v.coord===name;});
+    var cancels = DATA.allCancels.filter(function(c){return c.coord===name;});
+    var patients = {};
+    var studies = {};
+    visits.forEach(function(v) { patients[v.patient]=1; studies[v.study]=1; });
+    var cancelRate = (visits.length+cancels.length) > 0 ? Math.round(cancels.length/(visits.length+cancels.length)*100) : 0;
+    return { name:name, visits:visits.length, cancels:cancels.length, patients:Object.keys(patients).length, studies:Object.keys(studies).length, cancelRate:cancelRate };
+  }).sort(function(a,b){return b.visits-a.visits;});
+
+  var maxVisits = Math.max.apply(null, coordStats.map(function(c){return c.visits;})) || 1;
+  var totalVisits = coordStats.reduce(function(s,c){return s+c.visits;},0);
+  var avgVisits = COORDS.length > 0 ? Math.round(totalVisits/COORDS.length) : 0;
+  var maxDev = 0;
+  coordStats.forEach(function(c){var d=Math.abs(c.visits-avgVisits);if(d>maxDev)maxDev=d;});
+  var balanceScore = avgVisits > 0 ? Math.max(0,100-Math.round(maxDev/avgVisits*100)) : 100;
+  var balColor = balanceScore >= 80 ? '#059669' : balanceScore >= 60 ? '#f59e0b' : '#dc2626';
+  var highCancel = coordStats.filter(function(c){return c.cancelRate>20;});
+
+  var html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:14px;">';
+  html += '<div style="padding:8px;background:#eff6ff;border-radius:8px;text-align:center;"><div style="font-size:18px;font-weight:800;color:#3b82f6;">'+totalVisits+'</div><div style="font-size:9px;color:#3b82f6;font-weight:600;">Total Visits</div></div>';
+  html += '<div style="padding:8px;background:#f0fdf4;border-radius:8px;text-align:center;"><div style="font-size:18px;font-weight:800;color:#059669;">'+avgVisits+'</div><div style="font-size:9px;color:#059669;font-weight:600;">Avg/Coord</div></div>';
+  html += '<div style="padding:8px;background:'+(balanceScore>=80?'#f0fdf4':'#fffbeb')+';border-radius:8px;text-align:center;"><div style="font-size:18px;font-weight:800;color:'+balColor+';">'+balanceScore+'%</div><div style="font-size:9px;color:'+balColor+';font-weight:600;">Balance Score</div></div>';
+  html += '<div style="padding:8px;background:'+(highCancel.length>0?'#fef2f2':'#f0fdf4')+';border-radius:8px;text-align:center;"><div style="font-size:18px;font-weight:800;color:'+(highCancel.length>0?'#dc2626':'#059669')+';">'+highCancel.length+'</div><div style="font-size:9px;color:'+(highCancel.length>0?'#dc2626':'#059669')+';font-weight:600;">High Cancel Rate</div></div>';
+  html += '</div>';
+
+  // Workload bars
+  html += '<div style="display:grid;gap:6px;">';
+  coordStats.forEach(function(c) {
+    var pct = Math.round(c.visits / maxVisits * 100);
+    var devPct = avgVisits > 0 ? Math.round((c.visits - avgVisits) / avgVisits * 100) : 0;
+    var devColor = Math.abs(devPct) <= 15 ? '#059669' : Math.abs(devPct) <= 30 ? '#f59e0b' : '#dc2626';
+    var crColor = c.cancelRate > 20 ? '#dc2626' : c.cancelRate > 10 ? '#f59e0b' : '#059669';
+    html += '<div style="display:grid;grid-template-columns:120px 1fr 60px 50px 50px;align-items:center;gap:6px;font-size:11px;">';
+    html += '<div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+c.name.split(' ')[0]+'</div>';
+    html += '<div style="background:#e2e8f0;border-radius:4px;height:14px;overflow:hidden;position:relative;">';
+    html += '<div style="height:100%;width:'+pct+'%;background:linear-gradient(90deg,#1843AD,#3b82f6);border-radius:4px;"></div>';
+    html += '<div style="position:absolute;left:'+Math.min(pct,50)+'%;top:0;transform:translateX(4px);font-size:9px;font-weight:700;color:#1e293b;line-height:14px;">'+c.visits+'</div>';
+    html += '</div>';
+    html += '<div style="text-align:center;font-size:10px;color:'+devColor+';font-weight:700;">'+(devPct>0?'+':'')+devPct+'%</div>';
+    html += '<div style="text-align:center;font-size:10px;color:'+crColor+';font-weight:600;">'+c.cancelRate+'% CR</div>';
+    html += '<div style="text-align:center;font-size:10px;color:#64748b;">'+c.patients+' pts</div>';
+    html += '</div>';
+  });
+  html += '</div>';
+  html += '<div style="margin-top:6px;font-size:9px;color:#94a3b8;text-align:right;">CR = cancel rate · Balance = 100% minus max deviation from average</div>';
+
+  el.innerHTML = html;
+}
+
+function renderInvCapacity() {
+  var el = document.getElementById('invCapacityContainer');
+  if (!el) return;
+  var visits = DATA.allVisitDetail || [];
+  var cancels = DATA.allCancels || [];
+  var INVS = CRP_CONFIG.INVESTIGATORS || [];
+  if (INVS.length === 0 || visits.length === 0) return;
+  var schedules = CRP_CONFIG.INV_SCHEDULES || {};
+
+  var invStats = INVS.map(function(name) {
+    var iv = visits.filter(function(v){return v.investigator===name;});
+    var ic = cancels.filter(function(c){return c.investigator===name;});
+    var days = {};
+    iv.forEach(function(v){days[v.date_iso]=((days[v.date_iso]||0)+1);});
+    var dayCount = Object.keys(days).length;
+    var avgPerDay = dayCount > 0 ? (iv.length / dayCount).toFixed(1) : '0';
+    var sched = schedules[name] || {};
+    var availDays = sched.daysPerWeek || 5;
+    var utilPct = dayCount > 0 && availDays > 0 ? Math.min(100, Math.round(dayCount / (availDays * 2) * 100)) : 0; // 2 weeks of data
+    var studies = {};
+    iv.forEach(function(v){studies[v.study]=1;});
+    // Cost from QB
+    var costPerVisit = 0;
+    if (typeof QB_DATA !== 'undefined' && QB_DATA.loaded && QB_DATA.pnlCostByName) {
+      var pnlCost = 0;
+      var nameLo = name.toLowerCase();
+      Object.entries(QB_DATA.pnlCostByName).forEach(function(kv) {
+        if (kv[0].toLowerCase().indexOf(nameLo.split(' ')[0]) !== -1) pnlCost = kv[1];
+      });
+      if (pnlCost > 0 && iv.length > 0) costPerVisit = Math.round(pnlCost / iv.length);
+    }
+    return { name:name, visits:iv.length, cancels:ic.length, avgPerDay:avgPerDay, dayCount:dayCount, utilPct:utilPct, studies:Object.keys(studies).length, costPerVisit:costPerVisit };
+  }).sort(function(a,b){return b.visits-a.visits;});
+
+  var maxVisits = Math.max.apply(null, invStats.map(function(i){return i.visits;})) || 1;
+  var html = '<div style="display:grid;gap:10px;">';
+  invStats.forEach(function(inv) {
+    var pct = Math.round(inv.visits / maxVisits * 100);
+    var utilColor = inv.utilPct >= 80 ? '#059669' : inv.utilPct >= 50 ? '#f59e0b' : '#94a3b8';
+    html += '<div style="background:#f9fafb;border-radius:8px;padding:12px;border:1px solid #e5e7eb;">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">';
+    html += '<span style="font-weight:700;font-size:12px;">'+inv.name+'</span>';
+    html += '<span style="font-size:11px;font-weight:700;color:#1843AD;">'+inv.visits+' visits</span>';
+    html += '</div>';
+    html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center;margin-bottom:6px;">';
+    html += '<div><div style="font-size:14px;font-weight:800;color:#1843AD;">'+inv.avgPerDay+'</div><div style="font-size:8px;color:#94a3b8;">Avg/Day</div></div>';
+    html += '<div><div style="font-size:14px;font-weight:800;color:'+utilColor+';">'+inv.utilPct+'%</div><div style="font-size:8px;color:#94a3b8;">Utilization</div></div>';
+    html += '<div><div style="font-size:14px;font-weight:800;color:#6366f1;">'+inv.studies+'</div><div style="font-size:8px;color:#94a3b8;">Studies</div></div>';
+    if (inv.costPerVisit > 0) {
+      html += '<div><div style="font-size:14px;font-weight:800;color:#059669;">$'+inv.costPerVisit+'</div><div style="font-size:8px;color:#94a3b8;">Cost/Visit</div></div>';
+    } else {
+      html += '<div><div style="font-size:14px;font-weight:800;color:#94a3b8;">—</div><div style="font-size:8px;color:#94a3b8;">Cost/Visit</div></div>';
+    }
+    html += '</div>';
+    html += '<div style="background:#e2e8f0;border-radius:4px;height:6px;overflow:hidden;"><div style="height:100%;width:'+pct+'%;background:#1843AD;border-radius:4px;"></div></div>';
+    html += '</div>';
+  });
+  html += '</div>';
+  el.innerHTML = html;
+}
+
 function toggleCoordDayDetail(coordName, date, el) {
   const card = el.closest('.coord-day-detail')?.parentElement || el.closest('[style*="background:#F9FAFB"]');
   if (!card) return;
@@ -6690,6 +6823,8 @@ function renderCRIOvsQB() {
   ).join('');
 
   renderStaffEconomics();
+  safe(renderStudyProfitability, 'renderStudyProfitability');
+  safe(renderSitePnL, 'renderSitePnL');
 }
 
 function renderStaffEconomics() {
@@ -7215,6 +7350,163 @@ function renderStaffEconomics() {
     '<td class="r" style="color:#10B981">' + fmtD(vAvgRPV) + '</td>' +
     '<td class="r" style="font-weight:700;color:' + (vAvgRPV - vAvgCPV >= 0 ? '#10B981' : '#EF4444') + '">' + (vAvgRPV - vAvgCPV >= 0 ? '+' : '') + fmtD(vAvgRPV - vAvgCPV) + '</td>' +
     '</tr>';
+}
+
+function renderStudyProfitability() {
+  if (!QB_DATA.loaded) return;
+  if (!CRIO_STUDIES_DATA || CRIO_STUDIES_DATA.length === 0) return;
+  var body = document.getElementById('studyProfitBody');
+  var kpiEl = document.getElementById('studyProfitKpis');
+  if (!body) return;
+  var fmtD = function(v){return '$'+Math.round(v).toLocaleString();};
+  var fmtK = function(v){return v>=1000?'$'+Math.round(v/1000).toLocaleString()+'K':'$'+Math.round(v).toLocaleString();};
+  var SKIP = {'Config Study':1,'Upload test':1,'EVENT':1,'2025_COVID_FLU_RSV_DETECTION STUDY':1};
+
+  // Build subject counts
+  var subsByStudy = {};
+  CRIO_SUBJECTS_DATA.forEach(function(s) {
+    if (!subsByStudy[s.study_key]) subsByStudy[s.study_key] = {};
+    subsByStudy[s.study_key][s.status||'Unknown'] = (subsByStudy[s.study_key][s.status||'Unknown']||0) + 1;
+  });
+
+  // Build labor cost per study from studyHoursAll
+  var studyHoursAll = QB_DATA.studyHoursAll || {};
+  var empMap = QB_DATA.empMap || {};
+  var avgCostRate = 0, rateCount = 0;
+  Object.values(empMap).forEach(function(d){if(d.costRate>0){avgCostRate+=d.costRate;rateCount++;}});
+  avgCostRate = rateCount > 0 ? avgCostRate / rateCount : 35;
+  var studyLaborCost = {};
+  Object.entries(studyHoursAll).forEach(function(kv){ studyLaborCost[kv[0]] = kv[1] * avgCostRate; });
+
+  var rows = [];
+  var totCrioRev = 0, totLabor = 0, totNet = 0, profitable = 0, unprofitable = 0;
+  CRIO_STUDIES_DATA.forEach(function(s) {
+    if (SKIP[s.protocol_number] || s.total_revenue <= 0) return;
+    var subs = subsByStudy[s.study_key] || {};
+    var enrolled = subs['ENROLLED'] || 0;
+    var completed = subs['COMPLETED'] || 0;
+    var total = s.subject_count;
+    // Find labor cost (fuzzy match on protocol number)
+    var labor = 0;
+    var proto = s.protocol_number.toLowerCase().replace(/[\s\-]/g,'');
+    Object.entries(studyLaborCost).forEach(function(kv) {
+      var k = kv[0].toLowerCase().replace(/[\s\-]/g,'');
+      if (k.length >= 4 && (k.indexOf(proto) !== -1 || proto.indexOf(k) !== -1)) labor = kv[1];
+    });
+    var net = s.total_revenue - labor;
+    var margin = s.total_revenue > 0 ? Math.round(net / s.total_revenue * 100) : 0;
+    var costPerEnrolled = enrolled > 0 ? labor / enrolled : 0;
+    var revPerEnrolled = enrolled > 0 ? s.total_revenue / enrolled : 0;
+    var breakeven = (net < 0 && revPerEnrolled > 0) ? Math.ceil(Math.abs(net) / revPerEnrolled) : 0;
+    totCrioRev += s.total_revenue;
+    totLabor += labor;
+    totNet += net;
+    if (net >= 0) profitable++; else unprofitable++;
+    rows.push({ proto: s.protocol_number, crioRev: s.total_revenue, labor: labor, net: net, margin: margin, costPerEnrolled: costPerEnrolled, revPerEnrolled: revPerEnrolled, breakeven: breakeven, enrolled: enrolled, siteKey: s.site_key, siteName: s.site_name });
+  });
+  rows.sort(function(a,b){return b.crioRev - a.crioRev;});
+
+  if (kpiEl) {
+    var totMargin = totCrioRev > 0 ? Math.round(totNet / totCrioRev * 100) : 0;
+    var mColor = totMargin >= 30 ? '#10B981' : totMargin >= 0 ? '#F59E0B' : '#EF4444';
+    kpiEl.innerHTML = '<div style="display:flex;gap:12px;flex-wrap:wrap;">' +
+      '<div style="flex:1;min-width:100px;text-align:center;"><div style="font-size:18px;font-weight:800;color:#10B981;">' + fmtK(totCrioRev) + '</div><div style="font-size:9px;color:var(--muted);">Total CRIO Revenue</div></div>' +
+      '<div style="flex:1;min-width:100px;text-align:center;"><div style="font-size:18px;font-weight:800;color:#EF4444;">' + fmtK(totLabor) + '</div><div style="font-size:9px;color:var(--muted);">Total Labor Cost</div></div>' +
+      '<div style="flex:1;min-width:100px;text-align:center;"><div style="font-size:18px;font-weight:800;color:' + mColor + ';">' + fmtK(totNet) + '</div><div style="font-size:9px;color:var(--muted);">Net (' + totMargin + '% margin)</div></div>' +
+      '<div style="flex:1;min-width:100px;text-align:center;"><div style="font-size:18px;font-weight:800;color:#10B981;">' + profitable + '</div><div style="font-size:9px;color:var(--muted);">Profitable Studies</div></div>' +
+      '<div style="flex:1;min-width:100px;text-align:center;"><div style="font-size:18px;font-weight:800;color:#EF4444;">' + unprofitable + '</div><div style="font-size:9px;color:var(--muted);">Unprofitable</div></div>' +
+      '</div>';
+  }
+
+  body.innerHTML = rows.map(function(r) {
+    var nColor = r.net >= 0 ? '#10B981' : '#EF4444';
+    var mColor = r.margin >= 30 ? '#10B981' : r.margin >= 0 ? '#F59E0B' : '#EF4444';
+    return '<tr style="border-bottom:1px solid var(--border)">' +
+      '<td style="font-weight:600;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + r.proto + '">' + r.proto + '</td>' +
+      '<td class="r" style="color:#10B981;font-weight:700">' + fmtK(r.crioRev) + '</td>' +
+      '<td class="r" style="color:#EF4444">' + (r.labor > 0 ? fmtK(r.labor) : '<span style="color:var(--muted)">—</span>') + '</td>' +
+      '<td class="r" style="color:' + nColor + ';font-weight:700">' + (r.net >= 0 ? '+' : '') + fmtK(r.net) + '</td>' +
+      '<td class="r" style="color:' + mColor + ';font-weight:600">' + r.margin + '%</td>' +
+      '<td class="r">' + (r.costPerEnrolled > 0 ? fmtD(r.costPerEnrolled) : '—') + '</td>' +
+      '<td class="r">' + (r.revPerEnrolled > 0 ? fmtD(r.revPerEnrolled) : '—') + '</td>' +
+      '<td class="r">' + (r.breakeven > 0 ? '<span style="color:#EF4444;font-weight:700">+' + r.breakeven + ' needed</span>' : '<span style="color:#10B981">—</span>') + '</td>' +
+      '</tr>';
+  }).join('');
+}
+
+function renderSitePnL() {
+  if (!QB_DATA.loaded) return;
+  if (!CRIO_STUDIES_DATA || CRIO_STUDIES_DATA.length === 0) return;
+  var el = document.getElementById('sitePnlContainer');
+  if (!el) return;
+  var fmtK = function(v){return v>=1000?'$'+Math.round(v/1000).toLocaleString()+'K':'$'+Math.round(v).toLocaleString();};
+  var SKIP = {'Config Study':1,'Upload test':1,'EVENT':1,'2025_COVID_FLU_RSV_DETECTION STUDY':1};
+  var PNJ_KEYS = new Set(CRP_CONFIG.PENNINGTON_STUDY_KEYS || []);
+
+  // Build subject counts
+  var subsByStudy = {};
+  CRIO_SUBJECTS_DATA.forEach(function(s) {
+    if (!subsByStudy[s.study_key]) subsByStudy[s.study_key] = {};
+    subsByStudy[s.study_key][s.status||'Unknown'] = (subsByStudy[s.study_key][s.status||'Unknown']||0) + 1;
+  });
+
+  var sites = { PHL: { revenue: 0, labor: 0, studies: 0, subjects: 0, enrolled: 0 }, PNJ: { revenue: 0, labor: 0, studies: 0, subjects: 0, enrolled: 0 } };
+  var studyHoursAll = QB_DATA.studyHoursAll || {};
+  var empMap = QB_DATA.empMap || {};
+  var avgCostRate = 0, rateCount = 0;
+  Object.values(empMap).forEach(function(d){if(d.costRate>0){avgCostRate+=d.costRate;rateCount++;}});
+  avgCostRate = rateCount > 0 ? avgCostRate / rateCount : 35;
+
+  CRIO_STUDIES_DATA.forEach(function(s) {
+    if (SKIP[s.protocol_number]) return;
+    var site = PNJ_KEYS.has(s.study_key) ? 'PNJ' : 'PHL';
+    var subs = subsByStudy[s.study_key] || {};
+    var enrolled = subs['ENROLLED'] || 0;
+    var total = s.subject_count;
+    sites[site].revenue += s.total_revenue || 0;
+    sites[site].studies++;
+    sites[site].subjects += total;
+    sites[site].enrolled += enrolled;
+    // Labor cost
+    var proto = s.protocol_number.toLowerCase().replace(/[\s\-]/g,'');
+    Object.entries(studyHoursAll).forEach(function(kv) {
+      var k = kv[0].toLowerCase().replace(/[\s\-]/g,'');
+      if (k.length >= 4 && (k.indexOf(proto) !== -1 || proto.indexOf(k) !== -1)) sites[site].labor += kv[1] * avgCostRate;
+    });
+  });
+
+  var html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">';
+  ['PHL', 'PNJ'].forEach(function(key) {
+    var d = sites[key];
+    var net = d.revenue - d.labor;
+    var margin = d.revenue > 0 ? Math.round(net / d.revenue * 100) : 0;
+    var nColor = net >= 0 ? '#10B981' : '#EF4444';
+    var mColor = margin >= 30 ? '#10B981' : margin >= 0 ? '#F59E0B' : '#EF4444';
+    var label = key === 'PHL' ? 'Philadelphia' : 'Pennington';
+    var accent = key === 'PHL' ? '#072061' : '#059669';
+    html += '<div style="background:var(--surface2);border-radius:10px;padding:16px;border-left:4px solid ' + accent + ';">';
+    html += '<div style="font-size:14px;font-weight:700;color:' + accent + ';margin-bottom:10px;">' + label + '</div>';
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:11px;">';
+    html += '<div><span style="color:var(--muted);">Studies:</span> <strong>' + d.studies + '</strong></div>';
+    html += '<div><span style="color:var(--muted);">Subjects:</span> <strong>' + d.subjects + '</strong></div>';
+    html += '<div><span style="color:var(--muted);">Enrolled:</span> <strong>' + d.enrolled + '</strong></div>';
+    html += '<div><span style="color:var(--muted);">Revenue:</span> <strong style="color:#10B981;">' + fmtK(d.revenue) + '</strong></div>';
+    html += '<div><span style="color:var(--muted);">Labor:</span> <strong style="color:#EF4444;">' + fmtK(d.labor) + '</strong></div>';
+    html += '<div><span style="color:var(--muted);">Net:</span> <strong style="color:' + nColor + ';">' + (net >= 0 ? '+' : '') + fmtK(net) + '</strong></div>';
+    html += '<div style="grid-column:span 2;text-align:center;margin-top:6px;padding:6px;background:' + mColor + '15;border-radius:6px;">';
+    html += '<span style="font-size:20px;font-weight:800;color:' + mColor + ';">' + margin + '%</span> <span style="font-size:10px;color:var(--muted);">margin</span>';
+    html += '</div></div></div>';
+  });
+  html += '</div>';
+
+  // Variance summary
+  var diff = sites.PHL.revenue - sites.PNJ.revenue;
+  html += '<div style="margin-top:12px;padding:10px;background:var(--surface2);border-radius:8px;font-size:11px;text-align:center;color:var(--muted);">';
+  html += 'Philadelphia generates <strong style="color:#072061;">' + fmtK(Math.abs(diff)) + '</strong> ' + (diff >= 0 ? 'more' : 'less') + ' CRIO revenue than Pennington · ';
+  html += 'PHL: ' + sites.PHL.studies + ' studies / ' + sites.PHL.enrolled + ' enrolled · PNJ: ' + sites.PNJ.studies + ' studies / ' + sites.PNJ.enrolled + ' enrolled';
+  html += '</div>';
+
+  el.innerHTML = html;
 }
 
 // ═══════════════════════════════════════════════════
@@ -9042,6 +9334,80 @@ function buildMedRecAlerts() {
     </div>
   </div>`;
 
+  // ── SLA Tracking & Patient Journey Duration ──
+  const today = new Date();
+  const _slaOverdue = [], _slaAtRisk = [], _slaMet = [];
+  MED_RECORDS_DATA.filter(r => r.is_active && r.retrieval_deadline).forEach(r => {
+    const deadline = new Date(r.retrieval_deadline);
+    if (isNaN(deadline.getTime())) return;
+    const daysLeft = Math.floor((deadline - today) / 86400000);
+    const entry = { name: r.name, study: r.study, daysLeft: daysLeft, deadline: r.retrieval_deadline, url: r.url };
+    if (daysLeft < 0) _slaOverdue.push(entry);
+    else if (daysLeft <= 7) _slaAtRisk.push(entry);
+    else _slaMet.push(entry);
+  });
+  const totalWithDeadline = _slaOverdue.length + _slaAtRisk.length + _slaMet.length;
+  const slaPct = totalWithDeadline > 0 ? Math.round((_slaMet.length + _slaAtRisk.length) / totalWithDeadline * 100) : 0;
+  const avgDaysLeft = totalWithDeadline > 0 ? Math.round((_slaOverdue.concat(_slaAtRisk, _slaMet).reduce((s,e)=>s+e.daysLeft,0)) / totalWithDeadline) : 0;
+
+  // Journey durations
+  const durations = [];
+  MED_RECORDS_DATA.forEach(r => {
+    if (!r.pre_screening_date && !r.screening_date) return;
+    const ps = r.pre_screening_date ? new Date(r.pre_screening_date) : null;
+    const sc = r.screening_date ? new Date(r.screening_date) : null;
+    const rand = r.randomization_date ? new Date(r.randomization_date) : null;
+    const created = r.date_created ? new Date(r.date_created) : null;
+    durations.push({
+      name: r.name, study: r.study,
+      createdToPrescreen: ps && created && !isNaN(ps) && !isNaN(created) ? Math.floor((ps - created) / 86400000) : null,
+      prescreenToScreen: ps && sc && !isNaN(ps) && !isNaN(sc) ? Math.floor((sc - ps) / 86400000) : null,
+      screenToRand: sc && rand && !isNaN(sc) && !isNaN(rand) ? Math.floor((rand - sc) / 86400000) : null,
+    });
+  });
+  const avgPS = durations.filter(d => d.prescreenToScreen !== null && d.prescreenToScreen >= 0);
+  const avgSR = durations.filter(d => d.screenToRand !== null && d.screenToRand >= 0);
+  const avgCP = durations.filter(d => d.createdToPrescreen !== null && d.createdToPrescreen >= 0);
+  const meanPS = avgPS.length > 0 ? Math.round(avgPS.reduce((s,d)=>s+d.prescreenToScreen,0)/avgPS.length) : 0;
+  const meanSR = avgSR.length > 0 ? Math.round(avgSR.reduce((s,d)=>s+d.screenToRand,0)/avgSR.length) : 0;
+  const meanCP = avgCP.length > 0 ? Math.round(avgCP.reduce((s,d)=>s+d.createdToPrescreen,0)/avgCP.length) : 0;
+
+  if (totalWithDeadline > 0 || durations.length > 0) {
+    const slaColor = slaPct >= 90 ? '#059669' : slaPct >= 70 ? '#f59e0b' : '#dc2626';
+    html += `<div style="padding:12px 16px;border-bottom:1px solid #e2e8f0;">
+      <div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:8px;">SLA & Patient Journey</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:10px;">`;
+    if (totalWithDeadline > 0) {
+      html += `<div style="padding:6px;background:#fef2f2;border-radius:6px;text-align:center;cursor:pointer;" onclick="showMedRecSlaModal('overdue')">
+          <div style="font-size:16px;font-weight:800;color:#dc2626;">${_slaOverdue.length}</div>
+          <div style="font-size:8px;color:#dc2626;font-weight:600;">Overdue</div>
+        </div>
+        <div style="padding:6px;background:#fffbeb;border-radius:6px;text-align:center;cursor:pointer;" onclick="showMedRecSlaModal('atrisk')">
+          <div style="font-size:16px;font-weight:800;color:#f59e0b;">${_slaAtRisk.length}</div>
+          <div style="font-size:8px;color:#f59e0b;font-weight:600;">Due in 7 days</div>
+        </div>
+        <div style="padding:6px;background:#f0fdf4;border-radius:6px;text-align:center;">
+          <div style="font-size:16px;font-weight:800;color:${slaColor};">${slaPct}%</div>
+          <div style="font-size:8px;color:${slaColor};font-weight:600;">SLA Compliance</div>
+        </div>`;
+    }
+    if (durations.length > 0) {
+      html += `<div style="padding:6px;background:#eff6ff;border-radius:6px;text-align:center;" title="Avg days: Created → Pre-screen">
+          <div style="font-size:16px;font-weight:800;color:#3b82f6;">${meanCP}d</div>
+          <div style="font-size:8px;color:#3b82f6;font-weight:600;">Intake → Pre-Scr</div>
+        </div>
+        <div style="padding:6px;background:#f5f3ff;border-radius:6px;text-align:center;" title="Avg days: Pre-screen → Screening">
+          <div style="font-size:16px;font-weight:800;color:#8b5cf6;">${meanPS}d</div>
+          <div style="font-size:8px;color:#8b5cf6;font-weight:600;">Pre-Scr → Screen</div>
+        </div>
+        <div style="padding:6px;background:#fdf2f8;border-radius:6px;text-align:center;" title="Avg days: Screening → Randomization">
+          <div style="font-size:16px;font-weight:800;color:#ec4899;">${meanSR}d</div>
+          <div style="font-size:8px;color:#ec4899;font-weight:600;">Screen → Rand</div>
+        </div>`;
+    }
+    html += `</div></div>`;
+  }
+
   // ── By-study breakdown ──
   const byStudy = {};
   MED_RECORDS_DATA.forEach(r => {
@@ -9247,6 +9613,8 @@ function renderAll() {
   safe(buildCoordList,       'buildCoordList');
   safe(buildInvestigatorList, 'buildInvestigatorList');
   safe(renderCoordinatorGoals, 'renderCoordinatorGoals');
+  safe(renderCoordWorkloadBalance, 'renderCoordWorkloadBalance');
+  safe(renderInvCapacity, 'renderInvCapacity');
   safe(buildActionSteps,     'buildActionSteps');
   safe(buildInsights,        'buildInsights');
   safe(buildRecruitmentKPIs, 'buildRecruitmentKPIs');
@@ -10913,6 +11281,8 @@ async function fetchCrioStudies() {
         safe(renderCrioStudies, 'renderCrioStudies');
         safe(mergeCrioIntoStudies, 'mergeCrioIntoStudies');
         safe(buildSchedulingGapAlerts, 'buildSchedulingGapAlerts');
+        safe(renderStudyProfitability, 'renderStudyProfitability');
+        safe(renderSitePnL, 'renderSitePnL');
       }
     } catch(e) {
       console.warn('fetchCrioStudies error:', e);
@@ -11177,6 +11547,65 @@ function renderCrioStudies() {
     + '<div style="font-size:10px;color:#64748b">Data Fixes</div>'
     + '<div style="font-size:9px;color:#059669">Auto-corrected</div></div>';
   html += '</div>';
+
+  // ── CRIO Revenue Dashboard ──
+  var _hasRevenue = CRIO_STUDIES_DATA.some(function(s){return s.total_revenue > 0;});
+  if (_hasRevenue) {
+    var pnlByStudy = (typeof QB_DATA !== 'undefined' && QB_DATA.loaded) ? (QB_DATA.pnlByStudy || {}) : {};
+    var revRows = [];
+    var totalCrioRev = 0, totalQbRev = 0, totalGap = 0, revStudyCount = 0, totalProjected = 0;
+    CRIO_STUDIES_DATA.forEach(function(s) {
+      if (SKIP[s.protocol_number] || s.total_revenue <= 0) return;
+      var subs = subsByStudy[s.study_key] || {};
+      var enrolled = subs['ENROLLED'] || 0;
+      var completed = subs['COMPLETED'] || 0;
+      var revPerCompleted = s.revenue_subjects > 0 ? s.total_revenue / s.revenue_subjects : 0;
+      var projected = enrolled > 0 ? enrolled * revPerCompleted : 0;
+      // Match QB
+      var qbMatch = pnlByStudy[s.protocol_number];
+      var qbRev = qbMatch ? qbMatch.total : 0;
+      var gap = s.total_revenue - qbRev;
+      totalCrioRev += s.total_revenue;
+      totalQbRev += qbRev;
+      totalGap += gap;
+      totalProjected += projected;
+      revStudyCount++;
+      revRows.push({ proto: s.protocol_number, crioRev: s.total_revenue, qbRev: qbRev, gap: gap, revPerCompleted: revPerCompleted, enrolled: enrolled, completed: completed, projected: projected, revSubjects: s.revenue_subjects });
+    });
+    revRows.sort(function(a,b){return b.crioRev - a.crioRev;});
+    var _fmtK = function(v){return v>=1000?'$'+Math.round(v/1000).toLocaleString()+'K':'$'+Math.round(v).toLocaleString();};
+
+    html += '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:14px;margin-bottom:14px;">';
+    html += '<div style="font-size:13px;font-weight:700;color:#065f46;margin-bottom:10px;">CRIO Revenue Intelligence</div>';
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:12px;">';
+    html += '<div style="text-align:center;padding:6px;background:#fff;border-radius:8px;"><div style="font-size:18px;font-weight:800;color:#059669;">' + _fmtK(totalCrioRev) + '</div><div style="font-size:9px;color:#64748b;">CRIO Revenue</div></div>';
+    if (totalQbRev > 0) {
+      html += '<div style="text-align:center;padding:6px;background:#fff;border-radius:8px;"><div style="font-size:18px;font-weight:800;color:#3b82f6;">' + _fmtK(totalQbRev) + '</div><div style="font-size:9px;color:#64748b;">QB Recognized</div></div>';
+      html += '<div style="text-align:center;padding:6px;background:#fff;border-radius:8px;"><div style="font-size:18px;font-weight:800;color:' + (totalGap > 0 ? '#f59e0b' : '#059669') + ';">' + _fmtK(Math.abs(totalGap)) + '</div><div style="font-size:9px;color:#64748b;">' + (totalGap > 0 ? 'Uninvoiced' : 'Over QB') + '</div></div>';
+    }
+    html += '<div style="text-align:center;padding:6px;background:#fff;border-radius:8px;"><div style="font-size:18px;font-weight:800;color:#6366f1;">' + _fmtK(totalProjected) + '</div><div style="font-size:9px;color:#64748b;">Projected (Enrolled)</div></div>';
+    html += '<div style="text-align:center;padding:6px;background:#fff;border-radius:8px;"><div style="font-size:18px;font-weight:800;color:#1e293b;">' + revStudyCount + '</div><div style="font-size:9px;color:#64748b;">Revenue Studies</div></div>';
+    html += '</div>';
+
+    // Revenue table
+    html += '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:10px;">';
+    html += '<thead><tr style="border-bottom:2px solid #d1fae5;text-align:center;"><th style="text-align:left;padding:4px 6px;">Study</th><th style="padding:4px 6px;">CRIO Rev</th>';
+    if (totalQbRev > 0) html += '<th style="padding:4px 6px;">QB Rev</th><th style="padding:4px 6px;">Gap</th>';
+    html += '<th style="padding:4px 6px;">Rev/Completed</th><th style="padding:4px 6px;">Enrolled</th><th style="padding:4px 6px;">Projected</th></tr></thead><tbody>';
+    revRows.slice(0, 15).forEach(function(r) {
+      var gapColor = r.gap > 0 ? '#f59e0b' : '#059669';
+      html += '<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:3px 6px;font-weight:600;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + esc(r.proto) + '">' + esc(r.proto) + '</td>';
+      html += '<td style="padding:3px 6px;text-align:center;font-weight:700;color:#059669;">' + _fmtK(r.crioRev) + '</td>';
+      if (totalQbRev > 0) {
+        html += '<td style="padding:3px 6px;text-align:center;">' + (r.qbRev > 0 ? _fmtK(r.qbRev) : '<span style="color:#94a3b8;">—</span>') + '</td>';
+        html += '<td style="padding:3px 6px;text-align:center;color:' + gapColor + ';font-weight:600;">' + (r.gap !== 0 ? _fmtK(Math.abs(r.gap)) : '—') + '</td>';
+      }
+      html += '<td style="padding:3px 6px;text-align:center;">' + (r.revPerCompleted > 0 ? _fmtK(r.revPerCompleted) : '—') + '</td>';
+      html += '<td style="padding:3px 6px;text-align:center;font-weight:700;">' + r.enrolled + '</td>';
+      html += '<td style="padding:3px 6px;text-align:center;color:#6366f1;font-weight:600;">' + (r.projected > 0 ? _fmtK(r.projected) : '—') + '</td></tr>';
+    });
+    html += '</tbody></table></div></div>';
+  }
 
   // ── Section 1: Win-Back Opportunities ──
   if (winbacks.length > 0) {
@@ -11921,6 +12350,28 @@ function showMedRecDetailModal(studyName) {
 }
 
 // ── Generic filtered popup for med records pipeline numbers ──
+function showMedRecSlaModal(type) {
+  var esc = typeof escapeHTML === 'function' ? escapeHTML : function(s){return s;};
+  var today = new Date();
+  var list = MED_RECORDS_DATA.filter(function(r) {
+    if (!r.is_active || !r.retrieval_deadline) return false;
+    var dl = new Date(r.retrieval_deadline);
+    if (isNaN(dl.getTime())) return false;
+    var days = Math.floor((dl - today) / 86400000);
+    if (type === 'overdue') return days < 0;
+    if (type === 'atrisk') return days >= 0 && days <= 7;
+    return false;
+  }).sort(function(a,b){ return new Date(a.retrieval_deadline) - new Date(b.retrieval_deadline); });
+  var title = type === 'overdue' ? 'Overdue Records (' + list.length + ')' : 'Due Within 7 Days (' + list.length + ')';
+  var rows = list.map(function(r) {
+    var dl = new Date(r.retrieval_deadline);
+    var days = Math.floor((dl - today) / 86400000);
+    var color = days < 0 ? '#dc2626' : days <= 3 ? '#f59e0b' : '#059669';
+    return '<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:6px 8px;">' + esc(maskPHI(r.name)) + '</td><td style="padding:6px 8px;">' + esc(r.study||'') + '</td><td style="padding:6px 8px;font-weight:700;color:' + color + ';">' + days + 'd</td><td style="padding:6px 8px;font-size:11px;color:#64748b;">' + esc(r.retrieval_deadline) + '</td><td style="padding:6px 8px;">' + esc(r.assignee||'') + '</td></tr>';
+  }).join('');
+  openModal(title, '', '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr style="border-bottom:2px solid #e2e8f0;text-align:left;"><th style="padding:6px 8px;">Patient</th><th style="padding:6px 8px;">Study</th><th style="padding:6px 8px;">Days Left</th><th style="padding:6px 8px;">Deadline</th><th style="padding:6px 8px;">Assignee</th></tr></thead><tbody>' + rows + '</tbody></table></div>');
+}
+
 function showMedRecFilteredModal(filterKey) {
   if (!MED_RECORDS_DATA || MED_RECORDS_DATA.length === 0) {
     openModal('Medical Records', '', '<div style="text-align:center;padding:30px;color:#94a3b8;">No medical records data loaded.</div>');
@@ -14099,6 +14550,36 @@ if (typeof window !== 'undefined') {
         <tbody id="otherEconBody"></tbody>
       </table>
       <div style="padding:8px 12px;font-size:10px;color:var(--muted);border-top:1px solid var(--border)">Staff not in COORDINATORS or INVESTIGATORS lists. Click any row to expand study detail.</div>
+    </div>
+  </div>
+
+  <!-- Study Profitability — CRIO Revenue vs QB Expenses -->
+  <div class="section-label" style="margin-top:20px"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#10B981;margin-right:6px"></span>Study Profitability — CRIO Revenue vs Labor Costs</div>
+  <div class="panel">
+    <div id="studyProfitKpis" style="padding:12px 16px;"></div>
+    <div class="panel-body" style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr>
+          <th>Study</th>
+          <th class="r">CRIO Revenue</th>
+          <th class="r">Labor Cost</th>
+          <th class="r">Net</th>
+          <th class="r">Margin</th>
+          <th class="r">Cost/Enrolled</th>
+          <th class="r">Rev/Enrolled</th>
+          <th class="r">Breakeven</th>
+        </tr></thead>
+        <tbody id="studyProfitBody"></tbody>
+      </table>
+      <div style="padding:8px 12px;font-size:10px;color:var(--muted);border-top:1px solid var(--border)">CRIO Revenue = per-subject revenue from CRIO finances API. Labor Cost = QB Time Activity hours × cost rate. Breakeven = additional enrollments needed if currently unprofitable.</div>
+    </div>
+  </div>
+
+  <!-- Site-Level P&L -->
+  <div class="section-label" style="margin-top:20px"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#3B82F6;margin-right:6px"></span>Site-Level P&L — Philadelphia vs Pennington</div>
+  <div class="panel">
+    <div class="panel-body" id="sitePnlContainer" style="padding:16px;">
+      <div style="text-align:center;color:var(--muted);font-size:12px;">Loading site-level financials...</div>
     </div>
   </div>
 
