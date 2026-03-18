@@ -3424,52 +3424,6 @@ function renderScreenFailAnalysis() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// FEATURE: Revenue KPI in Overview
-// ═══════════════════════════════════════════════════════════════
-function buildRevenueKPI() {
-  var banner = document.getElementById('revenue-kpi-banner');
-  if (!banner || !CRIO_STUDIES_DATA || CRIO_STUDIES_DATA.length === 0) return;
-
-  var totalRevenue = 0, totalEnrolled = 0, revenueStudies = 0;
-  CRIO_STUDIES_DATA.forEach(function(s) {
-    if (s.total_revenue > 0) { totalRevenue += s.total_revenue; revenueStudies++; }
-  });
-  CRIO_SUBJECTS_DATA.forEach(function(s) {
-    if (s.status === 'ENROLLED') totalEnrolled++;
-  });
-
-  var totalLabor = 0;
-  if (typeof QB_DATA !== 'undefined' && QB_DATA.loaded && QB_DATA.studyHoursAll) {
-    Object.values(QB_DATA.studyHoursAll).forEach(function(sh) {
-      if (sh.cost) totalLabor += sh.cost;
-    });
-  }
-
-  var costPerEnrolled = totalEnrolled > 0 ? Math.round(totalLabor / totalEnrolled) : 0;
-  var revPerEnrolled = totalEnrolled > 0 ? Math.round(totalRevenue / totalEnrolled) : 0;
-  var net = totalRevenue - totalLabor;
-  var margin = totalRevenue > 0 ? Math.round(net / totalRevenue * 100) : 0;
-  var marginColor = margin >= 30 ? '#059669' : margin >= 10 ? '#d97706' : '#dc2626';
-
-  var el = function(id) { return document.getElementById(id); };
-  if (el('ov-kpi-revenue')) el('ov-kpi-revenue').textContent = '$' + Math.round(totalRevenue).toLocaleString();
-  if (el('ov-kpi-revenue-sub')) el('ov-kpi-revenue-sub').textContent = revenueStudies + ' studies with revenue data';
-  if (el('ov-kpi-costenroll')) {
-    el('ov-kpi-costenroll').textContent = costPerEnrolled > 0 ? '$' + costPerEnrolled.toLocaleString() : '—';
-    if (costPerEnrolled > 0) el('ov-kpi-costenroll').style.color = costPerEnrolled > 5000 ? '#dc2626' : costPerEnrolled > 2000 ? '#d97706' : '#059669';
-  }
-  if (el('ov-kpi-costenroll-sub')) el('ov-kpi-costenroll-sub').textContent = totalEnrolled + ' enrolled · $' + Math.round(totalLabor).toLocaleString() + ' labor';
-  if (el('ov-kpi-margin')) {
-    el('ov-kpi-margin').textContent = margin + '%';
-    el('ov-kpi-margin').style.color = marginColor;
-  }
-  if (el('ov-kpi-margin-sub')) el('ov-kpi-margin-sub').textContent = (net >= 0 ? '+' : '') + '$' + Math.round(net).toLocaleString() + ' net';
-  if (el('ov-kpi-revenroll')) el('ov-kpi-revenroll').textContent = revPerEnrolled > 0 ? '$' + revPerEnrolled.toLocaleString() : '—';
-
-  if (totalRevenue > 0) banner.style.display = '';
-}
-
-// ═══════════════════════════════════════════════════════════════
 // FEATURE: Investigator Approval Tracker
 // ═══════════════════════════════════════════════════════════════
 function renderPIApprovalTracker() {
@@ -5142,7 +5096,6 @@ function renderCRIOvsQB() {
   renderStaffEconomics();
   safe(renderStudyProfitability, 'renderStudyProfitability');
   safe(renderSitePnL, 'renderSitePnL');
-  safe(buildRevenueKPI, 'buildRevenueKPI');
 }
 
 function renderStaffEconomics() {
@@ -9659,8 +9612,7 @@ async function fetchCrioStudies() {
           safe(renderCrioStudies, 'renderCrioStudies');
           safe(mergeCrioIntoStudies, 'mergeCrioIntoStudies');
           safe(buildEnrollmentKPIs, 'buildEnrollmentKPIs');
-          safe(buildRevenueKPI, 'buildRevenueKPI');
-          safe(renderScreenFailAnalysis, 'renderScreenFailAnalysis');
+                  safe(renderScreenFailAnalysis, 'renderScreenFailAnalysis');
           safe(buildSchedulingGapAlerts, 'buildSchedulingGapAlerts');
         }
       } catch(e) {
