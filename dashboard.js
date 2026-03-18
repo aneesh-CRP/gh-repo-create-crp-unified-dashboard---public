@@ -362,7 +362,7 @@ const CRP_CONFIG = {
 
   // Tab registry — add new tabs here
   TABS: {
-    PERFORMANCE: ['overview', 'studies', 'schedule', 'actions', 'referrals', 'admin'],
+    PERFORMANCE: ['overview', 'studies', 'schedule', 'referrals', 'admin'],
     FINANCE: ['fin-overview', 'fin-collections', 'fin-aging', 'fin-revenue', 'fin-accruals', 'fin-qb', 'insights'],
     CROSS: ['insights'],
   },
@@ -8585,56 +8585,60 @@ var _crioFetchInFlight = false;
 async function fetchCrioStudies() {
   if (_crioFetchInFlight) return;
   _crioFetchInFlight = true;
-  var studiesUrl = CRP_CONFIG.DATA_FEEDS.CRIO_STUDIES_CSV;
-  var subjectsUrl = CRP_CONFIG.DATA_FEEDS.CRIO_SUBJECTS_CSV;
-  if (!studiesUrl) { console.log('CRIO Studies CSV URL not configured'); _crioFetchInFlight = false; return; }
   try {
-    var rows = await fetchCSV(studiesUrl);
-    if (!rows || rows.length === 0) return;
-    CRIO_STUDIES_DATA = rows.map(function(r) {
-      return {
-        study_key: r.study_key || '',
-        protocol_number: r.protocol_number || '',
-        status: r.status || '',
-        coordinator: r.coordinator || '',
-        investigator: r.investigator || '',
-        indication: r.indication || '',
-        subject_count: parseInt(r.subject_count) || 0,
-        date_created: r.date_created || '',
-        last_updated: r.last_updated || '',
-      };
-    });
-    console.log('CRIO Studies loaded:', CRIO_STUDIES_DATA.length);
-    safe(renderCrioStudies, 'renderCrioStudies');
-    safe(mergeCrioIntoStudies, 'mergeCrioIntoStudies');
-    safe(buildSchedulingGapAlerts, 'buildSchedulingGapAlerts');
-  } catch(e) {
-    console.warn('fetchCrioStudies error:', e);
-  }
-  // Also fetch subjects if URL is configured
-  if (subjectsUrl) {
+    var studiesUrl = CRP_CONFIG.DATA_FEEDS.CRIO_STUDIES_CSV;
+    var subjectsUrl = CRP_CONFIG.DATA_FEEDS.CRIO_SUBJECTS_CSV;
+    if (!studiesUrl) { console.log('CRIO Studies CSV URL not configured'); return; }
     try {
-      var sRows = await fetchCSV(subjectsUrl);
-      if (sRows && sRows.length > 0) {
-        CRIO_SUBJECTS_DATA = sRows.map(function(r) {
+      var rows = await fetchCSV(studiesUrl);
+      if (rows && rows.length > 0) {
+        CRIO_STUDIES_DATA = rows.map(function(r) {
           return {
-            subject_id: r.subject_id || '',
             study_key: r.study_key || '',
             protocol_number: r.protocol_number || '',
             status: r.status || '',
+            coordinator: r.coordinator || '',
+            investigator: r.investigator || '',
+            indication: r.indication || '',
+            subject_count: parseInt(r.subject_count) || 0,
+            date_created: r.date_created || '',
+            last_updated: r.last_updated || '',
           };
         });
-        console.log('CRIO Subjects loaded:', CRIO_SUBJECTS_DATA.length);
+        console.log('CRIO Studies loaded:', CRIO_STUDIES_DATA.length);
         safe(renderCrioStudies, 'renderCrioStudies');
         safe(mergeCrioIntoStudies, 'mergeCrioIntoStudies');
-        safe(buildEnrollmentKPIs, 'buildEnrollmentKPIs');
         safe(buildSchedulingGapAlerts, 'buildSchedulingGapAlerts');
       }
     } catch(e) {
-      console.warn('fetchCrioSubjects error:', e);
+      console.warn('fetchCrioStudies error:', e);
     }
+    // Also fetch subjects if URL is configured
+    if (subjectsUrl) {
+      try {
+        var sRows = await fetchCSV(subjectsUrl);
+        if (sRows && sRows.length > 0) {
+          CRIO_SUBJECTS_DATA = sRows.map(function(r) {
+            return {
+              subject_id: r.subject_id || '',
+              study_key: r.study_key || '',
+              protocol_number: r.protocol_number || '',
+              status: r.status || '',
+            };
+          });
+          console.log('CRIO Subjects loaded:', CRIO_SUBJECTS_DATA.length);
+          safe(renderCrioStudies, 'renderCrioStudies');
+          safe(mergeCrioIntoStudies, 'mergeCrioIntoStudies');
+          safe(buildEnrollmentKPIs, 'buildEnrollmentKPIs');
+          safe(buildSchedulingGapAlerts, 'buildSchedulingGapAlerts');
+        }
+      } catch(e) {
+        console.warn('fetchCrioSubjects error:', e);
+      }
+    }
+  } finally {
+    _crioFetchInFlight = false;
   }
-  _crioFetchInFlight = false;
 }
 
 function renderCrioStudies() {
