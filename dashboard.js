@@ -3352,78 +3352,6 @@ function renderInvCapacity() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// FEATURE: Screen Fail Analysis by Study
-// ═══════════════════════════════════════════════════════════════
-function renderScreenFailAnalysis() {
-  var el = document.getElementById('sf-analysis-container');
-  var badge = document.getElementById('sf-analysis-badge');
-  if (!el || !CRIO_SUBJECTS_DATA || CRIO_SUBJECTS_DATA.length === 0) return;
-
-  var SKIP = {'Config Study':1,'Upload test':1,'EVENT':1,'2025_COVID_FLU_RSV_DETECTION STUDY':1};
-  var crioByKey = {};
-  CRIO_STUDIES_DATA.forEach(function(s) { crioByKey[s.study_key] = s; });
-
-  // Aggregate per study: enrolled, screen_fail, total screened
-  var studyStats = {};
-  CRIO_SUBJECTS_DATA.forEach(function(s) {
-    var cs = crioByKey[s.study_key];
-    if (!cs || SKIP[cs.protocol_number]) return;
-    var isPS = cs.protocol_number.toLowerCase().indexOf('pre-screen') >= 0 || cs.protocol_number === cs.indication;
-    if (isPS) return;
-    if (!studyStats[s.study_key]) studyStats[s.study_key] = { proto: cs.protocol_number, enrolled: 0, sf: 0, disc: 0, completed: 0, total: 0 };
-    var st = studyStats[s.study_key];
-    st.total++;
-    if (s.status === 'ENROLLED') st.enrolled++;
-    else if (s.status === 'SCREEN_FAIL') st.sf++;
-    else if (s.status === 'DISCONTINUED') st.disc++;
-    else if (s.status === 'COMPLETED') st.completed++;
-  });
-
-  // Filter to studies with screen fails, sort by SF count desc
-  var studies = Object.keys(studyStats).map(function(k) { return studyStats[k]; })
-    .filter(function(s) { return s.sf > 0; })
-    .sort(function(a, b) { return b.sf - a.sf; });
-
-  if (studies.length === 0) {
-    el.innerHTML = '<div style="padding:16px;text-align:center;color:#94a3b8;font-size:12px;">No screen fails recorded</div>';
-    return;
-  }
-
-  var totalSF = studies.reduce(function(s, r) { return s + r.sf; }, 0);
-  var totalScreened = studies.reduce(function(s, r) { return s + r.enrolled + r.sf + r.disc + r.completed; }, 0);
-  var overallRate = totalScreened > 0 ? Math.round(totalSF / totalScreened * 100) : 0;
-  if (badge) { badge.textContent = totalSF + ' fails'; badge.style.display = ''; }
-
-  var html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:14px;">';
-  html += '<div style="padding:8px;background:#fef2f2;border-radius:8px;text-align:center;"><div style="font-size:18px;font-weight:800;color:#dc2626;">'+totalSF+'</div><div style="font-size:9px;color:#dc2626;font-weight:600;">Total Screen Fails</div></div>';
-  html += '<div style="padding:8px;background:#eff6ff;border-radius:8px;text-align:center;"><div style="font-size:18px;font-weight:800;color:#3b82f6;">'+totalScreened+'</div><div style="font-size:9px;color:#3b82f6;font-weight:600;">Total Screened</div></div>';
-  var rColor = overallRate > 40 ? '#dc2626' : overallRate > 25 ? '#d97706' : '#059669';
-  html += '<div style="padding:8px;background:#f8fafc;border-radius:8px;text-align:center;"><div style="font-size:18px;font-weight:800;color:'+rColor+';">'+overallRate+'%</div><div style="font-size:9px;color:'+rColor+';font-weight:600;">Overall SF Rate</div></div>';
-  html += '<div style="padding:8px;background:#f0fdf4;border-radius:8px;text-align:center;"><div style="font-size:18px;font-weight:800;color:#059669;">'+studies.length+'</div><div style="font-size:9px;color:#059669;font-weight:600;">Studies w/ Fails</div></div>';
-  html += '</div>';
-
-  html += '<div style="overflow-x:auto;"><table class="fin-table" style="width:100%;font-size:11px;"><thead><tr>';
-  html += '<th style="text-align:left;padding:8px;">Study</th><th style="text-align:center;">Screen Fails</th><th style="text-align:center;">Enrolled</th>';
-  html += '<th style="text-align:center;">Total Screened</th><th style="text-align:center;">SF Rate</th><th style="text-align:center;">SF Share</th>';
-  html += '</tr></thead><tbody>';
-  studies.forEach(function(s) {
-    var screened = s.enrolled + s.sf + s.disc + s.completed;
-    var rate = screened > 0 ? Math.round(s.sf / screened * 100) : 0;
-    var share = totalSF > 0 ? Math.round(s.sf / totalSF * 100) : 0;
-    var rc = rate > 40 ? '#dc2626' : rate > 25 ? '#d97706' : '#059669';
-    html += '<tr><td style="padding:6px 8px;font-weight:600;">'+escapeHTML(s.proto)+'</td>';
-    html += '<td style="text-align:center;color:#dc2626;font-weight:700;">'+s.sf+'</td>';
-    html += '<td style="text-align:center;color:#059669;">'+s.enrolled+'</td>';
-    html += '<td style="text-align:center;">'+screened+'</td>';
-    html += '<td style="text-align:center;color:'+rc+';font-weight:700;">'+rate+'%</td>';
-    html += '<td style="text-align:center;"><div style="display:flex;align-items:center;justify-content:center;gap:4px;"><div style="width:'+Math.max(share,2)+'%;max-width:60px;height:8px;background:#dc2626;border-radius:4px;"></div><span style="font-size:10px;">'+share+'%</span></div></td>';
-    html += '</tr>';
-  });
-  html += '</tbody></table></div>';
-  el.innerHTML = html;
-}
-
-// ═══════════════════════════════════════════════════════════════
 // FEATURE: Investigator Approval Tracker
 // ═══════════════════════════════════════════════════════════════
 function renderPIApprovalTracker() {
@@ -9612,7 +9540,6 @@ async function fetchCrioStudies() {
           safe(renderCrioStudies, 'renderCrioStudies');
           safe(mergeCrioIntoStudies, 'mergeCrioIntoStudies');
           safe(buildEnrollmentKPIs, 'buildEnrollmentKPIs');
-                  safe(renderScreenFailAnalysis, 'renderScreenFailAnalysis');
           safe(buildSchedulingGapAlerts, 'buildSchedulingGapAlerts');
         }
       } catch(e) {
@@ -11432,8 +11359,13 @@ function renderStudiesTable() {
     if (_studyFilter === 'critical') return s.risk_level === 'critical';
     if (_studyFilter === 'high') return s.risk_level === 'high';
     if (_studyFilter === 'enrolling') return s.enroll_status === 'Enrolling';
+    if (_studyFilter === 'maintenance') return s.enroll_status === 'Maintenance';
+    if (_studyFilter === 'startup') return s.enroll_status === 'Startup';
+    if (_studyFilter === 'preclosed') return s.enroll_status === 'Pre-Closed' || s.enroll_status === 'Closed';
     if (_studyFilter === 'goal_met') return s.pct !== null && s.pct >= 100;
     if (_studyFilter === 'behind') return s.enroll_status === 'Enrolling' && s.target && s.pct !== null && s.pct < 50;
+    if (_studyFilter === 'phl') return (s.sites || []).indexOf('PHL') !== -1;
+    if (_studyFilter === 'pnj') return (s.sites || []).indexOf('PNJ') !== -1;
     return true;
   });
 
