@@ -5470,8 +5470,20 @@ function renderCoordWorkloadBalance() {
     var devPct = avgVisits > 0 ? Math.round((c.visits - avgVisits) / avgVisits * 100) : 0;
     var devColor = Math.abs(devPct) <= 15 ? '#059669' : Math.abs(devPct) <= 30 ? '#f59e0b' : '#dc2626';
     var crColor = c.cancelRate > 20 ? '#dc2626' : c.cancelRate > 10 ? '#f59e0b' : '#059669';
+    // Automated indicators
+    var alerts = [];
+    if (c.visits < avgVisits * 0.5 && avgVisits > 0) alerts.push({text:'Low Activity', bg:'#fffbeb', color:'#d97706'});
+    if (c.cancelRate > 25) alerts.push({text:'High Cancels', bg:'#fef2f2', color:'#dc2626'});
+    // Check for overloaded days (more than 8 visits in a single day)
+    var dayVisits = {};
+    DATA.allVisitDetail.filter(function(v){return v.coord===c.name;}).forEach(function(v){dayVisits[v.date_iso]=(dayVisits[v.date_iso]||0)+1;});
+    var maxDayVisits = Math.max.apply(null, Object.values(dayVisits).concat([0]));
+    if (maxDayVisits > 8) alerts.push({text:'Overloaded ('+maxDayVisits+'/day)', bg:'#fef2f2', color:'#dc2626'});
+    if (c.visits > avgVisits * 1.5 && avgVisits > 0 && c.cancelRate < 10) alerts.push({text:'Top Performer', bg:'#f0fdf4', color:'#059669'});
+    var alertHtml = alerts.length > 0 ? ' ' + alerts.map(function(a){ return '<span style="font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px;background:'+a.bg+';color:'+a.color+';">'+a.text+'</span>'; }).join(' ') : '';
+
     html += '<div style="display:grid;grid-template-columns:120px 1fr 60px 50px 50px;align-items:center;gap:6px;font-size:11px;">';
-    html += '<div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+c.name.split(' ')[0]+'</div>';
+    html += '<div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+c.name.split(' ')[0]+alertHtml+'</div>';
     html += '<div style="background:#e2e8f0;border-radius:4px;height:14px;overflow:hidden;position:relative;">';
     html += '<div style="height:100%;width:'+pct+'%;background:linear-gradient(90deg,#1843AD,#3b82f6);border-radius:4px;"></div>';
     html += '<div style="position:absolute;left:'+Math.min(pct,50)+'%;top:0;transform:translateX(4px);font-size:9px;font-weight:700;color:#1e293b;line-height:14px;">'+c.visits+'</div>';
@@ -8539,14 +8551,14 @@ function processLiveData(allRows, legacyCancels, auditLog) {
     return PHL;
   }
 
-  // ── Backfill Site Name on all rows if missing from CSV ──
-  // The upcoming visits CSV has no Site Name column; derive from Study Key via PENNINGTON_KEYS.
-  // Cancellations CSV already has Site Name, so this is a no-op for those rows.
+  // ── Derive Site Name from Study Key (authoritative) ──
+  // The upcoming visits CSV may have no Site Name or may show "Philadelphia, PA" for all rows.
+  // PENNINGTON_KEYS is the authoritative source: if the study key is in the set, it's PNJ.
+  // Always override based on study key — don't trust the CSV Site Name for site classification.
   [upcoming, cancels].forEach(function(arr) {
     arr.forEach(function(r) {
-      if (!r['Site Name']) {
-        r['Site Name'] = siteSlug(r['Study Key'], '') === PNJ ? 'Pennington, NJ' : 'Philadelphia, PA';
-      }
+      var derived = siteSlug(r['Study Key'], r['Site Name']) === PNJ ? 'Pennington, NJ' : 'Philadelphia, PA';
+      r['Site Name'] = derived;
     });
   });
 
@@ -10063,6 +10075,28 @@ function buildMedRecAlerts() {
     });
   }
 
+  // 8. Follow-up needed: active patients not contacted in 14+ days
+  const noContact = active.filter(r => {
+    if (!r.last_contact_date) return true; // never contacted
+    var lcd = new Date(r.last_contact_date);
+    return !isNaN(lcd.getTime()) && Math.floor((today - lcd) / 86400000) > 14;
+  });
+  const neverContacted = active.filter(r => !r.last_contact_date);
+  if (noContact.length > 0) {
+    alerts.push({ icon: '📱', color: '#1843AD', bg: '#e8eeff',
+      title: noContact.length + ' active patient' + (noContact.length>1?'s':'') + ' not contacted in 14+ days' + (neverContacted.length > 0 ? ' (' + neverContacted.length + ' never contacted)' : ''),
+      detail: noContact.sort((a,b) => {
+        var da = a.last_contact_date ? new Date(a.last_contact_date).getTime() : 0;
+        var db = b.last_contact_date ? new Date(b.last_contact_date).getTime() : 0;
+        return da - db;
+      }).slice(0, 5).map(r => {
+        var lcd = r.last_contact_date || 'Never';
+        return '<div style="font-size:11px;padding:2px 0;">' + maskPHI(r.name) + ' — last: ' + escapeHTML(lcd) + ' — ' + escapeHTML(r.study||'') + '</div>';
+      }).join('') + (noContact.length > 5 ? '<div style="font-size:10px;color:#94a3b8;">+' + (noContact.length-5) + ' more</div>' : ''),
+      action: 'Contact these patients. Patients not reached in 2+ weeks are at risk of dropping out.'
+    });
+  }
+
   // ── Badge ──
   const actionCount = alerts.length;
   if (badge) {
@@ -10320,7 +10354,12 @@ function showRescheduled() {
     openModal('Rescheduled Visits', 'None found', '<div style="text-align:center;padding:30px;color:#94a3b8;">No rescheduled visits detected</div>');
     return;
   }
-  var body = '';
+  // Site filter buttons
+  var body = '<div style="display:flex;gap:6px;margin-bottom:12px;"><span style="font-size:10px;font-weight:600;color:#94a3b8;line-height:24px;">Site:</span>'
+    + '<button onclick="filterRescheduledBySite(\'all\')" class="resch-site-btn resch-site-active" style="font-size:10px;padding:3px 10px;border-radius:4px;border:1px solid #e2e8f0;background:#1843AD;color:white;cursor:pointer;font-weight:600;">All</button>'
+    + '<button onclick="filterRescheduledBySite(\'PHL\')" class="resch-site-btn" style="font-size:10px;padding:3px 10px;border-radius:4px;border:1px solid #e2e8f0;background:white;cursor:pointer;">PHL</button>'
+    + '<button onclick="filterRescheduledBySite(\'PNJ\')" class="resch-site-btn" style="font-size:10px;padding:3px 10px;border-radius:4px;border:1px solid #e2e8f0;background:white;cursor:pointer;">PNJ</button>'
+    + '</div>';
 
   // ── Confirmed Rescheduled (have new date) ──
   if (confirmed.length) {
@@ -10330,7 +10369,7 @@ function showRescheduled() {
       '<th>Patient</th><th>Study</th><th>Cancelled</th><th>New Date</th><th>Original Reason</th><th>Coordinator</th><th>Site</th>' +
       '</tr></thead><tbody>' +
       confirmed.map(function(r) {
-        return '<tr>' +
+        return '<tr data-rsite="' + escapeHTML(r.site||'') + '">' +
           '<td>' + patientLink(r.name, r.url) + '</td>' +
           '<td style="font-size:11px">' + extLink(r.study, r.study_url) + '</td>' +
           '<td style="font-size:11px;color:#dc2626">' + escapeHTML(r.cancel_date||'—') + '</td>' +
@@ -10350,7 +10389,7 @@ function showRescheduled() {
       '<th>Patient</th><th>Study</th><th>Cancelled</th><th>Reason</th><th>Coordinator</th><th>Site</th>' +
       '</tr></thead><tbody>' +
       pending.map(function(r) {
-        return '<tr style="background:#fffbeb">' +
+        return '<tr style="background:#fffbeb" data-rsite="' + escapeHTML(r.site||'') + '">' +
           '<td>' + patientLink(r.name, r.url) + '</td>' +
           '<td style="font-size:11px">' + extLink(r.study, r.study_url) + '</td>' +
           '<td style="font-size:11px;color:#dc2626">' + escapeHTML(r.cancel_date||'—') + '</td>' +
@@ -10362,6 +10401,20 @@ function showRescheduled() {
   }
 
   openModal('Rescheduled Visits', confirmed.length + ' confirmed · ' + pending.length + ' pending', body);
+}
+
+function filterRescheduledBySite(site) {
+  var btns = document.querySelectorAll('.resch-site-btn');
+  btns.forEach(function(b) { b.style.background = 'white'; b.style.color = '#475569'; b.style.fontWeight = '400'; });
+  var active = Array.from(btns).find(function(b) { return b.textContent === (site === 'all' ? 'All' : site); });
+  if (active) { active.style.background = '#1843AD'; active.style.color = 'white'; active.style.fontWeight = '600'; }
+  var rows = document.querySelectorAll('[data-rsite]');
+  rows.forEach(function(row) {
+    var rs = row.dataset.rsite || '';
+    if (site === 'all') { row.style.display = ''; }
+    else if (site === 'PNJ') { row.style.display = rs.indexOf('Penn') !== -1 ? '' : 'none'; }
+    else { row.style.display = rs.indexOf('Penn') === -1 ? '' : 'none'; }
+  });
 }
 
 /* ── KPI Popup: Risk Studies ────────────────────── */
@@ -12654,13 +12707,26 @@ function mergeCrioIntoStudies() {
     'PRECLOSED':'Pre-Closed','CONFIGURING':'Configuring','CLOSED':'Closed'
   };
 
-  // Build CRIO lookup by protocol_number
+  // Build CRIO lookup by protocol_number — merge multi-site studies (e.g., PHL+PNJ)
   var crioByProto = {};
+  var PNJ_KEYS = new Set(CRP_CONFIG.PENNINGTON_STUDY_KEYS || []);
   CRIO_STUDIES_DATA.forEach(function(s) {
-    crioByProto[s.protocol_number] = s;
+    var existing = crioByProto[s.protocol_number];
+    if (existing) {
+      // Merge: combine targets, subjects, revenue from second site
+      existing.target_enrollment = (existing.target_enrollment || 0) + (s.target_enrollment || 0);
+      existing.subject_count = (existing.subject_count || 0) + (s.subject_count || 0);
+      existing.total_revenue = (existing.total_revenue || 0) + (s.total_revenue || 0);
+      existing.revenue_subjects = (existing.revenue_subjects || 0) + (s.revenue_subjects || 0);
+      if (!existing._extra_keys) existing._extra_keys = [];
+      existing._extra_keys.push(s.study_key);
+    } else {
+      crioByProto[s.protocol_number] = Object.assign({}, s);
+    }
     // Auto-register CRIO links
     if (s.study_key && typeof CRIO_LINKS !== 'undefined') {
-      var url = 'https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/' + s.study_key + '/subjects';
+      var siteSlugStr = PNJ_KEYS.has(parseInt(s.study_key)) ? 'pennington-nj' : 'philadelphia-pa';
+      var url = 'https://app.clinicalresearch.io/clinical-research-philadelphia-crp/' + siteSlugStr + '/study/' + s.study_key + '/subjects';
       if (!CRIO_LINKS[s.study_key]) CRIO_LINKS[s.study_key] = url;
       if (!CRIO_LINKS[s.protocol_number]) CRIO_LINKS[s.protocol_number] = url;
     }
@@ -12690,6 +12756,8 @@ function mergeCrioIntoStudies() {
     e.crio_sponsor = crio.sponsor || '';
     e.crio_phase = crio.phase || '';
     e.crio_study_name = crio.study_name || '';
+    e.crio_end_date = crio.end_date || '';
+    e.crio_start_date = crio.start_date || '';
     // Use CRIO target enrollment if dashboard doesn't have one
     if (crio.target_enrollment > 0 && (!e.target || e.target === 0)) {
       e.target = crio.target_enrollment;
@@ -12707,7 +12775,14 @@ function mergeCrioIntoStudies() {
     }
 
     // Update enrollment numbers from CRIO subjects (authoritative)
-    var subs = subsByStudy[crio.study_key] || {};
+    // Merge subjects from all site keys for multi-site studies (e.g., PHL+PNJ)
+    var subs = Object.assign({}, subsByStudy[crio.study_key] || {});
+    if (crio._extra_keys) {
+      crio._extra_keys.forEach(function(ek) {
+        var extra = subsByStudy[ek] || {};
+        Object.keys(extra).forEach(function(st) { subs[st] = (subs[st] || 0) + extra[st]; });
+      });
+    }
     if (Object.keys(subs).length > 0) {
       var crioEnrolled = subs['ENROLLED'] || 0;
       var crioSF = subs['SCREEN_FAIL'] || 0;
@@ -13651,7 +13726,26 @@ function renderStudiesTable() {
       (s.study_url ? `<a href="${escapeHTML(s.study_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="margin-left:4px;opacity:0.4;vertical-align:middle"><svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>` : '');
     const statusBadge = s.enroll_status
       ? `<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;margin-left:5px;background:${s.enroll_status==='Enrolling'?'#e8eeff':s.enroll_status==='Maintenance'?'#f0fdf4':s.enroll_status==='Startup'?'#fffbeb':'#f1f5f9'};color:${s.enroll_status==='Enrolling'?'#1843ad':s.enroll_status==='Maintenance'?'#059669':s.enroll_status==='Startup'?'#d97706':'#94a3b8'}">${s.enroll_status}</span>` : '';
-    const indicationTag = s.crio_indication ? `<div style="font-size:9px;color:#94a3b8;margin-top:1px">${escapeHTML(s.crio_indication)}</div>` : '';
+    const indicationTag = s.crio_indication ? `<div style="font-size:9px;color:#94a3b8;margin-top:1px">${escapeHTML(s.crio_indication)}${s.crio_end_date ? ' · End: '+escapeHTML(s.crio_end_date) : ''}</div>` : (s.crio_end_date ? `<div style="font-size:9px;color:#94a3b8;margin-top:1px">End: ${escapeHTML(s.crio_end_date)}</div>` : '');
+
+    // ── Automated study tags ──
+    var tags = [];
+    // Action alerts (red)
+    var cancelRate = (s.upcoming + s.cancels) > 0 ? Math.round(s.cancels / (s.upcoming + s.cancels) * 100) : 0;
+    if (cancelRate > 30 && s.cancels > 2) tags.push({text:'High Cancel', color:'#dc2626', bg:'#fef2f2'});
+    if (isEnrolling && s.screening === 0 && s.enrolled === 0 && s.upcoming > 0) tags.push({text:'No Enrollment', color:'#dc2626', bg:'#fef2f2'});
+    if (isEnrolling && s.screening === 0 && s.screened > 0) tags.push({text:'No Screening', color:'#dc2626', bg:'#fef2f2'});
+    // Warning alerts (amber)
+    if (s.screen_fail_pct > 40) tags.push({text:'High SF Rate', color:'#d97706', bg:'#fffbeb'});
+    if (isEnrolling && s.upcoming === 0 && s.enrolled > 0) tags.push({text:'No Visits', color:'#d97706', bg:'#fffbeb'});
+    // Opportunity alerts (green/blue)
+    if (hasTarget && pct >= 80 && pct < 100) tags.push({text:'Close to Goal', color:'#059669', bg:'#f0fdf4'});
+    if (s.screening > 3 && s.enrolled === 0) tags.push({text:'Screen→Enroll Gap', color:'#3b82f6', bg:'#eff6ff'});
+    var totalLeads = (s._refCount || 0) + (s._fbCount || 0);
+    if (totalLeads > 5 && s.screening === 0) tags.push({text:'Leads Unused', color:'#8b5cf6', bg:'#f5f3ff'});
+    var alertTags = tags.length > 0 ? '<div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:2px;">' + tags.map(function(t) {
+      return '<span style="font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px;background:'+t.bg+';color:'+t.color+';">'+t.text+'</span>';
+    }).join('') + '</div>' : '';
 
     const enrollCell = hasTarget
       ? `<div style="min-width:140px">
@@ -13691,7 +13785,7 @@ function renderStudiesTable() {
     const sfColor = s.screen_fail_pct > 60 ? '#dc2626' : s.screen_fail_pct > 40 ? '#d97706' : 'var(--muted)';
 
     return `<tr style="border-bottom:1px solid var(--border);transition:background .1s" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
-      <td style="padding:10px 12px;min-width:160px">${studyCell}${statusBadge}${indicationTag}</td>
+      <td style="padding:10px 12px;min-width:160px">${studyCell}${statusBadge}${indicationTag}${alertTags}</td>
       <td style="padding:10px 8px;text-align:center">${riskScoreCell}</td>
       <td style="padding:10px 8px;text-align:center">${cancelsCell}</td>
       <td style="padding:10px 8px;text-align:center">${upcomingCell}</td>
