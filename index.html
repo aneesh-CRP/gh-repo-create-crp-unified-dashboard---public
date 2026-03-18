@@ -1135,7 +1135,7 @@ body {
     <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showCancels(null,'All Cancellations')" title="Click to see all cancellations">
       <div class="tb-label">📅 Past 2 Months</div>
       <div class="tb-value red" id="kpi-cancels">112</div>
-      <div class="tb-sub">Clinical visit cancellations · Jan 4 – Mar 6</div>
+      <div class="tb-sub" id="kpi-cancel-range">Clinical visit cancellations</div>
     </div>
     <div class="tb-divider"></div>
     <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showRescheduled()" title="Click to see rescheduled visits">
@@ -1143,7 +1143,7 @@ body {
       <div class="tb-value" style="color:#f59e0b" id="kpi-rescheduled">0</div>
       <div class="tb-sub">Cancelled but rebooked</div>
     </div>
-    <div class="tb-divider">TODAY<br>Mar 6</div>
+    <div class="tb-divider" id="kpi-today-divider">TODAY</div>
     <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showUpcoming(r=>{ const d=new Date(r.date_iso||''); const now=new Date(); now.setHours(0,0,0,0); return (d-now)/86400000<=14; },'Next 14 Days')" title="Click to see next 14 days">
       <div class="tb-label">⚡ Next 14 Days</div>
       <div class="tb-value blue" id="kpi-next14">78</div>
@@ -1153,7 +1153,7 @@ body {
     <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showUpcoming(null,'All Upcoming Visits')" title="Click to see all upcoming visits">
       <div class="tb-label">📆 Next 2 Months</div>
       <div class="tb-value green" id="kpi-upcoming">75</div>
-      <div class="tb-sub">Scheduled visits · through May 6</div>
+      <div class="tb-sub" id="kpi-upcoming-range">Scheduled visits</div>
     </div>
     <div class="tb-divider"></div>
     <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showRiskFlags('At-Risk Patients')" title="Click to see at-risk patients">
@@ -1522,143 +1522,14 @@ body {
     </div>
   </div>
 
-  <!-- Recruiter Performance -->
+  <!-- Recruiter Performance (data-driven) -->
   <div class="card mb16 fade-in">
     <div class="card-header">
-      <span class="card-title">🔍 Recruiter Performance · Last 2 Months</span>
-      <span class="badge badge-gray">Gaby · Ana · Vlado · Ema · Jana</span>
+      <span class="card-title">Recruiter Performance</span>
+      <span class="badge badge-gray" id="recruiter-perf-badge">Loading...</span>
     </div>
-    <div style="padding:0 16px 4px;display:grid;grid-template-columns:1fr 1fr;gap:0 24px;">
-<div style="padding:12px 0;border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showCoordDetail('Gabrijela Ateljevic')">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-    <span style="font-size:13px;font-weight:700;color:var(--navy)">Gaby</span>
-    <div style="display:flex;gap:6px;">
-      <span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#e0f2fe;color:#0369a1;font-weight:600;">15 upcoming</span>
-      <span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#fef3c7;color:#92400e;font-weight:600;">14 cancels</span>
-    </div>
-  </div>
-  <div style="display:grid;grid-template-columns:60px 1fr 28px;gap:3px 6px;align-items:center;font-size:10px;color:var(--muted);">
-    <span>Upcoming</span>
-    <div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;">
-      <div style="width:100%;height:100%;background:#072061;border-radius:3px;"></div>
-    </div>
-    <span style="text-align:right;font-weight:600;color:#072061">15</span>
-    <span>Cancels</span>
-    <div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;">
-      <div style="width:100%;height:100%;background:#f59e0b;border-radius:3px;"></div>
-    </div>
-    <span style="text-align:right;font-weight:600;color:#d97706">14</span>
-  </div>
-  <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">
-    <span style="font-size:10px;color:#6b7280;">No-shows: <b style="color:#374151">4 (29%)</b></span>
-    <span style="font-size:10px;color:#6b7280;">Screen fails: <b>1</b></span>
-    <span style="font-size:10px;color:#6b7280;">Undocumented: <b style="color:#d97706">4</b></span>
-  </div>
-</div>
-<div style="padding:12px 0;border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showCoordDetail('Ema Gunic')">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-    <span style="font-size:13px;font-weight:700;color:var(--navy)">Ema</span>
-    <div style="display:flex;gap:6px;">
-      <span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#e0f2fe;color:#0369a1;font-weight:600;">14 upcoming</span>
-      <span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#fef3c7;color:#92400e;font-weight:600;">13 cancels</span>
-    </div>
-  </div>
-  <div style="display:grid;grid-template-columns:60px 1fr 28px;gap:3px 6px;align-items:center;font-size:10px;color:var(--muted);">
-    <span>Upcoming</span>
-    <div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;">
-      <div style="width:93%;height:100%;background:#072061;border-radius:3px;"></div>
-    </div>
-    <span style="text-align:right;font-weight:600;color:#072061">14</span>
-    <span>Cancels</span>
-    <div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;">
-      <div style="width:93%;height:100%;background:#f59e0b;border-radius:3px;"></div>
-    </div>
-    <span style="text-align:right;font-weight:600;color:#d97706">13</span>
-  </div>
-  <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">
-    <span style="font-size:10px;color:#6b7280;">No-shows: <b style="color:#374151">5 (38%)</b></span>
-    <span style="font-size:10px;color:#6b7280;">Screen fails: <b>0</b></span>
-    <span style="font-size:10px;color:#6b7280;">Undocumented: <b style="color:#d97706">3</b></span>
-  </div>
-</div>
-<div style="padding:12px 0;border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showCoordDetail('Ana Lambic')">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-    <span style="font-size:13px;font-weight:700;color:var(--navy)">Ana</span>
-    <div style="display:flex;gap:6px;">
-      <span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#e0f2fe;color:#0369a1;font-weight:600;">14 upcoming</span>
-      <span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#fef3c7;color:#92400e;font-weight:600;">5 cancels</span>
-    </div>
-  </div>
-  <div style="display:grid;grid-template-columns:60px 1fr 28px;gap:3px 6px;align-items:center;font-size:10px;color:var(--muted);">
-    <span>Upcoming</span>
-    <div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;">
-      <div style="width:93%;height:100%;background:#072061;border-radius:3px;"></div>
-    </div>
-    <span style="text-align:right;font-weight:600;color:#072061">14</span>
-    <span>Cancels</span>
-    <div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;">
-      <div style="width:36%;height:100%;background:#f59e0b;border-radius:3px;"></div>
-    </div>
-    <span style="text-align:right;font-weight:600;color:#d97706">5</span>
-  </div>
-  <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">
-    <span style="font-size:10px;color:#6b7280;">No-shows: <b style="color:#374151">2 (40%)</b></span>
-    <span style="font-size:10px;color:#6b7280;">Screen fails: <b>1</b></span>
-    <span style="font-size:10px;color:#6b7280;">Undocumented: <b style="color:#374151">1</b></span>
-  </div>
-</div>
-<div style="padding:12px 0;border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showCoordDetail('Vlado Draganic')">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-    <span style="font-size:13px;font-weight:700;color:var(--navy)">Vlado</span>
-    <div style="display:flex;gap:6px;">
-      <span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#e0f2fe;color:#0369a1;font-weight:600;">4 upcoming</span>
-      <span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#fef3c7;color:#92400e;font-weight:600;">8 cancels</span>
-    </div>
-  </div>
-  <div style="display:grid;grid-template-columns:60px 1fr 28px;gap:3px 6px;align-items:center;font-size:10px;color:var(--muted);">
-    <span>Upcoming</span>
-    <div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;">
-      <div style="width:27%;height:100%;background:#072061;border-radius:3px;"></div>
-    </div>
-    <span style="text-align:right;font-weight:600;color:#072061">4</span>
-    <span>Cancels</span>
-    <div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;">
-      <div style="width:57%;height:100%;background:#f59e0b;border-radius:3px;"></div>
-    </div>
-    <span style="text-align:right;font-weight:600;color:#d97706">8</span>
-  </div>
-  <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">
-    <span style="font-size:10px;color:#6b7280;">No-shows: <b style="color:#374151">0 (0%)</b></span>
-    <span style="font-size:10px;color:#6b7280;">Screen fails: <b>0</b></span>
-    <span style="font-size:10px;color:#6b7280;">Undocumented: <b style="color:#374151">2</b></span>
-  </div>
-</div>
-<div style="padding:12px 0;border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showCoordDetail('Jana Milankovic')">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-    <span style="font-size:13px;font-weight:700;color:var(--navy)">Jana</span>
-    <div style="display:flex;gap:6px;">
-      <span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#e0f2fe;color:#0369a1;font-weight:600;">0 upcoming</span>
-      <span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#fef3c7;color:#92400e;font-weight:600;">39 cancels</span>
-    </div>
-  </div>
-  <div style="display:grid;grid-template-columns:60px 1fr 28px;gap:3px 6px;align-items:center;font-size:10px;color:var(--muted);">
-    <span>Upcoming</span>
-    <div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;">
-      <div style="width:0%;height:100%;background:#072061;border-radius:3px;"></div>
-    </div>
-    <span style="text-align:right;font-weight:600;color:#072061">0</span>
-    <span>Cancels</span>
-    <div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;">
-      <div style="width:100%;height:100%;background:#f59e0b;border-radius:3px;"></div>
-    </div>
-    <span style="text-align:right;font-weight:600;color:#d97706">39</span>
-  </div>
-  <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">
-    <span style="font-size:10px;color:#6b7280;">No-shows: <b style="color:#374151">9 (23%)</b></span>
-    <span style="font-size:10px;color:#6b7280;">Screen fails: <b>4</b></span>
-    <span style="font-size:10px;color:#6b7280;">Undocumented: <b style="color:#374151">0</b></span>
-  </div>
-</div>
+    <div id="recruiterPerfContainer" style="padding:0 16px 4px;">
+      <p style="color:#94a3b8;font-size:12px">Loading recruiter data...</p>
     </div>
   </div>
 
@@ -4285,9 +4156,11 @@ function buildSiteChart() {
     }
   });
   // Summary stat cards
-  const wrap = document.getElementById('siteChart').closest('.card');
-  let summaryEl = wrap.querySelector('.site-summary');
-  if (!summaryEl) { summaryEl = document.createElement('div'); summaryEl.className = 'site-summary'; wrap.appendChild(summaryEl); }
+  const wrap = document.getElementById('siteChart');
+  const wrapCard = wrap ? wrap.closest('.card') : null;
+  if (!wrapCard) return;
+  let summaryEl = wrapCard.querySelector('.site-summary');
+  if (!summaryEl) { summaryEl = document.createElement('div'); summaryEl.className = 'site-summary'; wrapCard.appendChild(summaryEl); }
   summaryEl.innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;">
     ${DATA.sites.map(s => {
       const rateColor = (s.cancelRate||0) >= 50 ? 'var(--red)' : (s.cancelRate||0) >= 35 ? 'var(--yellow)' : 'var(--green)';
@@ -5364,7 +5237,7 @@ function renderInvCapacity() {
     var sched = schedules[name] || {};
     var availDays = sched.daysPerWeek || 5;
     // Calculate actual weeks spanned by visit data for utilization
-    var allDates = visits.map(function(v){return v.date_iso;}).filter(Boolean).sort();
+    var allDates = iv.map(function(v){return v.date_iso;}).filter(Boolean).sort();
     var dataWeeks = 2; // fallback
     if (allDates.length >= 2) {
       var spanMs = new Date(allDates[allDates.length-1]) - new Date(allDates[0]);
@@ -5417,6 +5290,68 @@ function renderInvCapacity() {
   });
   html += '</div>';
   html += '<div style="margin-top:6px;font-size:9px;color:#94a3b8;text-align:right;">Util% · Studies · Avg/Day · $/Visit</div>';
+  el.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FEATURE: Recruiter Performance (data-driven)
+// ═══════════════════════════════════════════════════════════════
+function renderRecruiterPerformance() {
+  var el = document.getElementById('recruiterPerfContainer');
+  var badge = document.getElementById('recruiter-perf-badge');
+  if (!el) return;
+  var visits = DATA.allVisitDetail || [];
+  var cancels = DATA.allCancels || [];
+  if (visits.length === 0 && cancels.length === 0) return;
+
+  // Recruiters = COORDINATORS minus SCHEDULE_COORDINATORS
+  var schedSet = {};
+  (CRP_CONFIG.SCHEDULE_COORDINATORS || []).forEach(function(n){ schedSet[n] = true; });
+  var recruiters = (CRP_CONFIG.COORDINATORS || []).filter(function(n){ return !schedSet[n]; });
+  if (recruiters.length === 0) return;
+
+  // Nickname map for display
+  var nicknames = { 'Gabrijela Ateljevic': 'Gaby', 'Ema Gunic': 'Ema', 'Ana Lambic': 'Ana', 'Vlado Draganic': 'Vlado', 'Jana Milankovic': 'Jana' };
+
+  var stats = recruiters.map(function(name) {
+    var rv = visits.filter(function(v){ return v.coord === name; });
+    var rc = cancels.filter(function(c){ return c.coord === name; });
+    var noShows = rc.filter(function(c){ return c.category === 'No Show'; }).length;
+    var screenFails = rc.filter(function(c){ return c.category === 'Screen Fail / DNQ'; }).length;
+    var undoc = rc.filter(function(c){ return !c.category || c.category === 'Uncategorized' || c.category === 'Other'; }).length;
+    var nsPct = rc.length > 0 ? Math.round(noShows / rc.length * 100) : 0;
+    return { name: name, nick: nicknames[name] || name.split(' ')[0], upcoming: rv.length, cancels: rc.length, noShows: noShows, nsPct: nsPct, screenFails: screenFails, undoc: undoc };
+  }).sort(function(a,b){ return b.upcoming - a.upcoming; });
+
+  if (badge) badge.textContent = stats.map(function(s){ return s.nick; }).join(' · ');
+
+  var maxVal = Math.max.apply(null, stats.map(function(s){ return Math.max(s.upcoming, s.cancels); }).concat([1]));
+
+  var html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 24px;">';
+  stats.forEach(function(s) {
+    var upPct = Math.round(s.upcoming / maxVal * 100);
+    var cPct = Math.round(s.cancels / maxVal * 100);
+    var undocColor = s.undoc > 2 ? '#d97706' : '#374151';
+    html += '<div style="padding:12px 0;border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showCoordDetail(\'' + jsAttr(s.name) + '\')">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">';
+    html += '<span style="font-size:13px;font-weight:700;color:var(--navy)">' + escapeHTML(s.nick) + '</span>';
+    html += '<div style="display:flex;gap:6px;">';
+    html += '<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#e0f2fe;color:#0369a1;font-weight:600;">' + s.upcoming + ' upcoming</span>';
+    html += '<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#fef3c7;color:#92400e;font-weight:600;">' + s.cancels + ' cancels</span>';
+    html += '</div></div>';
+    html += '<div style="display:grid;grid-template-columns:60px 1fr 28px;gap:3px 6px;align-items:center;font-size:10px;color:var(--muted);">';
+    html += '<span>Upcoming</span><div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;"><div style="width:' + upPct + '%;height:100%;background:#072061;border-radius:3px;"></div></div>';
+    html += '<span style="text-align:right;font-weight:600;color:#072061">' + s.upcoming + '</span>';
+    html += '<span>Cancels</span><div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;"><div style="width:' + cPct + '%;height:100%;background:#f59e0b;border-radius:3px;"></div></div>';
+    html += '<span style="text-align:right;font-weight:600;color:#d97706">' + s.cancels + '</span>';
+    html += '</div>';
+    html += '<div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">';
+    html += '<span style="font-size:10px;color:#6b7280;">No-shows: <b style="color:#374151">' + s.noShows + ' (' + s.nsPct + '%)</b></span>';
+    html += '<span style="font-size:10px;color:#6b7280;">Screen fails: <b>' + s.screenFails + '</b></span>';
+    html += '<span style="font-size:10px;color:#6b7280;">Undocumented: <b style="color:' + undocColor + '">' + s.undoc + '</b></span>';
+    html += '</div></div>';
+  });
+  html += '</div>';
   el.innerHTML = html;
 }
 
@@ -8190,6 +8125,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
       study_url: studyUrl(r['Study Key'], r['Site Name']) || '',
       subject_status: r['Subject Status']||'',
       coord: cleanCoord(r['Staff Full Name'] || r['Full Name']),
+      investigator: cleanCoord(resolveInvestigator(r)),
       type: r['Appointment Cancellation Type']||'',
       reason: r['Cancel Reason']||'',
       visit: r['Name']||r['Appointment Type']||'',
@@ -9205,6 +9141,20 @@ function renderAll() {
   if (document.getElementById('sched-count'))
     document.getElementById('sched-count').textContent = (DATA.upcomingTotal||0) + ' visits';
 
+  // Dynamic KPI date subtitles
+  (function updateKpiDates() {
+    var now = new Date();
+    var fmt = function(d) { return d.toLocaleDateString('en-US', {month:'short', day:'numeric'}); };
+    var past = new Date(now); past.setMonth(past.getMonth() - 2);
+    var future = new Date(now); future.setMonth(future.getMonth() + 2);
+    var cancelRange = document.getElementById('kpi-cancel-range');
+    if (cancelRange) cancelRange.textContent = 'Clinical visit cancellations · ' + fmt(past) + ' – ' + fmt(now);
+    var todayDiv = document.getElementById('kpi-today-divider');
+    if (todayDiv) todayDiv.innerHTML = 'TODAY<br>' + fmt(now);
+    var upRange = document.getElementById('kpi-upcoming-range');
+    if (upRange) upRange.textContent = 'Scheduled visits · through ' + fmt(future);
+  })();
+
   safe(buildHorizon,         'buildHorizon');
   safe(buildReasonChart,     'buildReasonChart');
   safe(buildSiteChart,       'buildSiteChart');
@@ -9212,6 +9162,7 @@ function renderAll() {
   safe(renderCoordinatorGoals, 'renderCoordinatorGoals');
   safe(renderCoordWorkloadBalance, 'renderCoordWorkloadBalance');
   safe(renderInvCapacity, 'renderInvCapacity');
+  safe(renderRecruiterPerformance, 'renderRecruiterPerformance');
   safe(buildActionSteps,     'buildActionSteps');
   safe(buildInsights,        'buildInsights');
   safe(buildRecruitmentKPIs, 'buildRecruitmentKPIs');
@@ -13644,6 +13595,7 @@ async function _crpInit() {
       } else {
         DATA = newData;
         renderAll();
+        _updateHealthButton();
         _log('CRP Auto-Refresh: CRIO refreshed — upcoming:', rows1.length, 'audit:', auditRows.length);
       }
     } catch(e) { console.warn('CRP Auto-Refresh: CRIO refresh failed:', e.message); }

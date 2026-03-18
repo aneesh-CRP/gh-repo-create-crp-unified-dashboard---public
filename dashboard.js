@@ -2077,9 +2077,11 @@ function buildSiteChart() {
     }
   });
   // Summary stat cards
-  const wrap = document.getElementById('siteChart').closest('.card');
-  let summaryEl = wrap.querySelector('.site-summary');
-  if (!summaryEl) { summaryEl = document.createElement('div'); summaryEl.className = 'site-summary'; wrap.appendChild(summaryEl); }
+  const wrap = document.getElementById('siteChart');
+  const wrapCard = wrap ? wrap.closest('.card') : null;
+  if (!wrapCard) return;
+  let summaryEl = wrapCard.querySelector('.site-summary');
+  if (!summaryEl) { summaryEl = document.createElement('div'); summaryEl.className = 'site-summary'; wrapCard.appendChild(summaryEl); }
   summaryEl.innerHTML = `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;">
     ${DATA.sites.map(s => {
       const rateColor = (s.cancelRate||0) >= 50 ? 'var(--red)' : (s.cancelRate||0) >= 35 ? 'var(--yellow)' : 'var(--green)';
@@ -3156,7 +3158,7 @@ function renderInvCapacity() {
     var sched = schedules[name] || {};
     var availDays = sched.daysPerWeek || 5;
     // Calculate actual weeks spanned by visit data for utilization
-    var allDates = visits.map(function(v){return v.date_iso;}).filter(Boolean).sort();
+    var allDates = iv.map(function(v){return v.date_iso;}).filter(Boolean).sort();
     var dataWeeks = 2; // fallback
     if (allDates.length >= 2) {
       var spanMs = new Date(allDates[allDates.length-1]) - new Date(allDates[0]);
@@ -3209,6 +3211,68 @@ function renderInvCapacity() {
   });
   html += '</div>';
   html += '<div style="margin-top:6px;font-size:9px;color:#94a3b8;text-align:right;">Util% · Studies · Avg/Day · $/Visit</div>';
+  el.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FEATURE: Recruiter Performance (data-driven)
+// ═══════════════════════════════════════════════════════════════
+function renderRecruiterPerformance() {
+  var el = document.getElementById('recruiterPerfContainer');
+  var badge = document.getElementById('recruiter-perf-badge');
+  if (!el) return;
+  var visits = DATA.allVisitDetail || [];
+  var cancels = DATA.allCancels || [];
+  if (visits.length === 0 && cancels.length === 0) return;
+
+  // Recruiters = COORDINATORS minus SCHEDULE_COORDINATORS
+  var schedSet = {};
+  (CRP_CONFIG.SCHEDULE_COORDINATORS || []).forEach(function(n){ schedSet[n] = true; });
+  var recruiters = (CRP_CONFIG.COORDINATORS || []).filter(function(n){ return !schedSet[n]; });
+  if (recruiters.length === 0) return;
+
+  // Nickname map for display
+  var nicknames = { 'Gabrijela Ateljevic': 'Gaby', 'Ema Gunic': 'Ema', 'Ana Lambic': 'Ana', 'Vlado Draganic': 'Vlado', 'Jana Milankovic': 'Jana' };
+
+  var stats = recruiters.map(function(name) {
+    var rv = visits.filter(function(v){ return v.coord === name; });
+    var rc = cancels.filter(function(c){ return c.coord === name; });
+    var noShows = rc.filter(function(c){ return c.category === 'No Show'; }).length;
+    var screenFails = rc.filter(function(c){ return c.category === 'Screen Fail / DNQ'; }).length;
+    var undoc = rc.filter(function(c){ return !c.category || c.category === 'Uncategorized' || c.category === 'Other'; }).length;
+    var nsPct = rc.length > 0 ? Math.round(noShows / rc.length * 100) : 0;
+    return { name: name, nick: nicknames[name] || name.split(' ')[0], upcoming: rv.length, cancels: rc.length, noShows: noShows, nsPct: nsPct, screenFails: screenFails, undoc: undoc };
+  }).sort(function(a,b){ return b.upcoming - a.upcoming; });
+
+  if (badge) badge.textContent = stats.map(function(s){ return s.nick; }).join(' · ');
+
+  var maxVal = Math.max.apply(null, stats.map(function(s){ return Math.max(s.upcoming, s.cancels); }).concat([1]));
+
+  var html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 24px;">';
+  stats.forEach(function(s) {
+    var upPct = Math.round(s.upcoming / maxVal * 100);
+    var cPct = Math.round(s.cancels / maxVal * 100);
+    var undocColor = s.undoc > 2 ? '#d97706' : '#374151';
+    html += '<div style="padding:12px 0;border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showCoordDetail(\'' + jsAttr(s.name) + '\')">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">';
+    html += '<span style="font-size:13px;font-weight:700;color:var(--navy)">' + escapeHTML(s.nick) + '</span>';
+    html += '<div style="display:flex;gap:6px;">';
+    html += '<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#e0f2fe;color:#0369a1;font-weight:600;">' + s.upcoming + ' upcoming</span>';
+    html += '<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#fef3c7;color:#92400e;font-weight:600;">' + s.cancels + ' cancels</span>';
+    html += '</div></div>';
+    html += '<div style="display:grid;grid-template-columns:60px 1fr 28px;gap:3px 6px;align-items:center;font-size:10px;color:var(--muted);">';
+    html += '<span>Upcoming</span><div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;"><div style="width:' + upPct + '%;height:100%;background:#072061;border-radius:3px;"></div></div>';
+    html += '<span style="text-align:right;font-weight:600;color:#072061">' + s.upcoming + '</span>';
+    html += '<span>Cancels</span><div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;"><div style="width:' + cPct + '%;height:100%;background:#f59e0b;border-radius:3px;"></div></div>';
+    html += '<span style="text-align:right;font-weight:600;color:#d97706">' + s.cancels + '</span>';
+    html += '</div>';
+    html += '<div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">';
+    html += '<span style="font-size:10px;color:#6b7280;">No-shows: <b style="color:#374151">' + s.noShows + ' (' + s.nsPct + '%)</b></span>';
+    html += '<span style="font-size:10px;color:#6b7280;">Screen fails: <b>' + s.screenFails + '</b></span>';
+    html += '<span style="font-size:10px;color:#6b7280;">Undocumented: <b style="color:' + undocColor + '">' + s.undoc + '</b></span>';
+    html += '</div></div>';
+  });
+  html += '</div>';
   el.innerHTML = html;
 }
 
@@ -5982,6 +6046,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
       study_url: studyUrl(r['Study Key'], r['Site Name']) || '',
       subject_status: r['Subject Status']||'',
       coord: cleanCoord(r['Staff Full Name'] || r['Full Name']),
+      investigator: cleanCoord(resolveInvestigator(r)),
       type: r['Appointment Cancellation Type']||'',
       reason: r['Cancel Reason']||'',
       visit: r['Name']||r['Appointment Type']||'',
@@ -6997,6 +7062,20 @@ function renderAll() {
   if (document.getElementById('sched-count'))
     document.getElementById('sched-count').textContent = (DATA.upcomingTotal||0) + ' visits';
 
+  // Dynamic KPI date subtitles
+  (function updateKpiDates() {
+    var now = new Date();
+    var fmt = function(d) { return d.toLocaleDateString('en-US', {month:'short', day:'numeric'}); };
+    var past = new Date(now); past.setMonth(past.getMonth() - 2);
+    var future = new Date(now); future.setMonth(future.getMonth() + 2);
+    var cancelRange = document.getElementById('kpi-cancel-range');
+    if (cancelRange) cancelRange.textContent = 'Clinical visit cancellations · ' + fmt(past) + ' – ' + fmt(now);
+    var todayDiv = document.getElementById('kpi-today-divider');
+    if (todayDiv) todayDiv.innerHTML = 'TODAY<br>' + fmt(now);
+    var upRange = document.getElementById('kpi-upcoming-range');
+    if (upRange) upRange.textContent = 'Scheduled visits · through ' + fmt(future);
+  })();
+
   safe(buildHorizon,         'buildHorizon');
   safe(buildReasonChart,     'buildReasonChart');
   safe(buildSiteChart,       'buildSiteChart');
@@ -7004,6 +7083,7 @@ function renderAll() {
   safe(renderCoordinatorGoals, 'renderCoordinatorGoals');
   safe(renderCoordWorkloadBalance, 'renderCoordWorkloadBalance');
   safe(renderInvCapacity, 'renderInvCapacity');
+  safe(renderRecruiterPerformance, 'renderRecruiterPerformance');
   safe(buildActionSteps,     'buildActionSteps');
   safe(buildInsights,        'buildInsights');
   safe(buildRecruitmentKPIs, 'buildRecruitmentKPIs');
@@ -11436,6 +11516,7 @@ async function _crpInit() {
       } else {
         DATA = newData;
         renderAll();
+        _updateHealthButton();
         _log('CRP Auto-Refresh: CRIO refreshed — upcoming:', rows1.length, 'audit:', auditRows.length);
       }
     } catch(e) { console.warn('CRP Auto-Refresh: CRIO refresh failed:', e.message); }
