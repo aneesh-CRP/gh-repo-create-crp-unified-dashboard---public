@@ -1336,7 +1336,7 @@ function backfillInvestigators() {
       filled++;
     }
   });
-  if (filled) console.log('backfillInvestigators: filled ' + filled + ' rows');
+  if (filled) _log('backfillInvestigators: filled ' + filled + ' rows');
 }
 
 function togglePHIMask() {
@@ -2242,7 +2242,7 @@ function buildScheduleTable() {
   if (!tbody) return;
   var visits = (DATA && DATA.allVisitDetail) ? DATA.allVisitDetail : [];
   if (!visits.length) {
-    console.log('buildScheduleTable: no allVisitDetail data, keeping static rows');
+    _log('buildScheduleTable: no allVisitDetail data, keeping static rows');
     return;
   }
   var linkSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-left:2px;opacity:0.4;vertical-align:middle"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>';
@@ -2326,7 +2326,7 @@ function buildScheduleTable() {
       + '</tr>';
   }
   tbody.innerHTML = html;
-  console.log('buildScheduleTable: built ' + visits.length + ' rows from live CRIO data');
+  _log('buildScheduleTable: built ' + visits.length + ' rows from live CRIO data');
 }
 
 function buildSchedStudyBars() {
@@ -2562,11 +2562,11 @@ function injectScheduleMedRecords() {
     row.dataset.medInjected = '1';
     if (mr.medical_release || mr.records_received) withData++;
     if (matched < 5) {
-      console.log('MedRec [' + mr.name + ' / ' + mr.study + ']: release="' + mr.medical_release + '" records="' + mr.records_received + '"');
+      _log('MedRec [' + mr.name + ' / ' + mr.study + ']: release="' + mr.medical_release + '" records="' + mr.records_received + '"');
     }
     matched++;
   });
-  console.log('Schedule med records: matched ' + matched + '/' + rows.length + ' rows (' + withData + ' with data)');
+  _log('Schedule med records: matched ' + matched + '/' + rows.length + ' rows (' + withData + ' with data)');
 }
 
 // ── Hide past visits (only show today onward) ──
@@ -2590,7 +2590,7 @@ function hidePastVisits() {
   });
   var badge = document.getElementById('sched-count');
   if (badge) badge.textContent = shown + ' visits';
-  console.log('hidePastVisits: hidden=' + hidden + ', shown=' + shown);
+  _log('hidePastVisits: hidden=' + hidden + ', shown=' + shown);
 }
 
 // ── Visit Confirmation (localStorage-persisted per-visit checkboxes) ──
@@ -2699,7 +2699,7 @@ function injectVisitConfirmButtons() {
     injected++;
   });
   _updateConfirmCount();
-  console.log('injectVisitConfirmButtons: injected ' + injected + '/' + rows.length + ' rows');
+  _log('injectVisitConfirmButtons: injected ' + injected + '/' + rows.length + ' rows');
 }
 
 function buildStatusChart() {
@@ -4581,7 +4581,7 @@ async function fetchFinanceLive() {
 // ═══════════════════════════════════════════════════
 // CRIO vs QUICKBOOKS — Reconciliation
 // ═══════════════════════════════════════════════════
-let QB_DATA = { pnlMonthly: [], pnlByStudy: {}, pnlUnmatched: [], qbTotalIncome: 0, qbPeriod: '', invoiceLines: [], pnlClass: [], timeActivity: [], payments: [], empMap: {}, studyHoursAll: {}, studyBillableAll: {}, totalPayroll: 0, totalContractors: 0, totalTrackedHours: 0, totalAllHours: 0, totalBillableHours: 0, contractorNames: new Set(), pnlCostByName: {}, expenseLines: [], loaded: false };
+let QB_DATA = { pnlMonthly: [], pnlByStudy: {}, pnlUnmatched: [], qbTotalIncome: 0, qbPeriod: '', invoiceLines: [], pnlClass: [], timeActivity: [], payments: [], empMap: {}, studyHoursAll: {}, studyBillableAll: {}, totalTrackedHours: 0, totalAllHours: 0, totalBillableHours: 0, pnlCostByName: {}, loaded: false };
 
 async function fetchQuickBooksData() {
   const pk = CRP_CONFIG.DATA_FEEDS.FINANCE_PUB_KEY;
@@ -4598,14 +4598,8 @@ async function fetchQuickBooksData() {
       fetchFinanceTab(pk, tabs.QB_CLASSES),
       fetchFinanceTab(pk, tabs.QB_PAYMENTS),
     ];
-    // Optionally fetch QB_Employees and INV_Visits if tabs are published
-    if (tabs.QB_EMPLOYEES) fetches.push(fetchFinanceTab(pk, tabs.QB_EMPLOYEES));
-    if (tabs.INV_VISITS) fetches.push(fetchFinanceTab(pk, tabs.INV_VISITS));
     const results = await Promise.all(fetches);
     const [pnlMonthly, pnlCls, invLines, timeAct, classes, payments] = results;
-    let nextIdx = 6;
-    const qbEmployees = tabs.QB_EMPLOYEES ? (results[nextIdx++] || []) : [];
-    const invVisitsRaw = tabs.INV_VISITS ? (results[nextIdx++] || []) : [];
 
     // ── Detect QB period from PnL Monthly column headers
     const monthCols = pnlMonthly.length > 0 ? Object.keys(pnlMonthly[0]).filter(k => k !== 'Account' && k !== 'Total') : [];
@@ -4776,74 +4770,17 @@ async function fetchQuickBooksData() {
       });
     });
 
-    // Detect contractors: anyone with a PnL cost who is NOT on payroll (no time tracked, or identified investigator)
-    const contractorNames = new Set();
-    Object.keys(pnlCostByName).forEach(name => {
-      const lo = name.toLowerCase().trim();
-      const isInv = invConfig.some(i => {
-        const p = i.toLowerCase().trim().split(/\s+/);
-        return lo.includes(p[0]) && lo.includes(p[p.length-1]);
-      });
-      if (isInv || !empMap[name]) contractorNames.add(name);
-    });
-
-    // ── Parse QB Employees — extract bill rates, cost rates, hire dates
-    const empRates = {}; // name -> { billRate, costRate, hiredDate, active, email }
-    qbEmployees.forEach(r => {
-      const name = (r['Display Name']||'').trim();
-      if (!name) return;
-      const billRate = parseFloat(r['Bill Rate']) || 0;
-      const costRate = parseFloat(r['Cost Rate']) || 0;
-      const hiredDate = (r['Hired Date']||'').trim();
-      const active = (r['Active']||'').toLowerCase() === 'yes';
-      const email = (r['Email']||'').trim();
-      empRates[name] = { billRate, costRate, hiredDate, active, email };
-      // Also match to empMap entries by fuzzy name
-      Object.keys(empMap).forEach(empName => {
-        const lo = empName.toLowerCase();
-        const parts = name.toLowerCase().split(/\s+/);
-        if (parts.length >= 2 && lo.includes(parts[0]) && lo.includes(parts[parts.length-1])) {
-          empMap[empName].billRate = billRate;
-          empMap[empName].costRate = costRate;
-          empMap[empName].hiredDate = hiredDate;
-        }
-      });
-    });
-    if (qbEmployees.length > 0) _log('CRP QB: ' + qbEmployees.length + ' employees loaded, rates: ' + Object.entries(empRates).filter(([,v]) => v.billRate > 0 || v.costRate > 0).map(([k,v]) => k + '=$' + (v.costRate || v.billRate)).join(', '));
-
-    // ── Parse INV_Visits — manual investigator visit log
-    const invVisits = {}; // name -> { byDay: { date: { count, studies: [] } }, total: 0 }
-    invVisitsRaw.forEach(r => {
-      const name = (r['Investigator']||r['Name']||'').trim();
-      const date = (r['Date']||'').trim();
-      const study = (r['Study']||'').trim();
-      const count = parseInt(r['Visits']||r['Count']||'1') || 1;
-      if (!name || !date) return;
-      if (!invVisits[name]) invVisits[name] = { byDay: {}, total: 0 };
-      if (!invVisits[name].byDay[date]) invVisits[name].byDay[date] = { count: 0, studies: [] };
-      invVisits[name].byDay[date].count += count;
-      invVisits[name].byDay[date].studies.push(study);
-      invVisits[name].total += count;
-    });
-    if (invVisitsRaw.length > 0) _log('CRP QB: ' + invVisitsRaw.length + ' investigator visit entries loaded for ' + Object.keys(invVisits).length + ' investigators');
-
-    QB_DATA.invVisits = invVisits;
     QB_DATA.empMap = empMap;
-    QB_DATA.empRates = empRates;
     QB_DATA.studyHoursAll = studyHoursAll;
     QB_DATA.studyBillableAll = studyBillableAll;
-    QB_DATA.totalPayroll = totalPayroll;
-    QB_DATA.totalContractors = totalContractors;
     QB_DATA.totalTrackedHours = totalTrackedHours;
     QB_DATA.totalAllHours = totalAllHours;
     QB_DATA.totalBillableHours = totalBillableHours;
-    QB_DATA.contractorNames = contractorNames;
     QB_DATA.pnlCostByName = pnlCostByName;
-    QB_DATA.expenseLines = expenseLines;
 
     QB_DATA.loaded = true;
     const matchedRev = Object.values(pnlByStudy).reduce((s,v) => s + v.total, 0);
-    _log('CRP QB: Loaded — ' + Object.keys(pnlByStudy).length + ' studies matched ($' + Math.round(matchedRev).toLocaleString() + '), ' + pnlUnmatched.length + ' unmatched, income: $' + Math.round(qbTotalIncome).toLocaleString() + ', ' + Object.keys(empMap).length + ' TA staff (' + Math.round(totalTrackedHours) + ' hrs), payroll: $' + Math.round(totalPayroll).toLocaleString() + ', contractors: $' + Math.round(totalContractors).toLocaleString() + ', PnL name matches: ' + Object.keys(pnlCostByName).map(k => k + '=$' + Math.round(pnlCostByName[k]).toLocaleString()).join(', '));
+    _log('CRP QB: Loaded — ' + Object.keys(pnlByStudy).length + ' studies matched ($' + Math.round(matchedRev).toLocaleString() + '), ' + pnlUnmatched.length + ' unmatched, income: $' + Math.round(qbTotalIncome).toLocaleString() + ', ' + Object.keys(empMap).length + ' TA staff (' + Math.round(totalTrackedHours) + ' hrs)');
     renderCRIOvsQB();
   } catch(e) {
     console.warn('CRP QB: Fetch failed:', e.message);
@@ -4929,6 +4866,35 @@ function renderCRIOvsQB() {
   document.getElementById('qb-kpi2-sub').textContent = (QB_DATA.qbPeriod || 'YTD') + ' · ' + fmtK(totalQbMatched) + ' matched';
   document.getElementById('qb-kpi3').textContent = matureAlignPct + '%';
   document.getElementById('qb-kpi3-sub').textContent = matureCount + ' mature (≥6mo) · ' + allAlignPct + '% overall';
+
+  // ── Alignment gauge bar
+  var alignGaugeEl = document.getElementById('qbAlignGauge');
+  if (alignGaugeEl) {
+    var statusCounts = { Aligned: 0, Partial: 0, 'Low Match': 0, 'No QB Data': 0, Limited: 0 };
+    compRows.forEach(function(r) {
+      if (r.status.includes('mo data')) statusCounts.Limited++;
+      else statusCounts[r.status] = (statusCounts[r.status] || 0) + 1;
+    });
+    var gaugeTotal = compRows.length || 1;
+    var gaugeBars = [
+      { label: 'Aligned', count: statusCounts.Aligned, color: '#10B981' },
+      { label: 'Partial', count: statusCounts.Partial, color: '#F59E0B' },
+      { label: 'Low Match', count: statusCounts['Low Match'], color: '#EF4444' },
+      { label: 'Limited Data', count: statusCounts.Limited, color: '#60A5FA' },
+      { label: 'No QB Data', count: statusCounts['No QB Data'], color: '#9CA3AF' },
+    ].filter(function(g) { return g.count > 0; });
+    var gaugeHtml = '<div style="display:flex;height:10px;border-radius:5px;overflow:hidden;margin-bottom:6px;">';
+    gaugeBars.forEach(function(g) {
+      gaugeHtml += '<div style="width:' + (g.count / gaugeTotal * 100) + '%;background:' + g.color + '" title="' + g.label + ': ' + g.count + '"></div>';
+    });
+    gaugeHtml += '</div><div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;">';
+    gaugeBars.forEach(function(g) {
+      gaugeHtml += '<span style="font-size:10px;color:' + g.color + ';font-weight:600"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:' + g.color + ';margin-right:3px;vertical-align:middle"></span>' + g.count + ' ' + g.label + '</span>';
+    });
+    gaugeHtml += '</div>';
+    alignGaugeEl.innerHTML = gaugeHtml;
+  }
+
   // ── Revenue Comparison Table
   const statusColor = { 'Aligned': '#10B981', 'Partial': '#F59E0B', 'Low Match': '#EF4444', 'No QB Data': '#9CA3AF', 'QB Only': '#60A5FA' };
   const limitedColor = '#60A5FA';
@@ -4995,6 +4961,62 @@ function renderCRIOvsQB() {
     '</tr>'
   ).join('');
 
+  // ── Charts ──
+  // Bar chart: CRIO vs QB revenue per study (top 15 by CRIO billed)
+  var chartRows = compRows.slice().sort((a,b) => b.crioBilled - a.crioBilled).slice(0, 15);
+  var chartLabels = chartRows.map(r => r.code.length > 20 ? r.code.substring(0,18) + '…' : r.code);
+  mkChart('qbStudyBarChart', {
+    type: 'bar',
+    data: {
+      labels: chartLabels,
+      datasets: [
+        { label: 'CRIO Billed', data: chartRows.map(r => Math.round(r.crioBilled)), backgroundColor: '#10B98140', borderColor: '#10B981', borderWidth: 1.5, borderRadius: 3 },
+        { label: 'QB Revenue', data: chartRows.map(r => Math.round(r.qbRev)), backgroundColor: '#8B5CF640', borderColor: '#8B5CF6', borderWidth: 1.5, borderRadius: 3 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'top', labels: { boxWidth: 12, font: { size: 10 } } } },
+      scales: {
+        x: { type: 'category', ticks: { font: { size: 9 }, maxRotation: 45 } },
+        y: { type: 'linear', ticks: { font: { size: 10 }, callback: function(v) { return v >= 1000 ? '$' + Math.round(v/1000) + 'K' : '$' + v; } }, beginAtZero: true }
+      }
+    }
+  });
+
+  // Line chart: Monthly QB revenue trend
+  var monthCols = QB_DATA.pnlMonthly.length > 0 ? Object.keys(QB_DATA.pnlMonthly[0]).filter(k => k !== 'Account' && k !== 'Total') : [];
+  if (monthCols.length > 0) {
+    var monthlyTotals = monthCols.map(function(mo) {
+      var total = 0;
+      Object.values(pnlByStudy).forEach(function(s) { total += (s.monthly && s.monthly[mo]) || 0; });
+      return Math.round(total);
+    });
+    var qbOnlyMonthly = monthCols.map(function(mo) {
+      var total = 0;
+      QB_DATA.pnlUnmatched.forEach(function(r) { total += (r.monthly && r.monthly[mo]) || 0; });
+      return Math.round(total);
+    });
+    var allMonthly = monthCols.map(function(_, i) { return monthlyTotals[i] + qbOnlyMonthly[i]; });
+    mkChart('qbMonthlyTrendChart', {
+      type: 'line',
+      data: {
+        labels: monthCols.map(function(m) { var p = m.split(' '); return p[0].substring(0,3) + ' ' + (p[1]||'').slice(-2); }),
+        datasets: [
+          { label: 'Total QB Income', data: allMonthly, borderColor: '#8B5CF6', backgroundColor: '#8B5CF620', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#8B5CF6', fill: true, tension: 0.3 },
+          { label: 'CRIO-Matched', data: monthlyTotals, borderColor: '#10B981', backgroundColor: '#10B98120', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#10B981', fill: true, tension: 0.3 }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'top', labels: { boxWidth: 12, font: { size: 10 } } } },
+        scales: {
+          x: { type: 'category', ticks: { font: { size: 9 } } },
+          y: { type: 'linear', ticks: { font: { size: 10 }, callback: function(v) { return v >= 1000 ? '$' + Math.round(v/1000) + 'K' : '$' + v; } }, beginAtZero: true }
+        }
+      }
+    });
+  }
 }
 
 // ═══════════════════════════════════════════════════
@@ -8743,7 +8765,7 @@ async function fetchMedicalRecords(attempt) {
       _mrUnknown++;
     });
     if (_mrUnknown > 0) console.warn('MedRecords: ' + _mrUnknown + ' patients still have no study assignment — update in ClickUp');
-    console.log('MedRecords loaded:', MED_RECORDS_DATA.length, 'patients');
+    _log('MedRecords loaded: ' + MED_RECORDS_DATA.length + ' patients');
     setHealthChip('dh-medrec', MED_RECORDS_DATA.length > 0 ? 'ok' : 'warn', 'Med Records (' + MED_RECORDS_DATA.length + ')');
     safe(renderMedicalRecords, 'renderMedicalRecords');
     safe(buildMedRecAlerts, 'buildMedRecAlerts');
@@ -8754,7 +8776,7 @@ async function fetchMedicalRecords(attempt) {
     // Retry up to 3 times with increasing delay (Google Sheets rate limiting)
     if (attempt < 3) {
       var delay = attempt * 3000;
-      console.log('Retrying fetchMedicalRecords in ' + (delay/1000) + 's...');
+      _log('Retrying fetchMedicalRecords in ' + (delay/1000) + 's...');
       await new Promise(function(r){ setTimeout(r, delay); });
       return fetchMedicalRecords(attempt + 1);
     }
@@ -8795,7 +8817,7 @@ async function fetchLookerStudyStatus() {
         presite_selection: (r['Presite Selection Date'] || '').trim(),
       };
     });
-    console.log('Looker Study Status loaded:', Object.keys(LOOKER_STUDY_STATUS).length, 'studies');
+    _log('Looker Study Status loaded: ' + Object.keys(LOOKER_STUDY_STATUS).length + ' studies');
     setHealthChip('dh-looker-status', Object.keys(LOOKER_STUDY_STATUS).length > 0 ? 'ok' : 'warn', 'Looker Status (' + Object.keys(LOOKER_STUDY_STATUS).length + ')');
     // Re-merge if CRIO data already loaded
     if (CRIO_STUDIES_DATA && CRIO_STUDIES_DATA.length > 0) {
@@ -8817,7 +8839,7 @@ async function fetchCrioStudies() {
   try {
     var studiesUrl = CRP_CONFIG.DATA_FEEDS.CRIO_STUDIES_CSV;
     var subjectsUrl = CRP_CONFIG.DATA_FEEDS.CRIO_SUBJECTS_CSV;
-    if (!studiesUrl) { console.log('CRIO Studies CSV URL not configured'); return; }
+    if (!studiesUrl) { _log('CRIO Studies CSV URL not configured'); return; }
     try {
       var rows = await fetchCSV(studiesUrl);
       if (rows && rows.length > 0) {
@@ -8848,7 +8870,7 @@ async function fetchCrioStudies() {
             revenue_subjects: parseInt(r.revenue_subjects) || 0,
           };
         });
-        console.log('CRIO Studies loaded:', CRIO_STUDIES_DATA.length);
+        _log('CRIO Studies loaded: ' + CRIO_STUDIES_DATA.length);
         setHealthChip('dh-crio-api', CRIO_STUDIES_DATA.length > 0 ? 'ok' : 'warn', 'CRIO Studies (' + CRIO_STUDIES_DATA.length + ')');
         safe(renderCrioStudies, 'renderCrioStudies');
         safe(mergeCrioIntoStudies, 'mergeCrioIntoStudies');
@@ -8871,7 +8893,7 @@ async function fetchCrioStudies() {
               status: r.status || '',
             };
           });
-          console.log('CRIO Subjects loaded:', CRIO_SUBJECTS_DATA.length);
+          _log('CRIO Subjects loaded: ' + CRIO_SUBJECTS_DATA.length);
           setHealthChip('dh-crio-subjects', CRIO_SUBJECTS_DATA.length > 0 ? 'ok' : 'warn', 'CRIO Subjects (' + CRIO_SUBJECTS_DATA.length + ')');
           safe(renderCrioStudies, 'renderCrioStudies');
           safe(mergeCrioIntoStudies, 'mergeCrioIntoStudies');
@@ -9847,8 +9869,9 @@ function mergeCrioIntoStudies() {
 
   // Re-render studies tab
   safe(renderStudiesTable, 'renderStudiesTable');
+  safe(renderMilestoneTimeline, 'renderMilestoneTimeline');
 
-  console.log('CRIO enrichment: ' + updated + '/' + DATA.enrollmentData.length + ' studies updated with live CRIO data');
+  _log('CRIO enrichment: ' + updated + '/' + DATA.enrollmentData.length + ' studies updated with live CRIO data');
 }
 
 function buildSchedulingGapAlerts() {
@@ -9922,7 +9945,7 @@ function renderMedicalRecords() {
   // Update any KPI badges that reference med records
   const totalActive = MED_RECORDS_DATA.filter(r => r.is_active).length;
   const totalAll = MED_RECORDS_DATA.length;
-  console.log('MedRecords render:', totalActive, 'active /', totalAll, 'total across', Object.keys(byStudy).length, 'studies');
+  _log('MedRecords render: ' + totalActive + ' active / ' + totalAll + ' total across ' + Object.keys(byStudy).length + ' studies');
 }
 
 function showMedRecDetailModal(studyName) {
@@ -10668,6 +10691,104 @@ function buildTotalLeadsCell(studyName, safeStudy) {
     '<div style="font-size:12px;font-weight:700;color:' + color + ';">' + total + '</div>' +
     '<div style="font-size:9px;color:#94a3b8;">' + refCount + ' ref + ' + fbCount + ' FB</div>' +
     '</div>';
+}
+
+function renderMilestoneTimeline() {
+  var el = document.getElementById('milestoneTimelineBody');
+  var kpiEl = document.getElementById('milestone-kpi-strip');
+  var card = document.getElementById('study-milestones-card');
+  if (!el) return;
+  var studies = DATA.mergedStudies || [];
+  if (Object.keys(LOOKER_STUDY_STATUS).length === 0) return;
+
+  if (card) card.style.display = 'block';
+
+  // Helper: days between two date strings
+  function daysBetween(a, b) {
+    if (!a || !b) return null;
+    var da = new Date(a), db = new Date(b);
+    if (isNaN(da) || isNaN(db)) return null;
+    return Math.round((db - da) / 86400000);
+  }
+  function fmtDate(d) {
+    if (!d) return '';
+    var parts = d.split('-');
+    if (parts.length === 3) return parts[1] + '/' + parts[2].substring(0,2) + '/' + parts[0].substring(2);
+    return d;
+  }
+
+  // Milestone stages: IRB → Contract → SIV → Enroll Start → FPS
+  var STAGES = [
+    { key: 'irb_approval', label: 'IRB', color: '#6366f1' },
+    { key: 'contract_signed', label: 'Contract', color: '#8B5CF6' },
+    { key: 'siv_date', label: 'SIV', color: '#3B82F6' },
+    { key: 'enrollment_start', label: 'Enroll Start', color: '#10B981' },
+    { key: 'fps_date', label: 'FPS', color: '#059669' },
+  ];
+
+  // Build rows with milestone data
+  var rows = [];
+  var totalIrbToSiv = [], totalSivToFps = [], totalCreatedToFps = [];
+  studies.forEach(function(s) {
+    var hasAny = STAGES.some(function(st) { return !!s[st.key]; });
+    if (!hasAny) return;
+    var row = { study: s.study, status: s.enroll_status, dates: {} };
+    STAGES.forEach(function(st) { row.dates[st.key] = s[st.key] || ''; });
+    // Calculate durations
+    row.irb_to_siv = daysBetween(s.irb_approval, s.siv_date);
+    row.siv_to_fps = daysBetween(s.siv_date, s.fps_date);
+    row.siv_to_enroll = daysBetween(s.siv_date, s.enrollment_start);
+    if (row.irb_to_siv !== null && row.irb_to_siv >= 0) totalIrbToSiv.push(row.irb_to_siv);
+    if (row.siv_to_fps !== null && row.siv_to_fps >= 0) totalSivToFps.push(row.siv_to_fps);
+    rows.push(row);
+  });
+  rows.sort(function(a,b) { return (b.dates.siv_date || '').localeCompare(a.dates.siv_date || ''); });
+
+  // KPI strip
+  var avgIrbSiv = totalIrbToSiv.length > 0 ? Math.round(totalIrbToSiv.reduce(function(a,b){return a+b;},0) / totalIrbToSiv.length) : null;
+  var avgSivFps = totalSivToFps.length > 0 ? Math.round(totalSivToFps.reduce(function(a,b){return a+b;},0) / totalSivToFps.length) : null;
+  if (kpiEl) {
+    var kpiParts = [];
+    if (avgIrbSiv !== null) kpiParts.push('Avg IRB→SIV: <strong>' + avgIrbSiv + 'd</strong>');
+    if (avgSivFps !== null) kpiParts.push('Avg SIV→FPS: <strong>' + avgSivFps + 'd</strong>');
+    kpiParts.push(rows.length + ' studies with milestones');
+    kpiEl.innerHTML = kpiParts.join(' · ');
+  }
+
+  if (rows.length === 0) { el.innerHTML = '<div style="color:var(--muted);font-size:11px;">No milestone dates available.</div>'; return; }
+
+  // Render timeline table
+  var html = '<table style="width:100%;border-collapse:collapse;font-size:11px;">';
+  html += '<thead><tr style="border-bottom:2px solid var(--border);background:var(--surface2);">';
+  html += '<th style="padding:6px 8px;text-align:left;font-weight:700;">Study</th>';
+  html += '<th style="padding:6px 8px;text-align:center;font-weight:700;">Status</th>';
+  STAGES.forEach(function(st) {
+    html += '<th style="padding:6px 8px;text-align:center;font-weight:700;color:' + st.color + '">' + st.label + '</th>';
+  });
+  html += '<th style="padding:6px 8px;text-align:center;font-weight:700;">IRB→SIV</th>';
+  html += '<th style="padding:6px 8px;text-align:center;font-weight:700;">SIV→FPS</th>';
+  html += '</tr></thead><tbody>';
+
+  rows.forEach(function(r) {
+    var statusColor = r.status === 'Enrolling' ? '#1843ad' : r.status === 'Maintenance' ? '#059669' : r.status === 'Startup' ? '#d97706' : '#94a3b8';
+    var statusBg = r.status === 'Enrolling' ? '#e8eeff' : r.status === 'Maintenance' ? '#f0fdf4' : r.status === 'Startup' ? '#fffbeb' : '#f1f5f9';
+    html += '<tr style="border-bottom:1px solid var(--border);">';
+    html += '<td style="padding:5px 8px;font-weight:600;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + (r.study||'') + '">' + (r.study||'') + '</td>';
+    html += '<td style="padding:5px 8px;text-align:center;"><span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;background:' + statusBg + ';color:' + statusColor + ';">' + (r.status||'') + '</span></td>';
+    STAGES.forEach(function(st) {
+      var d = r.dates[st.key];
+      html += '<td style="padding:5px 8px;text-align:center;font-size:10px;color:' + (d ? 'var(--text)' : 'var(--muted)') + ';">' + (d ? fmtDate(d) : '—') + '</td>';
+    });
+    // Duration columns
+    var dIrbSiv = r.irb_to_siv;
+    var dSivFps = r.siv_to_fps;
+    var dColor = function(v) { return v === null ? '#94a3b8' : v <= 30 ? '#059669' : v <= 60 ? '#d97706' : '#dc2626'; };
+    html += '<td style="padding:5px 8px;text-align:center;font-weight:600;color:' + dColor(dIrbSiv) + ';">' + (dIrbSiv !== null ? dIrbSiv + 'd' : '—') + '</td>';
+    html += '<td style="padding:5px 8px;text-align:center;font-weight:600;color:' + dColor(dSivFps) + ';">' + (dSivFps !== null ? dSivFps + 'd' : '—') + '</td>';
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  el.innerHTML = html;
 }
 
 function renderStudiesTable() {
