@@ -3912,67 +3912,6 @@ function buildInsights() {
     '<div class="insight-item"><span class="insight-icon">📊</span><div><div class="insight-title">Connect live data to see trend insights</div></div></div>';
 }
 
-function buildRiskTable() {
-  const tbody = document.getElementById('risk-tbody');
-  tbody.innerHTML = DATA.riskMatrix.map(r => {
-    const levelClass = r.level === 'critical' ? 'risk-critical' : r.level === 'high' ? 'risk-high' : r.level === 'medium' ? 'risk-medium' : 'risk-low';
-    const levelLabel = r.level === 'critical' ? 'CRITICAL' : r.level === 'high' ? 'HIGH' : r.level === 'medium' ? 'MEDIUM' : 'LOW';
-    const barColor = r.level === 'critical' ? '#dc2626' : r.level === 'high' ? '#d97706' : r.level === 'medium' ? '#f97316' : '#059669';
-    const barPct = Math.min((r.score / 8 * 100), 100).toFixed(0);
-    return `<tr style="cursor:pointer;" data-action="studyDetail" data-study="${escapeHTML(r.study||r.name)}" data-url="${escapeHTML(r.study_url||'')}"><td style="font-weight:500;color:var(--text)">${r.study_url ? `<a href="${escapeHTML(r.study_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="text-decoration:none;font-weight:500;color:var(--text);">${escapeHTML(r.study)}<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-left:3px;opacity:0.45;vertical-align:middle;flex-shrink:0"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>` : escapeHTML(r.study)}</td>
-      <td><span class="risk-tag ${levelClass}">${levelLabel}</span></td>
-      <td style="color:var(--red);font-weight:600;">${r.cancel}</td>
-      <td style="color:var(--blue);font-weight:600;">${r.upcoming}</td>
-      <td style="font-size:12px;font-weight:700;color:${(r.cancels||0)>=10?'var(--red)':(r.cancels||0)>=5?'var(--orange)':'var(--muted)'}">${r.cancels||0}</td>
-      <td>
-        <div class="risk-bar-wrap"><div class="risk-bar" style="width:${barPct}%;background:${barColor};"></div></div>
-        <span style="font-size:11px;font-weight:600;">${r.score.toFixed(2)}</span>
-      </td>
-      <td style="font-size:11px;color:var(--muted);">${escapeHTML(r.action)}</td>
-    </tr>`;
-  }).join('');
-  // Event delegation for risk table rows
-  if (!tbody._delegated) {
-    tbody._delegated = true;
-    tbody.addEventListener('click', function(e) {
-      if (e.target.closest('a')) return; // let links handle themselves
-      var tr = e.target.closest('tr[data-action="studyDetail"]');
-      if (tr) showStudyDetail(tr.dataset.study, tr.dataset.url);
-    });
-  }
-}
-
-function buildStudyCards() {
-  const el = document.getElementById('study-cards');
-  if (!el) return;
-  const levelColor = { critical:'#dc2626', high:'#d97706', medium:'#f97316', low:'#059669' };
-  const levelBg    = { critical:'#fee2e2', high:'#fff3e0', medium:'#ffedd5', low:'#dcfce7' };
-  el.innerHTML = DATA.riskMatrix.map(r => {
-    const lc = levelColor[r.level] || '#94a3b8';
-    const lb = levelBg[r.level]   || '#f1f5f9';
-    return `<div class="study-card" data-action="studyDetail" data-study="${escapeHTML(r.study||r.name)}" data-url="${escapeHTML(r.study_url||'')}" style="cursor:pointer;border:1px solid ${lc}30;border-radius:10px;padding:14px 16px;background:#fff;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-        <span style="font-weight:700;font-size:13px;color:var(--text)">${escapeHTML(r.study)}</span>
-        <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:${lb};color:${lc}">${r.level.toUpperCase()}</span>
-      </div>
-      <div style="display:flex;gap:16px;font-size:12px;">
-        <span style="color:var(--red)">✗ ${r.cancel} cancels</span>
-        <span style="color:#1843ad">↑ ${r.upcoming} upcoming</span>
-        <span style="color:var(--muted)">score: ${r.score.toFixed(1)}</span>
-      </div>
-      <div style="font-size:11px;color:var(--muted);margin-top:6px">${r.action}</div>
-    </div>`;
-  }).join('');
-  // Event delegation for study cards
-  if (!el._delegated) {
-    el._delegated = true;
-    el.addEventListener('click', function(e) {
-      var card = e.target.closest('[data-action="studyDetail"]');
-      if (card) showStudyDetail(card.dataset.study, card.dataset.url);
-    });
-  }
-}
-
 // ═══════════════════════════════════════════════════
 // VIEW SWITCHING
 // ═══════════════════════════════════════════════════
@@ -5013,6 +4952,90 @@ function renderCRIOvsQB() {
         scales: {
           x: { type: 'category', ticks: { font: { size: 9 } } },
           y: { type: 'linear', ticks: { font: { size: 10 }, callback: function(v) { return v >= 1000 ? '$' + Math.round(v/1000) + 'K' : '$' + v; } }, beginAtZero: true }
+        }
+      }
+    });
+  }
+
+  // ── AR Aging Chart + Summary ──
+  if (typeof AGING_INV !== 'undefined' && typeof AGING_AP !== 'undefined') {
+    var buckets = [
+      { label: 'Current', key: 'current', color: '#10B981' },
+      { label: '30-60d', key: 'd30_60', color: '#3B82F6' },
+      { label: '61-90d', key: 'd61_90', color: '#F59E0B' },
+      { label: '91-120d', key: 'd91_120', color: '#F97316' },
+      { label: '121-150d', key: 'd121_150', color: '#EF4444' },
+      { label: '150d+', key: 'd150plus', color: '#DC2626' },
+    ];
+    var invTotals = buckets.map(function(b) { return AGING_INV.reduce(function(s,r) { return s + (r[b.key]||0); }, 0); });
+    var apTotals = buckets.map(function(b) { return AGING_AP.reduce(function(s,r) { return s + (r[b.key]||0); }, 0); });
+    mkChart('qbAgingBarChart', {
+      type: 'bar',
+      data: {
+        labels: buckets.map(function(b) { return b.label; }),
+        datasets: [
+          { label: 'Invoice AR', data: invTotals.map(Math.round), backgroundColor: '#3B82F640', borderColor: '#3B82F6', borderWidth: 1.5, borderRadius: 3 },
+          { label: 'Autopay AR', data: apTotals.map(Math.round), backgroundColor: '#8B5CF640', borderColor: '#8B5CF6', borderWidth: 1.5, borderRadius: 3 }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'top', labels: { boxWidth: 12, font: { size: 10 } } } },
+        scales: {
+          x: { type: 'category', stacked: true },
+          y: { type: 'linear', stacked: true, ticks: { callback: function(v) { return '$' + Math.round(v/1000) + 'K'; } }, beginAtZero: true }
+        }
+      }
+    });
+
+    // Summary card
+    var summEl = document.getElementById('qbAgingSummary');
+    if (summEl) {
+      var totalInvAR = invTotals.reduce(function(a,b){return a+b;},0);
+      var totalApAR = apTotals.reduce(function(a,b){return a+b;},0);
+      var totalAR = totalInvAR + totalApAR;
+      var overdue = invTotals.slice(2).reduce(function(a,b){return a+b;},0) + apTotals.slice(2).reduce(function(a,b){return a+b;},0);
+      var overduePct = totalAR > 0 ? Math.round(overdue / totalAR * 100) : 0;
+      var overdueColor = overduePct > 30 ? '#dc2626' : overduePct > 15 ? '#d97706' : '#059669';
+      summEl.innerHTML = '<div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:12px;">AR Summary</div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">' +
+        '<div style="text-align:center;padding:8px;background:var(--surface2);border-radius:8px;"><div style="font-size:20px;font-weight:800;color:#3B82F6;">' + fmtK(totalInvAR) + '</div><div style="font-size:9px;color:var(--muted);">Invoice AR</div></div>' +
+        '<div style="text-align:center;padding:8px;background:var(--surface2);border-radius:8px;"><div style="font-size:20px;font-weight:800;color:#8B5CF6;">' + fmtK(totalApAR) + '</div><div style="font-size:9px;color:var(--muted);">Autopay AR</div></div>' +
+        '<div style="text-align:center;padding:8px;background:var(--surface2);border-radius:8px;"><div style="font-size:20px;font-weight:800;color:var(--text);">' + fmtK(totalAR) + '</div><div style="font-size:9px;color:var(--muted);">Total AR</div></div>' +
+        '<div style="text-align:center;padding:8px;background:var(--surface2);border-radius:8px;"><div style="font-size:20px;font-weight:800;color:' + overdueColor + ';">' + overduePct + '%</div><div style="font-size:9px;color:var(--muted);">Overdue (>60d)</div></div>' +
+        '</div>' +
+        '<div style="margin-top:10px;">' + buckets.map(function(b, i) {
+          var val = invTotals[i] + apTotals[i];
+          return '<div style="display:flex;justify-content:space-between;padding:3px 0;font-size:11px;border-bottom:1px solid var(--border);">' +
+            '<span style="color:' + b.color + ';font-weight:600;">' + b.label + '</span>' +
+            '<span style="font-weight:700;">' + fmtK(val) + '</span></div>';
+        }).join('') + '</div>';
+    }
+  }
+
+  // ── Payment Trend Chart ──
+  if (typeof MONTHLY_PAYMENTS !== 'undefined' && MONTHLY_PAYMENTS.length > 0) {
+    var payLabels = MONTHLY_PAYMENTS.map(function(p) { return p.month || p.label || ''; });
+    var payAmounts = MONTHLY_PAYMENTS.map(function(p) { return Math.round(p.amount || p.total || 0); });
+    mkChart('qbPaymentTrendChart', {
+      type: 'bar',
+      data: {
+        labels: payLabels,
+        datasets: [{
+          label: 'Monthly Payments Collected',
+          data: payAmounts,
+          backgroundColor: '#10B98140',
+          borderColor: '#10B981',
+          borderWidth: 1.5,
+          borderRadius: 4
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { type: 'category', ticks: { font: { size: 9 } } },
+          y: { type: 'linear', ticks: { callback: function(v) { return '$' + Math.round(v/1000) + 'K'; } }, beginAtZero: true }
         }
       }
     });
@@ -8574,80 +8597,6 @@ function showCampaignDetailModal(studyName) {
   openModal('📣 ' + studyName, campaign ? `Vendor: ${campaign.vendor} · ${campaign.first_contact} total contacts` : '', html);
 }
 
-// ── Campaign ↔ Patient DB Cross-Reference Renderer ──────────────────
-function renderCampaignXRef() {
-  const el = document.getElementById('ref-campaign-xref');
-  const badge = document.getElementById('ref-xref-badge');
-  if (!el) return;
-
-  // Collect ALL referral participants that match any campaign study
-  const allParticipants = [];
-  const studiesChecked = new Set();
-
-  CAMPAIGN_DATA.forEach(c => {
-    const sn = c.study.toLowerCase().trim();
-    if (studiesChecked.has(sn)) return;
-    studiesChecked.add(sn);
-
-    REFERRAL_DATA.filter(r => {
-      const rs = (r.study||'').toLowerCase().trim();
-      return rs === sn || rs.includes(sn) || sn.includes(rs);
-    }).forEach(r => {
-      const nameKey = r.name.toLowerCase().trim();
-      const dbMatch = PATIENT_DB_MAP.get(nameKey);
-      const pVisits = (DATA.allVisitDetail || []).filter(v => v.patient.toLowerCase().trim() === nameKey);
-      allParticipants.push({ ...r, campaign: c.study, dbMatch, pVisits });
-    });
-  });
-
-  if (badge) badge.textContent = allParticipants.length + ' participants';
-
-  if (allParticipants.length === 0) {
-    el.innerHTML = `<div style="padding:8px 16px;background:#f8fafc;"><span style="font-size:12px;font-weight:700;color:var(--navy);">🔗 Participant Status & Appointments</span> <span class="badge badge-purple" style="margin-left:6px;">0</span></div>
-    <div style="text-align:center;padding:16px;color:#94a3b8;font-size:12px;">No individual participants to cross-reference — click any campaign row above for details</div>`;
-    return;
-  }
-
-  // Show participants needing attention first (no appt, flagged, stale)
-  const sorted = allParticipants.sort((a,b) => {
-    const aUrgent = (a.pVisits.length === 0 && !a.next_appt ? 2 : 0) + (a.dbMatch && a.dbMatch.status !== 'Available' ? 3 : 0) + (a.days_since_update >= 7 ? 1 : 0);
-    const bUrgent = (b.pVisits.length === 0 && !b.next_appt ? 2 : 0) + (b.dbMatch && b.dbMatch.status !== 'Available' ? 3 : 0) + (b.days_since_update >= 7 ? 1 : 0);
-    return bUrgent - aUrgent || a.days_since_update - b.days_since_update;
-  });
-
-  let html = `<div style="padding:8px 16px;background:#f8fafc;border-bottom:1px solid #f1f5f9;"><span style="font-size:12px;font-weight:700;color:var(--navy);">🔗 Participant Status & Appointments</span> <span class="badge badge-purple" style="margin-left:6px;">${allParticipants.length}</span></div>`;
-  html += `<div style="overflow-x:auto;max-height:400px;overflow-y:auto;"><table class="fin-table" style="width:100%;font-size:11px;">
-    <thead style="position:sticky;top:0;background:#fff;z-index:1;"><tr>
-      <th style="text-align:left;padding:6px 10px;">Participant</th>
-      <th style="text-align:left;">Campaign</th>
-      <th style="text-align:center;">Stage</th>
-      <th style="text-align:center;">Appt Booked</th>
-      <th style="text-align:center;">Patient Status</th>
-      <th style="text-align:center;">Updated</th>
-    </tr></thead>
-    <tbody>${sorted.slice(0, 40).map(r => {
-      const apptCell = r.pVisits.length > 0
-        ? `<span style="color:#059669;font-weight:700;">✓ ${r.pVisits[0].date}</span><div style="font-size:9px;color:#94a3b8;">${r.pVisits[0].visit}</div>`
-        : r.next_appt ? `<span style="color:#3b82f6;">${r.next_appt}</span>` : `<span style="color:#ef4444;font-size:10px;">No appt</span>`;
-      const pStatus = r.dbMatch
-        ? `<span style="padding:2px 5px;border-radius:3px;font-size:10px;font-weight:600;background:${r.dbMatch.status==='Available'?'#dcfce7':'#fef2f2'};color:${r.dbMatch.status==='Available'?'#059669':'#dc2626'}">${r.dbMatch.status}</span>`
-        : '<span style="color:#94a3b8;font-size:10px;">Not in DB</span>';
-      const staleColor = r.days_since_update >= 14 ? '#dc2626' : r.days_since_update >= 7 ? '#d97706' : '#059669';
-      return `<tr>
-        <td style="padding:5px 10px;"><a href="${escapeHTML(r.url)}" target="_blank" style="font-weight:600;color:#1e293b;text-decoration:none;">${maskPHI(r.name)}</a></td>
-        <td style="padding:5px 8px;font-size:10px;color:#475569;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHTML(r.campaign)}">${escapeHTML(r.campaign)}</td>
-        <td style="padding:5px 8px;text-align:center;"><span style="padding:2px 5px;border-radius:3px;font-size:10px;font-weight:600;background:${(STAGE_COLORS[r.stage]||'#94a3b8')}22;color:${STAGE_COLORS[r.stage]||'#94a3b8'}">${escapeHTML(r.stage)}</span></td>
-        <td style="padding:5px 8px;">${apptCell}</td>
-        <td style="padding:5px 8px;">${pStatus}</td>
-        <td style="padding:5px 8px;text-align:center;font-weight:600;color:${staleColor};">${r.days_since_update}d</td>
-      </tr>`;
-    }).join('')}</tbody>
-  </table></div>`;
-  if (allParticipants.length > 40) html += `<div style="text-align:center;padding:6px;font-size:10px;color:#94a3b8;">Showing 40 of ${allParticipants.length} — click campaign rows for full details</div>`;
-
-  el.innerHTML = html;
-}
-
 // ── Tracker + Stage detail popup (from Physician Tracker table) ──
 function showTrackerStageDetail(tracker, stageLabel) {
   var SG = ((CRP_CONFIG.CLICKUP||{}).STAGE_GROUPS||{});
@@ -10408,133 +10357,6 @@ function buildWeeklyTrendChart() {
 
 
 // ══════════════════════════════════════════════════════════════
-// ENROLLMENT TAB
-// ══════════════════════════════════════════════════════════════
-let _enrollFilter = 'all';
-
-function filterEnroll(type, btn) {
-  _enrollFilter = type;
-  document.querySelectorAll('#enroll-filter-bar .sched-filter').forEach(b => {
-    b.style.background = 'var(--surface)';
-    b.style.color = 'var(--muted)';
-    b.style.borderColor = 'var(--border)';
-  });
-  btn.style.background = '#e8eeff';
-  btn.style.color = '#1843ad';
-  btn.style.borderColor = '#1843ad';
-  renderEnrollCards();
-}
-
-function renderEnrollCards() {
-  const studies = DATA.enrollmentData || [];
-  const el = document.getElementById('enroll-cards-grid');
-  if (!el) return;
-
-  const filtered = studies.filter(s => {
-    if (_enrollFilter === 'all') return true;
-    if (_enrollFilter === 'enrolling') return s.status === 'Enrolling' && s.target;
-    if (_enrollFilter === 'on_track') return s.pct !== null && s.pct >= 50 && s.pct < 100;
-    if (_enrollFilter === 'behind') return s.status === 'Enrolling' && s.target && s.pct !== null && s.pct < 50;
-    if (_enrollFilter === 'maintenance') return s.status === 'Maintenance';
-    return true;
-  });
-
-  el.innerHTML = filtered.map(s => {
-    const hasTarget = s.target !== null && s.target !== undefined;
-    const pct = hasTarget ? (s.pct || 0) : null;
-    const barColor = !hasTarget ? '#94a3b8' :
-      s.pct >= 100 ? '#059669' : s.pct >= 75 ? '#1843ad' : s.pct >= 50 ? '#d97706' : s.pct >= 25 ? '#f97316' : '#dc2626';
-    const statusColor = s.status === 'Enrolling' ? '#1843ad' : s.status === 'Maintenance' ? '#059669' : '#94a3b8';
-    const statusBg = s.status === 'Enrolling' ? '#e8eeff' : s.status === 'Maintenance' ? '#f0fdf4' : '#f1f5f9';
-    const siteTag = (s.sites||[]).map(st =>
-      `<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;background:${st==='PNJ'?'#05996920':'#07206120'};color:${st==='PNJ'?'#059669':'#072061'}">${st}</span>`
-    ).join(' ');
-
-    const studyLink = s.study_url
-      ? `<a href="${escapeHTML(s.study_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="text-decoration:none;color:var(--navy);font-weight:700;font-size:13px">${escapeHTML(s.study)}<svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-left:3px;opacity:0.4;vertical-align:middle"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>`
-      : `<span style="font-weight:700;font-size:13px;color:var(--navy)">${escapeHTML(s.study)}</span>`;
-
-    // Progress bar section
-    const progressSection = hasTarget ? `
-      <div style="margin:10px 0 4px;">
-        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">
-          <span style="font-size:11px;color:var(--muted)">Enrollment Goal</span>
-          <span style="font-size:13px;font-weight:700;color:${barColor}">${s.enrolled} <span style="font-size:11px;color:var(--muted);font-weight:400">/ ${s.target}</span> <span style="font-size:11px;font-weight:700;color:${barColor}">(${pct}%)</span></span>
-        </div>
-        <div style="height:10px;background:var(--border);border-radius:6px;overflow:hidden;">
-          <div style="height:100%;background:${barColor};border-radius:6px;width:${Math.min(pct,100)}%;transition:width .5s ease;"></div>
-        </div>
-        <div style="margin-top:4px;font-size:10px;color:${pct>=100?'#059669':'#f97316'};font-weight:600;">
-          ${pct >= 100 ? `✓ Goal reached${s.over>0?' · '+s.over+' over target':''}` : `${s.remaining} more needed`}
-        </div>
-      </div>` : `
-      <div style="margin:10px 0 4px;">
-        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">
-          <span style="font-size:11px;color:var(--muted)">Enrolled to Date</span>
-          <span style="font-size:13px;font-weight:700;color:var(--navy)">${s.enrolled} <span style="font-size:11px;color:var(--muted);font-weight:400">no target set</span></span>
-        </div>
-      </div>`;
-
-    // Stats grid
-    const stat = (label, val, color='var(--text)') =>
-      `<div style="text-align:center;padding:6px 4px;background:var(--surface2);border-radius:6px;">
-        <div style="font-size:14px;font-weight:700;color:${color}">${val}</div>
-        <div style="font-size:9px;color:var(--muted);margin-top:1px;white-space:nowrap">${label}</div>
-      </div>`;
-
-    const statsGrid = `<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin-top:8px;">
-      ${stat('Screened', s.screened || 0, '#1843ad')}
-      ${stat('In Screen', s.screening || 0, '#7c3aed')}
-      ${stat('Enrolled', s.enrolled || 0, '#059669')}
-      ${stat('Screen Fail', s.screen_fail || 0, s.screen_fail > 10 ? '#dc2626' : 'var(--text)')}
-      ${stat('SF Rate', s.screen_fail_pct ? s.screen_fail_pct+'%' : '0%', s.screen_fail_pct > 50 ? '#dc2626' : s.screen_fail_pct > 30 ? '#d97706' : 'var(--text)')}
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-top:4px;">
-      ${stat('Active', s.active || 0, '#059669')}
-      ${stat('Completed', s.completed || 0, '#64748b')}
-      ${stat('Discontinued', s.discontinued || 0, s.discontinued > 0 ? '#d97706' : 'var(--text)')}
-    </div>`;
-
-    return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;border-top:3px solid ${barColor};">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
-        <div style="flex:1;min-width:0;">${studyLink}</div>
-        <span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;background:${statusBg};color:${statusColor};margin-left:6px;white-space:nowrap">${escapeHTML(s.status)}</span>
-      </div>
-      <div style="display:flex;gap:4px;align-items:center;margin-bottom:2px;">${siteTag}</div>
-      ${progressSection}
-      ${statsGrid}
-    </div>`;
-  }).join('');
-
-  if (filtered.length === 0) {
-    el.innerHTML = '<div style="color:var(--muted);padding:20px;text-align:center;grid-column:1/-1">No studies match this filter</div>';
-  }
-}
-
-function buildEnrollmentView() {
-  const d = DATA.enrollSummary || {};
-  const pct = d.overallPct || 0;
-  const completePct = d.totalTarget ? Math.round(d.complete / d.studies * 100) : 0;
-
-  safe(() => {
-    document.getElementById('enroll-kpi-enrolled').textContent = d.totalEnrolled ?? '—';
-    document.getElementById('enroll-kpi-target').textContent = `of ${d.totalTarget} goal`;
-    document.getElementById('enroll-kpi-pct').textContent = (d.overallPct ?? '—') + '%';
-    document.getElementById('enroll-kpi-remaining').textContent = d.totalRemaining ?? '—';
-    document.getElementById('enroll-kpi-screening').textContent = d.totalScreening ?? '—';
-    document.getElementById('enroll-kpi-complete').innerHTML = `${d.complete ?? '—'} <span style="font-size:14px;font-weight:400;color:var(--muted)">of</span> ${d.studies ?? '—'}`;
-    document.getElementById('enroll-overall-bar').style.width = Math.min(pct, 100) + '%';
-    document.getElementById('enroll-overall-bar-complete').style.width = (d.totalTarget ? Math.round(d.totalEnrolled/d.totalTarget*100) : 0) + '%';
-    document.getElementById('enroll-overall-label').textContent = `${d.totalEnrolled} enrolled · ${d.totalRemaining} remaining · ${d.totalScreening} in screening`;
-    document.getElementById('enroll-overall-target').textContent = `Portfolio target: ${d.totalTarget}`;
-    document.getElementById('enroll-overall-badge').textContent = `${pct}% complete · ${d.complete} of ${d.studies} goals reached`;
-  }, 'enroll-kpis');
-
-  renderEnrollCards();
-}
-
-
-
 // ══════════════════════════════════════════════════════════════
 // MERGED STUDIES TABLE
 // ══════════════════════════════════════════════════════════════
@@ -10854,6 +10676,19 @@ function renderStudiesTable() {
     // Warning alerts (amber)
     if (s.screen_fail_pct > 40) tags.push({text:'High SF Rate', color:'#d97706', bg:'#fffbeb'});
     if (isEnrolling && s.upcoming === 0 && s.enrolled > 0) tags.push({text:'No Visits', color:'#d97706', bg:'#fffbeb'});
+    // Enrollment close date warnings
+    if (s.enrollment_close) {
+      var _ecDays = Math.round((new Date(s.enrollment_close) - new Date()) / 86400000);
+      if (_ecDays < 0) tags.push({text:'Enroll Closed', color:'#94a3b8', bg:'#f1f5f9'});
+      else if (_ecDays <= 14) tags.push({text:'Closing ' + _ecDays + 'd', color:'#dc2626', bg:'#fef2f2'});
+      else if (_ecDays <= 30) tags.push({text:'Closing ' + _ecDays + 'd', color:'#d97706', bg:'#fffbeb'});
+      else if (_ecDays <= 60) tags.push({text:'Closing ' + _ecDays + 'd', color:'#3b82f6', bg:'#eff6ff'});
+    }
+    // Closeout date warnings
+    if (s.closeout_date) {
+      var _coDays = Math.round((new Date(s.closeout_date) - new Date()) / 86400000);
+      if (_coDays >= 0 && _coDays <= 30) tags.push({text:'Closeout ' + _coDays + 'd', color:'#dc2626', bg:'#fef2f2'});
+    }
     // Opportunity alerts (green/blue)
     if (hasTarget && pct >= 80 && pct < 100) tags.push({text:'Close to Goal', color:'#059669', bg:'#f0fdf4'});
     if (s.screening > 3 && s.enrolled === 0) tags.push({text:'Screen→Enroll Gap', color:'#3b82f6', bg:'#eff6ff'});
