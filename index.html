@@ -11882,6 +11882,19 @@ async function fetchCrioStudies() {
   }
 }
 
+// ── Pre-screening / placeholder study detection (shared by renderCrioStudies + buildEnrollmentKPIs) ──
+var CRIO_SKIP_STUDIES = {'Config Study':1,'Upload test':1,'EVENT':1,'2025_COVID_FLU_RSV_DETECTION STUDY':1};
+var PRESCREEN_OVERRIDES = {
+  '100455': ['154462','161620','188815','189260'],  // Cardiology → D7960C00015, D6973C00001, J2O-MC-EKBG (PHL+PNJ)
+  '38926':  ['86826','135648'],            // Migraine → M23-714, C4951063
+  '148951': ['135157'],                    // Obesity → J2A-MC-GZPO
+  '35892':  ['109260'],                    // Contraceptives → MR-130A-01-TD-3001
+  '55102':  ['177553'],                    // Lupus → 80202135SLE3001
+  '140400': ['136289'],                    // Plaque Psoriasis → 77242113PSO3006
+  '49590':  ['50058','60296'],             // Type 2 Diabetes → I8F-MC-GPHE, J2A-MC-GZGS
+  '67088':  [],                            // Rheumatoid Arthritis — no protocol study yet
+};
+
 function renderCrioStudies() {
   var container = document.getElementById('crio-studies-container');
   if (!container || CRIO_STUDIES_DATA.length === 0) return;
@@ -11897,18 +11910,7 @@ function renderCrioStudies() {
   });
 
   // ── Identify pre-screening / generic-name studies ──
-  var SKIP = {'Config Study':1,'Upload test':1,'EVENT':1,'2025_COVID_FLU_RSV_DETECTION STUDY':1};
-  // Manual pre-screening → protocol overrides (indication text doesn't match)
-  var PRESCREEN_OVERRIDES = {
-    '100455': ['154462','161620','188815','189260'],  // Cardiology → D7960C00015, D6973C00001, J2O-MC-EKBG (PHL+PNJ)
-    '38926':  ['86826','135648'],            // Migraine → M23-714, C4951063
-    '148951': ['135157'],                    // Obesity → J2A-MC-GZPO
-    '35892':  ['109260'],                    // Contraceptives → MR-130A-01-TD-3001
-    '55102':  ['177553'],                    // Lupus → 80202135SLE3001
-    '140400': ['136289'],                    // Plaque Psoriasis → 77242113PSO3006
-    '49590':  ['50058','60296'],             // Type 2 Diabetes → I8F-MC-GPHE, J2A-MC-GZGS
-    '67088':  [],                            // Rheumatoid Arthritis — no protocol study yet
-  };
+  var SKIP = CRIO_SKIP_STUDIES;
 
   var crioByKey = {};
   CRIO_STUDIES_DATA.forEach(function(s) { crioByKey[s.study_key] = s; });
@@ -12564,14 +12566,13 @@ function buildEnrollmentKPIs() {
   if (!banner) return;
 
   // Build set of pre-screening + placeholder study keys to exclude from protocol KPIs
-  var SKIP_PROTO = {'Config Study':1,'Upload test':1,'EVENT':1,'2025_COVID_FLU_RSV_DETECTION STUDY':1};
   var psKeys = {};
   CRIO_STUDIES_DATA.forEach(function(s) {
     var isPS = s.protocol_number.toLowerCase().indexOf('pre-screen') >= 0
       || s.protocol_number.toLowerCase().indexOf('pre screen') >= 0
       || s.protocol_number === s.indication
       || !!PRESCREEN_OVERRIDES[s.study_key];
-    if (isPS || SKIP_PROTO[s.protocol_number]) psKeys[s.study_key] = true;
+    if (isPS || CRIO_SKIP_STUDIES[s.protocol_number]) psKeys[s.study_key] = true;
   });
 
   // Aggregate subject statuses across protocol studies only (excluding pre-screening)
