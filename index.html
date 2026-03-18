@@ -11479,8 +11479,8 @@ function mergeCrioIntoStudies() {
     e.crio_study_key = crio.study_key;
     e.crio_indication = crio.indication || '';
 
-    // Fix study_url if missing
-    if (!e.study_url && crio.study_key) {
+    // Always use CRIO study_key for study_url (CRIO is authoritative for PHL site)
+    if (crio.study_key) {
       e.study_url = 'https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/' + crio.study_key + '/subjects';
     }
 
