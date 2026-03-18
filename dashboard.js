@@ -1940,6 +1940,13 @@ function chartDefaults() {
 function mkChart(id, config) {
   var el = document.getElementById(id);
   if (!el) return;
+  // Add explicit scale type to suppress Chart.js 4.x resolver warnings
+  if (config.options && config.options.scales) {
+    Object.keys(config.options.scales).forEach(function(k) {
+      var s = config.options.scales[k];
+      if (s && !s.type) s.type = (k === 'x' || k === 'xAxes') ? 'category' : 'linear';
+    });
+  }
   var ctx = el.getContext('2d');
   if (charts[id]) {
     // Update existing chart instead of destroy+recreate when possible
