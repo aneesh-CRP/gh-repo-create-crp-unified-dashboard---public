@@ -2589,7 +2589,7 @@ const CRP_CONFIG = {
 
   // Expected CSV columns per data source — used by validateColumns() to warn on schema drift
   EXPECTED_COLUMNS: {
-    CRIO: ['Study Name','Study Key','Site Name','Scheduled Date','Subject Full Name',
+    CRIO: ['Study Name','Study Key','Scheduled Date','Subject Full Name',
            'Subject Key (Back End)','Full Name','Appointment Status','Name','Subject Status','Subject ID'],
     CANCELLATIONS: ['Study Name','Study Key','Site Name','Cancel Date','Scheduled Date',
                     'Subject Full Name','Subject Key (Back End)','Staff Full Name',
@@ -5447,7 +5447,7 @@ function renderCoordWorkloadBalance() {
     return { name:name, visits:visits.length, cancels:cancels.length, patients:Object.keys(patients).length, studies:Object.keys(studies).length, cancelRate:cancelRate };
   }).sort(function(a,b){return b.visits-a.visits;});
 
-  var maxVisits = Math.max.apply(null, coordStats.map(function(c){return c.visits;})) || 1;
+  var maxVisits = Math.max.apply(null, coordStats.map(function(c){return c.visits;}).concat([0])) || 1;
   var totalVisits = coordStats.reduce(function(s,c){return s+c.visits;},0);
   var avgVisits = COORDS.length > 0 ? Math.round(totalVisits/COORDS.length) : 0;
   var maxDev = 0;
@@ -5533,7 +5533,7 @@ function renderInvCapacity() {
     return { name:name, visits:iv.length, cancels:ic.length, avgPerDay:avgPerDay, dayCount:dayCount, utilPct:utilPct, studies:Object.keys(studies).length, costPerVisit:costPerVisit };
   }).sort(function(a,b){return b.visits-a.visits;});
 
-  var maxVisits = Math.max.apply(null, invStats.map(function(i){return i.visits;})) || 1;
+  var maxVisits = Math.max.apply(null, invStats.map(function(i){return i.visits;}).concat([0])) || 1;
   var html = '<div style="display:grid;gap:10px;">';
   invStats.forEach(function(inv) {
     var pct = Math.round(inv.visits / maxVisits * 100);
@@ -5727,7 +5727,7 @@ function renderPIApprovalTracker() {
       var daysWaiting = patients.map(function(p) {
         return p.date_updated ? Math.floor((today - new Date(p.date_updated)) / 86400000) : 999;
       });
-      var maxDays = Math.max.apply(null, daysWaiting);
+      var maxDays = Math.max.apply(null, daysWaiting.concat([0]));
       var urgColor = maxDays > 14 ? '#dc2626' : maxDays > 7 ? '#d97706' : '#059669';
       html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:#f8fafc;border-radius:6px;border-left:3px solid '+urgColor+';">';
       html += '<div><span style="font-weight:700;font-size:11px;">'+escapeHTML(study)+'</span> <span style="font-size:10px;color:#94a3b8;">'+patients.length+' patient'+(patients.length>1?'s':'')+'</span></div>';
@@ -5774,7 +5774,7 @@ function renderVendorAnalytics() {
   }
   if (badge) { badge.textContent = vendorList.length + ' vendors'; badge.style.display = ''; }
 
-  var maxContacts = Math.max.apply(null, vendorList.map(function(v){return v.contacts;})) || 1;
+  var maxContacts = Math.max.apply(null, vendorList.map(function(v){return v.contacts;}).concat([0])) || 1;
   var html = '<div style="overflow-x:auto;"><table class="fin-table" style="width:100%;font-size:11px;"><thead><tr>';
   html += '<th style="text-align:left;padding:8px;">Vendor</th><th style="text-align:center;">Campaigns</th>';
   html += '<th style="text-align:center;">Total Contacts</th><th style="text-align:center;">Referrals</th>';
@@ -5827,7 +5827,7 @@ function renderContactSequence() {
     { label: 'Referrals', count: totalRef, color: '#059669' },
     { label: 'Scheduled', count: totalSched, color: '#d97706' }
   ];
-  var maxCount = Math.max.apply(null, steps.map(function(s){return s.count;})) || 1;
+  var maxCount = Math.max.apply(null, steps.map(function(s){return s.count;}).concat([0])) || 1;
 
   var html = '<div style="display:grid;gap:8px;">';
   steps.forEach(function(step, i) {
@@ -8542,7 +8542,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
   const BASE = 'https://app.clinicalresearch.io/clinical-research-philadelphia-crp';
   const PHL  = 'philadelphia-pa';
   const PNJ  = 'clinical-research-philadelphia-pennington';
-  const PENNINGTON_KEYS = new Set(CRP_CONFIG.PENNINGTON_STUDY_KEYS || [161619, 162446, 167755, 167794, 172389, 173164]);
+  const PENNINGTON_KEYS = new Set(CRP_CONFIG.PENNINGTON_STUDY_KEYS || [161619, 162446, 167755, 167794, 172389, 173164, 189260]);
 
   function siteSlug(studyKey, siteName) {
     const k = parseInt(studyKey);
@@ -11343,7 +11343,7 @@ function buildPatientJourneyFunnel() {
     { label: 'Enrolled / Complete', count: enrolled, color: '#059669', sources: 'Med Records System', clickKey: 'medrec_enrolled' },
   ];
 
-  var maxCount = Math.max.apply(null, stages.map(function(s){ return s.count; })) || 1;
+  var maxCount = Math.max.apply(null, stages.map(function(s){ return s.count; }).concat([0])) || 1;
 
   var html = '';
 
