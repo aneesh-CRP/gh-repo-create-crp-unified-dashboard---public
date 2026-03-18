@@ -4230,7 +4230,7 @@ function buildSiteChart() {
     ${DATA.sites.map(s => {
       const rateColor = (s.cancelRate||0) >= 50 ? 'var(--red)' : (s.cancelRate||0) >= 35 ? 'var(--yellow)' : 'var(--green)';
       return `<div style="padding:12px;background:var(--surface2);border-radius:8px;border:1px solid var(--border);cursor:pointer"
-                   onclick="showCancels(r=>{const cl=(r.coord||'').toLowerCase();const ip=${s.site.includes('Penn') ? 'true' : 'false'};const rp=['angelina mcmullen','cady chilensky'].includes(cl);return ip?rp:!rp;},'${escapeHTML(s.site)} — Cancellations','${s.cancels} records')">
+                   onclick="showCancels(r=>{const rp=(r.site||'').includes('Penn');return ${s.site.includes('Penn') ? 'true' : 'false'}?rp:!rp;},'${escapeHTML(s.site)} — Cancellations','${s.cancels} records')">
         <div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:8px">${escapeHTML(s.site)}</div>
         <div style="display:flex;gap:12px;">
           <div><div style="font-size:18px;font-weight:700;color:var(--blue)">${s.upcoming}</div><div style="font-size:10px;color:var(--muted)">Upcoming</div></div>
@@ -8850,8 +8850,7 @@ function buildPatientPipelineBySite() {
   visits.forEach(function(v) {
     var key = (v.patient || '').toLowerCase().trim();
     if (!key) return;
-    var isPNJ = (v.patient_url || '').includes('pennington');
-    var siteLabel = isPNJ ? 'PNJ' : 'PHL';
+    var siteLabel = (v.site || '').includes('Penn') ? 'PNJ' : 'PHL';
     // Keep the latest visit per patient
     if (!patientMap[key] || (v.date_iso && v.date_iso > (patientMap[key].date_iso || ''))) {
       patientMap[key] = { name: v.patient, status: v.status || 'Unknown', site: siteLabel, study: v.study, date_iso: v.date_iso, url: v.patient_url };
