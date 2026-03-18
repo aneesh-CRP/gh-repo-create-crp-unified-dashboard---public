@@ -374,7 +374,7 @@ const CRP_CONFIG = {
   // Tab registry — add new tabs here
   TABS: {
     PERFORMANCE: ['overview', 'studies', 'schedule', 'referrals', 'admin'],
-    FINANCE: ['fin-overview', 'fin-collections', 'fin-aging', 'fin-revenue', 'fin-accruals', 'fin-qb', 'insights'],
+    FINANCE: ['fin-overview', 'fin-collections', 'fin-aging', 'fin-revenue', 'fin-qb', 'insights'],
     CROSS: ['insights'],
   },
 
@@ -1939,7 +1939,7 @@ var SAMPLE = {
   pennTotal: 0, marchTotal: 0, aprilTotal: 0, activeStudies: 0,
   riskFlags: [], next14Detail: [], cancelTrend: [], cancelWeekly: [],
   upcomingWeekly: [], enrollmentData: [], enrollSummary: {},
-  mergedStudies: [], actionDetails: [], snapshotDate: '', weeklyTrends: []
+  mergedStudies: [], actionDetails: [], snapshotDate: '', weeklyTrends: [], weeklyTrendsAll: []
 };
 
 async function loadFallbackData() {
@@ -3984,13 +3984,11 @@ function switchView(name, el) {
   if (name === 'schedule') {
     setTimeout(() => {
       safe(buildWeeklyBySiteChart,   'wkChart');
-      safe(buildVisitTypeChart,      'visitChart');
-      safe(buildStatusChart,         'statusChart');
-      safe(buildStatusLegend,        'statusLegend');
       safe(buildScheduleTable,       'buildSched');
       safe(buildRiskFlagCards,       'riskCards');
       safe(buildSchedStudyBars,      'schedBars');
       safe(buildSchedCoordList,      'schedCoord');
+      safe(renderCoordTrendChart,    'coordTrend');
       safe(hidePastVisits,           'hidePast');
       safe(injectVisitConfirmButtons,'confirmBtns');
       if (MED_RECORDS_DATA && MED_RECORDS_DATA.length > 0) safe(injectScheduleMedRecords, 'medRec');
@@ -6033,20 +6031,16 @@ function processLiveData(allRows, legacyCancels, auditLog) {
   // ── Trends: per-week aggregation for longitudinal charts ──
   // Groups ALL visits (active + cancelled) by week of their scheduled/cancel date
   // Past weeks show actual cancel rates; future weeks show scheduled volume
-  // ── Trends: ±2 weeks from today for targeted insights ──
-  const weeklyTrends = (() => {
+  // ── Trends: full aggregation (filtered at render time by _trendsRangeDays) ──
+  const weeklyTrendsAll = (() => {
     const byWeek = {};
-    const trendStart = new Date(today); trendStart.setDate(today.getDate() - 14);
-    const trendEnd   = new Date(today); trendEnd.setDate(today.getDate() + 14);
     function weekKey(d) {
       const mon = new Date(d); mon.setDate(d.getDate() - ((d.getDay() + 6) % 7));
       return localISO(mon);
     }
-    function inWindow(d) { return d >= trendStart && d <= trendEnd; }
-    // All rows from the main report (includes both active and cancelled)
     allRows.forEach(r => {
       const d = parseDate(r['Scheduled Date'] || r['Cancel Date']);
-      if (!d || !inWindow(d) || isExcludedStudy(r['Study Name'])) return;
+      if (!d || isExcludedStudy(r['Study Name'])) return;
       const wk = weekKey(d);
       if (!byWeek[wk]) byWeek[wk] = { upcoming: 0, cancelled: 0, byStudy: {}, byCoord: {} };
       const status = (r['Appointment Status'] || '').trim().toLowerCase();
@@ -6066,11 +6060,10 @@ function processLiveData(allRows, legacyCancels, auditLog) {
         else byWeek[wk].byCoord[coord].upcoming++;
       }
     });
-    // Add legacy cancels
     if (legacyCancels && legacyCancels.length) {
       legacyCancels.forEach(r => {
         const d = parseDate(r['Cancel Date'] || r['Scheduled Date']);
-        if (!d || !inWindow(d) || isExcludedStudy(r['Study Name'])) return;
+        if (!d || isExcludedStudy(r['Study Name'])) return;
         const wk = weekKey(d);
         if (!byWeek[wk]) byWeek[wk] = { upcoming: 0, cancelled: 0, byStudy: {}, byCoord: {} };
         byWeek[wk].cancelled++;
@@ -6101,6 +6094,8 @@ function processLiveData(allRows, legacyCancels, auditLog) {
       };
     });
   })();
+  // Default filtered view (±14 days)
+  const weeklyTrends = filterTrendsByRange(weeklyTrendsAll, 14, today);
 
   return {
     actionDetails,
@@ -6114,6 +6109,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
     cancelWeekly: weekBucket(recentCancels,'Cancel Date'),
     upcomingWeekly: weekBucket(activeUpcoming,'Scheduled Date'),
     weeklyTrends,
+    weeklyTrendsAll,
     cancelByStudy,
     upcomingByStudy,
     upcomingByStudyFull: upcomingByStudy,
@@ -7178,8 +7174,6 @@ function renderAll() {
     document.getElementById('sched-count').textContent = (DATA.upcomingTotal||0) + ' visits';
 
   safe(buildHorizon,         'buildHorizon');
-  safe(buildCancelTrend,     'buildCancelTrend');
-  safe(buildUpcomingTrend,   'buildUpcomingTrend');
   safe(buildReasonChart,     'buildReasonChart');
   safe(buildSiteChart,       'buildSiteChart');
   safe(buildCancelStudyBars, 'buildCancelStudyBars');
@@ -7199,9 +7193,6 @@ function renderAll() {
   if (typeof buildRiskFlagCards === 'function')     safe(buildRiskFlagCards,     'buildRiskFlagCards');
   // Pre-build schedule so it's ready when tab is clicked
   safe(buildWeeklyBySiteChart,   'buildWeeklyBySiteChart');
-  safe(buildVisitTypeChart,      'buildVisitTypeChart');
-  safe(buildStatusChart,         'buildStatusChart');
-  safe(buildStatusLegend,        'buildStatusLegend');
   safe(buildScheduleTable,       'buildScheduleTable');
   safe(buildSchedStudyBars,      'buildSchedStudyBars');
   safe(buildSchedCoordList,      'buildSchedCoordList');
@@ -10225,6 +10216,63 @@ const LIVE_URL1 = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSQJ_QKC-ttmV
 const LIVE_URL2_LEGACY = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRUXJxTDsr5IRByMfuLF0P3hVq_QuEw6M1MPNDwd1CaV2UZ9tnFflUwsmUKAd3xeX3_esn0c4YlrV0q/pub?gid=1487298034&single=true&output=csv';
 const AUDIT_LOG_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRpPUZFSyW0rrx2yQdqYPyccRZC0wqUCWyCfX_n2XTMPyKQr9da4jl1jMbZ5_KKFkYZjJiNl_ClYbXk/pub?output=csv';
 
+var _trendsRangeDays = 14;
+
+function filterTrendsByRange(allTrends, days, baseDate) {
+  if (!allTrends || !allTrends.length) return [];
+  var base = baseDate || new Date();
+  var start = new Date(base); start.setDate(base.getDate() - days);
+  var end = new Date(base); end.setDate(base.getDate() + days);
+  var startISO = start.toISOString().slice(0,10);
+  var endISO = end.toISOString().slice(0,10);
+  return allTrends.filter(function(t) { return t.date >= startISO && t.date <= endISO; });
+}
+
+function setTrendsRange(days, btn) {
+  _trendsRangeDays = days;
+  // Update button styles
+  var bar = document.getElementById('trends-range-bar');
+  if (bar) bar.querySelectorAll('.sched-filter').forEach(function(b) {
+    b.classList.remove('active');
+    b.style.border = '1px solid var(--border)'; b.style.background = 'var(--surface)'; b.style.color = 'var(--muted)';
+  });
+  if (btn) { btn.classList.add('active'); btn.style.border = '1px solid #1843ad'; btn.style.background = '#e8eeff'; btn.style.color = '#1843ad'; }
+  // Re-filter and re-render
+  DATA.weeklyTrends = filterTrendsByRange(DATA.weeklyTrendsAll || [], days, new Date());
+  renderTrendsCharts();
+  renderCoordTrendChart();
+}
+
+function renderCoordTrendChart() {
+  var trends = DATA.weeklyTrends || [];
+  if (!trends.length) return;
+  var allCoords = new Set();
+  trends.forEach(function(t) { Object.keys(t.byCoord).forEach(function(c) { allCoords.add(c); }); });
+  var coordColors = ['#dc2626','#2563eb','#059669','#d97706','#7c3aed','#db2777','#0891b2','#65a30d'];
+  var topCoords = Array.from(allCoords).slice(0, 8);
+  mkChart('trendsCoordChart', {
+    type: 'line',
+    data: {
+      labels: trends.map(function(t) { return t.label; }),
+      datasets: topCoords.map(function(coord, i) {
+        return {
+          label: coord,
+          data: trends.map(function(t) {
+            var c = t.byCoord[coord];
+            return c ? +((c.cancelled / (c.upcoming + c.cancelled || 1)) * 100).toFixed(1) : null;
+          }),
+          borderColor: coordColors[i % coordColors.length],
+          borderWidth: 2, pointRadius: 2, tension: 0.3, fill: false, spanGaps: true
+        };
+      })
+    },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
+      scales: { x: { grid: { display: false } }, y: { grid: { color: '#f1f5f9' }, beginAtZero: true, ticks: { callback: function(v) { return v + '%'; } } } }
+    }
+  });
+}
+
 function renderTrendsCharts() {
   const trends = DATA.weeklyTrends || [];
   const noDataEl = document.getElementById('trends-no-data-msg');
@@ -10325,30 +10373,8 @@ function renderTrendsCharts() {
     }
   });
 
-  // ── Chart 4: Coordinator Cancel Rate Over Time ──
-  const allCoords = new Set();
-  trends.forEach(t => Object.keys(t.byCoord).forEach(c => allCoords.add(c)));
-  const coordColors = ['#dc2626','#2563eb','#059669','#d97706','#7c3aed','#db2777','#0891b2','#65a30d'];
-  const topCoords = [...allCoords].slice(0, 8);
-  mkChart('trendsCoordChart', {
-    type: 'line',
-    data: {
-      labels: trends.map(t => t.label),
-      datasets: topCoords.map((coord, i) => ({
-        label: coord,
-        data: trends.map(t => {
-          const c = t.byCoord[coord];
-          return c ? +((c.cancelled / (c.upcoming + c.cancelled || 1)) * 100).toFixed(1) : null;
-        }),
-        borderColor: coordColors[i % coordColors.length],
-        borderWidth: 2, pointRadius: 2, tension: 0.3, fill: false, spanGaps: true
-      }))
-    },
-    options: { responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
-      scales: { x: { grid: { display: false } }, y: { grid: { color: '#f1f5f9' }, beginAtZero: true, ticks: { callback: v => v + '%' } } }
-    }
-  });
+  // Coord chart now lives in Schedule tab — render it from there
+  renderCoordTrendChart();
 
   // ── Chart 5: Study Cancel Rate Trends (top 6 by volume) ──
   const studyTotals = {};
@@ -10388,11 +10414,8 @@ function loadLongitudinalData() {
   }
 }
 
-// Alias for backward compatibility
-function buildWeeklyTrendChart() {
-  try { buildCancelTrend(); } catch(e) { _log('buildCancelTrend: ' + e.message); }
-  try { buildUpcomingTrend(); } catch(e) { _log('buildUpcomingTrend: ' + e.message); }
-}
+// Alias for backward compatibility (trend charts moved to Insights dual-axis)
+function buildWeeklyTrendChart() {}
 
 
 // ══════════════════════════════════════════════════════════════
@@ -11425,7 +11448,7 @@ async function _crpInit() {
   if (location.hash) {
     var _hashTab = location.hash.replace('#', '');
     if (_hashTab === 'actions') _hashTab = 'schedule'; // Actions tab removed — redirect to Schedule
-    var _allTabs = ['overview','studies','schedule','referrals','admin','fin-overview','fin-collections','fin-aging','fin-revenue','fin-accruals','insights'];
+    var _allTabs = ['overview','studies','schedule','referrals','admin','fin-overview','fin-collections','fin-aging','fin-revenue','insights'];
     if (_allTabs.indexOf(_hashTab) !== -1) _initTab = _hashTab;
   }
   var _initTabEl = document.querySelector(".nav-tab[onclick*='" + _initTab + "']");

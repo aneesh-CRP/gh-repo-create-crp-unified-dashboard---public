@@ -1074,8 +1074,7 @@ body {
     <span class="nav-tab fin-tab" onclick="switchTab('fin-overview',this)" role="tab">🔒 Finance</span>
     <span class="nav-tab fin-tab" onclick="switchTab('fin-collections',this)">🔒 Collections</span>
     <span class="nav-tab fin-tab" onclick="switchTab('fin-aging',this)">🔒 Aging AR</span>
-    <span class="nav-tab fin-tab" onclick="switchTab('fin-revenue',this)">🔒 Revenue</span>
-    <span class="nav-tab fin-tab" onclick="switchTab('fin-accruals',this)">🔒 Accruals</span>
+    <span class="nav-tab fin-tab" onclick="switchTab('fin-revenue',this)">🔒 Billing</span>
     <span class="nav-tab fin-tab" onclick="switchTab('fin-qb',this)">🔒 CRIO vs QB</span>
     <span style="width:1px;background:#CBD5E0;margin:8px 3px"></span>
     <span class="nav-tab fin-tab" onclick="switchTab('insights',this)" role="tab">🔒 Insights</span>
@@ -1247,29 +1246,7 @@ body {
     </div>
   </div>
 
-  <!-- Row 2: Trend Charts -->
-  <div class="grid-2 fade-in">
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title">Cancellation Trend · Last 2 Months</span>
-        <span class="badge badge-red" id="cancel-trend-badge">↑ Jan 12 spike: 36 in one week</span>
-      </div>
-      <div class="chart-wrap h220">
-        <canvas id="cancelTrendChart"></canvas>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title">Upcoming Visits · Next 2 Months</span>
-        <span class="badge badge-blue">Peak: Week of Mar 9</span>
-      </div>
-      <div class="chart-wrap h220">
-        <canvas id="upcomingTrendChart"></canvas>
-      </div>
-    </div>
-  </div>
-
-  <!-- Row 3: Cancel by Study + Reason Breakdown -->
+  <!-- Row 2: Cancel by Study + Reason Breakdown -->
   <div class="grid-65 fade-in">
     <div class="card">
       <div class="card-header">
@@ -1393,14 +1370,6 @@ body {
     </div>
     <div id="crio-studies-container" style="padding:12px;">
       <div style="text-align:center;padding:20px;color:var(--muted);font-size:12px;">Loading CRIO study data...</div>
-    </div>
-  </div>
-
-  <!-- Scheduling Gaps (moved from Actions) -->
-  <div class="card mb16">
-    <div class="card-header"><span class="card-title">📅 Scheduling Gaps</span><span class="badge badge-blue" id="sched-gap-badge" style="display:none">0</span></div>
-    <div id="scheduling-gap-list">
-      <div style="padding:12px;color:#94a3b8;font-size:12px;">Waiting for CRIO data...</div>
     </div>
   </div>
 
@@ -1759,20 +1728,6 @@ body {
     </div>
   </div>
 
-  <!-- Charts row: visit type + subject status -->
-  <div class="grid-2 mb16 fade-in">
-    <div class="card">
-      <div class="card-header"><span class="card-title">Visit Type Breakdown</span></div>
-      <div class="chart-wrap h180" style="margin-bottom:8px"><canvas id="visitTypeChart"></canvas></div>
-      <div id="visit-type-legend" style="padding:0 16px 12px;"></div>
-    </div>
-    <div class="card">
-      <div class="card-header"><span class="card-title">Subject Status</span></div>
-      <div class="chart-wrap h180" style="margin-bottom:8px"><canvas id="statusChart"></canvas></div>
-      <div id="status-legend" style="padding:0 16px 12px;"></div>
-    </div>
-  </div>
-
   <!-- ── COORDINATOR DAILY GOALS ── -->
   <div class="section-title" style="margin-top:24px">Coordinator Visit Tracker</div>
   <div class="card fade-in">
@@ -1808,6 +1763,17 @@ body {
   <div class="card fade-in" style="margin-bottom:16px">
     <div style="padding:16px" id="coordBalanceContainer">
       <p style="color:#94a3b8;font-size:12px">Loading workload balance...</p>
+    </div>
+  </div>
+
+  <!-- Coordinator Cancel Rate Trend -->
+  <div class="card fade-in" style="margin-bottom:16px">
+    <div class="card-header">
+      <span class="card-title">Coordinator Cancel Rate Over Time</span>
+      <span class="badge badge-blue" style="font-size:10px">% of their visits that cancelled</span>
+    </div>
+    <div class="chart-wrap h220">
+      <canvas id="trendsCoordChart"></canvas>
     </div>
   </div>
 
@@ -2149,6 +2115,13 @@ body {
     </div>
   </div>
 
+  <!-- Time range toggle -->
+  <div style="display:flex;gap:6px;margin-bottom:12px;" id="trends-range-bar">
+    <button class="sched-filter active" onclick="setTrendsRange(14,this)" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid #1843ad;background:#e8eeff;color:#1843ad;cursor:pointer">2 Weeks</button>
+    <button class="sched-filter" onclick="setTrendsRange(30,this)" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">1 Month</button>
+    <button class="sched-filter" onclick="setTrendsRange(61,this)" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">2 Months</button>
+  </div>
+
   <!-- No data message (shown before live data loads) -->
   <div id="trends-no-data-msg" class="card fade-in" style="text-align:center;padding:40px 24px;">
     <div style="font-size:36px;margin-bottom:12px;">📈</div>
@@ -2180,17 +2153,6 @@ body {
         <div class="chart-wrap h220">
           <canvas id="trendsUpcomingVolChart"></canvas>
         </div>
-      </div>
-    </div>
-
-    <!-- Coordinator performance over time -->
-    <div class="card mb16 fade-in">
-      <div class="card-header">
-        <span class="card-title">👤 Coordinator Cancel Rate Over Time</span>
-        <span class="badge badge-blue">% of their visits that cancelled</span>
-      </div>
-      <div class="chart-wrap h220">
-        <canvas id="trendsCoordChart"></canvas>
       </div>
     </div>
 
@@ -2702,7 +2664,7 @@ const CRP_CONFIG = {
   // Tab registry — add new tabs here
   TABS: {
     PERFORMANCE: ['overview', 'studies', 'schedule', 'referrals', 'admin'],
-    FINANCE: ['fin-overview', 'fin-collections', 'fin-aging', 'fin-revenue', 'fin-accruals', 'fin-qb', 'insights'],
+    FINANCE: ['fin-overview', 'fin-collections', 'fin-aging', 'fin-revenue', 'fin-qb', 'insights'],
     CROSS: ['insights'],
   },
 
@@ -4267,7 +4229,7 @@ var SAMPLE = {
   pennTotal: 0, marchTotal: 0, aprilTotal: 0, activeStudies: 0,
   riskFlags: [], next14Detail: [], cancelTrend: [], cancelWeekly: [],
   upcomingWeekly: [], enrollmentData: [], enrollSummary: {},
-  mergedStudies: [], actionDetails: [], snapshotDate: '', weeklyTrends: []
+  mergedStudies: [], actionDetails: [], snapshotDate: '', weeklyTrends: [], weeklyTrendsAll: []
 };
 
 async function loadFallbackData() {
@@ -6312,13 +6274,11 @@ function switchView(name, el) {
   if (name === 'schedule') {
     setTimeout(() => {
       safe(buildWeeklyBySiteChart,   'wkChart');
-      safe(buildVisitTypeChart,      'visitChart');
-      safe(buildStatusChart,         'statusChart');
-      safe(buildStatusLegend,        'statusLegend');
       safe(buildScheduleTable,       'buildSched');
       safe(buildRiskFlagCards,       'riskCards');
       safe(buildSchedStudyBars,      'schedBars');
       safe(buildSchedCoordList,      'schedCoord');
+      safe(renderCoordTrendChart,    'coordTrend');
       safe(hidePastVisits,           'hidePast');
       safe(injectVisitConfirmButtons,'confirmBtns');
       if (MED_RECORDS_DATA && MED_RECORDS_DATA.length > 0) safe(injectScheduleMedRecords, 'medRec');
@@ -8361,20 +8321,16 @@ function processLiveData(allRows, legacyCancels, auditLog) {
   // ── Trends: per-week aggregation for longitudinal charts ──
   // Groups ALL visits (active + cancelled) by week of their scheduled/cancel date
   // Past weeks show actual cancel rates; future weeks show scheduled volume
-  // ── Trends: ±2 weeks from today for targeted insights ──
-  const weeklyTrends = (() => {
+  // ── Trends: full aggregation (filtered at render time by _trendsRangeDays) ──
+  const weeklyTrendsAll = (() => {
     const byWeek = {};
-    const trendStart = new Date(today); trendStart.setDate(today.getDate() - 14);
-    const trendEnd   = new Date(today); trendEnd.setDate(today.getDate() + 14);
     function weekKey(d) {
       const mon = new Date(d); mon.setDate(d.getDate() - ((d.getDay() + 6) % 7));
       return localISO(mon);
     }
-    function inWindow(d) { return d >= trendStart && d <= trendEnd; }
-    // All rows from the main report (includes both active and cancelled)
     allRows.forEach(r => {
       const d = parseDate(r['Scheduled Date'] || r['Cancel Date']);
-      if (!d || !inWindow(d) || isExcludedStudy(r['Study Name'])) return;
+      if (!d || isExcludedStudy(r['Study Name'])) return;
       const wk = weekKey(d);
       if (!byWeek[wk]) byWeek[wk] = { upcoming: 0, cancelled: 0, byStudy: {}, byCoord: {} };
       const status = (r['Appointment Status'] || '').trim().toLowerCase();
@@ -8394,11 +8350,10 @@ function processLiveData(allRows, legacyCancels, auditLog) {
         else byWeek[wk].byCoord[coord].upcoming++;
       }
     });
-    // Add legacy cancels
     if (legacyCancels && legacyCancels.length) {
       legacyCancels.forEach(r => {
         const d = parseDate(r['Cancel Date'] || r['Scheduled Date']);
-        if (!d || !inWindow(d) || isExcludedStudy(r['Study Name'])) return;
+        if (!d || isExcludedStudy(r['Study Name'])) return;
         const wk = weekKey(d);
         if (!byWeek[wk]) byWeek[wk] = { upcoming: 0, cancelled: 0, byStudy: {}, byCoord: {} };
         byWeek[wk].cancelled++;
@@ -8429,6 +8384,8 @@ function processLiveData(allRows, legacyCancels, auditLog) {
       };
     });
   })();
+  // Default filtered view (±14 days)
+  const weeklyTrends = filterTrendsByRange(weeklyTrendsAll, 14, today);
 
   return {
     actionDetails,
@@ -8442,6 +8399,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
     cancelWeekly: weekBucket(recentCancels,'Cancel Date'),
     upcomingWeekly: weekBucket(activeUpcoming,'Scheduled Date'),
     weeklyTrends,
+    weeklyTrendsAll,
     cancelByStudy,
     upcomingByStudy,
     upcomingByStudyFull: upcomingByStudy,
@@ -9506,8 +9464,6 @@ function renderAll() {
     document.getElementById('sched-count').textContent = (DATA.upcomingTotal||0) + ' visits';
 
   safe(buildHorizon,         'buildHorizon');
-  safe(buildCancelTrend,     'buildCancelTrend');
-  safe(buildUpcomingTrend,   'buildUpcomingTrend');
   safe(buildReasonChart,     'buildReasonChart');
   safe(buildSiteChart,       'buildSiteChart');
   safe(buildCancelStudyBars, 'buildCancelStudyBars');
@@ -9527,9 +9483,6 @@ function renderAll() {
   if (typeof buildRiskFlagCards === 'function')     safe(buildRiskFlagCards,     'buildRiskFlagCards');
   // Pre-build schedule so it's ready when tab is clicked
   safe(buildWeeklyBySiteChart,   'buildWeeklyBySiteChart');
-  safe(buildVisitTypeChart,      'buildVisitTypeChart');
-  safe(buildStatusChart,         'buildStatusChart');
-  safe(buildStatusLegend,        'buildStatusLegend');
   safe(buildScheduleTable,       'buildScheduleTable');
   safe(buildSchedStudyBars,      'buildSchedStudyBars');
   safe(buildSchedCoordList,      'buildSchedCoordList');
@@ -12553,6 +12506,63 @@ const LIVE_URL1 = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSQJ_QKC-ttmV
 const LIVE_URL2_LEGACY = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRUXJxTDsr5IRByMfuLF0P3hVq_QuEw6M1MPNDwd1CaV2UZ9tnFflUwsmUKAd3xeX3_esn0c4YlrV0q/pub?gid=1487298034&single=true&output=csv';
 const AUDIT_LOG_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRpPUZFSyW0rrx2yQdqYPyccRZC0wqUCWyCfX_n2XTMPyKQr9da4jl1jMbZ5_KKFkYZjJiNl_ClYbXk/pub?output=csv';
 
+var _trendsRangeDays = 14;
+
+function filterTrendsByRange(allTrends, days, baseDate) {
+  if (!allTrends || !allTrends.length) return [];
+  var base = baseDate || new Date();
+  var start = new Date(base); start.setDate(base.getDate() - days);
+  var end = new Date(base); end.setDate(base.getDate() + days);
+  var startISO = start.toISOString().slice(0,10);
+  var endISO = end.toISOString().slice(0,10);
+  return allTrends.filter(function(t) { return t.date >= startISO && t.date <= endISO; });
+}
+
+function setTrendsRange(days, btn) {
+  _trendsRangeDays = days;
+  // Update button styles
+  var bar = document.getElementById('trends-range-bar');
+  if (bar) bar.querySelectorAll('.sched-filter').forEach(function(b) {
+    b.classList.remove('active');
+    b.style.border = '1px solid var(--border)'; b.style.background = 'var(--surface)'; b.style.color = 'var(--muted)';
+  });
+  if (btn) { btn.classList.add('active'); btn.style.border = '1px solid #1843ad'; btn.style.background = '#e8eeff'; btn.style.color = '#1843ad'; }
+  // Re-filter and re-render
+  DATA.weeklyTrends = filterTrendsByRange(DATA.weeklyTrendsAll || [], days, new Date());
+  renderTrendsCharts();
+  renderCoordTrendChart();
+}
+
+function renderCoordTrendChart() {
+  var trends = DATA.weeklyTrends || [];
+  if (!trends.length) return;
+  var allCoords = new Set();
+  trends.forEach(function(t) { Object.keys(t.byCoord).forEach(function(c) { allCoords.add(c); }); });
+  var coordColors = ['#dc2626','#2563eb','#059669','#d97706','#7c3aed','#db2777','#0891b2','#65a30d'];
+  var topCoords = Array.from(allCoords).slice(0, 8);
+  mkChart('trendsCoordChart', {
+    type: 'line',
+    data: {
+      labels: trends.map(function(t) { return t.label; }),
+      datasets: topCoords.map(function(coord, i) {
+        return {
+          label: coord,
+          data: trends.map(function(t) {
+            var c = t.byCoord[coord];
+            return c ? +((c.cancelled / (c.upcoming + c.cancelled || 1)) * 100).toFixed(1) : null;
+          }),
+          borderColor: coordColors[i % coordColors.length],
+          borderWidth: 2, pointRadius: 2, tension: 0.3, fill: false, spanGaps: true
+        };
+      })
+    },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
+      scales: { x: { grid: { display: false } }, y: { grid: { color: '#f1f5f9' }, beginAtZero: true, ticks: { callback: function(v) { return v + '%'; } } } }
+    }
+  });
+}
+
 function renderTrendsCharts() {
   const trends = DATA.weeklyTrends || [];
   const noDataEl = document.getElementById('trends-no-data-msg');
@@ -12653,30 +12663,8 @@ function renderTrendsCharts() {
     }
   });
 
-  // ── Chart 4: Coordinator Cancel Rate Over Time ──
-  const allCoords = new Set();
-  trends.forEach(t => Object.keys(t.byCoord).forEach(c => allCoords.add(c)));
-  const coordColors = ['#dc2626','#2563eb','#059669','#d97706','#7c3aed','#db2777','#0891b2','#65a30d'];
-  const topCoords = [...allCoords].slice(0, 8);
-  mkChart('trendsCoordChart', {
-    type: 'line',
-    data: {
-      labels: trends.map(t => t.label),
-      datasets: topCoords.map((coord, i) => ({
-        label: coord,
-        data: trends.map(t => {
-          const c = t.byCoord[coord];
-          return c ? +((c.cancelled / (c.upcoming + c.cancelled || 1)) * 100).toFixed(1) : null;
-        }),
-        borderColor: coordColors[i % coordColors.length],
-        borderWidth: 2, pointRadius: 2, tension: 0.3, fill: false, spanGaps: true
-      }))
-    },
-    options: { responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
-      scales: { x: { grid: { display: false } }, y: { grid: { color: '#f1f5f9' }, beginAtZero: true, ticks: { callback: v => v + '%' } } }
-    }
-  });
+  // Coord chart now lives in Schedule tab — render it from there
+  renderCoordTrendChart();
 
   // ── Chart 5: Study Cancel Rate Trends (top 6 by volume) ──
   const studyTotals = {};
@@ -12716,11 +12704,8 @@ function loadLongitudinalData() {
   }
 }
 
-// Alias for backward compatibility
-function buildWeeklyTrendChart() {
-  try { buildCancelTrend(); } catch(e) { _log('buildCancelTrend: ' + e.message); }
-  try { buildUpcomingTrend(); } catch(e) { _log('buildUpcomingTrend: ' + e.message); }
-}
+// Alias for backward compatibility (trend charts moved to Insights dual-axis)
+function buildWeeklyTrendChart() {}
 
 
 // ══════════════════════════════════════════════════════════════
@@ -13753,7 +13738,7 @@ async function _crpInit() {
   if (location.hash) {
     var _hashTab = location.hash.replace('#', '');
     if (_hashTab === 'actions') _hashTab = 'schedule'; // Actions tab removed — redirect to Schedule
-    var _allTabs = ['overview','studies','schedule','referrals','admin','fin-overview','fin-collections','fin-aging','fin-revenue','fin-accruals','insights'];
+    var _allTabs = ['overview','studies','schedule','referrals','admin','fin-overview','fin-collections','fin-aging','fin-revenue','insights'];
     if (_allTabs.indexOf(_hashTab) !== -1) _initTab = _hashTab;
   }
   var _initTabEl = document.querySelector(".nav-tab[onclick*='" + _initTab + "']");
@@ -14252,13 +14237,9 @@ if (typeof window !== 'undefined') {
       </table>
     </div>
   </div>
-</div>
 
-<!-- ═══════════ ACCRUALS ═══════════ -->
-<div id="view-fin-accruals" class="view">
-
-  <!-- Accruals KPIs (dynamic) -->
-  <div class="section-label">Open Accruals Summary</div>
+  <!-- ═══════════ ACCRUALS (merged into Billing) ═══════════ -->
+  <div class="section-label" style="margin-top:24px">Open Accruals Summary</div>
   <div class="kpi-row" id="accrualKpiRow">
     <div class="kpi click" onclick="showUninvoicedModal()">
       <div class="kpi-stripe" style="background:#8B5CF6"></div>
@@ -14552,17 +14533,6 @@ if (typeof window !== 'undefined') {
       <table class="tbl" id="insightRiskTable">
         <thead><tr><th>Study</th><th>Status</th><th class="r">Cancels</th><th class="r">Upcoming</th><th class="r">Total AR</th><th class="r">Collection %</th><th>Risk</th></tr></thead>
         <tbody id="insightRiskBody"></tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- AR Aging vs Operations -->
-  <div class="group-panel" style="margin-bottom:18px">
-    <div class="group-title"><span class="gt-icon" style="background:#8B5CF6"></span> AR Aging &amp; Enrollment Health</div>
-    <div class="panel-body" id="ins-aging-ops" style="overflow-x:auto;padding:0">
-      <table class="tbl" id="insAgingOpsTable">
-        <thead><tr><th>Study</th><th>Enrollment</th><th class="r">Current AR</th><th class="r">&gt;90 Day AR</th><th class="r">% Overdue</th><th>Alert</th></tr></thead>
-        <tbody id="insAgingOpsBody"></tbody>
       </table>
     </div>
   </div>
