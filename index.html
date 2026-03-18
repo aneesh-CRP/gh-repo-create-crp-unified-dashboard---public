@@ -1330,33 +1330,6 @@ body {
     <div id="risk-flag-cards" style="padding:12px 16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px;"></div>
   </div>
 
-  <!-- What to do -->
-  <div class="card fade-in" style="margin-bottom:16px;">
-    <div class="card-header">
-      <span class="card-title">📋 Protocol for At-Risk Patients</span>
-    </div>
-    <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-      <div style="background:var(--surface2);border-radius:8px;padding:14px;">
-        <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px;">📞 Personal Call (not text)</div>
-        <div style="font-size:12px;color:var(--muted);line-height:1.7;">
-          Call 48–72 hours before their appointment.<br>
-          Confirm transportation is arranged.<br>
-          Ask if there are any barriers to attending.<br>
-          Offer to reschedule if timing is the issue.
-        </div>
-      </div>
-      <div style="background:var(--surface2);border-radius:8px;padding:14px;">
-        <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px;">📝 Document the call in CTMS</div>
-        <div style="font-size:12px;color:var(--muted);line-height:1.7;">
-          Log every contact attempt.<br>
-          Note the reason for prior cancellations.<br>
-          Flag in CTMS if patient is at withdrawal risk.<br>
-          Escalate to PI if unreachable after 2 attempts.
-        </div>
-      </div>
-    </div>
-  </div>
-
   <!-- Medical Records Follow-Up (moved from Actions) -->
   <div class="card fade-in" style="margin-bottom:16px;">
     <div class="card-header">
@@ -1794,10 +1767,6 @@ body {
       </div>
       <div style="padding:0;" id="ref-campaigns-table">
         <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Loading campaigns...</div>
-      </div>
-      <div style="padding:0;border-top:2px solid #e2e8f0;" id="ref-campaign-xref">
-        <div style="padding:8px 16px;background:#f8fafc;"><span style="font-size:12px;font-weight:700;color:var(--navy);">🔗 Participant Status &amp; Appointments</span> <span class="badge badge-purple" id="ref-xref-badge" style="margin-left:6px;">—</span></div>
-        <div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">Cross-referencing with patient database...</div>
       </div>
     </div>
 
@@ -2476,6 +2445,8 @@ const CRP_CONFIG = {
 
   // Coordinator visit goals
   COORDINATORS: ['Mario Castellanos','Stacey Scott','Ruby Pereira','Cady Chilensky','Angelina McMullen','Ema Gunic','Vlado Draganic','Gabrijela Ateljevic','Ana Lambic','Jana Milankovic'],
+  // Clinical coordinators who schedule patient visits (shown in Schedule tab)
+  SCHEDULE_COORDINATORS: ['Mario Castellanos','Stacey Scott','Ruby Pereira','Cady Chilensky','Angelina McMullen'],
   INVESTIGATORS: ['Taher Modarressi','Eugene Andruczyk','Lolita Vaughan','Michael Tomeo','Joseph Heether','Brian Shaffer'],
   // Default PI for each study (fallback when audit log doesn't resolve investigator)
   STUDY_INVESTIGATORS: {
@@ -4349,7 +4320,7 @@ function buildVisitTypeChart() {
 function buildSchedCoordList() {
   const el = document.getElementById('sched-coord-list');
   if (!el || el.innerHTML.trim()) return; // already populated statically
-  const VALID = new Set(CRP_CONFIG.COORDINATORS || []);
+  const VALID = new Set(CRP_CONFIG.SCHEDULE_COORDINATORS || CRP_CONFIG.COORDINATORS || []);
   const coords = (DATA.coordinators || []).filter(c => VALID.has(c.name));
   const max = Math.max(...coords.map(c => c.upcoming), 1);
   el.innerHTML = coords.map(c => {
@@ -4990,7 +4961,7 @@ function buildCancelStudyBars() {
 function buildCoordList() {
   const el = document.getElementById('sched-coord-list') || document.getElementById('coord-list');
   if (!el) return;
-  const VALID2 = new Set(CRP_CONFIG.COORDINATORS || []);
+  const VALID2 = new Set(CRP_CONFIG.SCHEDULE_COORDINATORS || CRP_CONFIG.COORDINATORS || []);
   const coords = (DATA.coordinators||[]).filter(c => VALID2.has(c.name));
   if (!coords.length) { el.innerHTML = '<p style="color:#94a3b8;font-size:12px">No coordinator data</p>'; return; }
   const maxUp = Math.max(...coords.map(c => c.upcoming || 0), 1);
@@ -5494,7 +5465,8 @@ function buildInsights() {
   }
 
   // Cross-source: stale referrals
-  var staleRefs = REFERRAL_DATA ? REFERRAL_DATA.filter(function(r) { return !r.is_closed && r.days_since_update >= 14; }).length : 0;
+  var _stale60d = Date.now() - 60 * 86400000;
+  var staleRefs = REFERRAL_DATA ? REFERRAL_DATA.filter(function(r) { if (r.is_closed || r.days_since_update < 14) return false; if (r.date_created) { var cd = new Date(r.date_created).getTime(); if (cd && cd < _stale60d) return false; } return true; }).length : 0;
   if (staleRefs > 0) {
     flagItems.push({
       urgent: false,
@@ -7599,7 +7571,9 @@ function processLiveData(allRows, legacyCancels, auditLog) {
   const EXCLUDE_STUDIES = new Set([]);
   const isExcludedStudy = (name) => false;
   const FIBRO = /^$/;  // disabled — include all visits
-  const EXCL_COORD = new Set([]);
+  // Recruitment/support staff — resolve to clinical coordinator via audit log
+  const SCHED_COORDS = new Set((CRP_CONFIG.SCHEDULE_COORDINATORS || []).map(n => n.toLowerCase()));
+  const EXCL_COORD = new Set((CRP_CONFIG.COORDINATORS || []).filter(n => !SCHED_COORDS.has(n.toLowerCase())).map(n => n.toLowerCase()));
   const COORD_MAP = {
     'stacey scott':'Stacey Scott','ruby pereira':'Ruby Pereira',
     'mario castellanos':'Mario Castellanos','angelina mcmullen':'Angelina McMullen',
@@ -9018,10 +8992,10 @@ function buildMedRecAlerts() {
         <div style="height:100%;width:${releasePct}%;background:${relBarColor};border-radius:3px;"></div>
       </div>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center;">
-        <div><span style="font-size:14px;font-weight:800;color:#059669;">${releaseRecvd}</span><div style="font-size:8px;color:#94a3b8;">Signed</div></div>
-        <div><span style="font-size:14px;font-weight:800;color:#f59e0b;">${releasePending}</span><div style="font-size:8px;color:#94a3b8;">Pending</div></div>
-        <div><span style="font-size:14px;font-weight:800;color:#8b5cf6;">${releaseContact}</span><div style="font-size:8px;color:#94a3b8;">Contacting</div></div>
-        <div><span style="font-size:14px;font-weight:800;color:#94a3b8;">${releaseNA}</span><div style="font-size:8px;color:#94a3b8;">N/A</div></div>
+        <div style="cursor:pointer;" onclick="showMedRecFilteredModal('rel_signed')"><span style="font-size:14px;font-weight:800;color:#059669;">${releaseRecvd}</span><div style="font-size:8px;color:#94a3b8;">Signed</div></div>
+        <div style="cursor:pointer;" onclick="showMedRecFilteredModal('rel_pending')"><span style="font-size:14px;font-weight:800;color:#f59e0b;">${releasePending}</span><div style="font-size:8px;color:#94a3b8;">Pending</div></div>
+        <div style="cursor:pointer;" onclick="showMedRecFilteredModal('rel_contact')"><span style="font-size:14px;font-weight:800;color:#8b5cf6;">${releaseContact}</span><div style="font-size:8px;color:#94a3b8;">Contacting</div></div>
+        <div style="cursor:pointer;" onclick="showMedRecFilteredModal('rel_na')"><span style="font-size:14px;font-weight:800;color:#94a3b8;">${releaseNA}</span><div style="font-size:8px;color:#94a3b8;">N/A</div></div>
       </div>
     </div>
 
@@ -9035,28 +9009,28 @@ function buildMedRecAlerts() {
         <div style="height:100%;width:${completionPct}%;background:${barColor};border-radius:3px;"></div>
       </div>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center;">
-        <div><span style="font-size:14px;font-weight:800;color:#059669;">${recsComplete}</span><div style="font-size:8px;color:#94a3b8;">Received</div></div>
-        <div><span style="font-size:14px;font-weight:800;color:#f59e0b;">${recsPending}</span><div style="font-size:8px;color:#94a3b8;">Pending</div></div>
-        <div><span style="font-size:14px;font-weight:800;color:#dc2626;">${recsUnavail}</span><div style="font-size:8px;color:#94a3b8;">Unavailable</div></div>
-        <div><span style="font-size:14px;font-weight:800;color:#94a3b8;">${recsBlank}</span><div style="font-size:8px;color:#94a3b8;">Not Set</div></div>
+        <div style="cursor:pointer;" onclick="showMedRecFilteredModal('rec_received')"><span style="font-size:14px;font-weight:800;color:#059669;">${recsComplete}</span><div style="font-size:8px;color:#94a3b8;">Received</div></div>
+        <div style="cursor:pointer;" onclick="showMedRecFilteredModal('rec_pending')"><span style="font-size:14px;font-weight:800;color:#f59e0b;">${recsPending}</span><div style="font-size:8px;color:#94a3b8;">Pending</div></div>
+        <div style="cursor:pointer;" onclick="showMedRecFilteredModal('rec_unavail')"><span style="font-size:14px;font-weight:800;color:#dc2626;">${recsUnavail}</span><div style="font-size:8px;color:#94a3b8;">Unavailable</div></div>
+        <div style="cursor:pointer;" onclick="showMedRecFilteredModal('rec_notset')"><span style="font-size:14px;font-weight:800;color:#94a3b8;">${recsBlank}</span><div style="font-size:8px;color:#94a3b8;">Not Set</div></div>
       </div>
     </div>
 
     <!-- Supporting metrics -->
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center;">
-      <div style="padding:5px;background:#f0fdf4;border-radius:6px;">
+      <div style="padding:5px;background:#f0fdf4;border-radius:6px;cursor:pointer;" onclick="showMedRecFilteredModal('active')">
         <div style="font-size:14px;font-weight:800;color:#059669;">${active.length}</div>
         <div style="font-size:8px;color:#059669;font-weight:600;">Active</div>
       </div>
-      <div style="padding:5px;background:#eff6ff;border-radius:6px;">
+      <div style="padding:5px;background:#eff6ff;border-radius:6px;cursor:pointer;" onclick="showMedRecFilteredModal('in_crio')">
         <div style="font-size:14px;font-weight:800;color:#3b82f6;">${inCrio}</div>
         <div style="font-size:8px;color:#3b82f6;font-weight:600;">In CRIO</div>
       </div>
-      <div style="padding:5px;background:#f5f3ff;border-radius:6px;">
+      <div style="padding:5px;background:#f5f3ff;border-radius:6px;cursor:pointer;" onclick="showMedRecFilteredModal('pi_approved')">
         <div style="font-size:14px;font-weight:800;color:#8b5cf6;">${piConfirmed}</div>
         <div style="font-size:8px;color:#8b5cf6;font-weight:600;">PI Approved</div>
       </div>
-      <div style="padding:5px;background:#fef2f2;border-radius:6px;">
+      <div style="padding:5px;background:#fef2f2;border-radius:6px;cursor:pointer;" onclick="showMedRecFilteredModal('closed')">
         <div style="font-size:14px;font-weight:800;color:#dc2626;">${total - active.length}</div>
         <div style="font-size:8px;color:#dc2626;font-weight:600;">Closed</div>
       </div>
@@ -10195,15 +10169,20 @@ function renderReferralDashboard() {
     });
   }
 
-  // ── Stale Leads (active, not updated in 7+ days) ──
+  // ── Stale Leads (active, not updated in 7+ days, created within last 60 days) ──
   const staleEl = el('ref-stale-list');
   const staleBadge = el('ref-stale-badge');
-  const staleLeads = active.filter(r => r.days_since_update >= 7)
-    .sort((a,b) => b.days_since_update - a.days_since_update);
+  const _sixtyDaysAgo = Date.now() - 60 * 86400000;
+  const staleLeads = active.filter(r => {
+    if (r.days_since_update < 7) return false;
+    // Only include leads created within last 60 days — older leads are unlikely to still be in play
+    if (r.date_created) { var cd = new Date(r.date_created).getTime(); if (cd && cd < _sixtyDaysAgo) return false; }
+    return true;
+  }).sort((a,b) => b.days_since_update - a.days_since_update);
   if (staleBadge) staleBadge.textContent = staleLeads.length + ' stale';
 
   if (staleLeads.length === 0) {
-    staleEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">🟢 No stale leads — all active referrals updated within 7 days</div>';
+    staleEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">🟢 No stale leads — all active referrals updated within 7 days (showing last 60 days only)</div>';
   } else {
     staleEl.innerHTML = staleLeads.slice(0, 15).map(r => {
       const urgency = r.days_since_update >= 14 ? '#dc2626' : '#d97706';
@@ -10239,15 +10218,22 @@ function renderReferralDashboard() {
     <tbody>${trackerRows.map(([name, tasks]) => {
       const sc = {};
       tasks.forEach(t => { sc[t.stage] = (sc[t.stage] || 0) + 1; });
+      const tn = escapeHTML(name).replace(/'/g,"\\'");
+      const _enrolled = Array.from(SG.ENROLLED||[]).reduce((s,st)=>s+(sc[st]||0),0);
+      const _closed = Array.from(SG.CLOSED||[]).reduce((s,st)=>s+(sc[st]||0),0);
+      function _td(count, filterExpr, label, color) {
+        if (!count) return '<td style="text-align:center;color:#cbd5e1;">0</td>';
+        return '<td style="text-align:center;cursor:pointer;' + (color||'') + '" onclick="showTrackerStageDetail(\'' + tn + '\',\'' + label + '\')">' + count + '</td>';
+      }
       return `<tr>
-        <td style="padding:8px 12px;font-weight:600;">${escapeHTML(name)}</td>
-        <td style="text-align:center;font-weight:700;">${tasks.length}</td>
-        <td style="text-align:center;">${sc['New Lead']||0}</td>
-        <td style="text-align:center;">${sc['Contacted']||0}</td>
-        <td style="text-align:center;">${sc['Pre-Screening']||0}</td>
-        <td style="text-align:center;">${sc['Screening']||0}</td>
-        <td style="text-align:center;color:#059669;font-weight:700;">${Array.from(SG.ENROLLED||[]).reduce((s,st)=>s+(sc[st]||0),0)}</td>
-        <td style="text-align:center;color:#dc2626;">${Array.from(SG.CLOSED||[]).reduce((s,st)=>s+(sc[st]||0),0)}</td>
+        <td style="padding:8px 12px;font-weight:600;cursor:pointer;" onclick="showTrackerStageDetail('${tn}','all')">${escapeHTML(name)}</td>
+        <td style="text-align:center;font-weight:700;cursor:pointer;" onclick="showTrackerStageDetail('${tn}','all')">${tasks.length}</td>
+        ${_td(sc['New Lead']||0,null,'New Lead')}
+        ${_td(sc['Contacted']||0,null,'Contacted')}
+        ${_td(sc['Pre-Screening']||0,null,'Pre-Screening')}
+        ${_td(sc['Screening']||0,null,'Screening')}
+        ${_td(_enrolled,null,'Enrolled','color:#059669;font-weight:700;')}
+        ${_td(_closed,null,'DNQ/Lost','color:#dc2626;')}
       </tr>`;
     }).join('')}</tbody>
   </table>`;
@@ -10295,12 +10281,13 @@ function renderReferralDashboard() {
     const totalUpcoming = enriched.reduce((s,c) => s + c.upcomingVisits, 0);
     const overallConv = totalReferrals > 0 ? Math.round(totalScheduled / totalReferrals * 100) : 0;
 
-    let campHtml = `<div style="display:flex;gap:12px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid #f1f5f9;">
+    let campHtml = `<div style="padding:6px 16px 0;"><div style="font-size:9px;color:#94a3b8;">Data: Campaigns CSV (ClickUp sync) · cross-ref: Referral Pipeline, CRIO Visits, Patient DB</div></div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid #f1f5f9;">
       <div style="text-align:center;min-width:70px;"><div style="font-size:18px;font-weight:800;color:#3b82f6;">${totalContacts.toLocaleString()}</div><div style="font-size:10px;color:#94a3b8;">Total Contacts</div></div>
-      <div style="text-align:center;min-width:70px;"><div style="font-size:18px;font-weight:800;color:#059669;">${totalReferrals}</div><div style="font-size:10px;color:#94a3b8;">New Referrals</div></div>
-      <div style="text-align:center;min-width:70px;"><div style="font-size:18px;font-weight:800;color:#8b5cf6;">${totalScheduled}</div><div style="font-size:10px;color:#94a3b8;">Scheduled</div></div>
+      <div style="text-align:center;min-width:70px;cursor:pointer;" onclick="showReferralDetailModal(function(){return true;},'All Referrals from Campaigns','${totalReferrals} referrals')"><div style="font-size:18px;font-weight:800;color:#059669;">${totalReferrals}</div><div style="font-size:10px;color:#94a3b8;">New Referrals</div></div>
+      <div style="text-align:center;min-width:70px;cursor:pointer;" onclick="showReferralDetailModal(function(r){var SG=((CRP_CONFIG.CLICKUP||{}).STAGE_GROUPS||{});return SG.SCHEDULED&&SG.SCHEDULED.has(r.stage);},'Scheduled Referrals')"><div style="font-size:18px;font-weight:800;color:#8b5cf6;">${totalScheduled}</div><div style="font-size:10px;color:#94a3b8;">Scheduled</div></div>
       <div style="text-align:center;min-width:70px;"><div style="font-size:18px;font-weight:800;color:${overallConv>=20?'#059669':overallConv>=10?'#d97706':'#dc2626'};">${overallConv}%</div><div style="font-size:10px;color:#94a3b8;">Conv. Rate</div></div>
-      <div style="text-align:center;min-width:70px;"><div style="font-size:18px;font-weight:800;color:#1843ad;">${totalPipeline}</div><div style="font-size:10px;color:#94a3b8;">In Pipeline</div></div>
+      <div style="text-align:center;min-width:70px;cursor:pointer;" onclick="showReferralDetailModal(function(r){return !r.is_closed;},'Active Pipeline')"><div style="font-size:18px;font-weight:800;color:#1843ad;">${totalPipeline}</div><div style="font-size:10px;color:#94a3b8;">In Pipeline</div></div>
       <div style="text-align:center;min-width:70px;"><div style="font-size:18px;font-weight:800;color:#06b6d4;">${totalUpcoming}</div><div style="font-size:10px;color:#94a3b8;">Upcoming Visits</div></div>
     </div>`;
 
@@ -10348,11 +10335,47 @@ function renderReferralDashboard() {
     }
   }
 
-  // Render the cross-reference detail section
-  renderCampaignXRef();
+  // Participant Status section removed (duplicative with Schedule tab)
 
   // Render cross-source patient journey funnel
   buildPatientJourneyFunnel();
+}
+
+function showJourneyFunnelDetail(key) {
+  var _jSG = (CRP_CONFIG.CLICKUP||{}).STAGE_GROUPS||{};
+  var _contactSet = new Set(['Contacted']); if(_jSG.SCREENING) _jSG.SCREENING.forEach(function(s){_contactSet.add(s);});
+  if (key === 'total_leads') {
+    // Show all referrals + FB CRM leads
+    showReferralDetailModal(function() { return true; }, 'Total Leads', 'All referrals + FB CRM leads');
+  } else if (key === 'contacted') {
+    showReferralDetailModal(function(r) { return _contactSet.has(r.stage); }, 'Contacted / Pre-Screen');
+  } else if (key === 'medrec_all') {
+    showMedRecFilteredModal('active');
+  } else if (key === 'medrec_screening') {
+    // In Screening / Visit Scheduled
+    var pts = (MED_RECORDS_DATA||[]).filter(function(r) { return r.status === 'In Screening' || r.status === 'Visit Scheduled'; });
+    _showMedRecList('In Screening / Scheduled', pts);
+  } else if (key === 'medrec_enrolled') {
+    var pts = (MED_RECORDS_DATA||[]).filter(function(r) { return r.status === 'Enrolled' || r.status === 'Complete'; });
+    _showMedRecList('Enrolled / Complete', pts);
+  }
+}
+function _showMedRecList(title, patients) {
+  var recColors = {'Received':'#059669','Pending':'#f59e0b','Not applicable':'#94a3b8','Unavailable':'#dc2626'};
+  function badge(val, cm) { if(!val) return '<span style="color:#cbd5e1;">—</span>'; var c=cm[val]||'#64748b'; return '<span style="padding:1px 5px;border-radius:3px;font-size:9px;font-weight:600;background:'+c+'18;color:'+c+';">'+escapeHTML(val)+'</span>'; }
+  var html = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;min-width:500px;">';
+  html += '<thead><tr style="border-bottom:2px solid #e2e8f0;text-align:left;"><th style="padding:6px 8px;">Patient</th><th style="padding:6px 8px;">Study</th><th style="padding:6px 8px;">Status</th><th style="padding:6px 8px;">Records</th><th style="padding:6px 8px;">Assignee</th></tr></thead><tbody>';
+  patients.forEach(function(r) {
+    var patLink = r.crio_link || r.url || '#';
+    html += '<tr style="border-bottom:1px solid #f1f5f9;">';
+    html += '<td style="padding:4px 8px;"><a href="'+escapeHTML(patLink)+'" target="_blank" style="font-weight:600;color:#1e293b;text-decoration:none;">'+maskPHI(r.name)+'</a></td>';
+    html += '<td style="padding:4px 8px;font-size:10px;">'+escapeHTML(r.study||'—')+'</td>';
+    html += '<td style="padding:4px 8px;">'+badge(r.status,{'Enrolled':'#059669','In Screening':'#8b5cf6','Visit Scheduled':'#06b6d4','Complete':'#059669'})+'</td>';
+    html += '<td style="padding:4px 8px;">'+badge(r.records_received,recColors)+'</td>';
+    html += '<td style="padding:4px 8px;font-size:10px;">'+escapeHTML(r.assignee||'—')+'</td></tr>';
+  });
+  html += '</tbody></table></div>';
+  openModal(title, patients.length + ' patients', html);
 }
 
 function buildPatientJourneyFunnel() {
@@ -10374,11 +10397,11 @@ function buildPatientJourneyFunnel() {
   }
 
   var stages = [
-    { label: 'Total Leads', count: totalLeads, color: '#3b82f6', sources: 'Referrals + FB CRM' },
-    { label: 'Contacted / Pre-Screen', count: contacted, color: '#f59e0b', sources: 'Referral Pipeline' },
-    { label: 'Medical Records Created', count: medRecsCreated, color: '#8b5cf6', sources: 'Med Records System' },
-    { label: 'In Screening / Scheduled', count: inScreening, color: '#06b6d4', sources: 'Med Records + Referrals' },
-    { label: 'Enrolled / Complete', count: enrolled, color: '#059669', sources: 'Med Records System' },
+    { label: 'Total Leads', count: totalLeads, color: '#3b82f6', sources: 'Referrals + FB CRM', clickKey: 'total_leads' },
+    { label: 'Contacted / Pre-Screen', count: contacted, color: '#f59e0b', sources: 'Referral Pipeline', clickKey: 'contacted' },
+    { label: 'Medical Records Created', count: medRecsCreated, color: '#8b5cf6', sources: 'Med Records System', clickKey: 'medrec_all' },
+    { label: 'In Screening / Scheduled', count: inScreening, color: '#06b6d4', sources: 'Med Records + Referrals', clickKey: 'medrec_screening' },
+    { label: 'Enrolled / Complete', count: enrolled, color: '#059669', sources: 'Med Records System', clickKey: 'medrec_enrolled' },
   ];
 
   var maxCount = Math.max.apply(null, stages.map(function(s){ return s.count; })) || 1;
@@ -10389,7 +10412,7 @@ function buildPatientJourneyFunnel() {
   stages.forEach(function(stage, i) {
     var pct = Math.max(stage.count / maxCount * 100, 3);
     var convPct = i > 0 && stages[i-1].count > 0 ? Math.round(stage.count / stages[i-1].count * 100) : 0;
-    html += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;">';
+    html += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;cursor:pointer;" onclick="showJourneyFunnelDetail(\'' + stage.clickKey + '\')">';
     html += '<div style="width:180px;text-align:right;"><div style="font-size:12px;font-weight:600;color:#1e293b;">' + stage.label + '</div><div style="font-size:9px;color:#94a3b8;">' + stage.sources + '</div></div>';
     html += '<div style="flex:1;background:#f1f5f9;border-radius:6px;height:32px;overflow:hidden;position:relative;">';
     html += '<div style="width:' + pct + '%;background:' + stage.color + ';height:100%;border-radius:6px;display:flex;align-items:center;justify-content:center;transition:width 0.5s;">';
@@ -10700,6 +10723,24 @@ function renderCampaignXRef() {
   el.innerHTML = html;
 }
 
+// ── Tracker + Stage detail popup (from Physician Tracker table) ──
+function showTrackerStageDetail(tracker, stageLabel) {
+  var SG = ((CRP_CONFIG.CLICKUP||{}).STAGE_GROUPS||{});
+  var enrolledSet = SG.ENROLLED || new Set();
+  var closedSet = SG.CLOSED || new Set();
+  var filterFn;
+  if (stageLabel === 'all') {
+    filterFn = function(r) { return r.tracker === tracker; };
+  } else if (stageLabel === 'Enrolled') {
+    filterFn = function(r) { return r.tracker === tracker && enrolledSet.has(r.stage); };
+  } else if (stageLabel === 'DNQ/Lost') {
+    filterFn = function(r) { return r.tracker === tracker && closedSet.has(r.stage); };
+  } else {
+    filterFn = function(r) { return r.tracker === tracker && r.stage === stageLabel; };
+  }
+  showReferralDetailModal(filterFn, tracker + (stageLabel !== 'all' ? ' — ' + stageLabel : ''));
+}
+
 // ── Referral detail modal (click from funnel, tracker rows, stale leads) ──
 function showReferralDetailModal(filterFn, title, subtitle) {
   if (!REFERRAL_DATA || REFERRAL_DATA.length === 0) {
@@ -10785,6 +10826,24 @@ async function fetchMedicalRecords(attempt) {
         is_closed: r.is_closed === 'TRUE' || CLOSED.indexOf(status) !== -1,
       };
     });
+    // Try to resolve empty study fields from CRIO subjects / referral data
+    var _mrUnknown = 0;
+    MED_RECORDS_DATA.forEach(function(mr) {
+      if (mr.study) return;
+      var nameKey = mr.name.toLowerCase().trim();
+      // Try CRIO subjects
+      if (typeof CRIO_SUBJECTS_DATA !== 'undefined' && CRIO_SUBJECTS_DATA.length) {
+        var match = CRIO_SUBJECTS_DATA.find(function(s) { return (s.full_name||'').toLowerCase().trim() === nameKey; });
+        if (match && match.study_name) { mr.study = match.study_name.split(' - ').pop().trim(); mr._studySource = 'CRIO'; return; }
+      }
+      // Try referral data
+      if (typeof REFERRAL_DATA !== 'undefined' && REFERRAL_DATA.length) {
+        var ref = REFERRAL_DATA.find(function(r) { return r.name.toLowerCase().trim() === nameKey; });
+        if (ref && ref.study) { mr.study = ref.study; mr._studySource = 'Referral'; return; }
+      }
+      _mrUnknown++;
+    });
+    if (_mrUnknown > 0) console.warn('MedRecords: ' + _mrUnknown + ' patients still have no study assignment — update in ClickUp');
     console.log('MedRecords loaded:', MED_RECORDS_DATA.length, 'patients');
     safe(renderMedicalRecords, 'renderMedicalRecords');
     safe(buildMedRecAlerts, 'buildMedRecAlerts');
@@ -11827,6 +11886,65 @@ function showMedRecDetailModal(studyName) {
   });
   html += '</tbody></table></div>';
   openModal('Medical Records — ' + studyName, active.length + ' active · ' + closed.length + ' closed · ' + patients.length + ' total', html);
+}
+
+// ── Generic filtered popup for med records pipeline numbers ──
+function showMedRecFilteredModal(filterKey) {
+  if (!MED_RECORDS_DATA || MED_RECORDS_DATA.length === 0) {
+    openModal('Medical Records', '', '<div style="text-align:center;padding:30px;color:#94a3b8;">No medical records data loaded.</div>');
+    return;
+  }
+  var labels = {
+    rel_signed: 'Medical Release — Signed', rel_pending: 'Medical Release — Pending',
+    rel_contact: 'Medical Release — Contacting', rel_na: 'Medical Release — N/A',
+    rec_received: 'Records Received', rec_pending: 'Records Pending',
+    rec_unavail: 'Records Unavailable', rec_notset: 'Records Not Set',
+    active: 'Active Patients', in_crio: 'Records in CRIO',
+    pi_approved: 'PI Approved', closed: 'Closed Patients'
+  };
+  var filters = {
+    rel_signed: function(r) { return r.medical_release === 'Recieved' || r.medical_release === 'Received'; },
+    rel_pending: function(r) { return r.is_active && r.medical_release === 'Pending'; },
+    rel_contact: function(r) { return r.is_active && (r.medical_release||'').indexOf('Contact') !== -1; },
+    rel_na: function(r) { return (r.medical_release||'').indexOf('Not Applicable') !== -1; },
+    rec_received: function(r) { return r.records_received === 'Received'; },
+    rec_pending: function(r) { return r.is_active && r.records_received === 'Pending'; },
+    rec_unavail: function(r) { return r.is_active && r.records_received === 'Unavailable'; },
+    rec_notset: function(r) { return r.is_active && (!r.records_received || r.records_received === ''); },
+    active: function(r) { return r.is_active; },
+    in_crio: function(r) { return r.records_in_crio === 'Yes'; },
+    pi_approved: function(r) { return r.investigator_approval && r.investigator_approval.indexOf('Confirmed') !== -1; },
+    closed: function(r) { return !r.is_active; }
+  };
+  var fn = filters[filterKey];
+  if (!fn) return;
+  var patients = MED_RECORDS_DATA.filter(fn);
+  var title = labels[filterKey] || filterKey;
+  var recColors = {'Received':'#059669','Pending':'#f59e0b','Not applicable':'#94a3b8','Unavailable':'#dc2626'};
+  var relColors = {'Recieved':'#059669','Pending':'#f59e0b','Not Applicable ( Link to proxy in collum E)':'#94a3b8','Contact 1':'#3b82f6','Contact 2':'#8b5cf6','Contact 3':'#dc2626'};
+  function badge(val, colorMap) {
+    if (!val) return '<span style="color:#cbd5e1;">—</span>';
+    var c = colorMap[val] || '#64748b';
+    return '<span style="padding:1px 5px;border-radius:3px;font-size:9px;font-weight:600;background:' + c + '18;color:' + c + ';">' + escapeHTML(val) + '</span>';
+  }
+  var html = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;min-width:600px;">';
+  html += '<thead><tr style="border-bottom:2px solid #e2e8f0;text-align:left;">';
+  html += '<th style="padding:6px 8px;">Patient</th><th style="padding:6px 8px;">Study</th><th style="padding:6px 8px;">Release</th><th style="padding:6px 8px;">Records</th><th style="padding:6px 8px;">Portal</th><th style="padding:6px 8px;">Assignee</th><th style="padding:6px 8px;">Updated</th></tr></thead><tbody>';
+  patients.forEach(function(r) {
+    var staleColor = r.days_since_update > 14 ? '#dc2626' : r.days_since_update > 7 ? '#f59e0b' : '#64748b';
+    var patLink = r.crio_link || r.url || '#';
+    html += '<tr style="border-bottom:1px solid #f1f5f9;">';
+    html += '<td style="padding:4px 8px;"><a href="' + escapeHTML(patLink) + '" target="_blank" style="font-weight:600;color:#1e293b;text-decoration:none;">' + maskPHI(r.name) + '</a></td>';
+    html += '<td style="padding:4px 8px;font-size:10px;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + escapeHTML(r.study||'') + '">' + escapeHTML(r.study||'—') + '</td>';
+    html += '<td style="padding:4px 8px;">' + badge(r.medical_release, relColors) + '</td>';
+    html += '<td style="padding:4px 8px;">' + badge(r.records_received, recColors) + '</td>';
+    html += '<td style="padding:4px 8px;font-size:10px;">' + escapeHTML(r.records_portal || '—') + '</td>';
+    html += '<td style="padding:4px 8px;font-size:10px;">' + escapeHTML(r.assignee || '—') + '</td>';
+    html += '<td style="padding:4px 8px;text-align:center;font-weight:600;color:' + staleColor + ';">' + r.days_since_update + 'd</td>';
+    html += '</tr>';
+  });
+  html += '</tbody></table></div>';
+  openModal(title, patients.length + ' patients', html);
 }
 
 
