@@ -233,4 +233,10 @@ Implemented all 5 phases of the enhancement plan:
 **Chart.js Fix:**
 - `mkChart()` now adds explicit `type: 'category'` / `type: 'linear'` to all scale configs, suppressing Chart.js 4.x "Ignoring resolver" console warnings
 
-**Commits:** `3ad09e3`, `0ba34b2`, `2cecc49`, `3bb1809`, `ab9f441`, `ce39eb7`, `4273214`, `cba8bae`, `2c8e5a2`
+**Referral/Leads Matching Fix:**
+- `REFERRAL_STUDY_MAP` (7 entries): Maps referral CSV nicknames (Ocean(a), PREVENT-HF, Sjogren's, etc.) to protocol numbers
+- `REFERRAL_STUDY_SKIP` + `isReferralStudyGarbage()`: Filters garbage values (doctor names, dates, blanks) from study column
+- Fixed empty-string bug (`includes('')` = true), removed bidirectional fuzzy matching, added min-length guard
+- Aliases pre-indexed into `_referralByStudy` Map for O(1) lookups
+
+**Commits:** `3ad09e3`, `0ba34b2`, `2cecc49`, `3bb1809`, `ab9f441`, `ce39eb7`, `4273214`, `cba8bae`, `2c8e5a2`, `88e3563`

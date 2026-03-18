@@ -1,6 +1,6 @@
 # CRP Dashboard — Ground Truth
 
-> Last verified: March 17, 2026 | Version 2.9.6 | 1,959 CRIO subjects across 50 studies | Chart.js warnings suppressed
+> Last verified: March 17, 2026 | Version 2.9.6 | 1,959 CRIO subjects across 50 studies | Referral matching fixed
 
 This document is the single reference for all dashboard data mappings, formulas, configurations, and verified counts. Use it to validate that the dashboard is rendering correctly.
 
@@ -133,6 +133,24 @@ Normalizes fragmented CRIO indication strings:
 - Upload test
 - EVENT
 - 2025_COVID_FLU_RSV_DETECTION STUDY
+
+### REFERRAL_STUDY_MAP (7 entries)
+
+Maps referral CSV nicknames to protocol numbers for the Studies table:
+
+| Referral Nickname | Protocol Number |
+|-------------------|----------------|
+| prevent-hf-az-d6973 baxduo | D6973C00001 |
+| az-baxduo | D6973C00001 |
+| ocean(a) | EFC17599 |
+| sjogren's disease | 80202135SJS3001 |
+| psa-2001 | 88545223PSA2001 |
+| mash prescreening | MASLD |
+| aqua | EFC17600 (ESTUARY) |
+
+**REFERRAL_STUDY_SKIP:** Filters non-study values from referral CSV study column (blank, doctor names, source names, date strings).
+
+**Matching logic:** Exact lookup → alias map → one-directional fuzzy (referral nickname ⊂ protocol, min 3 chars).
 
 ### Pre-Screening Detection (4 conditions, any = pre-screening)
 
@@ -439,3 +457,4 @@ git push
 
 **Resolved:**
 - ~~Chart.js 4.x "Ignoring resolver" scale warnings~~ — fixed in `mkChart()` by adding explicit scale types (`2c8e5a2`)
+- ~~Referral/Total Leads columns showed wrong counts in studies table~~ — fixed with `REFERRAL_STUDY_MAP`, garbage filter, one-directional matching (`88e3563`)
