@@ -2695,6 +2695,13 @@ const CRP_CONFIG = {
   // Auto-refresh interval (ms) — 0 to disable
   REFRESH_INTERVAL: 900000,
 
+  // Timeout constants (ms)
+  FETCH_TIMEOUT: 30000,         // abort fetch after 30s
+  WORKER_TIMEOUT: 10000,        // abort Web Worker after 10s
+  RETRY_DELAY: 5000,            // delay before retry on initial load failure
+  TOAST_DURATION: 5000,         // default toast notification duration
+  FRESHNESS_INTERVAL: 60000,    // update freshness badge every 60s
+
   // Finance auth (SHA-256 hash of PIN)
   AUTH_HASH: '78e370b587b145920213731b7c7c725e512b3b6577c51c800218a7c764c532ae',
   AUTH_STORAGE_KEY: 'crp_fin_auth',
@@ -3309,6 +3316,7 @@ function renderRevenueItems() {
 }
 // ══════════ ENHANCED ACCRUALS TAB ══════════
 function renderAccruals() {
+  if (!UNINVOICED || !UNINVOICED.length || !UNPAID_AP || !UNPAID_INVOICES) return;
   const el = id => document.getElementById(id);
 
   // KPI values
@@ -3425,6 +3433,7 @@ function defaultStatus(days,amt){
   return 'New';
 }
 function initColl(){
+  if (!UNPAID_INVOICES || !UNPAID_INVOICES.length) return;
   collData=UNPAID_INVOICES.map(inv=>{const k='crp_coll_'+inv.invoice;const s=localStorage.getItem(k);
     if(s){const p=JSON.parse(s);return{...inv,...p};}
     return{...inv,status:defaultStatus(inv.days,Math.abs(inv.unpaid)),notes:''};});
@@ -3530,10 +3539,23 @@ function closeAuthModal() {
   document.getElementById('authModal').style.display = 'none';
 }
 
+var _authAttempts = 0;
+var _authLockUntil = 0;
+var AUTH_MAX_ATTEMPTS = 5;
+var AUTH_LOCKOUT_MS = 60000; // 1 minute lockout
+
 async function verifyPin() {
+  // Rate-limit: check lockout
+  if (Date.now() < _authLockUntil) {
+    var secLeft = Math.ceil((_authLockUntil - Date.now()) / 1000);
+    var errEl = document.getElementById('authError');
+    if (errEl) { errEl.textContent = 'Too many attempts. Try again in ' + secLeft + 's'; errEl.style.display = 'block'; }
+    return;
+  }
   const pin = document.getElementById('authPinInput').value;
   const hash = await hashPin(pin);
   if (hash === FIN_PIN_HASH) {
+    _authAttempts = 0;
     sessionStorage.setItem(CRP_CONFIG.AUTH_STORAGE_KEY, 'true');
     if (typeof logAudit === 'function') logAudit('finance_unlock', 'Finance/Admin access granted');
     closeAuthModal();
@@ -3542,7 +3564,15 @@ async function verifyPin() {
     if (pending === 'admin') { switchView('admin', document.querySelector(".nav-tab[onclick*='admin']")); }
     else if (pending) switchTab(pending);
   } else {
-    document.getElementById('authError').style.display = 'block';
+    _authAttempts++;
+    if (typeof logAudit === 'function') logAudit('finance_auth_fail', 'Failed PIN attempt #' + _authAttempts);
+    var errEl = document.getElementById('authError');
+    if (_authAttempts >= AUTH_MAX_ATTEMPTS) {
+      _authLockUntil = Date.now() + AUTH_LOCKOUT_MS;
+      if (errEl) { errEl.textContent = 'Too many attempts. Locked for 60 seconds.'; errEl.style.display = 'block'; }
+    } else {
+      if (errEl) { errEl.textContent = 'Incorrect PIN. ' + (AUTH_MAX_ATTEMPTS - _authAttempts) + ' attempts remaining.'; errEl.style.display = 'block'; }
+    }
     document.getElementById('authPinInput').value = '';
     document.getElementById('authPinInput').focus();
   }
@@ -3683,35 +3713,37 @@ function togglePHIMask() {
     btn.style.background = PHI_MASKED ? '#059669' : '#dc2626';
   }
   // Re-render dynamic views
-  try { if (typeof renderAll === 'function') renderAll(); } catch(e) {}
-  try { if (typeof renderStudiesTable === 'function') renderStudiesTable(); } catch(e) {}
-  try { if (typeof renderReferralDashboard === 'function' && _referralsLoaded) renderReferralDashboard(); } catch(e) {}
+  try { if (typeof renderAll === 'function') renderAll(); } catch(e) { _log('renderAll: ' + e.message); }
+  try { if (typeof renderStudiesTable === 'function') renderStudiesTable(); } catch(e) { _log('renderStudiesTable: ' + e.message); }
+  try { if (typeof renderReferralDashboard === 'function' && _referralsLoaded) renderReferralDashboard(); } catch(e) { _log('renderReferralDashboard: ' + e.message); }
   // Mask/unmask pre-rendered static tables
-  try { maskStaticPHI(); } catch(e) { console.warn('maskStaticPHI:', e); }
+  try { maskStaticPHI(); } catch(e) { _log('maskStaticPHI: ' + e.message); }
 }
 
 let finInitDone = false;
-function initFinanceDashboard() {
-  if (finInitDone) return;
+function initFinanceDashboard(forceRefresh) {
+  if (finInitDone && !forceRefresh) return;
+  // Guard: ensure finance globals have data before rendering
+  if (!AGING_INV || !AGING_INV.length) { _log('CRP Finance: No aging data yet — skipping init'); return; }
   finInitDone = true;
   // Overview: alerts, forecast, charts, AR studies
-  try { renderAlerts(); } catch(e) { console.warn('renderAlerts:', e); }
-  try { renderForecast(); } catch(e) { console.warn('renderForecast:', e); }
-  try { drawRevChart(); } catch(e) { console.warn('drawRevChart:', e); }
-  try { drawPayChart(); } catch(e) { console.warn('drawPayChart:', e); }
-  try { drawPayChartOverview(); } catch(e) { console.warn('drawPayChartOverview:', e); }
-  try { renderARStudies(); } catch(e) { console.warn('renderARStudies:', e); }
+  try { renderAlerts(); } catch(e) { _log('renderAlerts: ' + e.message); }
+  try { renderForecast(); } catch(e) { _log('renderForecast: ' + e.message); }
+  try { drawRevChart(); } catch(e) { _log('drawRevChart: ' + e.message); }
+  try { drawPayChart(); } catch(e) { _log('drawPayChart: ' + e.message); }
+  try { drawPayChartOverview(); } catch(e) { _log('drawPayChartOverview: ' + e.message); }
+  try { renderARStudies(); } catch(e) { _log('renderARStudies: ' + e.message); }
   // Aging
-  try { renderAgingKPIs(); } catch(e) { console.warn('renderAgingKPIs:', e); }
-  try { renderAgingTables(); } catch(e) { console.warn('renderAgingTables:', e); }
+  try { renderAgingKPIs(); } catch(e) { _log('renderAgingKPIs: ' + e.message); }
+  try { renderAgingTables(); } catch(e) { _log('renderAgingTables: ' + e.message); }
   // Revenue (enhanced)
-  try { renderRevenueTab(); } catch(e) { console.warn('renderRevenueTab:', e); }
+  try { renderRevenueTab(); } catch(e) { _log('renderRevenueTab: ' + e.message); }
   // Accruals (enhanced)
-  try { renderAccruals(); } catch(e) { console.warn('renderAccruals:', e); }
+  try { renderAccruals(); } catch(e) { _log('renderAccruals: ' + e.message); }
   // Studies
-  try { renderStudies(); } catch(e) { console.warn('renderStudies:', e); }
+  try { renderStudies(); } catch(e) { _log('renderStudies: ' + e.message); }
   // Collections
-  try { initColl(); renderCollections(); } catch(e) { console.warn('collections:', e); }
+  try { initColl(); renderCollections(); } catch(e) { _log('collections: ' + e.message); }
   // Emit lifecycle event for plugins
   CRP.emit('financeLoaded', { arrays: ['AGING_INV','AGING_AP','UNPAID_INVOICES','UNPAID_AP','UNINVOICED','MONTHLY_PAYMENTS','MONTHLY_REVENUE','TOP_AR_STUDIES'] });
   _log('CRP: Finance dashboard initialized');
@@ -3796,6 +3828,7 @@ function switchTab(name, el) {
 
 // ═══ COMPREHENSIVE INSIGHTS ═══
 function renderInsights() {
+  if (!FIN_MERGED_STUDIES || !FIN_MERGED_STUDIES.length || !MONTHLY_PAYMENTS || !AGING_INV) return;
   const totalStudies = FIN_MERGED_STUDIES.length;
   const el = (id) => document.getElementById(id);
   if (el('ins-studies')) el('ins-studies').textContent = totalStudies;
@@ -6342,7 +6375,7 @@ async function fetchText(url) {
   } else {
     const bustUrl = url + (url.includes('?') ? '&' : '?') + '_cb=' + Date.now();
     const ac = typeof AbortController !== 'undefined' ? new AbortController() : null;
-    const timer = ac ? setTimeout(() => ac.abort(), 30000) : null;
+    const timer = ac ? setTimeout(() => ac.abort(), CRP_CONFIG.FETCH_TIMEOUT) : null;
     try {
       const resp = await fetch(bustUrl, { cache: 'no-store', signal: ac ? ac.signal : undefined });
       if (!resp.ok) throw new Error('HTTP ' + resp.status + ' fetching: ' + url.slice(0, 80));
@@ -6373,7 +6406,7 @@ function parseCSVInWorker(text) {
   return new Promise(function(resolve, reject) {
     try {
       var w = new Worker(_getCSVWorkerUrl());
-      var timer = setTimeout(function() { w.terminate(); resolve(parseCSV(text)); }, 10000);
+      var timer = setTimeout(function() { w.terminate(); resolve(parseCSV(text)); }, CRP_CONFIG.WORKER_TIMEOUT);
       w.onmessage = function(e) { clearTimeout(timer); w.terminate(); resolve(e.data); };
       w.onerror = function() { clearTimeout(timer); w.terminate(); resolve(parseCSV(text)); };
       w.postMessage(text);
@@ -6830,12 +6863,8 @@ async function fetchFinanceLive() {
     const heroPay = document.querySelectorAll('.hero-val');
     heroPay.forEach(el => { if (el.textContent.includes('2,483')) el.textContent = '$' + Math.round(payTotal).toLocaleString(); });
 
-    // Re-render finance charts if currently visible
-    if (typeof renderForecast === 'function') try { renderForecast(); } catch(e) {}
-    if (typeof drawPayChartOverview === 'function') try { drawPayChartOverview(); } catch(e) {}
-    if (typeof drawRevChart === 'function') try { drawRevChart(); } catch(e) {}
-    if (typeof renderRevenueTab === 'function') try { renderRevenueTab(); } catch(e) {}
-    if (typeof renderAccruals === 'function') try { renderAccruals(); } catch(e) {}
+    // Re-render all finance views with fresh data
+    initFinanceDashboard(true);
 
     // Update the data source badge
     const badge = document.getElementById('data-source-badge');
@@ -6847,7 +6876,8 @@ async function fetchFinanceLive() {
 
     return true;
   } catch (e) {
-    console.warn('CRP Finance: Could not fetch live data — using defaults. Error:', e.message);
+    _log('CRP Finance: Could not fetch live data — using defaults. Error: ' + e.message);
+    if (typeof showToast === 'function') showToast('Finance data unavailable — using defaults', 'warning', 5000);
     return false;
   }
 }
@@ -7735,20 +7765,14 @@ function processLiveData(allRows, legacyCancels, auditLog) {
   // ── Coordinator definitions (must be before audit log resolution) ──
   const EXCLUDE_STUDIES = new Set([]);
   const isExcludedStudy = (name) => false;
-  const FIBRO = /^$/;  // disabled — include all visits
   // Recruitment/support staff — resolve to clinical coordinator via audit log
   const SCHED_COORDS = new Set((CRP_CONFIG.SCHEDULE_COORDINATORS || []).map(n => n.toLowerCase()));
   const EXCL_COORD = new Set((CRP_CONFIG.COORDINATORS || []).filter(n => !SCHED_COORDS.has(n.toLowerCase())).map(n => n.toLowerCase()));
-  const COORD_MAP = {
-    'stacey scott':'Stacey Scott','ruby pereira':'Ruby Pereira',
-    'mario castellanos':'Mario Castellanos','angelina mcmullen':'Angelina McMullen',
-    'cady chilensky':'Cady Chilensky','eugene andruczyk':'Eugene Andruczyk',
-    'lolita vaughan':'Lolita Vaughan','michael tomeo':'Michael Tomeo',
-    'joseph heether':'Joseph Heether','brian shaffer':'Brian Shaffer',
-    'taher modarressi':'Taher Modarressi',
-    'vlado draganic':'Vlado Draganic','jana milankovic':'Jana Milankovic',
-    'ema gunic':'Ema Gunic','gabrijela ateljevic':'Gabrijela Ateljevic','ana lambic':'Ana Lambic'
-  };
+  // Build COORD_MAP from config (coordinators + investigators) for case normalization
+  const COORD_MAP = {};
+  (CRP_CONFIG.COORDINATORS || []).concat(CRP_CONFIG.INVESTIGATORS || []).forEach(function(n) {
+    COORD_MAP[n.toLowerCase()] = n;
+  });
   function normName(n)   { return (n||'').trim().replace(/\s+/g,' '); }
   function cleanCoord(n) { return COORD_MAP[normName(n).toLowerCase()] || normName(n); }
   function isCoord(n)    { return !EXCL_COORD.has(normName(n).toLowerCase()); }
@@ -8585,8 +8609,8 @@ async function refreshData() {
     // Phase 2: Finance (staggered)
     fetchFinanceLive().then(ok => {
       if (ok) {
-        if (typeof renderForecast === 'function') try { renderForecast(); } catch(e) {}
-        if (typeof drawPayChartOverview === 'function') try { drawPayChartOverview(); } catch(e) {}
+        if (typeof renderForecast === 'function') try { renderForecast(); } catch(e) { _log('renderForecast re-render: ' + e.message); }
+        if (typeof drawPayChartOverview === 'function') try { drawPayChartOverview(); } catch(e) { _log('drawPayChartOverview: ' + e.message); }
       }
       // Phase 2b: QuickBooks data
       fetchQuickBooksData().catch(e => console.warn('QB fetch failed:', e));
@@ -10221,7 +10245,7 @@ function initReferrals() {
   if (!_referralsLoaded) refreshReferrals();
   if (FB_CRM_DATA.length === 0) fetchFacebookCRM().catch(e => console.warn('FB CRM:', e));
   // Delay med records fetch to avoid Google Sheets rate limiting (referrals+campaigns fetch first)
-  if (MED_RECORDS_DATA.length === 0) setTimeout(function(){ fetchMedicalRecords().catch(e => console.warn('Med Records:', e)); }, 5000);
+  if (MED_RECORDS_DATA.length === 0) setTimeout(function(){ fetchMedicalRecords().catch(e => _log('Med Records retry: ' + e.message)); }, CRP_CONFIG.RETRY_DELAY);
   // CRIO API data — fetch after a delay to avoid rate limiting
   if (CRIO_STUDIES_DATA.length === 0) setTimeout(function(){ fetchCrioStudies().catch(e => console.warn('CRIO Studies:', e)); }, 8000);
   // Looker study status — fetch after CRIO (needs study keys for merge)
@@ -10311,12 +10335,12 @@ async function refreshReferrals() {
     // Refresh cross-source KPIs now that referral data is loaded
     safe(buildRecruitmentKPIs, 'buildRecruitmentKPIs');
     safe(buildInsights, 'buildInsights');
-    if (typeof renderStudiesTable === 'function') try { renderStudiesTable(); } catch(e) {}
+    if (typeof renderStudiesTable === 'function') try { renderStudiesTable(); } catch(e) { _log('renderStudiesTable: ' + e.message); }
 
     // Also fetch Facebook CRM (non-blocking)
     fetchFacebookCRM().then(function() {
       safe(buildRecruitmentKPIs, 'buildRecruitmentKPIs');
-      if (typeof renderStudiesTable === 'function') try { renderStudiesTable(); } catch(e) {}
+      if (typeof renderStudiesTable === 'function') try { renderStudiesTable(); } catch(e) { _log('renderStudiesTable: ' + e.message); }
     }).catch(e => console.warn('FB CRM fetch failed:', e));
   } catch(e) {
     console.error('CRP Referrals: CSV fetch failed', e);
@@ -12686,8 +12710,8 @@ function loadLongitudinalData() {
 
 // Alias for backward compatibility
 function buildWeeklyTrendChart() {
-  try { buildCancelTrend(); } catch(e) {}
-  try { buildUpcomingTrend(); } catch(e) {}
+  try { buildCancelTrend(); } catch(e) { _log('buildCancelTrend: ' + e.message); }
+  try { buildUpcomingTrend(); } catch(e) { _log('buildUpcomingTrend: ' + e.message); }
 }
 
 
@@ -13367,7 +13391,7 @@ function switchAdmin(section, btn) {
   });
   if (btn) { btn.style.background = '#e8eeff'; btn.style.color = '#1843ad'; btn.style.borderColor = '#1843ad'; }
   if (section === 'trends' && typeof renderTrendsCharts === 'function') {
-    try { renderTrendsCharts(); } catch(e) {}
+    try { renderTrendsCharts(); } catch(e) { _log('renderTrendsCharts: ' + e.message); }
   }
   if (section === 'auditlog') renderAuditLogView();
 }
@@ -13402,7 +13426,7 @@ function renderAuditLogView() {
 // ═══ TOAST NOTIFICATIONS ═══
 function showToast(message, type, durationMs) {
   type = type || 'info';
-  durationMs = durationMs || 5000;
+  durationMs = durationMs || CRP_CONFIG.TOAST_DURATION;
   var container = document.getElementById('toast-container');
   if (!container) return;
   var toast = document.createElement('div');
@@ -13628,10 +13652,10 @@ function _updateFreshnessBadge() {
   else if (mins < 15) { badge.style.color = '#d97706'; }
   else { badge.style.color = '#dc2626'; }
 }
-var _freshnessIntervalId = setInterval(_updateFreshnessBadge, 60000);
+var _freshnessIntervalId = setInterval(_updateFreshnessBadge, CRP_CONFIG.FRESHNESS_INTERVAL);
 document.addEventListener('visibilitychange', function() {
   if (document.hidden) { clearInterval(_freshnessIntervalId); }
-  else { _freshnessIntervalId = setInterval(_updateFreshnessBadge, 60000); _updateFreshnessBadge(); }
+  else { _freshnessIntervalId = setInterval(_updateFreshnessBadge, CRP_CONFIG.FRESHNESS_INTERVAL); _updateFreshnessBadge(); }
 });
 
 // ═══ DEEP-LINK: HASHCHANGE LISTENER ═══
@@ -13768,7 +13792,7 @@ async function _crpInit() {
       showToast('Data fetch failed — retrying...', 'warning');
       setHealthChip('dh-crio','warn','CRIO (retrying...)');
       if (badge) { badge.textContent = '⚠️ Fetch failed — retrying...'; badge.style.color = '#dc2626'; }
-      await new Promise(r => setTimeout(r, 5000));
+      await new Promise(r => setTimeout(r, CRP_CONFIG.RETRY_DELAY));
       try {
         const [rows1b, legacyB, auditB] = await Promise.all([
           fetchCSV(LIVE_URL1),
@@ -13815,12 +13839,12 @@ async function _crpInit() {
       if (ok) {
         _log('CRP Finance: Live data applied — re-rendering finance views');
         setHealthChip('dh-finance','ok','Finance');
-        if (typeof renderForecast === 'function') try { renderForecast(); } catch(e) {}
-        if (typeof drawPayChartOverview === 'function') try { drawPayChartOverview(); } catch(e) {}
-        if (typeof drawRevChart === 'function') try { drawRevChart(); } catch(e) {}
-        if (typeof drawAgingChart === 'function') try { drawAgingChart(); } catch(e) {}
-        if (typeof renderAccruals === 'function') try { renderAccruals(); } catch(e) {}
-        if (typeof renderStudiesTable === 'function') try { renderStudiesTable(); } catch(e) {}
+        if (typeof renderForecast === 'function') try { renderForecast(); } catch(e) { _log('renderForecast re-render: ' + e.message); }
+        if (typeof drawPayChartOverview === 'function') try { drawPayChartOverview(); } catch(e) { _log('drawPayChartOverview: ' + e.message); }
+        if (typeof drawRevChart === 'function') try { drawRevChart(); } catch(e) { _log('drawRevChart: ' + e.message); }
+        if (typeof drawAgingChart === 'function') try { drawAgingChart(); } catch(e) { _log('drawAgingChart: ' + e.message); }
+        if (typeof renderAccruals === 'function') try { renderAccruals(); } catch(e) { _log('renderAccruals: ' + e.message); }
+        if (typeof renderStudiesTable === 'function') try { renderStudiesTable(); } catch(e) { _log('renderStudiesTable: ' + e.message); }
       } else {
         setHealthChip('dh-finance','warn','Finance (no data)');
       }
@@ -13837,7 +13861,7 @@ async function _crpInit() {
         _log('CRP: Patient DB cross-reference complete');
         setHealthChip('dh-patientdb','ok','Patient DB');
         // Re-render views that depend on Patient DB
-        if (typeof renderStudiesTable === 'function') try { renderStudiesTable(); } catch(e) {}
+        if (typeof renderStudiesTable === 'function') try { renderStudiesTable(); } catch(e) { _log('renderStudiesTable: ' + e.message); }
       }
       else setHealthChip('dh-patientdb','warn','Patient DB (empty)');
     }).catch(e => { console.warn('CRP: Patient DB fetch failed:', e); setHealthChip('dh-patientdb','fail','Patient DB (failed)'); });
@@ -13847,7 +13871,7 @@ async function _crpInit() {
         setHealthChip('dh-fbcrm','ok','FB CRM (' + (FB_CRM_DATA||[]).length + ')');
         // Re-render views that depend on FB CRM data
         safe(buildRecruitmentKPIs, 'buildRecruitmentKPIs');
-        if (typeof renderStudiesTable === 'function') try { renderStudiesTable(); } catch(e) {}
+        if (typeof renderStudiesTable === 'function') try { renderStudiesTable(); } catch(e) { _log('renderStudiesTable: ' + e.message); }
       }).catch(e => { console.warn('CRP: Facebook CRM initial load failed:', e); setHealthChip('dh-fbcrm','fail','FB CRM (failed)'); });
     }, 1500);
 
@@ -13915,8 +13939,8 @@ async function _crpInit() {
     try {
       const ok = await fetchFinanceLive();
       if (ok) {
-        if (typeof renderForecast === 'function') try { renderForecast(); } catch(e) {}
-        if (typeof drawPayChartOverview === 'function') try { drawPayChartOverview(); } catch(e) {}
+        if (typeof renderForecast === 'function') try { renderForecast(); } catch(e) { _log('renderForecast re-render: ' + e.message); }
+        if (typeof drawPayChartOverview === 'function') try { drawPayChartOverview(); } catch(e) { _log('drawPayChartOverview: ' + e.message); }
       }
     } catch(e) { /* silent */ }
 
