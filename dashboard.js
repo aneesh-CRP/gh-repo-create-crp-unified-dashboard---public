@@ -2124,7 +2124,8 @@ function buildRiskFlagCards() {
   const urgent = flags.filter(f => {
     const parts = f.next_visit.split(' ');
     const monthMap = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
-    const d = new Date(2026, monthMap[parts[0]], parseInt(parts[1]));
+    const d = new Date(today.getFullYear(), monthMap[parts[0]], parseInt(parts[1]));
+    if (d < new Date(today.getFullYear(), today.getMonth() - 3, 1)) d.setFullYear(d.getFullYear() + 1);
     return (d - today) / 86400000 <= 14;
   });
   document.getElementById('risk-kpi-urgent').textContent = urgent.length;
@@ -2258,6 +2259,8 @@ function buildSchedStudyBars() {
   const el = document.getElementById('upcoming-study-bars');
   if (!el) return;
   const studies = DATA.upcomingByStudyFull || DATA.upcomingByStudy || [];
+  var _sscBadge = document.getElementById('sched-study-count');
+  if (_sscBadge) _sscBadge.textContent = studies.length + ' studies';
   const max = Math.max(...studies.map(s => s.count));
   el.innerHTML = studies.map((s, i) => {
     const pct = (s.count / max * 100).toFixed(0);
@@ -3125,7 +3128,7 @@ function renderCoordWorkloadBalance() {
     html += '<div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+c.name.split(' ')[0]+alertHtml+'</div>';
     html += '<div style="background:#e2e8f0;border-radius:4px;height:14px;overflow:hidden;position:relative;">';
     html += '<div style="height:100%;width:'+pct+'%;background:linear-gradient(90deg,#1843AD,#3b82f6);border-radius:4px;"></div>';
-    html += '<div style="position:absolute;left:'+Math.min(pct,50)+'%;top:0;transform:translateX(4px);font-size:9px;font-weight:700;color:#1e293b;line-height:14px;">'+c.visits+'</div>';
+    html += '<div style="position:absolute;left:'+Math.min(pct,50)+'%;top:0;transform:translateX(4px);font-size:9px;font-weight:700;color:'+(pct>30?'#fff':'#1e293b')+';line-height:14px;">'+c.visits+'</div>';
     html += '</div>';
     html += '<div style="text-align:center;">'+siteBadge+'</div>';
     html += '<div style="text-align:center;font-size:10px;color:'+crColor+';font-weight:600;">'+c.cancelRate+'%</div>';
@@ -3201,7 +3204,7 @@ function renderInvCapacity() {
     html += '<div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+jsAttr(inv.name)+'">'+escapeHTML(shortName)+'</div>';
     html += '<div style="background:#e2e8f0;border-radius:4px;height:14px;overflow:hidden;position:relative;">';
     html += '<div style="height:100%;width:'+pct+'%;background:linear-gradient(90deg,#7c3aed,#a78bfa);border-radius:4px;"></div>';
-    html += '<div style="position:absolute;left:'+Math.min(pct,50)+'%;top:0;transform:translateX(4px);font-size:9px;font-weight:700;color:#1e293b;line-height:14px;">'+inv.visits+'</div>';
+    html += '<div style="position:absolute;left:'+Math.min(pct,50)+'%;top:0;transform:translateX(4px);font-size:9px;font-weight:700;color:'+(pct>30?'#fff':'#1e293b')+';line-height:14px;">'+inv.visits+'</div>';
     html += '</div>';
     html += '<div style="text-align:center;font-size:10px;color:'+utilColor+';font-weight:700;">'+inv.utilPct+'%</div>';
     html += '<div style="text-align:center;font-size:10px;color:#6366f1;font-weight:600;">'+inv.studies+'</div>';
@@ -3890,6 +3893,15 @@ function switchView(name, el) {
       sk('sched-kpi-april',  d.aprilTotal);
       sk('sched-kpi-total',  d.upcomingTotal);
       sk('sched-count', (d.allVisitDetail || d.next14Detail || []).length + ' visits');
+      // Dynamic month labels
+      var _mn = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      var _now = new Date();
+      var _m1 = _now.getMonth(), _m2 = (_m1+1)%12;
+      var _y1 = _now.getFullYear(), _y2 = _m2===0 ? _y1+1 : _y1;
+      window._schedMonth1Prefix = _y1+'-'+String(_m1+1).padStart(2,'0');
+      window._schedMonth2Prefix = _y2+'-'+String(_m2+1).padStart(2,'0');
+      sk('sched-kpi-month1-label', '\uD83D\uDCC5 ' + _mn[_m1]);
+      sk('sched-kpi-month2-label', '\uD83D\uDCC5 ' + _mn[_m2]);
     }, 50);
   }
 }
@@ -5554,9 +5566,8 @@ function processLiveData(allRows, legacyCancels, auditLog) {
       }
       return false;
     }
-    const name = (r['Subject Full Name']||'').replace(/\s{2,}/g,' ').trim().toLowerCase();
-    const study = (r['Study Name']||'').trim().toLowerCase();
-    if (name && study && rescheduledPatientStudy.has(name + '||' + study)) {
+    const rk = buildKey(r['Subject Full Name'], r['Study Name']);
+    if (rk !== '|' && rescheduledPatientStudy.has(rk)) {
       r._category = 'Rescheduled';
       rescheduledVisits.push(r);
       return false;
@@ -5589,11 +5600,11 @@ function processLiveData(allRows, legacyCancels, auditLog) {
   function categorizeReason(reason, apptType) {
     const r = (reason||'').toLowerCase(); const t = (apptType||'').toLowerCase();
     if (/\bcompleted?\b/.test(r) && !/not completed|never completed/.test(r)) return 'Completed';
-    if (/fibroscan|fibrosan|fibro scan|scan only|scan visit/i.test(r) || /fibroscan|fibrosan|fibro scan|scan only|scan visit/i.test(t)) return 'FibroScan Only';
+    if (/fibroscan|fibrosan|fibro scan|fibroscan only|scan visit/i.test(r) || /fibroscan|fibrosan|fibro scan|fibroscan only|scan visit/i.test(t)) return 'FibroScan Only';
     if (/discontinu/i.test(r)) return 'Discontinued';
     if (t === 'no show') return 'No Show';
-    if (/screen.?fail|screenfail|dnq|does not qualify|not qualify|protocol criteria|excluded medication|autoimmune|bmi/.test(r)) return 'Screen Fail / DNQ';
-    if (/reschedul|will call back|call back|reach out/.test(r) && !r.includes('no show')) return 'Rescheduled';
+    if (/screen.?fail|screenfail|dnq|does not qualify|not qualify|protocol criteria|excluded medication|autoimmune|\bbmi\b/.test(r)) return 'Screen Fail / DNQ';
+    if (/reschedul|will call back/.test(r) && !r.includes('no show') && !r.includes('did not call back') && !r.includes('didn\'t call back')) return 'Rescheduled';
     if (/no.?show|didn.t answer|did not answer|no answer|mailbox|left text|left vm|text sent|unresponsive|lost to follow|never reached/.test(r)) return 'No Show';
     if (/withdrew|no longer interested|not interested|refuses to return|do not solicit|not comfortable/.test(r)) return 'Patient Withdrew';
     if (/weather|snow|storm/.test(r)) return 'Weather';
@@ -5807,8 +5818,10 @@ function processLiveData(allRows, legacyCancels, auditLog) {
   const subjectStatus = groupBy(activeUpcoming, 'Subject Status').slice(0,6)
     .map(x => ({status:x.name, count:x.count}));
 
-  const marchTotal = activeUpcoming.filter(r => parseDate(r['Scheduled Date'])?.getMonth()===2).length;
-  const aprilTotal = activeUpcoming.filter(r => parseDate(r['Scheduled Date'])?.getMonth()===3).length;
+  const _thisMonth = new Date().getMonth();
+  const _nextMonth = (_thisMonth + 1) % 12;
+  const marchTotal = activeUpcoming.filter(r => parseDate(r['Scheduled Date'])?.getMonth()===_thisMonth).length;
+  const aprilTotal = activeUpcoming.filter(r => parseDate(r['Scheduled Date'])?.getMonth()===_nextMonth).length;
 
 
   // ── actionDetails from live CSV ──
@@ -5838,7 +5851,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
     const pu = patientUrl(r['Study Key'], r['Subject Key (Back End)'], r['Site Name']);
     const su = studyUrl(r['Study Key'], r['Site Name']);
     const coord = cleanCoord(r['Staff Full Name']||r['Full Name']||'');
-    const cancelDate = (() => { try { const d=new Date(r['Cancel Date']); return d.toLocaleDateString('en-US',{month:'short',day:'numeric'}); } catch(e) { return ''; } })();
+    const cancelDate = (() => { try { const d=parseDate(r['Cancel Date']); return d?d.toLocaleDateString('en-US',{month:'short',day:'numeric'}):''; } catch(e) { return ''; } })();
     const row = {name: patient, patient, study, url: pu, study_url: su, reason: reason.substring(0,80), coord, cancel_date: cancelDate};
     const cat = r._category;
 
@@ -5926,6 +5939,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
       const mon = new Date(d); mon.setDate(d.getDate() - ((d.getDay() + 6) % 7));
       return localISO(mon);
     }
+    const _trendCancelSeen = new Set();
     allRows.forEach(r => {
       const d = parseDate(r['Scheduled Date'] || r['Cancel Date']);
       if (!d || isExcludedStudy(r['Study Name'])) return;
@@ -5933,7 +5947,10 @@ function processLiveData(allRows, legacyCancels, auditLog) {
       if (!byWeek[wk]) byWeek[wk] = { upcoming: 0, cancelled: 0, byStudy: {}, byCoord: {} };
       const status = (r['Appointment Status'] || '').trim().toLowerCase();
       const isCancelled = status === 'cancelled' || status === 'canceled';
-      if (isCancelled) byWeek[wk].cancelled++;
+      if (isCancelled) {
+        byWeek[wk].cancelled++;
+        _trendCancelSeen.add(buildKey(r['Subject Full Name'], r['Study Name'], r['Cancel Date']||r['Scheduled Date']));
+      }
       else byWeek[wk].upcoming++;
       const study = (r['Study Name'] || '').split(' - ').pop().trim();
       if (study) {
@@ -5950,6 +5967,9 @@ function processLiveData(allRows, legacyCancels, auditLog) {
     });
     if (legacyCancels && legacyCancels.length) {
       legacyCancels.forEach(r => {
+        const dk = buildKey(r['Subject Full Name'], r['Study Name'], r['Cancel Date']||r['Scheduled Date']);
+        if (_trendCancelSeen.has(dk)) return;
+        _trendCancelSeen.add(dk);
         const d = parseDate(r['Cancel Date'] || r['Scheduled Date']);
         if (!d || isExcludedStudy(r['Study Name'])) return;
         const wk = weekKey(d);
@@ -6051,7 +6071,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
       reason: r['Cancel Reason']||'',
       visit: r['Name']||r['Appointment Type']||'',
       category: r._category || categorizeReason(r['Cancel Reason'], r['Appointment Cancellation Type']),
-      cancel_date: (() => { try { const d=new Date(r['Cancel Date']);return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});}catch(e){return '';}})(),
+      cancel_date: (() => { try { const d=parseDate(r['Cancel Date']);return d?d.toLocaleDateString('en-US',{month:'short',day:'numeric'}):''; }catch(e){return '';}})(),
       site: r['Site Name'],
     })),
     rescheduledVisits: rescheduledVisits.map(r => {
@@ -6072,7 +6092,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
         coord: cleanCoord(r['Staff Full Name'] || r['Full Name']),
         type: r['Appointment Cancellation Type']||'',
         reason: r['Cancel Reason']||'',
-        cancel_date: (() => { try { const d=new Date(r['Cancel Date']);return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});}catch(e){return '';}})(),
+        cancel_date: (() => { try { const d=parseDate(r['Cancel Date']);return d?d.toLocaleDateString('en-US',{month:'short',day:'numeric'}):''; }catch(e){return '';}})(),
         new_date: newDate ? newDate.toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '—',
         site: r['Site Name'],
       };
@@ -6086,7 +6106,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
         study_url: studyUrl(sk, r['Site Name']) || '',
         coord: cleanCoord(r['Staff Full Name'] || r['Full Name']),
         reason: r['Cancel Reason']||'',
-        cancel_date: (() => { try { const d=new Date(r['Cancel Date']);return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});}catch(e){return '';}})(),
+        cancel_date: (() => { try { const d=parseDate(r['Cancel Date']);return d?d.toLocaleDateString('en-US',{month:'short',day:'numeric'}):''; }catch(e){return '';}})(),
         site: r['Site Name'],
       };
     }),
@@ -6874,7 +6894,7 @@ function buildMedRecAlerts() {
       const recPct = d.total > 0 ? Math.round(d.recsRecvd / d.total * 100) : 0;
       const relColor = relPct >= 75 ? '#059669' : relPct >= 50 ? '#f59e0b' : relPct > 0 ? '#3b82f6' : '#94a3b8';
       const recColor = recPct >= 75 ? '#059669' : recPct >= 50 ? '#f59e0b' : recPct > 0 ? '#3b82f6' : '#94a3b8';
-      html += `<tr style="border-bottom:1px solid #f8fafc;" onclick="showMedRecDetailModal('${escapeHTML(name).replace(/'/g,"\\'")}')" style="cursor:pointer;">
+      html += `<tr style="border-bottom:1px solid #f8fafc;cursor:pointer;" onclick="showMedRecDetailModal('${jsAttr(name)}')">
         <td style="padding:3px 6px;font-weight:600;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;" title="${escapeHTML(name)}">${escapeHTML(name)}</td>
         <td style="padding:3px 6px;text-align:center;font-weight:700;">${d.total}</td>
         <td style="padding:3px 6px;text-align:center;">
@@ -7102,7 +7122,6 @@ function renderAll() {
   if (MED_RECORDS_DATA && MED_RECORDS_DATA.length > 0) safe(injectScheduleMedRecords, 'injectScheduleMedRecords');
   safe(() => filterSchedTable('all', null), 'schedFilter');
   safe(renderTrendsCharts,       'renderTrendsCharts');
-  safe(renderCoordTrendChart,    'renderCoordTrendChart');
 }
 
 function closeSetup() {
@@ -7780,7 +7799,6 @@ let FB_CRM_DATA = [];          // Facebook CRM leads from Google Sheet
 let MED_RECORDS_DATA = [];     // Medical Records & Patient's Path (per-study patient tracking)
 let CRIO_STUDIES_DATA = [];    // CRIO API — study enrollment status, roles, subject counts
 let CRIO_SUBJECTS_DATA = [];   // CRIO API — individual subject IDs and statuses per study
-let PATIENT_NJ_DATA = [];      // Patient tracker NJ (Pennington site)
 let _referralsLoaded = false;
 let _referralByStudy = new Map();
 
@@ -8689,14 +8707,12 @@ async function fetchLookerStudyStatus() {
       };
     });
     _log('Looker Study Status loaded: ' + Object.keys(LOOKER_STUDY_STATUS).length + ' studies');
-    setHealthChip('dh-looker-status', Object.keys(LOOKER_STUDY_STATUS).length > 0 ? 'ok' : 'warn', 'Looker Status (' + Object.keys(LOOKER_STUDY_STATUS).length + ')');
     // Re-merge if CRIO data already loaded
     if (CRIO_STUDIES_DATA && CRIO_STUDIES_DATA.length > 0) {
       safe(mergeCrioIntoStudies, 'mergeCrioIntoStudies');
     }
   } catch(e) {
     console.warn('fetchLookerStudyStatus error:', e);
-    setHealthChip('dh-looker-status', 'fail', 'Looker Status (failed)');
   }
 }
 
@@ -9528,7 +9544,7 @@ function showCrioSubjectModal(statusFilter, title) {
   });
   html += '</tbody></table></div>';
 
-  openModal(title || 'CRIO Subjects', html);
+  openModal(title || 'CRIO Subjects', subjects.length + ' subjects', html);
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -9892,13 +9908,6 @@ function showMedRecFilteredModal(filterKey) {
 // ══════════════════════════════════════════════════════════════
 // PATIENT TRACKER NJ (PENNINGTON)
 // ══════════════════════════════════════════════════════════════
-async function fetchPatientTrackerNJ() {
-  return;
-}
-
-function renderPatientTrackerNJ() {
-  return;
-}
 
 
 
@@ -10086,7 +10095,6 @@ function setTrendsRange(days, btn) {
   // Re-filter and re-render
   DATA.weeklyTrends = filterTrendsByRange(DATA.weeklyTrendsAll || [], days, new Date());
   renderTrendsCharts();
-  renderCoordTrendChart();
 }
 
 function renderCoordTrendChart() {
@@ -11310,6 +11318,14 @@ async function _crpInit() {
   skpi('sched-kpi-april',  d.aprilTotal);
   skpi('sched-kpi-total',  d.upcomingTotal);
   skpi('sched-count',      (d.next14Detail||[]).length + ' visits');
+  // Dynamic month labels for schedule KPI
+  var _mn2 = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var _now2 = new Date(), _m1i = _now2.getMonth(), _m2i = (_m1i+1)%12;
+  var _y1i = _now2.getFullYear(), _y2i = _m2i===0 ? _y1i+1 : _y1i;
+  window._schedMonth1Prefix = _y1i+'-'+String(_m1i+1).padStart(2,'0');
+  window._schedMonth2Prefix = _y2i+'-'+String(_m2i+1).padStart(2,'0');
+  skpi('sched-kpi-month1-label', '\uD83D\uDCC5 ' + _mn2[_m1i]);
+  skpi('sched-kpi-month2-label', '\uD83D\uDCC5 ' + _mn2[_m2i]);
   // Inject export bars into views
   if (typeof _injectExportBars === 'function') _injectExportBars();
 
