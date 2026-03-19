@@ -7974,11 +7974,15 @@ async function refreshReferrals() {
     safe(buildRecruitmentKPIs, 'buildRecruitmentKPIs');
     safe(buildInsights, 'buildInsights');
     if (typeof renderStudiesTable === 'function') try { renderStudiesTable(); } catch(e) { _log('renderStudiesTable: ' + e.message); }
+    // Re-render cross-source marketing intelligence (Meta data may already be loaded)
+    safe(renderRecruiterAttribution, 'renderRecruiterAttribution');
+    safe(renderEnrollmentVelocity, 'renderEnrollmentVelocity');
 
     // Also fetch Facebook CRM (non-blocking)
     fetchFacebookCRM().then(function() {
       safe(buildRecruitmentKPIs, 'buildRecruitmentKPIs');
       if (typeof renderStudiesTable === 'function') try { renderStudiesTable(); } catch(e) { _log('renderStudiesTable: ' + e.message); }
+      safe(renderSpeedToContact, 'renderSpeedToContact');
     }).catch(e => console.warn('FB CRM fetch failed:', e));
   } catch(e) {
     console.error('CRP Referrals: CSV fetch failed', e);
@@ -8819,6 +8823,7 @@ async function fetchCrioStudies() {
         setHealthChip('dh-crio-api', CRIO_STUDIES_DATA.length > 0 ? 'ok' : 'warn', 'CRIO Studies (' + CRIO_STUDIES_DATA.length + ')');
         safe(renderCrioStudies, 'renderCrioStudies');
         safe(mergeCrioIntoStudies, 'mergeCrioIntoStudies');
+        safe(renderEnrollmentVelocity, 'renderEnrollmentVelocity');
       }
     } catch(e) {
       console.warn('fetchCrioStudies error:', e);
@@ -10182,6 +10187,9 @@ async function fetchMetaAds() {
     renderMetaFunnel();
     renderMetaAlignment();
     updateOverviewMarketingKPI();
+    safe(renderSpeedToContact, 'renderSpeedToContact');
+    safe(renderRecruiterAttribution, 'renderRecruiterAttribution');
+    safe(renderEnrollmentVelocity, 'renderEnrollmentVelocity');
     if (typeof renderFinMarketingROI === 'function') try { renderFinMarketingROI(); } catch(e) { _log('renderFinMarketingROI: ' + e.message); }
     checkMetaTokenExpiry(cfg).catch(function() {});
   } catch(e) {
@@ -10258,14 +10266,28 @@ function renderMetaAlerts() {
       }
     }
 
-    // Alert: Efficiency declining (compare first week to last week)
+    // Alert: Campaign fatigue — 3+ consecutive weeks of declining leads or CTR
     if (weeks.length >= 3) {
+      var leadDecline = 0, ctrDecline = 0;
+      for (var wi = 1; wi < weeks.length; wi++) {
+        if (weeks[wi].leads < weeks[wi-1].leads) leadDecline++; else leadDecline = 0;
+        var prevCtr = weeks[wi-1].impressions > 0 ? weeks[wi-1].clicks / weeks[wi-1].impressions * 100 : 0;
+        var curCtr = weeks[wi].impressions > 0 ? weeks[wi].clicks / weeks[wi].impressions * 100 : 0;
+        if (curCtr < prevCtr) ctrDecline++; else ctrDecline = 0;
+      }
+      if (leadDecline >= 2) {
+        alerts.push({ type: 'warning', icon: '\uD83D\uDCC9', msg: '<strong>' + escapeHTML(c.campaign) + '</strong> lead volume declining ' + (leadDecline+1) + ' weeks in a row \u2014 likely creative fatigue. Refresh ad creative or audience.' });
+      }
+      if (ctrDecline >= 2 && leadDecline < 2) {
+        alerts.push({ type: 'warning', icon: '\uD83D\uDCC9', msg: '<strong>' + escapeHTML(c.campaign) + '</strong> CTR declining ' + (ctrDecline+1) + ' consecutive weeks \u2014 audience fatigue signal. Consider new creative.' });
+      }
+      // Also check first-vs-last spend efficiency
       var first = weeks[0], last = weeks[weeks.length - 1];
       if (first.leads > 0 && last.leads > 0) {
         var firstEff = first.spend / first.leads;
         var lastEff = last.spend / last.leads;
-        if (lastEff > firstEff * 1.4 && last.spend > 100) {
-          alerts.push({ type: 'warning', icon: '\uD83D\uDCC9', msg: '<strong>' + escapeHTML(c.campaign) + '</strong> efficiency declining \u2014 trending worse over the last 4 weeks. Review targeting and creative.' });
+        if (lastEff > firstEff * 1.4 && last.spend > 100 && leadDecline < 2) {
+          alerts.push({ type: 'warning', icon: '\uD83D\uDCC9', msg: '<strong>' + escapeHTML(c.campaign) + '</strong> cost efficiency declining \u2014 CPL up 40%+ over 4 weeks. Review targeting.' });
         }
       }
     }
@@ -10542,10 +10564,31 @@ function renderMetaAlignment() {
         return st.some(function(sk) { return sk === s.protocol_number; });
       });
       if (!covered) {
-        rows.push({ indication: ind, campaigns: [], studies: [{ study: s.protocol_number, status: 'Enrolling' }], hasActive: false, totalLeads: 0, enrolling: 1, maintenance: 0, noStudy: false, noCampaign: true });
+        // Check pipeline volume for this study
+        var pipeCount = 0;
+        var skLower = (s.protocol_number || '').toLowerCase();
+        if (REFERRAL_DATA) REFERRAL_DATA.forEach(function(r) {
+          var rs = (r.study || '').toLowerCase().trim();
+          if (rs.includes(skLower) || skLower.includes(rs)) pipeCount++;
+        });
+        rows.push({ indication: ind, campaigns: [], studies: [{ study: s.protocol_number, status: 'Enrolling' }], hasActive: false, totalLeads: 0, enrolling: 1, maintenance: 0, noStudy: false, noCampaign: true, pipelineVolume: pipeCount });
       }
     });
   }
+
+  // Add pipeline volume to campaign rows too
+  rows.forEach(function(r) {
+    if (r.pipelineVolume !== undefined) return; // already set for noCampaign rows
+    var vol = 0;
+    r.studies.forEach(function(s) {
+      var skLower = s.study.toLowerCase();
+      if (REFERRAL_DATA) REFERRAL_DATA.forEach(function(ref) {
+        var rs = (ref.study || '').toLowerCase().trim();
+        if (rs.includes(skLower) || skLower.includes(rs)) vol++;
+      });
+    });
+    r.pipelineVolume = vol;
+  });
 
   if (badge) badge.textContent = rows.length + ' indications';
   var html = '<div style="overflow-x:auto;"><table class="fin-table" style="width:100%;font-size:11px;"><thead><tr>';
@@ -10553,12 +10596,14 @@ function renderMetaAlignment() {
   html += '<th style="text-align:center;">Campaign</th>';
   html += '<th style="text-align:center;">Status</th>';
   html += '<th style="text-align:center;">30d Leads</th>';
+  html += '<th style="text-align:center;">Pipeline</th>';
   html += '<th style="text-align:left;">Studies</th>';
   html += '<th style="text-align:center;">Signal</th>';
   html += '</tr></thead><tbody>';
   rows.sort(function(a, b) { return b.totalLeads - a.totalLeads; }).forEach(function(r) {
     var signal = '', signalColor = '#059669';
-    if (r.noCampaign) { signal = 'No campaign'; signalColor = '#dc2626'; }
+    if (r.noCampaign && r.pipelineVolume < 5) { signal = 'Untapped \u2014 needs campaign'; signalColor = '#dc2626'; }
+    else if (r.noCampaign) { signal = 'No campaign'; signalColor = '#d97706'; }
     else if (r.maintenance > 0 && r.hasActive) { signal = 'Study in maintenance'; signalColor = '#dc2626'; }
     else if (r.noStudy) { signal = 'No study mapped'; signalColor = '#d97706'; }
     else if (!r.hasActive && r.enrolling > 0) { signal = 'Campaign paused'; signalColor = '#d97706'; }
@@ -10574,6 +10619,8 @@ function renderMetaAlignment() {
     html += '<td style="text-align:center;font-size:10px;">' + campNames + '</td>';
     html += '<td style="text-align:center;"><span style="font-size:10px;padding:2px 8px;border-radius:10px;background:' + (r.hasActive ? '#ECFDF5' : '#F1F5F9') + ';color:' + (r.hasActive ? '#059669' : '#94a3b8') + ';font-weight:600;">' + (r.hasActive ? 'Active' : 'Paused') + '</span></td>';
     html += '<td style="text-align:center;font-weight:700;color:#3b82f6;">' + r.totalLeads + '</td>';
+    var pipColor = r.pipelineVolume < 5 ? '#dc2626' : r.pipelineVolume < 15 ? '#d97706' : '#059669';
+    html += '<td style="text-align:center;font-weight:600;color:' + pipColor + ';">' + (r.pipelineVolume || 0) + '</td>';
     html += '<td style="padding:5px 10px;">' + studyHtml + '</td>';
     html += '<td style="text-align:center;font-weight:600;color:' + signalColor + ';font-size:10px;">' + signal + '</td>';
     html += '</tr>';
@@ -10591,6 +10638,363 @@ function updateOverviewMarketingKPI() {
   var kpiSub = document.getElementById('kpi-marketing-sub');
   if (kpiVal) kpiVal.textContent = totalLeads.toLocaleString();
   if (kpiSub) kpiSub.textContent = active + ' active campaigns (30d)';
+}
+
+// ── 6. Speed-to-Contact Tracker ──
+function renderSpeedToContact() {
+  var el = document.getElementById('meta-speed-container');
+  var badge = document.getElementById('meta-speed-badge');
+  if (!el) return;
+  if (!FB_CRM_DATA || FB_CRM_DATA.length === 0 || !REFERRAL_DATA || REFERRAL_DATA.length === 0) return;
+
+  // Detect FB CRM column names
+  var keys = Object.keys(FB_CRM_DATA[0] || {});
+  var nameCol = keys.find(function(k) { return /^(full.?name|name|patient)$/i.test(k); });
+  var dateCol = keys.find(function(k) { return /date|created|submitted|timestamp/i.test(k); });
+  var studyCol = keys.find(function(k) { return /study|campaign|indication|condition/i.test(k); });
+  if (!nameCol || !dateCol) { el.innerHTML = '<div style="color:#94a3b8;font-size:12px;text-align:center;padding:8px;">CRM data missing name or date columns</div>'; return; }
+
+  // Build REFERRAL_DATA lookup by normalized name
+  var refByName = {};
+  REFERRAL_DATA.forEach(function(r) {
+    var n = (r.name || '').toLowerCase().trim();
+    if (n && (!refByName[n] || r.date_created < refByName[n].date_created)) refByName[n] = r;
+  });
+
+  var matches = [], unmatched = [], totalHours = 0, matchCount = 0, over24h = 0;
+  var now = Date.now();
+  FB_CRM_DATA.forEach(function(row) {
+    var name = (row[nameCol] || '').trim();
+    var nameLower = name.toLowerCase();
+    var crmDateStr = row[dateCol] || '';
+    var study = studyCol ? (row[studyCol] || '') : '';
+    if (!name || !crmDateStr) return;
+
+    var crmDate = new Date(crmDateStr);
+    if (isNaN(crmDate.getTime())) return;
+    // Skip old leads (> 60 days)
+    if ((now - crmDate.getTime()) > 60 * 86400000) return;
+
+    var ref = refByName[nameLower];
+    if (ref && ref.date_created) {
+      var refDate = new Date(ref.date_created);
+      if (!isNaN(refDate.getTime())) {
+        var hours = Math.max(0, (refDate.getTime() - crmDate.getTime()) / 3600000);
+        totalHours += hours;
+        matchCount++;
+        if (hours > 24) over24h++;
+        matches.push({ name: name, study: study, crmDate: crmDate, refDate: refDate, hours: hours, stage: ref.stage });
+      }
+    } else {
+      unmatched.push({ name: name, study: study, crmDate: crmDate });
+    }
+  });
+
+  var avgHours = matchCount > 0 ? totalHours / matchCount : 0;
+  var avgColor = avgHours <= 12 ? '#059669' : avgHours <= 24 ? '#d97706' : '#dc2626';
+  var badgeText = matchCount > 0 ? (avgHours < 24 ? avgHours.toFixed(0) + 'h avg' : (avgHours/24).toFixed(1) + 'd avg') : 'No data';
+  var badgeClass = avgHours <= 24 ? 'badge-green' : 'badge-yellow';
+  if (badge) { badge.textContent = badgeText; badge.className = 'badge ' + badgeClass; }
+
+  var html = '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px;">';
+  html += '<div style="flex:1;min-width:120px;text-align:center;padding:8px;background:#f0fdf4;border-radius:8px;"><div style="font-size:20px;font-weight:800;color:' + avgColor + ';">' + (avgHours < 24 ? avgHours.toFixed(1) + 'h' : (avgHours/24).toFixed(1) + 'd') + '</div><div style="font-size:10px;color:#64748b;">Avg Response Time</div></div>';
+  html += '<div style="flex:1;min-width:120px;text-align:center;padding:8px;background:#fef3c7;border-radius:8px;"><div style="font-size:20px;font-weight:800;color:#d97706;">' + over24h + '</div><div style="font-size:10px;color:#64748b;">Leads &gt;24h Response</div></div>';
+  html += '<div style="flex:1;min-width:120px;text-align:center;padding:8px;background:#fef2f2;border-radius:8px;"><div style="font-size:20px;font-weight:800;color:#dc2626;">' + unmatched.length + '</div><div style="font-size:10px;color:#64748b;">Never Entered Pipeline</div></div>';
+  html += '<div style="flex:1;min-width:120px;text-align:center;padding:8px;background:#eff6ff;border-radius:8px;"><div style="font-size:20px;font-weight:800;color:#3b82f6;">' + matchCount + '</div><div style="font-size:10px;color:#64748b;">Matched to Pipeline</div></div>';
+  html += '</div>';
+
+  // Show worst offenders
+  var problems = matches.filter(function(m) { return m.hours > 24; }).sort(function(a, b) { return b.hours - a.hours; }).slice(0, 8);
+  if (problems.length > 0) {
+    html += '<div style="font-size:11px;font-weight:700;color:#1e293b;margin-bottom:4px;">Slowest Responses (>24h)</div>';
+    html += '<table class="fin-table" style="width:100%;font-size:11px;"><thead><tr><th style="text-align:left;padding:4px 8px;">Lead</th><th>Campaign</th><th>CRM Date</th><th>Pipeline Date</th><th>Delay</th><th>Stage</th></tr></thead><tbody>';
+    problems.forEach(function(m) {
+      var delayColor = m.hours > 72 ? '#dc2626' : '#d97706';
+      html += '<tr style="border-top:1px solid #f1f5f9;">';
+      html += '<td style="padding:4px 8px;font-weight:600;">' + escapeHTML(m.name) + '</td>';
+      html += '<td style="text-align:center;font-size:10px;">' + escapeHTML(m.study) + '</td>';
+      html += '<td style="text-align:center;font-size:10px;">' + m.crmDate.toLocaleDateString('en-US', {month:'short',day:'numeric'}) + '</td>';
+      html += '<td style="text-align:center;font-size:10px;">' + m.refDate.toLocaleDateString('en-US', {month:'short',day:'numeric'}) + '</td>';
+      html += '<td style="text-align:center;font-weight:700;color:' + delayColor + ';">' + (m.hours > 48 ? (m.hours/24).toFixed(1) + 'd' : m.hours.toFixed(0) + 'h') + '</td>';
+      html += '<td style="text-align:center;"><span style="font-size:9px;padding:2px 6px;border-radius:10px;background:#F1F5F9;">' + escapeHTML(m.stage || '—') + '</span></td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+  }
+
+  // Show unmatched leads (never entered pipeline)
+  if (unmatched.length > 0) {
+    var recent = unmatched.sort(function(a, b) { return b.crmDate - a.crmDate; }).slice(0, 8);
+    html += '<div style="font-size:11px;font-weight:700;color:#dc2626;margin-top:8px;margin-bottom:4px;">⚠ Never Entered Pipeline (last 60 days)</div>';
+    html += '<table class="fin-table" style="width:100%;font-size:11px;"><thead><tr><th style="text-align:left;padding:4px 8px;">Lead</th><th>Campaign</th><th>CRM Date</th><th>Days Ago</th></tr></thead><tbody>';
+    recent.forEach(function(m) {
+      var daysAgo = Math.round((now - m.crmDate.getTime()) / 86400000);
+      html += '<tr style="border-top:1px solid #f1f5f9;">';
+      html += '<td style="padding:4px 8px;font-weight:600;">' + escapeHTML(m.name) + '</td>';
+      html += '<td style="text-align:center;font-size:10px;">' + escapeHTML(m.study) + '</td>';
+      html += '<td style="text-align:center;font-size:10px;">' + m.crmDate.toLocaleDateString('en-US', {month:'short',day:'numeric'}) + '</td>';
+      html += '<td style="text-align:center;font-weight:700;color:' + (daysAgo > 7 ? '#dc2626' : '#d97706') + ';">' + daysAgo + 'd</td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+  }
+
+  if (matchCount === 0 && unmatched.length === 0) {
+    html = '<div style="color:#94a3b8;font-size:12px;text-align:center;padding:8px;">No recent CRM leads to analyze</div>';
+  }
+  el.innerHTML = html;
+}
+
+// ── 7. Recruiter Attribution per Campaign ──
+function renderRecruiterAttribution() {
+  var el = document.getElementById('meta-recruit-container');
+  var badge = document.getElementById('meta-recruit-badge');
+  if (!el) return;
+  if (!META_ADS_DATA || META_ADS_DATA.length === 0 || !REFERRAL_DATA || REFERRAL_DATA.length === 0) return;
+
+  var campMap = ((CRP_CONFIG.CLICKUP || {}).FB_CAMPAIGN_MAP || {});
+  var SG = ((CRP_CONFIG.CLICKUP || {}).STAGE_GROUPS || {});
+
+  // Build CRIO study → coordinator map
+  var coordByStudy = {};
+  if (CRIO_STUDIES_DATA && CRIO_STUDIES_DATA.length > 0) {
+    CRIO_STUDIES_DATA.forEach(function(s) {
+      coordByStudy[s.protocol_number] = s.coordinator || '';
+    });
+  }
+
+  var rows = [];
+  META_ADS_DATA.forEach(function(c) {
+    var studies = _metaStudiesForCampaign(c.campaign);
+    if (studies.length === 0) return;
+
+    // Find referrals matching these studies
+    var refs = [], coordSet = new Set();
+    studies.forEach(function(sk) {
+      var skLower = sk.toLowerCase();
+      REFERRAL_DATA.forEach(function(r) {
+        var rs = (r.study || '').toLowerCase().trim();
+        if (rs.includes(skLower) || skLower.includes(rs)) refs.push(r);
+      });
+      if (coordByStudy[sk]) coordSet.add(coordByStudy[sk]);
+    });
+
+    var newLead = 0, contacted = 0, screening = 0, enrolled = 0, closed = 0;
+    refs.forEach(function(r) {
+      if (r.stage === 'New Lead') newLead++;
+      else if (r.stage === 'Contacted') contacted++;
+      else if (SG.SCREENING && SG.SCREENING.has(r.stage)) screening++;
+      else if (SG.ENROLLED && SG.ENROLLED.has(r.stage)) enrolled++;
+      else if (SG.CLOSED && SG.CLOSED.has(r.stage)) closed++;
+    });
+
+    var convRate = refs.length > 0 ? ((enrolled / refs.length) * 100) : 0;
+    rows.push({
+      campaign: c.campaign,
+      metaLeads: c.leads,
+      pipelineTotal: refs.length,
+      newLead: newLead,
+      contacted: contacted,
+      screening: screening,
+      enrolled: enrolled,
+      closed: closed,
+      convRate: convRate,
+      coordinators: Array.from(coordSet).join(', ') || '—',
+      studies: studies
+    });
+  });
+
+  rows.sort(function(a, b) { return b.pipelineTotal - a.pipelineTotal; });
+
+  if (badge) badge.textContent = rows.length + ' campaigns';
+
+  if (rows.length === 0) {
+    el.innerHTML = '<div style="color:#94a3b8;font-size:12px;text-align:center;padding:12px;">No campaign-to-referral matches found</div>';
+    return;
+  }
+
+  var html = '<div style="overflow-x:auto;"><table class="fin-table" style="width:100%;font-size:11px;"><thead><tr>';
+  html += '<th style="text-align:left;padding:5px 8px;">Campaign</th>';
+  html += '<th>Meta Leads</th>';
+  html += '<th>Pipeline</th>';
+  html += '<th>New</th>';
+  html += '<th>Contacted</th>';
+  html += '<th>Screening</th>';
+  html += '<th>Enrolled</th>';
+  html += '<th>Closed</th>';
+  html += '<th>Conv%</th>';
+  html += '<th style="text-align:left;">Coordinator</th>';
+  html += '</tr></thead><tbody>';
+  rows.forEach(function(r) {
+    var convColor = r.convRate >= 15 ? '#059669' : r.convRate >= 5 ? '#d97706' : '#dc2626';
+    var gapPct = r.metaLeads > 0 ? Math.round((r.pipelineTotal / r.metaLeads) * 100) : 0;
+    html += '<tr style="border-top:1px solid #f1f5f9;">';
+    html += '<td style="padding:5px 8px;font-weight:600;font-size:10px;">' + escapeHTML(r.campaign) + '</td>';
+    html += '<td style="text-align:center;color:#3b82f6;font-weight:700;">' + r.metaLeads + '</td>';
+    html += '<td style="text-align:center;font-weight:600;">' + r.pipelineTotal + ' <span style="font-size:9px;color:#94a3b8;">(' + gapPct + '%)</span></td>';
+    html += '<td style="text-align:center;">' + r.newLead + '</td>';
+    html += '<td style="text-align:center;">' + r.contacted + '</td>';
+    html += '<td style="text-align:center;">' + r.screening + '</td>';
+    html += '<td style="text-align:center;color:#059669;font-weight:700;">' + r.enrolled + '</td>';
+    html += '<td style="text-align:center;color:#94a3b8;">' + r.closed + '</td>';
+    html += '<td style="text-align:center;font-weight:700;color:' + convColor + ';">' + r.convRate.toFixed(1) + '%</td>';
+    html += '<td style="padding:5px 8px;font-size:10px;">' + escapeHTML(r.coordinators) + '</td>';
+    html += '</tr>';
+  });
+  html += '</tbody></table></div>';
+  el.innerHTML = html;
+}
+
+// ── 8. Enrollment Velocity Forecast ──
+function renderEnrollmentVelocity() {
+  var el = document.getElementById('enroll-velocity-container');
+  var badge = document.getElementById('enroll-velocity-badge');
+  if (!el) return;
+  if (!CRIO_STUDIES_DATA || CRIO_STUDIES_DATA.length === 0) return;
+
+  var campMap = ((CRP_CONFIG.CLICKUP || {}).FB_CAMPAIGN_MAP || {});
+  var SG = ((CRP_CONFIG.CLICKUP || {}).STAGE_GROUPS || {});
+  var now = Date.now();
+
+  // Subject counts by study
+  var subsByStudy = {};
+  if (CRIO_SUBJECTS_DATA && CRIO_SUBJECTS_DATA.length > 0) {
+    CRIO_SUBJECTS_DATA.forEach(function(s) {
+      if (!subsByStudy[s.study_key]) subsByStudy[s.study_key] = { total: 0, active: 0, screen_fail: 0, completed: 0 };
+      var b = subsByStudy[s.study_key];
+      b.total++;
+      var st = (s.status || '').toLowerCase();
+      if (st === 'active' || st === 'enrolled' || st === 'randomized') b.active++;
+      else if (st === 'screen failure' || st === 'screen fail') b.screen_fail++;
+      else if (st === 'completed') b.completed++;
+    });
+  }
+
+  // Referral pipeline counts by study
+  var refsByProto = {};
+  if (REFERRAL_DATA && REFERRAL_DATA.length > 0) {
+    REFERRAL_DATA.forEach(function(r) {
+      var rs = (r.study || '').toLowerCase().trim();
+      CRIO_STUDIES_DATA.forEach(function(s) {
+        var pk = (s.protocol_number || '').toLowerCase();
+        if (pk && (rs.includes(pk) || pk.includes(rs))) {
+          if (!refsByProto[s.protocol_number]) refsByProto[s.protocol_number] = { total: 0, screening: 0, enrolled: 0 };
+          var b = refsByProto[s.protocol_number];
+          b.total++;
+          if (SG.SCREENING && SG.SCREENING.has(r.stage)) b.screening++;
+          if (SG.ENROLLED && SG.ENROLLED.has(r.stage)) b.enrolled++;
+        }
+      });
+    });
+  }
+
+  // Reverse-lookup: protocol → campaign names
+  var campForProto = {};
+  if (META_ADS_DATA && META_ADS_DATA.length > 0) {
+    META_ADS_DATA.forEach(function(c) {
+      var studies = _metaStudiesForCampaign(c.campaign);
+      studies.forEach(function(sk) {
+        if (!campForProto[sk]) campForProto[sk] = [];
+        campForProto[sk].push(c.campaign);
+      });
+    });
+  }
+
+  var rows = [];
+  var atRisk = 0;
+  CRIO_STUDIES_DATA.forEach(function(s) {
+    if (s.status !== 'ENROLLING' && s.status !== 'Enrolling' && s.status !== 'Active') return;
+    var target = s.target_enrollment || 0;
+    if (target <= 0) return;
+
+    var subs = subsByStudy[s.study_key] || { total: 0, active: 0, screen_fail: 0, completed: 0 };
+    var enrolled = subs.active + subs.completed;
+    var remaining = Math.max(0, target - enrolled);
+    var pctDone = Math.round((enrolled / target) * 100);
+
+    // Compute weeks since study start
+    var startDate = s.start_date ? new Date(s.start_date) : null;
+    var weeksSinceStart = startDate && !isNaN(startDate.getTime()) ? Math.max(1, Math.round((now - startDate.getTime()) / (7 * 86400000))) : null;
+
+    var weeklyRate = weeksSinceStart ? enrolled / weeksSinceStart : 0;
+    var weeksToTarget = weeklyRate > 0 ? Math.ceil(remaining / weeklyRate) : null;
+    var endDate = s.end_date ? new Date(s.end_date) : null;
+    var weeksLeft = endDate && !isNaN(endDate.getTime()) ? Math.max(0, Math.round((endDate.getTime() - now) / (7 * 86400000))) : null;
+    var risk = weeksToTarget !== null && weeksLeft !== null && weeksToTarget > weeksLeft;
+    if (risk) atRisk++;
+
+    var refs = refsByProto[s.protocol_number] || { total: 0, screening: 0, enrolled: 0 };
+    var camps = campForProto[s.protocol_number] || [];
+
+    rows.push({
+      study: s.protocol_number,
+      studyName: s.study_name || s.protocol_number,
+      indication: s.indication || '',
+      enrolled: enrolled,
+      target: target,
+      pctDone: pctDone,
+      remaining: remaining,
+      weeklyRate: weeklyRate,
+      weeksToTarget: weeksToTarget,
+      weeksLeft: weeksLeft,
+      risk: risk,
+      screenFail: subs.screen_fail,
+      pipelineTotal: refs.total,
+      pipelineScreening: refs.screening,
+      campaigns: camps,
+      coordinator: s.coordinator || '—'
+    });
+  });
+
+  rows.sort(function(a, b) { return (a.risk ? 0 : 1) - (b.risk ? 0 : 1) || b.pctDone - a.pctDone; });
+
+  if (badge) {
+    badge.textContent = rows.length + ' studies' + (atRisk > 0 ? ' · ' + atRisk + ' at risk' : '');
+    badge.className = 'badge ' + (atRisk > 0 ? 'badge-red' : 'badge-green');
+  }
+
+  if (rows.length === 0) {
+    el.innerHTML = '<div style="color:#94a3b8;font-size:12px;text-align:center;padding:12px;">No enrolling studies with targets found in CRIO</div>';
+    return;
+  }
+
+  var html = '<div style="overflow-x:auto;"><table class="fin-table" style="width:100%;font-size:11px;"><thead><tr>';
+  html += '<th style="text-align:left;padding:5px 8px;">Study</th>';
+  html += '<th>Enrolled</th>';
+  html += '<th>Target</th>';
+  html += '<th>Progress</th>';
+  html += '<th>Rate/wk</th>';
+  html += '<th>Wks to Target</th>';
+  html += '<th>Wks Left</th>';
+  html += '<th>Pipeline</th>';
+  html += '<th>Campaign</th>';
+  html += '<th>Signal</th>';
+  html += '</tr></thead><tbody>';
+
+  rows.forEach(function(r) {
+    var barPct = Math.min(100, r.pctDone);
+    var barColor = r.pctDone >= 80 ? '#059669' : r.pctDone >= 50 ? '#3b82f6' : '#d97706';
+    var signal = '', sigColor = '#059669';
+    if (r.risk) { signal = 'At Risk'; sigColor = '#dc2626'; }
+    else if (r.weeksToTarget === null) { signal = 'Need data'; sigColor = '#94a3b8'; }
+    else if (r.pctDone >= 80) { signal = 'On Track'; sigColor = '#059669'; }
+    else { signal = 'OK'; sigColor = '#3b82f6'; }
+
+    html += '<tr style="border-top:1px solid #f1f5f9;' + (r.risk ? 'background:#fef2f2;' : '') + '">';
+    html += '<td style="padding:5px 8px;"><div style="font-weight:600;font-size:10px;">' + escapeHTML(r.study) + '</div><div style="font-size:9px;color:#64748b;">' + escapeHTML(r.indication) + '</div></td>';
+    html += '<td style="text-align:center;font-weight:700;">' + r.enrolled + '</td>';
+    html += '<td style="text-align:center;">' + r.target + '</td>';
+    html += '<td style="min-width:80px;"><div style="background:#f1f5f9;border-radius:4px;height:14px;position:relative;overflow:hidden;"><div style="background:' + barColor + ';height:100%;width:' + barPct + '%;border-radius:4px;"></div><span style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-size:9px;font-weight:700;color:' + (barPct > 40 ? '#fff' : '#1e293b') + ';">' + r.pctDone + '%</span></div></td>';
+    html += '<td style="text-align:center;font-weight:600;">' + r.weeklyRate.toFixed(1) + '</td>';
+    html += '<td style="text-align:center;font-weight:700;color:' + (r.risk ? '#dc2626' : '#1e293b') + ';">' + (r.weeksToTarget !== null ? r.weeksToTarget + 'w' : '—') + '</td>';
+    html += '<td style="text-align:center;">' + (r.weeksLeft !== null ? r.weeksLeft + 'w' : '—') + '</td>';
+    html += '<td style="text-align:center;">' + r.pipelineTotal + (r.pipelineScreening > 0 ? ' <span style="font-size:9px;color:#059669;">(' + r.pipelineScreening + ' screening)</span>' : '') + '</td>';
+    html += '<td style="text-align:center;font-size:9px;">' + (r.campaigns.length > 0 ? r.campaigns.map(function(cn) { return escapeHTML(cn); }).join(', ') : '<span style="color:#dc2626;">None</span>') + '</td>';
+    html += '<td style="text-align:center;font-weight:700;font-size:10px;color:' + sigColor + ';">' + signal + '</td>';
+    html += '</tr>';
+  });
+  html += '</tbody></table></div>';
+  el.innerHTML = html;
 }
 
 
