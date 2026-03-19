@@ -1825,28 +1825,6 @@ body {
       </div>
     </div>
 
-    <!-- Speed-to-Contact Tracker -->
-    <div class="card fade-in" style="margin-bottom:16px;">
-      <div class="card-header">
-        <span class="card-title">⏱️ Speed-to-Contact Tracker</span>
-        <span class="badge badge-blue" id="meta-speed-badge">—</span>
-      </div>
-      <div id="meta-speed-container" style="padding:12px 16px;">
-        <div style="text-align:center;padding:12px;color:var(--muted);font-size:13px;">Waiting for CRM + pipeline data...</div>
-      </div>
-    </div>
-
-    <!-- Recruiter Attribution per Campaign -->
-    <div class="card fade-in" style="margin-bottom:16px;">
-      <div class="card-header">
-        <span class="card-title">👥 Recruiter Attribution by Campaign</span>
-        <span class="badge badge-blue" id="meta-recruit-badge">—</span>
-      </div>
-      <div id="meta-recruit-container" style="padding:0;">
-        <div style="text-align:center;padding:12px;color:var(--muted);font-size:13px;">Waiting for referral + CRIO data...</div>
-      </div>
-    </div>
-
     <!-- Facebook CRM -->
     <!-- Patient Pipeline by Site -->
     <div class="card fade-in" style="margin-bottom:16px;">
@@ -10150,14 +10128,12 @@ async function refreshReferrals() {
     safe(buildInsights, 'buildInsights');
     if (typeof renderStudiesTable === 'function') try { renderStudiesTable(); } catch(e) { _log('renderStudiesTable: ' + e.message); }
     // Re-render cross-source marketing intelligence (Meta data may already be loaded)
-    safe(renderRecruiterAttribution, 'renderRecruiterAttribution');
     safe(renderEnrollmentVelocity, 'renderEnrollmentVelocity');
 
     // Also fetch Facebook CRM (non-blocking)
     fetchFacebookCRM().then(function() {
       safe(buildRecruitmentKPIs, 'buildRecruitmentKPIs');
       if (typeof renderStudiesTable === 'function') try { renderStudiesTable(); } catch(e) { _log('renderStudiesTable: ' + e.message); }
-      safe(renderSpeedToContact, 'renderSpeedToContact');
     }).catch(e => console.warn('FB CRM fetch failed:', e));
   } catch(e) {
     console.error('CRP Referrals: CSV fetch failed', e);
@@ -12363,8 +12339,6 @@ async function fetchMetaAds() {
     renderMetaFunnel();
     renderMetaAlignment();
     updateOverviewMarketingKPI();
-    safe(renderSpeedToContact, 'renderSpeedToContact');
-    safe(renderRecruiterAttribution, 'renderRecruiterAttribution');
     safe(renderEnrollmentVelocity, 'renderEnrollmentVelocity');
     if (typeof renderFinMarketingROI === 'function') try { renderFinMarketingROI(); } catch(e) { _log('renderFinMarketingROI: ' + e.message); }
     checkMetaTokenExpiry(cfg).catch(function() {});
@@ -12581,7 +12555,7 @@ function renderMetaFunnel() {
   html += '</div>';
 
   // Per-campaign funnel table
-  html += '<div style="padding:4px 16px 0;font-size:9px;color:#94a3b8;">Cross-reference: Meta API \u00B7 FB CRM Sheet \u00B7 ClickUp Referrals \u00B7 CRIO Visits</div>';
+  html += '<div style="padding:4px 16px 0;font-size:9px;color:#94a3b8;">Approximate cross-reference (matched by campaign/study name) \u00B7 Meta API \u00B7 FB CRM Sheet \u00B7 ClickUp \u00B7 CRIO</div>';
   html += '<div style="overflow-x:auto;"><table class="fin-table" style="width:100%;font-size:10px;">';
   html += '<thead><tr><th style="text-align:left;padding:6px 10px;">Campaign</th><th style="text-align:center;">Meta</th><th style="text-align:center;">CRM</th><th style="text-align:center;">Pipeline</th><th style="text-align:center;">Screening</th><th style="text-align:center;">Enrolled</th><th style="text-align:center;">Visits</th><th style="text-align:center;">Conv %</th></tr></thead><tbody>';
   funnelRows.forEach(function(r) {
@@ -12830,213 +12804,9 @@ function updateOverviewMarketingKPI() {
   if (kpiSub) kpiSub.textContent = active + ' active campaigns (30d)';
 }
 
-// ── 6. Speed-to-Contact Tracker ──
-function renderSpeedToContact() {
-  var el = document.getElementById('meta-speed-container');
-  var badge = document.getElementById('meta-speed-badge');
-  if (!el) return;
-  if (!FB_CRM_DATA || FB_CRM_DATA.length === 0 || !REFERRAL_DATA || REFERRAL_DATA.length === 0) return;
+// (Speed-to-Contact + Recruiter Attribution removed — noisy without shared lead IDs)
 
-  // Detect FB CRM column names
-  var keys = Object.keys(FB_CRM_DATA[0] || {});
-  var nameCol = keys.find(function(k) { return /^(full.?name|name|patient)$/i.test(k); });
-  var dateCol = keys.find(function(k) { return /date|created|submitted|timestamp/i.test(k); });
-  var studyCol = keys.find(function(k) { return /study|campaign|indication|condition/i.test(k); });
-  if (!nameCol || !dateCol) { el.innerHTML = '<div style="color:#94a3b8;font-size:12px;text-align:center;padding:8px;">CRM data missing name or date columns</div>'; return; }
-
-  // Build REFERRAL_DATA lookup by normalized name
-  var refByName = {};
-  REFERRAL_DATA.forEach(function(r) {
-    var n = (r.name || '').toLowerCase().trim();
-    if (n && (!refByName[n] || r.date_created < refByName[n].date_created)) refByName[n] = r;
-  });
-
-  var matches = [], unmatched = [], totalHours = 0, matchCount = 0, over24h = 0;
-  var now = Date.now();
-  FB_CRM_DATA.forEach(function(row) {
-    var name = (row[nameCol] || '').trim();
-    var nameLower = name.toLowerCase();
-    var crmDateStr = row[dateCol] || '';
-    var study = studyCol ? (row[studyCol] || '') : '';
-    if (!name || !crmDateStr) return;
-
-    var crmDate = _parseDate(crmDateStr);
-    if (!crmDate) return;
-    // Skip old leads (> 60 days)
-    if ((now - crmDate.getTime()) > 60 * 86400000) return;
-
-    var ref = refByName[nameLower];
-    if (ref && ref.date_created) {
-      var refDate = _parseDate(ref.date_created);
-      if (refDate) {
-        var hours = Math.max(0, (refDate.getTime() - crmDate.getTime()) / 3600000);
-        totalHours += hours;
-        matchCount++;
-        if (hours > 24) over24h++;
-        matches.push({ name: name, study: study, crmDate: crmDate, refDate: refDate, hours: hours, stage: ref.stage });
-      }
-    } else {
-      unmatched.push({ name: name, study: study, crmDate: crmDate });
-    }
-  });
-
-  var avgHours = matchCount > 0 ? totalHours / matchCount : 0;
-  var avgColor = avgHours <= 12 ? '#059669' : avgHours <= 24 ? '#d97706' : '#dc2626';
-  var badgeText = matchCount > 0 ? (avgHours < 24 ? avgHours.toFixed(0) + 'h avg' : (avgHours/24).toFixed(1) + 'd avg') : 'No data';
-  var badgeClass = avgHours <= 24 ? 'badge-green' : 'badge-yellow';
-  if (badge) { badge.textContent = badgeText; badge.className = 'badge ' + badgeClass; }
-
-  var html = '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px;">';
-  html += '<div style="flex:1;min-width:120px;text-align:center;padding:8px;background:#f0fdf4;border-radius:8px;"><div style="font-size:20px;font-weight:800;color:' + avgColor + ';">' + (avgHours < 24 ? avgHours.toFixed(1) + 'h' : (avgHours/24).toFixed(1) + 'd') + '</div><div style="font-size:10px;color:#64748b;">Avg Response Time</div></div>';
-  html += '<div style="flex:1;min-width:120px;text-align:center;padding:8px;background:#fef3c7;border-radius:8px;"><div style="font-size:20px;font-weight:800;color:#d97706;">' + over24h + '</div><div style="font-size:10px;color:#64748b;">Leads &gt;24h Response</div></div>';
-  html += '<div style="flex:1;min-width:120px;text-align:center;padding:8px;background:#fef2f2;border-radius:8px;"><div style="font-size:20px;font-weight:800;color:#dc2626;">' + unmatched.length + '</div><div style="font-size:10px;color:#64748b;">Never Entered Pipeline</div></div>';
-  html += '<div style="flex:1;min-width:120px;text-align:center;padding:8px;background:#eff6ff;border-radius:8px;"><div style="font-size:20px;font-weight:800;color:#3b82f6;">' + matchCount + '</div><div style="font-size:10px;color:#64748b;">Matched to Pipeline</div></div>';
-  html += '</div>';
-
-  // Show worst offenders
-  var problems = matches.filter(function(m) { return m.hours > 24; }).sort(function(a, b) { return b.hours - a.hours; }).slice(0, 8);
-  if (problems.length > 0) {
-    html += '<div style="font-size:11px;font-weight:700;color:#1e293b;margin-bottom:4px;">Slowest Responses (>24h)</div>';
-    html += '<table class="fin-table" style="width:100%;font-size:11px;"><thead><tr><th style="text-align:left;padding:4px 8px;">Lead</th><th>Campaign</th><th>CRM Date</th><th>Pipeline Date</th><th>Delay</th><th>Stage</th></tr></thead><tbody>';
-    problems.forEach(function(m) {
-      var delayColor = m.hours > 72 ? '#dc2626' : '#d97706';
-      html += '<tr style="border-top:1px solid #f1f5f9;">';
-      html += '<td style="padding:4px 8px;font-weight:600;">' + escapeHTML(m.name) + '</td>';
-      html += '<td style="text-align:center;font-size:10px;">' + escapeHTML(m.study) + '</td>';
-      html += '<td style="text-align:center;font-size:10px;">' + m.crmDate.toLocaleDateString('en-US', {month:'short',day:'numeric'}) + '</td>';
-      html += '<td style="text-align:center;font-size:10px;">' + m.refDate.toLocaleDateString('en-US', {month:'short',day:'numeric'}) + '</td>';
-      html += '<td style="text-align:center;font-weight:700;color:' + delayColor + ';">' + (m.hours > 48 ? (m.hours/24).toFixed(1) + 'd' : m.hours.toFixed(0) + 'h') + '</td>';
-      html += '<td style="text-align:center;"><span style="font-size:9px;padding:2px 6px;border-radius:10px;background:#F1F5F9;">' + escapeHTML(m.stage || '—') + '</span></td>';
-      html += '</tr>';
-    });
-    html += '</tbody></table>';
-  }
-
-  // Show unmatched leads (never entered pipeline)
-  if (unmatched.length > 0) {
-    var recent = unmatched.sort(function(a, b) { return b.crmDate - a.crmDate; }).slice(0, 8);
-    html += '<div style="font-size:11px;font-weight:700;color:#dc2626;margin-top:8px;margin-bottom:4px;">⚠ Never Entered Pipeline (last 60 days)</div>';
-    html += '<table class="fin-table" style="width:100%;font-size:11px;"><thead><tr><th style="text-align:left;padding:4px 8px;">Lead</th><th>Campaign</th><th>CRM Date</th><th>Days Ago</th></tr></thead><tbody>';
-    recent.forEach(function(m) {
-      var daysAgo = Math.round((now - m.crmDate.getTime()) / 86400000);
-      html += '<tr style="border-top:1px solid #f1f5f9;">';
-      html += '<td style="padding:4px 8px;font-weight:600;">' + escapeHTML(m.name) + '</td>';
-      html += '<td style="text-align:center;font-size:10px;">' + escapeHTML(m.study) + '</td>';
-      html += '<td style="text-align:center;font-size:10px;">' + m.crmDate.toLocaleDateString('en-US', {month:'short',day:'numeric'}) + '</td>';
-      html += '<td style="text-align:center;font-weight:700;color:' + (daysAgo > 7 ? '#dc2626' : '#d97706') + ';">' + daysAgo + 'd</td>';
-      html += '</tr>';
-    });
-    html += '</tbody></table>';
-  }
-
-  if (matchCount === 0 && unmatched.length === 0) {
-    html = '<div style="color:#94a3b8;font-size:12px;text-align:center;padding:8px;">No recent CRM leads to analyze</div>';
-  }
-  el.innerHTML = html;
-}
-
-// ── 7. Recruiter Attribution per Campaign ──
-function renderRecruiterAttribution() {
-  var el = document.getElementById('meta-recruit-container');
-  var badge = document.getElementById('meta-recruit-badge');
-  if (!el) return;
-  if (!META_ADS_DATA || META_ADS_DATA.length === 0 || !REFERRAL_DATA || REFERRAL_DATA.length === 0) return;
-
-  var campMap = ((CRP_CONFIG.CLICKUP || {}).FB_CAMPAIGN_MAP || {});
-  var SG = ((CRP_CONFIG.CLICKUP || {}).STAGE_GROUPS || {});
-
-  // Build CRIO study → coordinator map
-  var coordByStudy = {};
-  if (CRIO_STUDIES_DATA && CRIO_STUDIES_DATA.length > 0) {
-    CRIO_STUDIES_DATA.forEach(function(s) {
-      coordByStudy[s.protocol_number] = s.coordinator || '';
-    });
-  }
-
-  var rows = [];
-  META_ADS_DATA.forEach(function(c) {
-    var studies = _metaStudiesForCampaign(c.campaign);
-    if (studies.length === 0) return;
-
-    // Find referrals matching these studies (deduplicate to prevent double-counting)
-    var refs = [], refsSeen = new Set(), coordSet = new Set();
-    studies.forEach(function(sk) {
-      var skLower = sk.toLowerCase();
-      REFERRAL_DATA.forEach(function(r) {
-        if (refsSeen.has(r.id || r.name)) return;
-        var rs = (r.study || '').toLowerCase().trim();
-        if (rs && (rs.includes(skLower) || skLower.includes(rs))) { refs.push(r); refsSeen.add(r.id || r.name); }
-      });
-      if (coordByStudy[sk]) coordSet.add(coordByStudy[sk]);
-    });
-
-    var newLead = 0, contacted = 0, screening = 0, enrolled = 0, closed = 0;
-    refs.forEach(function(r) {
-      if (r.stage === 'New Lead') newLead++;
-      else if (r.stage === 'Contacted') contacted++;
-      else if (SG.SCREENING && SG.SCREENING.has(r.stage)) screening++;
-      else if (SG.ENROLLED && SG.ENROLLED.has(r.stage)) enrolled++;
-      else if (SG.CLOSED && SG.CLOSED.has(r.stage)) closed++;
-    });
-
-    var convRate = refs.length > 0 ? ((enrolled / refs.length) * 100) : 0;
-    rows.push({
-      campaign: c.campaign,
-      metaLeads: c.leads,
-      pipelineTotal: refs.length,
-      newLead: newLead,
-      contacted: contacted,
-      screening: screening,
-      enrolled: enrolled,
-      closed: closed,
-      convRate: convRate,
-      coordinators: Array.from(coordSet).join(', ') || '—',
-      studies: studies
-    });
-  });
-
-  rows.sort(function(a, b) { return b.pipelineTotal - a.pipelineTotal; });
-
-  if (badge) badge.textContent = rows.length + ' campaigns';
-
-  if (rows.length === 0) {
-    el.innerHTML = '<div style="color:#94a3b8;font-size:12px;text-align:center;padding:12px;">No campaign-to-referral matches found</div>';
-    return;
-  }
-
-  var html = '<div style="overflow-x:auto;"><table class="fin-table" style="width:100%;font-size:11px;"><thead><tr>';
-  html += '<th style="text-align:left;padding:5px 8px;">Campaign</th>';
-  html += '<th>Meta Leads</th>';
-  html += '<th>Pipeline</th>';
-  html += '<th>New</th>';
-  html += '<th>Contacted</th>';
-  html += '<th>Screening</th>';
-  html += '<th>Enrolled</th>';
-  html += '<th>Closed</th>';
-  html += '<th>Conv%</th>';
-  html += '<th style="text-align:left;">Coordinator</th>';
-  html += '</tr></thead><tbody>';
-  rows.forEach(function(r) {
-    var convColor = r.convRate >= 15 ? '#059669' : r.convRate >= 5 ? '#d97706' : '#dc2626';
-    var gapPct = r.metaLeads > 0 ? Math.min(100, Math.round((r.pipelineTotal / r.metaLeads) * 100)) : 0;
-    html += '<tr style="border-top:1px solid #f1f5f9;">';
-    html += '<td style="padding:5px 8px;font-weight:600;font-size:10px;">' + escapeHTML(r.campaign) + '</td>';
-    html += '<td style="text-align:center;color:#3b82f6;font-weight:700;">' + r.metaLeads + '</td>';
-    html += '<td style="text-align:center;font-weight:600;">' + r.pipelineTotal + ' <span style="font-size:9px;color:#94a3b8;">(' + gapPct + '%)</span></td>';
-    html += '<td style="text-align:center;">' + r.newLead + '</td>';
-    html += '<td style="text-align:center;">' + r.contacted + '</td>';
-    html += '<td style="text-align:center;">' + r.screening + '</td>';
-    html += '<td style="text-align:center;color:#059669;font-weight:700;">' + r.enrolled + '</td>';
-    html += '<td style="text-align:center;color:#94a3b8;">' + r.closed + '</td>';
-    html += '<td style="text-align:center;font-weight:700;color:' + convColor + ';">' + r.convRate.toFixed(1) + '%</td>';
-    html += '<td style="padding:5px 8px;font-size:10px;">' + escapeHTML(r.coordinators) + '</td>';
-    html += '</tr>';
-  });
-  html += '</tbody></table></div>';
-  el.innerHTML = html;
-}
-
-// ── 8. Enrollment Velocity Forecast ──
+// ── 6. Enrollment Velocity Forecast ──
 function renderEnrollmentVelocity() {
   var el = document.getElementById('enroll-velocity-container');
   var badge = document.getElementById('enroll-velocity-badge');
