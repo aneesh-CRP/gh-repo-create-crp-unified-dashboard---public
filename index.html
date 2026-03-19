@@ -5820,7 +5820,7 @@ function buildInsights() {
   flags.forEach(f => {
     const parts = f.next_visit.split(' ');
     const mMap = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
-    const visitDate = new Date(2026, mMap[parts[0]], parseInt(parts[1]));
+    const visitDate = new Date(today.getFullYear(), mMap[parts[0]], parseInt(parts[1]));
     const daysOut = Math.round((visitDate - today) / 86400000);
     const urgent = daysOut <= 14;
     const pLink = f.patient_url
@@ -5862,7 +5862,7 @@ function buildInsights() {
   const thisWeek = detail.filter(d => {
     const parts = d.date.split(' ');
     const mMap = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
-    const daysOut = Math.round((new Date(2026, mMap[parts[0]], parseInt(parts[1])) - today) / 86400000);
+    const daysOut = Math.round((new Date(today.getFullYear(), mMap[parts[0]], parseInt(parts[1])) - today) / 86400000);
     return daysOut <= 7;
   });
   if (thisWeek.length > 0) {
@@ -7795,7 +7795,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
     if (/withdrew|no longer interested|not interested|refuses to return|do not solicit|not comfortable/.test(r)) return 'Patient Withdrew';
     if (/weather|snow|storm/.test(r)) return 'Weather';
     if (/study.?clos|visit.*clos.*study/.test(r)) return 'Study Closed';
-    if (/wrong study|entered in error|scheduled in error|\bltv\b|scheduled under|demo/.test(r)) return 'Admin Error';
+    if (/wrong study|entered in error|scheduled in error|\bltv\b|scheduled under|\bdemo\b/.test(r)) return 'Admin Error';
     if (!r || r === 'nan') return 'Not Documented';
     return 'Other';
   }
@@ -8232,6 +8232,8 @@ function processLiveData(allRows, legacyCancels, auditLog) {
       const sk = r['Study Key'], subk = r['Subject Key (Back End)'];
       const d = parseDate(r['Scheduled Date']||'');
       return {
+        name: (r['Subject Full Name']||'').replace(/\s{2,}/g,' ').trim(),
+        url: patientUrl(sk, subk, r['Site Name']) || '',
         date: d ? d.toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '—',
         date_iso: r['Scheduled Date']||'',
         study: (r['Study Name']||'').split(' - ').pop().trim(),
@@ -8365,6 +8367,7 @@ async function refreshData() {
       DATA = newData;
       window._lastLiveData = DATA;
       renderAll();
+      if (typeof _updateHealthButton === 'function') _updateHealthButton();
       if (badge) badge.textContent = 'Updated: ' + new Date().toLocaleTimeString();
     }
     // Phase 2: Finance (staggered)
@@ -12274,6 +12277,8 @@ async function fetchMetaAds() {
     ]);
     var j1 = await r1.json(), j2 = await r2.json(), j3 = await r3.json();
     if (j1.error) throw new Error(j1.error.message);
+    if (j2.error) { console.warn('CRP: Meta weekly insights error:', j2.error.message); j2 = { data: [] }; }
+    if (j3.error) { console.warn('CRP: Meta campaigns error:', j3.error.message); j3 = { data: [] }; }
 
     function parseActions(c) {
       var leads = 0, engagement = 0;
@@ -12295,7 +12300,9 @@ async function fetchMetaAds() {
 
     META_ADS_WEEKLY = (j2.data || []).map(function(c) {
       var a = parseActions(c);
-      return { campaign: c.campaign_name, date_start: c.date_start, date_stop: c.date_stop, leads: a.leads, spend: parseFloat(c.spend)||0, impressions: parseInt(c.impressions)||0, clicks: parseInt(c.clicks)||0, cpl: a.cpl };
+      var spend = parseFloat(c.spend)||0;
+      var cpl = a.cpl > 0 ? a.cpl : (a.leads > 0 ? spend / a.leads : 0);
+      return { campaign: c.campaign_name, date_start: c.date_start, date_stop: c.date_stop, leads: a.leads, spend: spend, impressions: parseInt(c.impressions)||0, clicks: parseInt(c.clicks)||0, cpl: cpl };
     });
 
     META_ADS_CAMPAIGNS = (j3.data || []).map(function(c) {
@@ -12321,7 +12328,7 @@ async function fetchMetaAds() {
 
 async function checkMetaTokenExpiry(cfg) {
   try {
-    var resp = await fetch('https://graph.facebook.com/v21.0/debug_token?input_token=' + cfg.ACCESS_TOKEN + '&access_token=' + cfg.ACCESS_TOKEN);
+    var resp = await fetch('https://graph.facebook.com/' + cfg.API_VERSION + '/debug_token?input_token=' + cfg.ACCESS_TOKEN + '&access_token=' + cfg.ACCESS_TOKEN);
     if (!resp.ok) return;
     var json = await resp.json();
     var expiresAt = (json.data || {}).expires_at || 0;
@@ -12403,12 +12410,12 @@ function renderMetaAlerts() {
   });
 
   // Alert: Budget reallocation opportunity
-  var active = META_ADS_DATA.filter(function(c) { var m = campMap[c.name || c.campaign] || {}; return m.status === 'ACTIVE'; });
-  var paused = META_ADS_DATA.filter(function(c) { var m = campMap[c.name || c.campaign] || {}; return m.status === 'PAUSED' && c.leads > 20; });
+  var active = META_ADS_DATA.filter(function(c) { var m = campMap[c.campaign] || {}; return m.status === 'ACTIVE'; });
+  var paused = META_ADS_DATA.filter(function(c) { var m = campMap[c.campaign] || {}; return m.status === 'PAUSED' && c.leads > 20; });
   if (active.length > 0 && paused.length > 0) {
     var worstActive = active.slice().sort(function(a,b) { return b.cpl - a.cpl; })[0];
     var bestPaused = paused.slice().sort(function(a,b) { return a.cpl - b.cpl; })[0];
-    if (worstActive && bestPaused && bestPaused.cpl < worstActive.cpl * 0.6) {
+    if (worstActive && bestPaused && bestPaused.cpl > 0 && bestPaused.cpl < worstActive.cpl * 0.6) {
       alerts.push({ type: 'opportunity', icon: '\uD83D\uDD04', msg: 'Budget opportunity: <strong>' + escapeHTML(bestPaused.campaign) + '</strong> (paused, high efficiency) outperforms active <strong>' + escapeHTML(worstActive.campaign) + '</strong>. Consider reallocation.' });
     }
   }
@@ -12446,7 +12453,7 @@ function renderMetaFunnel() {
     if (fbStudyCol) {
       FB_CRM_DATA.forEach(function(r) {
         var cn = (r[fbStudyCol] || '').toLowerCase().trim();
-        if (cn.includes(campLower) || campLower.includes(cn)) crmLeads++;
+        if (cn && (cn.includes(campLower) || campLower.includes(cn))) crmLeads++;
       });
     }
 
@@ -12611,7 +12618,7 @@ function renderMetaAds() {
 function renderMetaAlignment() {
   var el = document.getElementById('meta-alignment-container');
   var badge = document.getElementById('meta-alignment-badge');
-  if (!el) return;
+  if (!el || !META_ADS_DATA || META_ADS_DATA.length === 0) return;
   var campMap = {};
   META_ADS_CAMPAIGNS.forEach(function(c) { campMap[c.name] = c; });
 
