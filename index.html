@@ -7645,8 +7645,8 @@ function processLiveData(allRows, legacyCancels, auditLog) {
       }
       return false;
     }
-    const rk = buildKey(r['Subject Full Name'], r['Study Name']);
-    if (rk !== '|' && rescheduledPatientStudy.has(rk)) {
+    var rk2 = buildKey(r['Subject Full Name'], r['Study Name']);
+    if (rk2 !== '|' && rescheduledPatientStudy.has(rk2)) {
       r._category = 'Rescheduled';
       rescheduledVisits.push(r);
       return false;
