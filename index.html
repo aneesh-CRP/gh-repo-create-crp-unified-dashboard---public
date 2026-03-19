@@ -2217,6 +2217,15 @@ function jsAttr(s) {
   return escapeHTML(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'"));
 }
 
+// ═══ DATE PARSING (global — safe for YYYY-MM-DD) ═══
+// Forces local-time parsing: 'YYYY-MM-DD' → 'YYYY-MM-DDT00:00:00' to avoid UTC off-by-one
+function _parseDate(s) {
+  if (!s) return null;
+  var t = String(s).trim();
+  var d = /^\d{4}-\d{2}-\d{2}$/.test(t) ? new Date(t + 'T00:00:00') : new Date(t);
+  return isNaN(d.getTime()) ? null : d;
+}
+
 // ═══ DATA NORMALIZATION UTILITIES ═══
 // Central normalization — use everywhere before comparing strings across data sources
 function normalize(s) {
@@ -11011,6 +11020,7 @@ async function fetchCrioStudies() {
           _log('CRIO Subjects loaded: ' + CRIO_SUBJECTS_DATA.length);
           setHealthChip('dh-crio-subjects', CRIO_SUBJECTS_DATA.length > 0 ? 'ok' : 'warn', 'CRIO Subjects (' + CRIO_SUBJECTS_DATA.length + ')');
           safe(renderCrioStudies, 'renderCrioStudies');
+          safe(renderEnrollmentVelocity, 'renderEnrollmentVelocity');
           safe(mergeCrioIntoStudies, 'mergeCrioIntoStudies');
           safe(buildEnrollmentKPIs, 'buildEnrollmentKPIs');
         }
@@ -12428,7 +12438,7 @@ function renderMetaAlerts() {
         return ms && ms.status === 'Maintenance';
       });
       if (maintStudies.length > 0) {
-        alerts.push({ type: 'warning', icon: '\u26A0\uFE0F', msg: '<strong>' + escapeHTML(c.campaign) + '</strong> is spending on studies in <strong>Maintenance</strong>: ' + maintStudies.join(', ') + '. Consider pausing or redirecting.' });
+        alerts.push({ type: 'warning', icon: '\u26A0\uFE0F', msg: '<strong>' + escapeHTML(c.campaign) + '</strong> is spending on studies in <strong>Maintenance</strong>: ' + maintStudies.map(function(s) { return escapeHTML(s); }).join(', ') + '. Consider pausing or redirecting.' });
       }
     }
 
@@ -12836,15 +12846,15 @@ function renderSpeedToContact() {
     var study = studyCol ? (row[studyCol] || '') : '';
     if (!name || !crmDateStr) return;
 
-    var crmDate = new Date(crmDateStr);
-    if (isNaN(crmDate.getTime())) return;
+    var crmDate = _parseDate(crmDateStr);
+    if (!crmDate) return;
     // Skip old leads (> 60 days)
     if ((now - crmDate.getTime()) > 60 * 86400000) return;
 
     var ref = refByName[nameLower];
     if (ref && ref.date_created) {
-      var refDate = new Date(ref.date_created);
-      if (!isNaN(refDate.getTime())) {
+      var refDate = _parseDate(ref.date_created);
+      if (refDate) {
         var hours = Math.max(0, (refDate.getTime() - crmDate.getTime()) / 3600000);
         totalHours += hours;
         matchCount++;
@@ -12934,13 +12944,14 @@ function renderRecruiterAttribution() {
     var studies = _metaStudiesForCampaign(c.campaign);
     if (studies.length === 0) return;
 
-    // Find referrals matching these studies
-    var refs = [], coordSet = new Set();
+    // Find referrals matching these studies (deduplicate to prevent double-counting)
+    var refs = [], refsSeen = new Set(), coordSet = new Set();
     studies.forEach(function(sk) {
       var skLower = sk.toLowerCase();
       REFERRAL_DATA.forEach(function(r) {
+        if (refsSeen.has(r.id || r.name)) return;
         var rs = (r.study || '').toLowerCase().trim();
-        if (rs.includes(skLower) || skLower.includes(rs)) refs.push(r);
+        if (rs && (rs.includes(skLower) || skLower.includes(rs))) { refs.push(r); refsSeen.add(r.id || r.name); }
       });
       if (coordByStudy[sk]) coordSet.add(coordByStudy[sk]);
     });
@@ -13036,12 +13047,14 @@ function renderEnrollmentVelocity() {
     });
   }
 
-  // Referral pipeline counts by study
+  // Referral pipeline counts by study (each referral counted once, first match wins)
   var refsByProto = {};
   if (REFERRAL_DATA && REFERRAL_DATA.length > 0) {
     REFERRAL_DATA.forEach(function(r) {
       var rs = (r.study || '').toLowerCase().trim();
-      CRIO_STUDIES_DATA.forEach(function(s) {
+      if (!rs) return;
+      for (var si = 0; si < CRIO_STUDIES_DATA.length; si++) {
+        var s = CRIO_STUDIES_DATA[si];
         var pk = (s.protocol_number || '').toLowerCase();
         if (pk && (rs.includes(pk) || pk.includes(rs))) {
           if (!refsByProto[s.protocol_number]) refsByProto[s.protocol_number] = { total: 0, screening: 0, enrolled: 0 };
@@ -13049,8 +13062,9 @@ function renderEnrollmentVelocity() {
           b.total++;
           if (SG.SCREENING && SG.SCREENING.has(r.stage)) b.screening++;
           if (SG.ENROLLED && SG.ENROLLED.has(r.stage)) b.enrolled++;
+          break; // count each referral in first matching study only
         }
-      });
+      }
     });
   }
 
@@ -13069,7 +13083,8 @@ function renderEnrollmentVelocity() {
   var rows = [];
   var atRisk = 0;
   CRIO_STUDIES_DATA.forEach(function(s) {
-    if (s.status !== 'ENROLLING' && s.status !== 'Enrolling' && s.status !== 'Active') return;
+    var stLower = (s.status || '').toLowerCase();
+    if (stLower !== 'enrolling' && stLower !== 'active') return;
     var target = s.target_enrollment || 0;
     if (target <= 0) return;
 
@@ -13079,13 +13094,13 @@ function renderEnrollmentVelocity() {
     var pctDone = Math.round((enrolled / target) * 100);
 
     // Compute weeks since study start
-    var startDate = s.start_date ? new Date(s.start_date) : null;
-    var weeksSinceStart = startDate && !isNaN(startDate.getTime()) ? Math.max(1, Math.round((now - startDate.getTime()) / (7 * 86400000))) : null;
+    var startDate = _parseDate(s.start_date);
+    var weeksSinceStart = startDate ? Math.max(1, Math.round((now - startDate.getTime()) / (7 * 86400000))) : null;
 
     var weeklyRate = weeksSinceStart ? enrolled / weeksSinceStart : 0;
     var weeksToTarget = weeklyRate > 0 ? Math.ceil(remaining / weeklyRate) : null;
-    var endDate = s.end_date ? new Date(s.end_date) : null;
-    var weeksLeft = endDate && !isNaN(endDate.getTime()) ? Math.max(0, Math.round((endDate.getTime() - now) / (7 * 86400000))) : null;
+    var endDate = _parseDate(s.end_date);
+    var weeksLeft = endDate ? Math.max(0, Math.round((endDate.getTime() - now) / (7 * 86400000))) : null;
     var risk = weeksToTarget !== null && weeksLeft !== null && weeksToTarget > weeksLeft;
     if (risk) atRisk++;
 
