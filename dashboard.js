@@ -10120,23 +10120,29 @@ function renderFacebookCRM() {
   el.innerHTML = html;
 }
 
-// ── Meta Marketing API — live campaign insights ──
+// ── Meta Marketing API — live campaign insights + intelligence ──
 var _metaAdsFetchInFlight = false;
+var META_ADS_WEEKLY = [];     // Weekly breakdowns per campaign
+var META_ADS_CAMPAIGNS = [];  // Campaign metadata (status, budget)
+
 async function fetchMetaAds() {
   if (_metaAdsFetchInFlight) return;
   var cfg = (CRP_CONFIG.CLICKUP || {}).META_ADS;
   if (!cfg || !cfg.ACCESS_TOKEN) return;
   _metaAdsFetchInFlight = true;
   try {
-    var url = 'https://graph.facebook.com/' + cfg.API_VERSION + '/' + cfg.AD_ACCOUNT_ID + '/insights'
-      + '?fields=campaign_name,impressions,clicks,ctr,actions,cost_per_action_type,spend'
-      + '&date_preset=last_30d&level=campaign'
-      + '&access_token=' + cfg.ACCESS_TOKEN;
-    var resp = await fetch(url);
-    if (!resp.ok) throw new Error('Meta API ' + resp.status);
-    var json = await resp.json();
-    if (json.error) throw new Error(json.error.message);
-    META_ADS_DATA = (json.data || []).map(function(c) {
+    var base = 'https://graph.facebook.com/' + cfg.API_VERSION + '/';
+    var tk = '&access_token=' + cfg.ACCESS_TOKEN;
+    // 3 parallel fetches: 30d summary, weekly breakdown, campaign metadata
+    var [r1, r2, r3] = await Promise.all([
+      fetch(base + cfg.AD_ACCOUNT_ID + '/insights?fields=campaign_name,impressions,clicks,ctr,actions,cost_per_action_type,spend&date_preset=last_30d&level=campaign' + tk),
+      fetch(base + cfg.AD_ACCOUNT_ID + '/insights?fields=campaign_name,actions,spend,impressions,clicks&date_preset=last_30d&level=campaign&time_increment=7' + tk),
+      fetch(base + cfg.AD_ACCOUNT_ID + '/campaigns?fields=name,status,effective_status,daily_budget' + tk),
+    ]);
+    var j1 = await r1.json(), j2 = await r2.json(), j3 = await r3.json();
+    if (j1.error) throw new Error(j1.error.message);
+
+    function parseActions(c) {
       var leads = 0, engagement = 0;
       (c.actions || []).forEach(function(a) {
         if (a.action_type === 'lead') leads = parseInt(a.value) || 0;
@@ -10146,21 +10152,30 @@ async function fetchMetaAds() {
       (c.cost_per_action_type || []).forEach(function(a) {
         if (a.action_type === 'lead') cpl = parseFloat(a.value) || 0;
       });
-      return {
-        campaign: c.campaign_name,
-        leads: leads,
-        impressions: parseInt(c.impressions) || 0,
-        clicks: parseInt(c.clicks) || 0,
-        ctr: parseFloat(c.ctr) || 0,
-        engagement: engagement,
-        spend: parseFloat(c.spend) || 0,
-        cpl: cpl,
-      };
+      return { leads: leads, engagement: engagement, cpl: cpl };
+    }
+
+    META_ADS_DATA = (j1.data || []).map(function(c) {
+      var a = parseActions(c);
+      return { campaign: c.campaign_name, leads: a.leads, impressions: parseInt(c.impressions)||0, clicks: parseInt(c.clicks)||0, ctr: parseFloat(c.ctr)||0, engagement: a.engagement, spend: parseFloat(c.spend)||0, cpl: a.cpl };
     });
-    _log('CRP: Meta Ads loaded — ' + META_ADS_DATA.length + ' campaigns');
+
+    META_ADS_WEEKLY = (j2.data || []).map(function(c) {
+      var a = parseActions(c);
+      return { campaign: c.campaign_name, date_start: c.date_start, date_stop: c.date_stop, leads: a.leads, spend: parseFloat(c.spend)||0, impressions: parseInt(c.impressions)||0, clicks: parseInt(c.clicks)||0, cpl: a.cpl };
+    });
+
+    META_ADS_CAMPAIGNS = (j3.data || []).map(function(c) {
+      return { name: c.name, status: c.status, effective_status: c.effective_status, daily_budget: parseInt(c.daily_budget||0)/100 };
+    });
+
+    _log('CRP: Meta Ads loaded — ' + META_ADS_DATA.length + ' campaigns, ' + META_ADS_WEEKLY.length + ' weekly rows');
     renderMetaAds();
+    renderMetaAlerts();
+    renderMetaFunnel();
+    renderMetaAlignment();
+    updateOverviewMarketingKPI();
     if (typeof renderFinMarketingROI === 'function') try { renderFinMarketingROI(); } catch(e) { _log('renderFinMarketingROI: ' + e.message); }
-    // Check token expiration
     checkMetaTokenExpiry(cfg).catch(function() {});
   } catch(e) {
     console.warn('CRP: Meta Ads fetch failed:', e.message);
@@ -10173,44 +10188,223 @@ async function fetchMetaAds() {
 
 async function checkMetaTokenExpiry(cfg) {
   try {
-    var url = 'https://graph.facebook.com/v21.0/debug_token?input_token=' + cfg.ACCESS_TOKEN + '&access_token=' + cfg.ACCESS_TOKEN;
-    var resp = await fetch(url);
+    var resp = await fetch('https://graph.facebook.com/v21.0/debug_token?input_token=' + cfg.ACCESS_TOKEN + '&access_token=' + cfg.ACCESS_TOKEN);
     if (!resp.ok) return;
     var json = await resp.json();
-    var data = json.data || {};
-    var expiresAt = data.expires_at || 0;
-    if (expiresAt === 0) return; // never-expiring token
-    var now = Math.floor(Date.now() / 1000);
-    var daysLeft = Math.round((expiresAt - now) / 86400);
-    var chip = document.getElementById('dh-metaads');
-    if (daysLeft <= 0) {
-      setHealthChip('dh-metaads', 'fail', 'Meta Token EXPIRED');
-      showToast('Meta API token has expired — regenerate at developers.facebook.com', 'error');
-    } else if (daysLeft <= 7) {
-      setHealthChip('dh-metaads', 'warn', 'Meta Ads \u00B7 Token: ' + daysLeft + 'd left');
-      showToast('Meta API token expires in ' + daysLeft + ' days — renew soon', 'warning');
-    } else {
-      setHealthChip('dh-metaads', 'ok', 'Meta Ads (' + (META_ADS_DATA||[]).length + ') \u00B7 ' + daysLeft + 'd');
-    }
+    var expiresAt = (json.data || {}).expires_at || 0;
+    if (expiresAt === 0) return;
+    var daysLeft = Math.round((expiresAt - Math.floor(Date.now()/1000)) / 86400);
+    if (daysLeft <= 0) { setHealthChip('dh-metaads','fail','Meta Token EXPIRED'); showToast('Meta API token has expired \u2014 regenerate at developers.facebook.com','error'); }
+    else if (daysLeft <= 7) { setHealthChip('dh-metaads','warn','Meta Ads \u00B7 Token: '+daysLeft+'d left'); showToast('Meta API token expires in '+daysLeft+' days \u2014 renew soon','warning'); }
+    else { setHealthChip('dh-metaads','ok','Meta Ads ('+META_ADS_DATA.length+') \u00B7 '+daysLeft+'d'); }
   } catch(e) { /* silent */ }
 }
 
+// Helper: get mapped studies for a campaign name
+function _metaStudiesForCampaign(campName) {
+  var campLower = campName.toLowerCase();
+  var campMap = ((CRP_CONFIG.CLICKUP || {}).FB_CAMPAIGN_MAP || {});
+  var best = [], bestLen = 0;
+  Object.keys(campMap).forEach(function(key) {
+    if (campLower.includes(key) && key.length > bestLen) { best = campMap[key]; bestLen = key.length; }
+  });
+  return best;
+}
+
+// Helper: build SVG sparkline from array of values
+function _sparkline(values, w, h, color) {
+  if (!values || values.length < 2) return '';
+  var max = Math.max.apply(null, values) || 1;
+  var pts = values.map(function(v, i) { return (i * w / (values.length - 1)).toFixed(1) + ',' + (h - v / max * h * 0.85).toFixed(1); }).join(' ');
+  return '<svg width="'+w+'" height="'+h+'" style="vertical-align:middle;"><polyline points="'+pts+'" fill="none" stroke="'+color+'" stroke-width="1.5" stroke-linecap="round"/><circle cx="'+(w)+'" cy="'+(h - values[values.length-1] / max * h * 0.85).toFixed(1)+'" r="2" fill="'+color+'"/></svg>';
+}
+
+// ── 1. Campaign Health Alerts ──
+function renderMetaAlerts() {
+  var el = document.getElementById('meta-alerts-container');
+  var badge = document.getElementById('meta-alerts-badge');
+  if (!el || !META_ADS_DATA || META_ADS_DATA.length === 0) return;
+  var alerts = [];
+  var campMap = {};
+  META_ADS_CAMPAIGNS.forEach(function(c) { campMap[c.name] = c; });
+  var weeklyByCamp = {};
+  META_ADS_WEEKLY.forEach(function(w) { if (!weeklyByCamp[w.campaign]) weeklyByCamp[w.campaign] = []; weeklyByCamp[w.campaign].push(w); });
+
+  META_ADS_DATA.forEach(function(c) {
+    var meta = campMap[c.campaign] || {};
+    var studies = _metaStudiesForCampaign(c.campaign);
+    var weeks = (weeklyByCamp[c.campaign] || []).sort(function(a,b) { return a.date_start < b.date_start ? -1 : 1; });
+
+    // Alert: Paused campaign with strong efficiency
+    if (meta.status === 'PAUSED' && c.leads > 50 && c.cpl < 10) {
+      alerts.push({ type: 'opportunity', icon: '\uD83D\uDFE2', msg: '<strong>' + escapeHTML(c.campaign) + '</strong> is PAUSED but was a top performer (' + c.leads + ' leads, strong efficiency). Consider reactivating.' });
+    }
+
+    // Alert: Active campaign targeting study in maintenance
+    if (meta.status === 'ACTIVE' && studies.length > 0) {
+      var maintStudies = studies.filter(function(sk) {
+        var ms = (typeof FIN_MERGED_STUDIES !== 'undefined' ? FIN_MERGED_STUDIES : []).find(function(f) { return f.study === sk; });
+        return ms && ms.status === 'Maintenance';
+      });
+      if (maintStudies.length > 0) {
+        alerts.push({ type: 'warning', icon: '\u26A0\uFE0F', msg: '<strong>' + escapeHTML(c.campaign) + '</strong> is spending on studies in <strong>Maintenance</strong>: ' + maintStudies.join(', ') + '. Consider pausing or redirecting.' });
+      }
+    }
+
+    // Alert: Efficiency declining (compare first week to last week)
+    if (weeks.length >= 3) {
+      var first = weeks[0], last = weeks[weeks.length - 1];
+      if (first.leads > 0 && last.leads > 0) {
+        var firstEff = first.spend / first.leads;
+        var lastEff = last.spend / last.leads;
+        if (lastEff > firstEff * 1.4 && last.spend > 100) {
+          alerts.push({ type: 'warning', icon: '\uD83D\uDCC9', msg: '<strong>' + escapeHTML(c.campaign) + '</strong> efficiency declining \u2014 trending worse over the last 4 weeks. Review targeting and creative.' });
+        }
+      }
+    }
+
+    // Alert: CTR below 1.5%
+    if (meta.status === 'ACTIVE' && c.ctr < 1.5 && c.impressions > 10000) {
+      alerts.push({ type: 'info', icon: '\uD83D\uDCA1', msg: '<strong>' + escapeHTML(c.campaign) + '</strong> has low CTR (' + c.ctr.toFixed(2) + '%). Consider refreshing ad creative.' });
+    }
+  });
+
+  // Alert: Budget reallocation opportunity
+  var active = META_ADS_DATA.filter(function(c) { var m = campMap[c.name || c.campaign] || {}; return m.status === 'ACTIVE'; });
+  var paused = META_ADS_DATA.filter(function(c) { var m = campMap[c.name || c.campaign] || {}; return m.status === 'PAUSED' && c.leads > 20; });
+  if (active.length > 0 && paused.length > 0) {
+    var worstActive = active.slice().sort(function(a,b) { return b.cpl - a.cpl; })[0];
+    var bestPaused = paused.slice().sort(function(a,b) { return a.cpl - b.cpl; })[0];
+    if (worstActive && bestPaused && bestPaused.cpl < worstActive.cpl * 0.6) {
+      alerts.push({ type: 'opportunity', icon: '\uD83D\uDD04', msg: 'Budget opportunity: <strong>' + escapeHTML(bestPaused.campaign) + '</strong> (paused, high efficiency) outperforms active <strong>' + escapeHTML(worstActive.campaign) + '</strong>. Consider reallocation.' });
+    }
+  }
+
+  if (badge) badge.textContent = alerts.length > 0 ? alerts.length + ' alert' + (alerts.length > 1 ? 's' : '') : 'All clear';
+  if (badge) badge.className = 'badge ' + (alerts.length > 0 ? 'badge-yellow' : 'badge-green');
+  if (alerts.length === 0) {
+    el.innerHTML = '<div style="color:#059669;font-size:12px;">\u2705 All campaigns healthy \u2014 no alerts</div>';
+    return;
+  }
+  var html = '';
+  alerts.forEach(function(a) {
+    var bg = a.type === 'warning' ? '#FEF3C7' : a.type === 'opportunity' ? '#ECFDF5' : '#EFF6FF';
+    var border = a.type === 'warning' ? '#F59E0B' : a.type === 'opportunity' ? '#10B981' : '#3B82F6';
+    html += '<div style="padding:8px 12px;margin-bottom:6px;border-radius:6px;background:' + bg + ';border-left:3px solid ' + border + ';font-size:11px;line-height:1.5;">' + a.icon + ' ' + a.msg + '</div>';
+  });
+  el.innerHTML = html;
+}
+
+// ── 2. Full-Funnel Tracker (no dollar amounts) ──
+function renderMetaFunnel() {
+  var el = document.getElementById('meta-funnel-container');
+  var badge = document.getElementById('meta-funnel-badge');
+  if (!el || !META_ADS_DATA || META_ADS_DATA.length === 0) return;
+
+  var campMap = ((CRP_CONFIG.CLICKUP || {}).FB_CAMPAIGN_MAP || {});
+  var fbStudyCol = (FB_CRM_DATA && FB_CRM_DATA.length > 0) ? Object.keys(FB_CRM_DATA[0] || {}).find(function(k) { return /study|campaign/i.test(k); }) : null;
+
+  var funnelRows = META_ADS_DATA.map(function(c) {
+    var campLower = c.campaign.toLowerCase();
+    var studies = _metaStudiesForCampaign(c.campaign);
+
+    // FB CRM leads for this campaign
+    var crmLeads = 0;
+    if (fbStudyCol) {
+      FB_CRM_DATA.forEach(function(r) {
+        var cn = (r[fbStudyCol] || '').toLowerCase().trim();
+        if (cn.includes(campLower) || campLower.includes(cn)) crmLeads++;
+      });
+    }
+
+    // Referral pipeline for mapped studies
+    var inPipeline = 0, contacted = 0, screening = 0, enrolled = 0;
+    var SG = ((CRP_CONFIG.CLICKUP || {}).STAGE_GROUPS || {});
+    if (studies.length > 0 && REFERRAL_DATA) {
+      REFERRAL_DATA.forEach(function(r) {
+        var rs = (r.study || '').toLowerCase().trim();
+        var match = studies.some(function(s) { return rs.includes(s.toLowerCase()) || s.toLowerCase().includes(rs); });
+        if (!match) return;
+        inPipeline++;
+        if (r.stage === 'Contacted') contacted++;
+        if (SG.SCREENING && SG.SCREENING.has(r.stage)) screening++;
+        if (SG.ENROLLED && SG.ENROLLED.has(r.stage)) enrolled++;
+      });
+    }
+
+    // CTMS visits for mapped studies
+    var ctmsVisits = 0;
+    if (studies.length > 0 && DATA && DATA.allVisitDetail) {
+      DATA.allVisitDetail.forEach(function(v) {
+        var vs = (v.study || '').toLowerCase();
+        if (studies.some(function(s) { return vs.includes(s.toLowerCase()); })) ctmsVisits++;
+      });
+    }
+
+    return { campaign: c.campaign, metaLeads: c.leads, crmLeads: crmLeads, inPipeline: inPipeline, contacted: contacted, screening: screening, enrolled: enrolled, ctmsVisits: ctmsVisits, studies: studies };
+  }).sort(function(a, b) { return b.metaLeads - a.metaLeads; });
+
+  var totals = { meta: 0, crm: 0, pipeline: 0, screening: 0, enrolled: 0, visits: 0 };
+  funnelRows.forEach(function(r) { totals.meta += r.metaLeads; totals.crm += r.crmLeads; totals.pipeline += r.inPipeline; totals.screening += r.screening; totals.enrolled += r.enrolled; totals.visits += r.ctmsVisits; });
+  if (badge) badge.textContent = totals.enrolled + ' enrolled from ' + totals.meta + ' leads';
+
+  // Funnel KPI bar (no dollar amounts)
+  var html = '<div style="display:flex;gap:4px;padding:12px 16px;border-bottom:1px solid #f1f5f9;align-items:center;flex-wrap:wrap;">';
+  var stages = [
+    { label: 'Meta Leads', val: totals.meta, color: '#3b82f6' },
+    { label: 'In CRM', val: totals.crm, color: '#6366f1' },
+    { label: 'Pipeline', val: totals.pipeline, color: '#8b5cf6' },
+    { label: 'Screening', val: totals.screening, color: '#d97706' },
+    { label: 'Enrolled', val: totals.enrolled, color: '#059669' },
+    { label: 'CTMS Visits', val: totals.visits, color: '#06b6d4' },
+  ];
+  stages.forEach(function(s, i) {
+    if (i > 0) html += '<div style="color:#cbd5e1;font-size:14px;">\u2192</div>';
+    html += '<div style="text-align:center;min-width:65px;"><div style="font-size:18px;font-weight:800;color:' + s.color + ';">' + s.val.toLocaleString() + '</div><div style="font-size:9px;color:#94a3b8;">' + s.label + '</div></div>';
+  });
+  html += '</div>';
+
+  // Per-campaign funnel table
+  html += '<div style="padding:4px 16px 0;font-size:9px;color:#94a3b8;">Cross-reference: Meta API \u00B7 FB CRM Sheet \u00B7 ClickUp Referrals \u00B7 CRIO Visits</div>';
+  html += '<div style="overflow-x:auto;"><table class="fin-table" style="width:100%;font-size:10px;">';
+  html += '<thead><tr><th style="text-align:left;padding:6px 10px;">Campaign</th><th style="text-align:center;">Meta</th><th style="text-align:center;">CRM</th><th style="text-align:center;">Pipeline</th><th style="text-align:center;">Screening</th><th style="text-align:center;">Enrolled</th><th style="text-align:center;">Visits</th><th style="text-align:center;">Conv %</th></tr></thead><tbody>';
+  funnelRows.forEach(function(r) {
+    var conv = r.metaLeads > 0 ? Math.round(r.enrolled / r.metaLeads * 100) : 0;
+    var convColor = conv >= 5 ? '#059669' : conv >= 2 ? '#d97706' : '#94a3b8';
+    html += '<tr style="transition:background .1s" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'\'">';
+    html += '<td style="padding:5px 10px;font-weight:600;">' + escapeHTML(r.campaign) + '<div style="font-size:8px;color:#94a3b8;">' + (r.studies.length > 0 ? r.studies.join(', ') : 'No study mapped') + '</div></td>';
+    html += '<td style="text-align:center;font-weight:700;color:#3b82f6;">' + r.metaLeads + '</td>';
+    html += '<td style="text-align:center;color:#6366f1;">' + r.crmLeads + '</td>';
+    html += '<td style="text-align:center;color:#8b5cf6;">' + r.inPipeline + '</td>';
+    html += '<td style="text-align:center;color:#d97706;">' + r.screening + '</td>';
+    html += '<td style="text-align:center;font-weight:700;color:#059669;">' + r.enrolled + '</td>';
+    html += '<td style="text-align:center;color:#06b6d4;">' + r.ctmsVisits + '</td>';
+    html += '<td style="text-align:center;font-weight:700;color:' + convColor + ';">' + conv + '%</td>';
+    html += '</tr>';
+  });
+  html += '</tbody></table></div>';
+  el.innerHTML = html;
+}
+
+// ── 3. Campaign Performance with Sparklines + Lead Capture Gap ──
 function renderMetaAds() {
   var el = document.getElementById('meta-ads-container');
   var badge = document.getElementById('meta-ads-badge');
-  if (!el || META_ADS_DATA.length === 0) return;
+  if (!el || !META_ADS_DATA || META_ADS_DATA.length === 0) return;
+  var campMeta = {};
+  META_ADS_CAMPAIGNS.forEach(function(c) { campMeta[c.name] = c; });
+  var weeklyByCamp = {};
+  META_ADS_WEEKLY.forEach(function(w) { if (!weeklyByCamp[w.campaign]) weeklyByCamp[w.campaign] = []; weeklyByCamp[w.campaign].push(w); });
 
-  // Sort by leads desc
   var camps = META_ADS_DATA.slice().sort(function(a, b) { return b.leads - a.leads; });
   var totalLeads = camps.reduce(function(s, c) { return s + c.leads; }, 0);
   var totalImpressions = camps.reduce(function(s, c) { return s + c.impressions; }, 0);
   var totalClicks = camps.reduce(function(s, c) { return s + c.clicks; }, 0);
   var totalEngagement = camps.reduce(function(s, c) { return s + c.engagement; }, 0);
   var avgCtr = totalImpressions > 0 ? (totalClicks / totalImpressions * 100).toFixed(2) : '0.00';
-
   if (badge) badge.textContent = totalLeads + ' leads \u00B7 ' + camps.length + ' campaigns';
 
-  // KPI banner (no dollar amounts — spend/CPL in Finance only)
+  // KPI banner (no dollar amounts)
   var html = '<div style="display:flex;gap:16px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid #f1f5f9;">';
   html += '<div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#3b82f6;">' + totalLeads.toLocaleString() + '</div><div style="font-size:10px;color:#94a3b8;">Total Leads</div></div>';
   html += '<div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#6366f1;">' + totalImpressions.toLocaleString() + '</div><div style="font-size:10px;color:#94a3b8;">Impressions</div></div>';
@@ -10219,93 +10413,177 @@ function renderMetaAds() {
   html += '<div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#06b6d4;">' + totalEngagement.toLocaleString() + '</div><div style="font-size:10px;color:#94a3b8;">Engagement</div></div>';
   html += '</div>';
 
-  // Source note
   html += '<div style="padding:4px 16px 0;font-size:9px;color:#94a3b8;">Data: Meta Marketing API \u00B7 Last 30 days \u00B7 Live</div>';
 
-  // Campaign table
-  html += '<div style="overflow-x:auto;"><table class="fin-table" style="width:100%;font-size:11px;">';
-  html += '<thead><tr>';
+  // Campaign table with sparklines and status
+  html += '<div style="overflow-x:auto;"><table class="fin-table" style="width:100%;font-size:11px;"><thead><tr>';
   html += '<th style="text-align:left;padding:8px 12px;">Campaign</th>';
+  html += '<th style="text-align:center;">Status</th>';
   html += '<th style="text-align:center;">Leads</th>';
-  html += '<th style="text-align:center;">Impressions</th>';
-  html += '<th style="text-align:center;">Clicks</th>';
   html += '<th style="text-align:center;">CTR</th>';
   html += '<th style="text-align:center;">Engagement</th>';
-  html += '<th style="text-align:center;min-width:120px;">Lead Volume</th>';
+  html += '<th style="text-align:center;min-width:80px;">4-Week Trend</th>';
+  html += '<th style="text-align:center;min-width:100px;">Lead Volume</th>';
   html += '</tr></thead><tbody>';
 
   var maxLeads = camps.length > 0 ? camps[0].leads : 1;
   camps.forEach(function(c) {
     var pct = maxLeads > 0 ? Math.round(c.leads / maxLeads * 100) : 0;
     var ctrColor = c.ctr >= 2.5 ? '#059669' : c.ctr >= 1.5 ? '#d97706' : '#dc2626';
+    var meta = campMeta[c.campaign] || {};
+    var statusColor = meta.status === 'ACTIVE' ? '#059669' : '#94a3b8';
+    var statusLabel = meta.status === 'ACTIVE' ? 'Active' : 'Paused';
+    var weeks = (weeklyByCamp[c.campaign] || []).sort(function(a,b) { return a.date_start < b.date_start ? -1 : 1; });
+    var weekLeads = weeks.map(function(w) { return w.leads; });
+    var spark = _sparkline(weekLeads, 70, 20, c.ctr >= 2 ? '#059669' : '#d97706');
+
     html += '<tr style="transition:background .1s" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'\'">';
     html += '<td style="padding:7px 12px;font-weight:600;">' + escapeHTML(c.campaign) + '</td>';
+    html += '<td style="text-align:center;"><span style="font-size:10px;padding:2px 8px;border-radius:10px;background:' + (meta.status === 'ACTIVE' ? '#ECFDF5' : '#F1F5F9') + ';color:' + statusColor + ';font-weight:600;">' + statusLabel + '</span></td>';
     html += '<td style="text-align:center;font-weight:700;color:#3b82f6;">' + c.leads.toLocaleString() + '</td>';
-    html += '<td style="text-align:center;">' + c.impressions.toLocaleString() + '</td>';
-    html += '<td style="text-align:center;">' + c.clicks.toLocaleString() + '</td>';
     html += '<td style="text-align:center;font-weight:600;color:' + ctrColor + ';">' + c.ctr.toFixed(2) + '%</td>';
     html += '<td style="text-align:center;">' + c.engagement.toLocaleString() + '</td>';
+    html += '<td style="text-align:center;">' + spark + '</td>';
     html += '<td style="padding:7px 12px;"><div style="background:linear-gradient(90deg,#3b82f6,#6366f1);height:18px;border-radius:4px;width:' + pct + '%;min-width:2px;display:flex;align-items:center;justify-content:flex-end;padding-right:4px;"><span style="font-size:9px;font-weight:700;color:' + (pct > 25 ? '#fff' : '#1e293b') + ';">' + c.leads + '</span></div></td>';
     html += '</tr>';
   });
-
   html += '</tbody></table></div>';
 
-  // Cross-reference with FB CRM data — Lead Capture Gap Analysis
+  // Lead Capture Gap Analysis
   if (FB_CRM_DATA && FB_CRM_DATA.length > 0) {
     var fbStudyCol = Object.keys(FB_CRM_DATA[0] || {}).find(function(k) { return /study|campaign/i.test(k); });
     if (fbStudyCol) {
       var fbByCamp = {};
-      FB_CRM_DATA.forEach(function(r) {
-        var cn = (r[fbStudyCol] || '').trim();
-        if (cn) fbByCamp[cn] = (fbByCamp[cn] || 0) + 1;
-      });
+      FB_CRM_DATA.forEach(function(r) { var cn = (r[fbStudyCol]||'').trim(); if (cn) fbByCamp[cn] = (fbByCamp[cn]||0) + 1; });
       var crossRef = camps.map(function(c) {
-        var campLower = c.campaign.toLowerCase();
-        var matched = 0;
-        Object.keys(fbByCamp).forEach(function(k) {
-          if (k.toLowerCase().includes(campLower) || campLower.includes(k.toLowerCase())) {
-            matched += fbByCamp[k];
-          }
-        });
-        // Also check FB_CAMPAIGN_MAP for study protocol mapping
-        var mappedStudies = [];
-        var campMap = ((CRP_CONFIG.CLICKUP || {}).FB_CAMPAIGN_MAP || {});
-        Object.keys(campMap).forEach(function(key) {
-          if (campLower.includes(key)) mappedStudies = campMap[key];
-        });
-        return { campaign: c.campaign, metaLeads: c.leads, crmLeads: matched, gap: c.leads - matched, studies: mappedStudies };
+        var cl = c.campaign.toLowerCase(), matched = 0;
+        Object.keys(fbByCamp).forEach(function(k) { if (k.toLowerCase().includes(cl) || cl.includes(k.toLowerCase())) matched += fbByCamp[k]; });
+        return { campaign: c.campaign, metaLeads: c.leads, crmLeads: matched, gap: c.leads - matched, studies: _metaStudiesForCampaign(c.campaign) };
       });
-      var totalMetaLeads = crossRef.reduce(function(s, x) { return s + x.metaLeads; }, 0);
-      var totalCrmLeads = crossRef.reduce(function(s, x) { return s + x.crmLeads; }, 0);
-      var overallCapture = totalMetaLeads > 0 ? Math.round(totalCrmLeads / totalMetaLeads * 100) : 0;
-      html += '<div style="border-top:2px solid #e2e8f0;margin-top:4px;">';
-      html += '<div style="padding:8px 16px 4px;font-size:12px;font-weight:700;color:#1e293b;">Lead Capture Gap Analysis <span style="font-weight:400;color:#64748b;font-size:10px;">(Meta API vs FB CRM Sheet)</span></div>';
-      html += '<div style="display:flex;gap:16px;padding:4px 16px 8px;flex-wrap:wrap;">';
-      html += '<div style="font-size:11px;"><span style="font-weight:700;color:#3b82f6;">' + totalMetaLeads + '</span> Meta leads</div>';
-      html += '<div style="font-size:11px;"><span style="font-weight:700;color:#059669;">' + totalCrmLeads + '</span> in CRM</div>';
-      html += '<div style="font-size:11px;">Overall capture: <span style="font-weight:700;color:' + (overallCapture >= 80 ? '#059669' : overallCapture >= 50 ? '#d97706' : '#dc2626') + ';">' + overallCapture + '%</span></div>';
-      html += '</div>';
-      html += '<table style="width:100%;font-size:10px;border-collapse:collapse;">';
-      html += '<thead><tr style="background:#f8fafc;"><th style="text-align:left;padding:4px 12px;">Campaign</th><th style="text-align:center;padding:4px 6px;">Meta</th><th style="text-align:center;padding:4px 6px;">CRM</th><th style="text-align:center;padding:4px 6px;">Gap</th><th style="text-align:center;padding:4px 6px;">Capture %</th><th style="text-align:left;padding:4px 6px;">Mapped Studies</th></tr></thead><tbody>';
+      var tm = crossRef.reduce(function(s,x){return s+x.metaLeads;},0), tc = crossRef.reduce(function(s,x){return s+x.crmLeads;},0);
+      var oc = tm > 0 ? Math.round(tc/tm*100) : 0;
+      html += '<div style="border-top:2px solid #e2e8f0;margin-top:4px;"><div style="padding:8px 16px 4px;font-size:12px;font-weight:700;">Lead Capture Gap <span style="font-weight:400;color:#64748b;font-size:10px;">Meta vs CRM \u00B7 Overall: <strong style="color:'+(oc>=80?'#059669':oc>=50?'#d97706':'#dc2626')+'">'+oc+'%</strong></span></div>';
+      html += '<table style="width:100%;font-size:10px;border-collapse:collapse;"><thead><tr style="background:#f8fafc;"><th style="text-align:left;padding:4px 12px;">Campaign</th><th style="text-align:center;padding:4px 6px;">Meta</th><th style="text-align:center;padding:4px 6px;">CRM</th><th style="text-align:center;padding:4px 6px;">Gap</th><th style="text-align:center;padding:4px 6px;">Capture</th></tr></thead><tbody>';
       crossRef.forEach(function(x) {
-        var pct = x.metaLeads > 0 ? Math.round(x.crmLeads / x.metaLeads * 100) : 0;
-        var gapColor = x.gap > 50 ? '#dc2626' : x.gap > 10 ? '#d97706' : '#059669';
-        var pctColor = pct >= 80 ? '#059669' : pct >= 50 ? '#d97706' : '#dc2626';
-        html += '<tr style="border-top:1px solid #f1f5f9;">';
-        html += '<td style="padding:4px 12px;font-weight:600;">' + escapeHTML(x.campaign) + '</td>';
-        html += '<td style="text-align:center;color:#3b82f6;font-weight:600;">' + x.metaLeads + '</td>';
-        html += '<td style="text-align:center;color:#059669;font-weight:600;">' + x.crmLeads + '</td>';
-        html += '<td style="text-align:center;color:' + gapColor + ';font-weight:700;">' + (x.gap > 0 ? '-' + x.gap : '\u2713') + '</td>';
-        html += '<td style="text-align:center;font-weight:700;color:' + pctColor + ';">' + pct + '%</td>';
-        html += '<td style="padding:4px 6px;font-size:9px;color:#94a3b8;">' + (x.studies.length > 0 ? x.studies.join(', ') : '\u2014') + '</td>';
-        html += '</tr>';
+        var p = x.metaLeads > 0 ? Math.round(x.crmLeads/x.metaLeads*100) : 0;
+        html += '<tr style="border-top:1px solid #f1f5f9;"><td style="padding:4px 12px;font-weight:600;">'+escapeHTML(x.campaign)+'</td><td style="text-align:center;color:#3b82f6;font-weight:600;">'+x.metaLeads+'</td><td style="text-align:center;color:#059669;font-weight:600;">'+x.crmLeads+'</td><td style="text-align:center;color:'+(x.gap>50?'#dc2626':x.gap>10?'#d97706':'#059669')+';font-weight:700;">'+(x.gap>0?'-'+x.gap:'\u2713')+'</td><td style="text-align:center;font-weight:700;color:'+(p>=80?'#059669':p>=50?'#d97706':'#dc2626')+';">'+p+'%</td></tr>';
       });
       html += '</tbody></table></div>';
     }
   }
-
   el.innerHTML = html;
+}
+
+// ── 4. Campaign ↔ Study Alignment ──
+function renderMetaAlignment() {
+  var el = document.getElementById('meta-alignment-container');
+  var badge = document.getElementById('meta-alignment-badge');
+  if (!el) return;
+  var campMap = {};
+  META_ADS_CAMPAIGNS.forEach(function(c) { campMap[c.name] = c; });
+
+  // Build indication → campaign mapping
+  var campByIndication = {};
+  META_ADS_DATA.forEach(function(c) {
+    var indication = c.campaign.replace(/_v\d+$/i, '').replace(/_V\d+$/i, '').replace(/_/g, ' ').trim();
+    if (!campByIndication[indication]) campByIndication[indication] = [];
+    campByIndication[indication].push(c);
+  });
+
+  // Build indication → CRIO studies mapping
+  var crioByIndication = {};
+  if (CRIO_STUDIES_DATA && CRIO_STUDIES_DATA.length > 0) {
+    CRIO_STUDIES_DATA.forEach(function(s) {
+      var ind = (s.indication || '').toLowerCase().trim();
+      if (!ind) return;
+      if (!crioByIndication[ind]) crioByIndication[ind] = [];
+      crioByIndication[ind].push(s);
+    });
+  }
+
+  // Build alignment rows
+  var rows = [];
+  // Check each indication for coverage
+  Object.keys(campByIndication).forEach(function(indication) {
+    var camps = campByIndication[indication];
+    var studies = _metaStudiesForCampaign(camps[0].campaign);
+    var hasActive = camps.some(function(c) { var m = campMap[c.campaign] || {}; return m.status === 'ACTIVE'; });
+    var totalLeads = camps.reduce(function(s, c) { return s + c.leads; }, 0);
+
+    // Check study enrollment status
+    var studyStatuses = studies.map(function(sk) {
+      var ms = (typeof FIN_MERGED_STUDIES !== 'undefined' ? FIN_MERGED_STUDIES : []).find(function(f) { return f.study === sk; });
+      return { study: sk, status: ms ? ms.status : 'Unknown' };
+    });
+    var enrolling = studyStatuses.filter(function(s) { return s.status === 'Active' || s.status === 'Enrolling'; }).length;
+    var maintenance = studyStatuses.filter(function(s) { return s.status === 'Maintenance'; }).length;
+
+    rows.push({ indication: indication, campaigns: camps, studies: studyStatuses, hasActive: hasActive, totalLeads: totalLeads, enrolling: enrolling, maintenance: maintenance, noStudy: studies.length === 0 });
+  });
+
+  // Check for CRIO enrolling studies with NO campaign
+  if (CRIO_STUDIES_DATA && CRIO_STUDIES_DATA.length > 0) {
+    var coveredStudies = new Set();
+    rows.forEach(function(r) { r.studies.forEach(function(s) { coveredStudies.add(s.study); }); });
+    CRIO_STUDIES_DATA.forEach(function(s) {
+      if (s.status !== 'ENROLLING' && s.status !== 'Enrolling') return;
+      if (coveredStudies.has(s.protocol_number)) return;
+      var ind = (s.indication || s.protocol_number || '').toLowerCase();
+      // Check if any campaign covers this study loosely
+      var covered = META_ADS_DATA.some(function(c) {
+        var st = _metaStudiesForCampaign(c.campaign);
+        return st.some(function(sk) { return sk === s.protocol_number; });
+      });
+      if (!covered) {
+        rows.push({ indication: ind, campaigns: [], studies: [{ study: s.protocol_number, status: 'Enrolling' }], hasActive: false, totalLeads: 0, enrolling: 1, maintenance: 0, noStudy: false, noCampaign: true });
+      }
+    });
+  }
+
+  if (badge) badge.textContent = rows.length + ' indications';
+  var html = '<div style="overflow-x:auto;"><table class="fin-table" style="width:100%;font-size:11px;"><thead><tr>';
+  html += '<th style="text-align:left;padding:6px 10px;">Indication</th>';
+  html += '<th style="text-align:center;">Campaign</th>';
+  html += '<th style="text-align:center;">Status</th>';
+  html += '<th style="text-align:center;">30d Leads</th>';
+  html += '<th style="text-align:left;">Studies</th>';
+  html += '<th style="text-align:center;">Signal</th>';
+  html += '</tr></thead><tbody>';
+  rows.sort(function(a, b) { return b.totalLeads - a.totalLeads; }).forEach(function(r) {
+    var signal = '', signalColor = '#059669';
+    if (r.noCampaign) { signal = 'No campaign'; signalColor = '#dc2626'; }
+    else if (r.maintenance > 0 && r.hasActive) { signal = 'Study in maintenance'; signalColor = '#dc2626'; }
+    else if (r.noStudy) { signal = 'No study mapped'; signalColor = '#d97706'; }
+    else if (!r.hasActive && r.enrolling > 0) { signal = 'Campaign paused'; signalColor = '#d97706'; }
+    else if (r.hasActive && r.enrolling > 0) { signal = 'Aligned'; signalColor = '#059669'; }
+    else { signal = '\u2014'; signalColor = '#94a3b8'; }
+    var campNames = r.campaigns.map(function(c) { return escapeHTML(c.campaign); }).join(', ') || '<span style="color:#dc2626;font-weight:600;">None</span>';
+    var studyHtml = r.studies.map(function(s) {
+      var sc = s.status === 'Maintenance' ? '#dc2626' : s.status === 'Active' || s.status === 'Enrolling' ? '#059669' : '#94a3b8';
+      return '<span style="font-size:9px;color:' + sc + ';">' + escapeHTML(s.study) + ' (' + s.status + ')</span>';
+    }).join('<br>') || '<span style="color:#94a3b8;font-size:9px;">\u2014</span>';
+    html += '<tr style="border-top:1px solid #f1f5f9;">';
+    html += '<td style="padding:5px 10px;font-weight:600;text-transform:capitalize;">' + escapeHTML(r.indication) + '</td>';
+    html += '<td style="text-align:center;font-size:10px;">' + campNames + '</td>';
+    html += '<td style="text-align:center;"><span style="font-size:10px;padding:2px 8px;border-radius:10px;background:' + (r.hasActive ? '#ECFDF5' : '#F1F5F9') + ';color:' + (r.hasActive ? '#059669' : '#94a3b8') + ';font-weight:600;">' + (r.hasActive ? 'Active' : 'Paused') + '</span></td>';
+    html += '<td style="text-align:center;font-weight:700;color:#3b82f6;">' + r.totalLeads + '</td>';
+    html += '<td style="padding:5px 10px;">' + studyHtml + '</td>';
+    html += '<td style="text-align:center;font-weight:600;color:' + signalColor + ';font-size:10px;">' + signal + '</td>';
+    html += '</tr>';
+  });
+  html += '</tbody></table></div>';
+  el.innerHTML = html;
+}
+
+// ── 5. Overview Marketing KPI ──
+function updateOverviewMarketingKPI() {
+  if (!META_ADS_DATA || META_ADS_DATA.length === 0) return;
+  var totalLeads = META_ADS_DATA.reduce(function(s, c) { return s + c.leads; }, 0);
+  var active = META_ADS_CAMPAIGNS.filter(function(c) { return c.status === 'ACTIVE'; }).length;
+  var kpiVal = document.getElementById('kpi-marketing-leads');
+  var kpiSub = document.getElementById('kpi-marketing-sub');
+  if (kpiVal) kpiVal.textContent = totalLeads.toLocaleString();
+  if (kpiSub) kpiSub.textContent = active + ' active campaigns (30d)';
 }
 
 
