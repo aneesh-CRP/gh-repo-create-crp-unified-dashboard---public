@@ -12463,7 +12463,7 @@ function renderMetaAlerts() {
         var firstEff = first.spend / first.leads;
         var lastEff = last.spend / last.leads;
         if (lastEff > firstEff * 1.4 && last.spend > 100 && leadDecline < 2) {
-          alerts.push({ type: 'warning', icon: '\uD83D\uDCC9', msg: '<strong>' + escapeHTML(c.campaign) + '</strong> cost efficiency declining \u2014 CPL up 40%+ over 4 weeks. Review targeting.' });
+          alerts.push({ type: 'warning', icon: '\uD83D\uDCC9', msg: '<strong>' + escapeHTML(c.campaign) + '</strong> cost efficiency declining \u2014 CPL up 40%+ over ' + weeks.length + ' weeks. Review targeting.' });
         }
       }
     }
@@ -12528,6 +12528,7 @@ function renderMetaFunnel() {
     if (studies.length > 0 && REFERRAL_DATA) {
       REFERRAL_DATA.forEach(function(r) {
         var rs = (r.study || '').toLowerCase().trim();
+        if (!rs) return;
         var match = studies.some(function(s) { return rs.includes(s.toLowerCase()) || s.toLowerCase().includes(rs); });
         if (!match) return;
         inPipeline++;
@@ -12550,7 +12551,17 @@ function renderMetaFunnel() {
   }).sort(function(a, b) { return b.metaLeads - a.metaLeads; });
 
   var totals = { meta: 0, crm: 0, pipeline: 0, screening: 0, enrolled: 0, visits: 0 };
-  funnelRows.forEach(function(r) { totals.meta += r.metaLeads; totals.crm += r.crmLeads; totals.pipeline += r.inPipeline; totals.screening += r.screening; totals.enrolled += r.enrolled; totals.visits += r.ctmsVisits; });
+  funnelRows.forEach(function(r) { totals.meta += r.metaLeads; totals.pipeline += r.inPipeline; totals.screening += r.screening; totals.enrolled += r.enrolled; totals.visits += r.ctmsVisits; });
+  // Unique CRM total (avoid double-counting leads matching multiple campaigns)
+  if (fbStudyCol) {
+    var crmSeen = new Set();
+    FB_CRM_DATA.forEach(function(r, idx) {
+      var cn = (r[fbStudyCol] || '').toLowerCase().trim();
+      if (!cn) return;
+      var matched = META_ADS_DATA.some(function(c) { var cl = c.campaign.toLowerCase(); return cn.includes(cl) || cl.includes(cn); });
+      if (matched && !crmSeen.has(idx)) { totals.crm++; crmSeen.add(idx); }
+    });
+  }
   if (badge) badge.textContent = totals.enrolled + ' enrolled from ' + totals.meta + ' leads';
 
   // Funnel KPI bar (no dollar amounts)
@@ -12711,7 +12722,10 @@ function renderMetaAlignment() {
   // Check each indication for coverage
   Object.keys(campByIndication).forEach(function(indication) {
     var camps = campByIndication[indication];
-    var studies = _metaStudiesForCampaign(camps[0].campaign);
+    // Collect studies from ALL campaigns in this indication (not just first)
+    var studySet = new Set();
+    camps.forEach(function(c) { _metaStudiesForCampaign(c.campaign).forEach(function(sk) { studySet.add(sk); }); });
+    var studies = Array.from(studySet);
     var hasActive = camps.some(function(c) { var m = campMap[c.campaign] || {}; return m.status === 'ACTIVE'; });
     var totalLeads = camps.reduce(function(s, c) { return s + c.leads; }, 0);
 
@@ -12745,7 +12759,7 @@ function renderMetaAlignment() {
         var skLower = (s.protocol_number || '').toLowerCase();
         if (REFERRAL_DATA) REFERRAL_DATA.forEach(function(r) {
           var rs = (r.study || '').toLowerCase().trim();
-          if (rs.includes(skLower) || skLower.includes(rs)) pipeCount++;
+          if (rs && (rs.includes(skLower) || skLower.includes(rs))) pipeCount++;
         });
         rows.push({ indication: ind, campaigns: [], studies: [{ study: s.protocol_number, status: 'Enrolling' }], hasActive: false, totalLeads: 0, enrolling: 1, maintenance: 0, noStudy: false, noCampaign: true, pipelineVolume: pipeCount });
       }
@@ -12760,7 +12774,7 @@ function renderMetaAlignment() {
       var skLower = s.study.toLowerCase();
       if (REFERRAL_DATA) REFERRAL_DATA.forEach(function(ref) {
         var rs = (ref.study || '').toLowerCase().trim();
-        if (rs.includes(skLower) || skLower.includes(rs)) vol++;
+        if (rs && (rs.includes(skLower) || skLower.includes(rs))) vol++;
       });
     });
     r.pipelineVolume = vol;
@@ -13004,7 +13018,7 @@ function renderRecruiterAttribution() {
   html += '</tr></thead><tbody>';
   rows.forEach(function(r) {
     var convColor = r.convRate >= 15 ? '#059669' : r.convRate >= 5 ? '#d97706' : '#dc2626';
-    var gapPct = r.metaLeads > 0 ? Math.round((r.pipelineTotal / r.metaLeads) * 100) : 0;
+    var gapPct = r.metaLeads > 0 ? Math.min(100, Math.round((r.pipelineTotal / r.metaLeads) * 100)) : 0;
     html += '<tr style="border-top:1px solid #f1f5f9;">';
     html += '<td style="padding:5px 8px;font-weight:600;font-size:10px;">' + escapeHTML(r.campaign) + '</td>';
     html += '<td style="text-align:center;color:#3b82f6;font-weight:700;">' + r.metaLeads + '</td>';
@@ -13158,6 +13172,7 @@ function renderEnrollmentVelocity() {
     var signal = '', sigColor = '#059669';
     if (r.risk) { signal = 'At Risk'; sigColor = '#dc2626'; }
     else if (r.weeksToTarget === null) { signal = 'Need data'; sigColor = '#94a3b8'; }
+    else if (r.weeksLeft === null) { signal = 'No deadline'; sigColor = '#d97706'; }
     else if (r.pctDone >= 80) { signal = 'On Track'; sigColor = '#059669'; }
     else { signal = 'OK'; sigColor = '#3b82f6'; }
 
