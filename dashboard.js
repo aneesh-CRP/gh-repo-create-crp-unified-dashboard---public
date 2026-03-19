@@ -257,6 +257,12 @@ const CRP_CONFIG = {
     EXTRA_LISTS: [],
     // Facebook CRM Google Sheet (published CSV — recruitment team comments + Delfa AI pre-screener)
     FACEBOOK_CRM_URL: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vR2y6TsaFLnVQcyskBntErNr5zl1WZRxZhWo-0cOIgMfEWvNm6NStcYatK9MF7U2tj4QDlnOCnopHri/pub?output=csv',
+    // Meta Marketing API — live campaign insights (token expires ~60 days, regenerate at developers.facebook.com)
+    META_ADS: {
+      ACCESS_TOKEN: 'EAAR30KmZARsIBQZBI3rY5NT5M943KyilrUywGRUupe0Nm4CYflEZBSrksryHFVYk3dZBcPqo9g906vH7ZAltDLWQZAAp1DaExCTc0l6pMQgVxFB2PkJ1ROjde42mefqp1AsCJ7sfJhuWeqkEP1g5IW55BZBINJARxo011ThFW7ngim76f93ax3hVrofPa6f0Qdy7rkLSw6wuVOI',
+      AD_ACCOUNT_ID: 'act_1368706200208131',
+      API_VERSION: 'v21.0',
+    },
     // Map FB campaign names → study protocol IDs (campaign keyword → [study1, study2])
     // Keys are lowercased substrings matched against the 'Study Campaign' column
     // More specific keys are checked first (longest match wins)
@@ -6194,6 +6200,7 @@ async function refreshData() {
     setTimeout(() => {
       fetchPatientDB().catch(e => console.warn('Patient DB refresh failed:', e));
       fetchFacebookCRM().catch(() => {});
+      fetchMetaAds().catch(() => {});
       fetchCrioStudies().catch(e => console.warn('CRIO refresh failed:', e));
       fetchLookerStudyStatus().catch(e => console.warn('Looker refresh failed:', e));
     }, 1500);
@@ -7796,6 +7803,7 @@ function showCoordDetail(coordName) {
 let REFERRAL_DATA = [];        // all referral tasks normalized
 let CAMPAIGN_DATA = [];        // central campaign aggregates
 let FB_CRM_DATA = [];          // Facebook CRM leads from Google Sheet
+let META_ADS_DATA = [];        // Meta Marketing API campaign insights (live)
 let MED_RECORDS_DATA = [];     // Medical Records & Patient's Path (per-study patient tracking)
 let CRIO_STUDIES_DATA = [];    // CRIO API — study enrollment status, roles, subject counts
 let CRIO_SUBJECTS_DATA = [];   // CRIO API — individual subject IDs and statuses per study
@@ -10065,6 +10073,144 @@ function renderFacebookCRM() {
   el.innerHTML = html;
 }
 
+// ── Meta Marketing API — live campaign insights ──
+var _metaAdsFetchInFlight = false;
+async function fetchMetaAds() {
+  if (_metaAdsFetchInFlight) return;
+  var cfg = (CRP_CONFIG.CLICKUP || {}).META_ADS;
+  if (!cfg || !cfg.ACCESS_TOKEN) return;
+  _metaAdsFetchInFlight = true;
+  try {
+    var url = 'https://graph.facebook.com/' + cfg.API_VERSION + '/' + cfg.AD_ACCOUNT_ID + '/insights'
+      + '?fields=campaign_name,impressions,clicks,ctr,actions,cost_per_action_type,spend'
+      + '&date_preset=last_30d&level=campaign'
+      + '&access_token=' + cfg.ACCESS_TOKEN;
+    var resp = await fetch(url);
+    if (!resp.ok) throw new Error('Meta API ' + resp.status);
+    var json = await resp.json();
+    if (json.error) throw new Error(json.error.message);
+    META_ADS_DATA = (json.data || []).map(function(c) {
+      var leads = 0, engagement = 0;
+      (c.actions || []).forEach(function(a) {
+        if (a.action_type === 'lead') leads = parseInt(a.value) || 0;
+        if (a.action_type === 'post_engagement') engagement = parseInt(a.value) || 0;
+      });
+      var cpl = 0;
+      (c.cost_per_action_type || []).forEach(function(a) {
+        if (a.action_type === 'lead') cpl = parseFloat(a.value) || 0;
+      });
+      return {
+        campaign: c.campaign_name,
+        leads: leads,
+        impressions: parseInt(c.impressions) || 0,
+        clicks: parseInt(c.clicks) || 0,
+        ctr: parseFloat(c.ctr) || 0,
+        engagement: engagement,
+        spend: parseFloat(c.spend) || 0,
+        cpl: cpl,
+      };
+    });
+    _log('CRP: Meta Ads loaded — ' + META_ADS_DATA.length + ' campaigns');
+    renderMetaAds();
+  } catch(e) {
+    console.warn('CRP: Meta Ads fetch failed:', e.message);
+    var el = document.getElementById('meta-ads-container');
+    if (el) el.innerHTML = '<div style="text-align:center;padding:20px;color:#94a3b8;font-size:13px;">\u26A0\uFE0F Could not load Meta campaign data</div>';
+  } finally {
+    _metaAdsFetchInFlight = false;
+  }
+}
+
+function renderMetaAds() {
+  var el = document.getElementById('meta-ads-container');
+  var badge = document.getElementById('meta-ads-badge');
+  if (!el || META_ADS_DATA.length === 0) return;
+
+  // Sort by leads desc
+  var camps = META_ADS_DATA.slice().sort(function(a, b) { return b.leads - a.leads; });
+  var totalLeads = camps.reduce(function(s, c) { return s + c.leads; }, 0);
+  var totalImpressions = camps.reduce(function(s, c) { return s + c.impressions; }, 0);
+  var totalClicks = camps.reduce(function(s, c) { return s + c.clicks; }, 0);
+  var totalEngagement = camps.reduce(function(s, c) { return s + c.engagement; }, 0);
+  var avgCtr = totalImpressions > 0 ? (totalClicks / totalImpressions * 100).toFixed(2) : '0.00';
+
+  if (badge) badge.textContent = totalLeads + ' leads \u00B7 ' + camps.length + ' campaigns';
+
+  // KPI banner (no dollar amounts — spend/CPL in Finance only)
+  var html = '<div style="display:flex;gap:16px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid #f1f5f9;">';
+  html += '<div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#3b82f6;">' + totalLeads.toLocaleString() + '</div><div style="font-size:10px;color:#94a3b8;">Total Leads</div></div>';
+  html += '<div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#6366f1;">' + totalImpressions.toLocaleString() + '</div><div style="font-size:10px;color:#94a3b8;">Impressions</div></div>';
+  html += '<div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#8b5cf6;">' + totalClicks.toLocaleString() + '</div><div style="font-size:10px;color:#94a3b8;">Clicks</div></div>';
+  html += '<div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:' + (parseFloat(avgCtr) >= 2 ? '#059669' : '#d97706') + ';">' + avgCtr + '%</div><div style="font-size:10px;color:#94a3b8;">Avg CTR</div></div>';
+  html += '<div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#06b6d4;">' + totalEngagement.toLocaleString() + '</div><div style="font-size:10px;color:#94a3b8;">Engagement</div></div>';
+  html += '</div>';
+
+  // Source note
+  html += '<div style="padding:4px 16px 0;font-size:9px;color:#94a3b8;">Data: Meta Marketing API \u00B7 Last 30 days \u00B7 Live</div>';
+
+  // Campaign table
+  html += '<div style="overflow-x:auto;"><table class="fin-table" style="width:100%;font-size:11px;">';
+  html += '<thead><tr>';
+  html += '<th style="text-align:left;padding:8px 12px;">Campaign</th>';
+  html += '<th style="text-align:center;">Leads</th>';
+  html += '<th style="text-align:center;">Impressions</th>';
+  html += '<th style="text-align:center;">Clicks</th>';
+  html += '<th style="text-align:center;">CTR</th>';
+  html += '<th style="text-align:center;">Engagement</th>';
+  html += '<th style="text-align:center;min-width:120px;">Lead Volume</th>';
+  html += '</tr></thead><tbody>';
+
+  var maxLeads = camps.length > 0 ? camps[0].leads : 1;
+  camps.forEach(function(c) {
+    var pct = maxLeads > 0 ? Math.round(c.leads / maxLeads * 100) : 0;
+    var ctrColor = c.ctr >= 2.5 ? '#059669' : c.ctr >= 1.5 ? '#d97706' : '#dc2626';
+    html += '<tr style="transition:background .1s" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'\'">';
+    html += '<td style="padding:7px 12px;font-weight:600;">' + escapeHTML(c.campaign) + '</td>';
+    html += '<td style="text-align:center;font-weight:700;color:#3b82f6;">' + c.leads.toLocaleString() + '</td>';
+    html += '<td style="text-align:center;">' + c.impressions.toLocaleString() + '</td>';
+    html += '<td style="text-align:center;">' + c.clicks.toLocaleString() + '</td>';
+    html += '<td style="text-align:center;font-weight:600;color:' + ctrColor + ';">' + c.ctr.toFixed(2) + '%</td>';
+    html += '<td style="text-align:center;">' + c.engagement.toLocaleString() + '</td>';
+    html += '<td style="padding:7px 12px;"><div style="background:linear-gradient(90deg,#3b82f6,#6366f1);height:18px;border-radius:4px;width:' + pct + '%;min-width:2px;display:flex;align-items:center;justify-content:flex-end;padding-right:4px;"><span style="font-size:9px;font-weight:700;color:' + (pct > 25 ? '#fff' : '#1e293b') + ';">' + c.leads + '</span></div></td>';
+    html += '</tr>';
+  });
+
+  html += '</tbody></table></div>';
+
+  // Cross-reference with FB CRM data
+  if (FB_CRM_DATA && FB_CRM_DATA.length > 0) {
+    var fbStudyCol = Object.keys(FB_CRM_DATA[0] || {}).find(function(k) { return /study|campaign/i.test(k); });
+    if (fbStudyCol) {
+      var fbByCamp = {};
+      FB_CRM_DATA.forEach(function(r) {
+        var cn = (r[fbStudyCol] || '').trim();
+        if (cn) fbByCamp[cn] = (fbByCamp[cn] || 0) + 1;
+      });
+      var crossRef = camps.map(function(c) {
+        var campLower = c.campaign.toLowerCase();
+        var matched = 0;
+        Object.keys(fbByCamp).forEach(function(k) {
+          if (k.toLowerCase().includes(campLower) || campLower.includes(k.toLowerCase())) {
+            matched += fbByCamp[k];
+          }
+        });
+        return matched > 0 ? { campaign: c.campaign, metaLeads: c.leads, crmLeads: matched } : null;
+      }).filter(Boolean);
+      if (crossRef.length > 0) {
+        html += '<div style="padding:10px 16px;border-top:1px solid #f1f5f9;font-size:11px;color:#64748b;">';
+        html += '<strong>Cross-reference with FB CRM Sheet:</strong> ';
+        crossRef.forEach(function(x) {
+          var pctCaptured = x.metaLeads > 0 ? Math.round(x.crmLeads / x.metaLeads * 100) : 0;
+          html += '<span style="margin-right:12px;">' + escapeHTML(x.campaign) + ': <strong>' + x.crmLeads + '</strong>/' + x.metaLeads + ' in CRM (' + pctCaptured + '%)</span>';
+        });
+        html += '</div>';
+      }
+    }
+  }
+
+  el.innerHTML = html;
+}
+
 
 // ── Data Source URLs (Looker → Google Sheets, auto-pushed every 15 min) ──
 const LIVE_URL1 = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSQJ_QKC-ttmVuaYZokhz6NPNsMUpMe262mqAXbLocxOgGqbxHIMschUhE6FERyYwJfARhVg3wppBZS/pub?output=csv';
@@ -11474,6 +11620,9 @@ async function _crpInit() {
         safe(buildRecruitmentKPIs, 'buildRecruitmentKPIs');
         if (typeof renderStudiesTable === 'function') try { renderStudiesTable(); } catch(e) { _log('renderStudiesTable: ' + e.message); }
       }).catch(e => { console.warn('CRP: Facebook CRM initial load failed:', e); setHealthChip('dh-fbcrm','fail','FB CRM (failed)'); });
+      fetchMetaAds().then(() => {
+        setHealthChip('dh-metaads','ok','Meta Ads (' + (META_ADS_DATA||[]).length + ')');
+      }).catch(e => { console.warn('CRP: Meta Ads initial load failed:', e); setHealthChip('dh-metaads','fail','Meta Ads (failed)'); });
     }, 1500);
 
     // ── Phase 4: Referral data from Google Sheets CSV — populates Overview KPIs ──
@@ -11553,6 +11702,7 @@ async function _crpInit() {
     setTimeout(() => {
       if (_referralsLoaded) refreshReferrals().catch(() => {});
       fetchFacebookCRM().catch(() => {});
+      fetchMetaAds().catch(() => {});
     }, 2000);
 
     if (badge) badge.textContent = `Auto-updated: ${now.toLocaleTimeString()}`;
