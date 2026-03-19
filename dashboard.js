@@ -270,6 +270,13 @@ const CRP_CONFIG = {
       'high triglycerides_v2': ['J2A-MC-GZPS'],
       'high triglycerides_v1': ['J2A-MC-GZPO'],
       'high triglycerides':    ['J2A-MC-GZPS'],  // fallback for unversioned
+      'diabetes':              ['I8F-MC-GPHE', 'J2A-MC-GZGS'],
+      'heart health':          ['D7960C00015', 'D6973C00001', 'J1I-MC-GZBO'],
+      'eczema':                ['M20-465', 'M23-698', 'M24-601', '95597528ADM2001'],
+      'chronic hives':         ['CDX0159-12'],
+      'menstural migraines':   ['M23-714', 'C4951063'],  // campaign typo preserved
+      'menstrual migraines':   ['M23-714', 'C4951063'],
+      'bladder leak':          [],  // no matching protocol study yet
     },
     // Unified pipeline stage mapping (ClickUp status → dashboard stage)
     PIPELINE_MAP: {
@@ -1179,6 +1186,45 @@ function drawPayChartOverview(){
   });
 }
 
+function renderFinMarketingROI() {
+  var wrap = document.getElementById('fin-marketing-roi');
+  var kpiEl = document.getElementById('fin-meta-ads-kpi');
+  var tblEl = document.getElementById('fin-meta-ads-table');
+  if (!wrap || !kpiEl || !tblEl || !META_ADS_DATA || META_ADS_DATA.length === 0) return;
+  wrap.style.display = '';
+  var camps = META_ADS_DATA.slice().sort(function(a,b) { return b.spend - a.spend; });
+  var totalSpend = camps.reduce(function(s,c) { return s + c.spend; }, 0);
+  var totalLeads = camps.reduce(function(s,c) { return s + c.leads; }, 0);
+  var avgCPL = totalLeads > 0 ? (totalSpend / totalLeads) : 0;
+  var totalClicks = camps.reduce(function(s,c) { return s + c.clicks; }, 0);
+  var avgCPC = totalClicks > 0 ? (totalSpend / totalClicks) : 0;
+  var kpi = '';
+  kpi += '<div style="text-align:center;min-width:90px;"><div style="font-size:20px;font-weight:800;color:#dc2626;">$' + totalSpend.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0}) + '</div><div style="font-size:10px;color:#94a3b8;">Total Spend</div></div>';
+  kpi += '<div style="text-align:center;min-width:90px;"><div style="font-size:20px;font-weight:800;color:#3b82f6;">' + totalLeads.toLocaleString() + '</div><div style="font-size:10px;color:#94a3b8;">Total Leads</div></div>';
+  kpi += '<div style="text-align:center;min-width:90px;"><div style="font-size:20px;font-weight:800;color:' + (avgCPL <= 10 ? '#059669' : avgCPL <= 20 ? '#d97706' : '#dc2626') + ';">$' + avgCPL.toFixed(2) + '</div><div style="font-size:10px;color:#94a3b8;">Avg CPL</div></div>';
+  kpi += '<div style="text-align:center;min-width:90px;"><div style="font-size:20px;font-weight:800;color:#6366f1;">$' + avgCPC.toFixed(2) + '</div><div style="font-size:10px;color:#94a3b8;">Avg CPC</div></div>';
+  kpiEl.innerHTML = kpi;
+  var html = '<table class="tbl" style="width:100%;font-size:11px;">';
+  html += '<thead><tr><th style="text-align:left;padding:8px 12px;">Campaign</th><th class="r">Spend</th><th class="r">Leads</th><th class="r">CPL</th><th class="r">CPC</th><th class="r">Clicks</th><th class="r">Impressions</th><th class="r">CTR</th></tr></thead><tbody>';
+  camps.forEach(function(c) {
+    var cpl = c.leads > 0 ? (c.spend / c.leads) : 0;
+    var cpc = c.clicks > 0 ? (c.spend / c.clicks) : 0;
+    var cplColor = cpl <= 10 ? '#059669' : cpl <= 20 ? '#d97706' : '#dc2626';
+    html += '<tr>';
+    html += '<td style="padding:7px 12px;font-weight:600;">' + escapeHTML(c.campaign) + '</td>';
+    html += '<td class="r" style="font-weight:700;color:#dc2626;">$' + c.spend.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0}) + '</td>';
+    html += '<td class="r" style="font-weight:700;color:#3b82f6;">' + c.leads.toLocaleString() + '</td>';
+    html += '<td class="r" style="font-weight:600;color:' + cplColor + ';">$' + cpl.toFixed(2) + '</td>';
+    html += '<td class="r">$' + cpc.toFixed(2) + '</td>';
+    html += '<td class="r">' + c.clicks.toLocaleString() + '</td>';
+    html += '<td class="r">' + c.impressions.toLocaleString() + '</td>';
+    html += '<td class="r">' + c.ctr.toFixed(2) + '%</td>';
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  tblEl.innerHTML = html;
+}
+
 // ══════════ INIT ══════════
 
 
@@ -1404,6 +1450,7 @@ function initFinanceDashboard(forceRefresh) {
   try { drawPayChart(); } catch(e) { _log('drawPayChart: ' + e.message); }
   try { drawPayChartOverview(); } catch(e) { _log('drawPayChartOverview: ' + e.message); }
   try { renderARStudies(); } catch(e) { _log('renderARStudies: ' + e.message); }
+  try { renderFinMarketingROI(); } catch(e) { _log('renderFinMarketingROI: ' + e.message); }
   // Aging
   try { renderAgingKPIs(); } catch(e) { _log('renderAgingKPIs: ' + e.message); }
   try { renderAgingTables(); } catch(e) { _log('renderAgingTables: ' + e.message); }
@@ -10112,6 +10159,9 @@ async function fetchMetaAds() {
     });
     _log('CRP: Meta Ads loaded — ' + META_ADS_DATA.length + ' campaigns');
     renderMetaAds();
+    if (typeof renderFinMarketingROI === 'function') try { renderFinMarketingROI(); } catch(e) { _log('renderFinMarketingROI: ' + e.message); }
+    // Check token expiration
+    checkMetaTokenExpiry(cfg).catch(function() {});
   } catch(e) {
     console.warn('CRP: Meta Ads fetch failed:', e.message);
     var el = document.getElementById('meta-ads-container');
@@ -10119,6 +10169,30 @@ async function fetchMetaAds() {
   } finally {
     _metaAdsFetchInFlight = false;
   }
+}
+
+async function checkMetaTokenExpiry(cfg) {
+  try {
+    var url = 'https://graph.facebook.com/v21.0/debug_token?input_token=' + cfg.ACCESS_TOKEN + '&access_token=' + cfg.ACCESS_TOKEN;
+    var resp = await fetch(url);
+    if (!resp.ok) return;
+    var json = await resp.json();
+    var data = json.data || {};
+    var expiresAt = data.expires_at || 0;
+    if (expiresAt === 0) return; // never-expiring token
+    var now = Math.floor(Date.now() / 1000);
+    var daysLeft = Math.round((expiresAt - now) / 86400);
+    var chip = document.getElementById('dh-metaads');
+    if (daysLeft <= 0) {
+      setHealthChip('dh-metaads', 'fail', 'Meta Token EXPIRED');
+      showToast('Meta API token has expired — regenerate at developers.facebook.com', 'error');
+    } else if (daysLeft <= 7) {
+      setHealthChip('dh-metaads', 'warn', 'Meta Ads \u00B7 Token: ' + daysLeft + 'd left');
+      showToast('Meta API token expires in ' + daysLeft + ' days — renew soon', 'warning');
+    } else {
+      setHealthChip('dh-metaads', 'ok', 'Meta Ads (' + (META_ADS_DATA||[]).length + ') \u00B7 ' + daysLeft + 'd');
+    }
+  } catch(e) { /* silent */ }
 }
 
 function renderMetaAds() {
@@ -10177,7 +10251,7 @@ function renderMetaAds() {
 
   html += '</tbody></table></div>';
 
-  // Cross-reference with FB CRM data
+  // Cross-reference with FB CRM data — Lead Capture Gap Analysis
   if (FB_CRM_DATA && FB_CRM_DATA.length > 0) {
     var fbStudyCol = Object.keys(FB_CRM_DATA[0] || {}).find(function(k) { return /study|campaign/i.test(k); });
     if (fbStudyCol) {
@@ -10194,17 +10268,40 @@ function renderMetaAds() {
             matched += fbByCamp[k];
           }
         });
-        return matched > 0 ? { campaign: c.campaign, metaLeads: c.leads, crmLeads: matched } : null;
-      }).filter(Boolean);
-      if (crossRef.length > 0) {
-        html += '<div style="padding:10px 16px;border-top:1px solid #f1f5f9;font-size:11px;color:#64748b;">';
-        html += '<strong>Cross-reference with FB CRM Sheet:</strong> ';
-        crossRef.forEach(function(x) {
-          var pctCaptured = x.metaLeads > 0 ? Math.round(x.crmLeads / x.metaLeads * 100) : 0;
-          html += '<span style="margin-right:12px;">' + escapeHTML(x.campaign) + ': <strong>' + x.crmLeads + '</strong>/' + x.metaLeads + ' in CRM (' + pctCaptured + '%)</span>';
+        // Also check FB_CAMPAIGN_MAP for study protocol mapping
+        var mappedStudies = [];
+        var campMap = ((CRP_CONFIG.CLICKUP || {}).FB_CAMPAIGN_MAP || {});
+        Object.keys(campMap).forEach(function(key) {
+          if (campLower.includes(key)) mappedStudies = campMap[key];
         });
-        html += '</div>';
-      }
+        return { campaign: c.campaign, metaLeads: c.leads, crmLeads: matched, gap: c.leads - matched, studies: mappedStudies };
+      });
+      var totalMetaLeads = crossRef.reduce(function(s, x) { return s + x.metaLeads; }, 0);
+      var totalCrmLeads = crossRef.reduce(function(s, x) { return s + x.crmLeads; }, 0);
+      var overallCapture = totalMetaLeads > 0 ? Math.round(totalCrmLeads / totalMetaLeads * 100) : 0;
+      html += '<div style="border-top:2px solid #e2e8f0;margin-top:4px;">';
+      html += '<div style="padding:8px 16px 4px;font-size:12px;font-weight:700;color:#1e293b;">Lead Capture Gap Analysis <span style="font-weight:400;color:#64748b;font-size:10px;">(Meta API vs FB CRM Sheet)</span></div>';
+      html += '<div style="display:flex;gap:16px;padding:4px 16px 8px;flex-wrap:wrap;">';
+      html += '<div style="font-size:11px;"><span style="font-weight:700;color:#3b82f6;">' + totalMetaLeads + '</span> Meta leads</div>';
+      html += '<div style="font-size:11px;"><span style="font-weight:700;color:#059669;">' + totalCrmLeads + '</span> in CRM</div>';
+      html += '<div style="font-size:11px;">Overall capture: <span style="font-weight:700;color:' + (overallCapture >= 80 ? '#059669' : overallCapture >= 50 ? '#d97706' : '#dc2626') + ';">' + overallCapture + '%</span></div>';
+      html += '</div>';
+      html += '<table style="width:100%;font-size:10px;border-collapse:collapse;">';
+      html += '<thead><tr style="background:#f8fafc;"><th style="text-align:left;padding:4px 12px;">Campaign</th><th style="text-align:center;padding:4px 6px;">Meta</th><th style="text-align:center;padding:4px 6px;">CRM</th><th style="text-align:center;padding:4px 6px;">Gap</th><th style="text-align:center;padding:4px 6px;">Capture %</th><th style="text-align:left;padding:4px 6px;">Mapped Studies</th></tr></thead><tbody>';
+      crossRef.forEach(function(x) {
+        var pct = x.metaLeads > 0 ? Math.round(x.crmLeads / x.metaLeads * 100) : 0;
+        var gapColor = x.gap > 50 ? '#dc2626' : x.gap > 10 ? '#d97706' : '#059669';
+        var pctColor = pct >= 80 ? '#059669' : pct >= 50 ? '#d97706' : '#dc2626';
+        html += '<tr style="border-top:1px solid #f1f5f9;">';
+        html += '<td style="padding:4px 12px;font-weight:600;">' + escapeHTML(x.campaign) + '</td>';
+        html += '<td style="text-align:center;color:#3b82f6;font-weight:600;">' + x.metaLeads + '</td>';
+        html += '<td style="text-align:center;color:#059669;font-weight:600;">' + x.crmLeads + '</td>';
+        html += '<td style="text-align:center;color:' + gapColor + ';font-weight:700;">' + (x.gap > 0 ? '-' + x.gap : '\u2713') + '</td>';
+        html += '<td style="text-align:center;font-weight:700;color:' + pctColor + ';">' + pct + '%</td>';
+        html += '<td style="padding:4px 6px;font-size:9px;color:#94a3b8;">' + (x.studies.length > 0 ? x.studies.join(', ') : '\u2014') + '</td>';
+        html += '</tr>';
+      });
+      html += '</tbody></table></div>';
     }
   }
 
