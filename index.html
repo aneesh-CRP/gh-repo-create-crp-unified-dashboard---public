@@ -4402,18 +4402,15 @@ function buildScheduleTable() {
     'screen failed':  {bg:'#ef444420',fg:'#ef4444'},
   };
   var esc = typeof escapeHTML === 'function' ? escapeHTML : function(s) { return s; };
-  // Build no-show history from past cancellations for risk badges
+  // Build no-show history from split no-show array for risk badges
   var noshowByPatient = {};
-  (DATA.allCancels || []).forEach(function(c) {
+  (DATA.noShows || []).forEach(function(c) {
     var key = (c.name || '').toLowerCase().trim();
-    if (!key) return;
-    if (c.type === 'No Show' || (c.category || '').toLowerCase().indexOf('no show') >= 0 || (c.category || '').toLowerCase().indexOf('no-show') >= 0) {
-      noshowByPatient[key] = (noshowByPatient[key] || 0) + 1;
-    }
+    if (key) noshowByPatient[key] = (noshowByPatient[key] || 0) + 1;
   });
-  // Also count total cancellations per patient for repeat-cancel warnings
+  // Count total cancellations + no-shows per patient for repeat-cancel warnings
   var cancelsByPatient = {};
-  (DATA.allCancels || []).forEach(function(c) {
+  (DATA.allCancels || []).concat(DATA.noShows || []).forEach(function(c) {
     var key = (c.name || '').toLowerCase().trim();
     if (key) cancelsByPatient[key] = (cancelsByPatient[key] || 0) + 1;
   });
@@ -7904,12 +7901,12 @@ function processLiveData(allRows, legacyCancels, auditLog) {
   // ── riskFlags: 2+ cancels + upcoming visit ──
   // Event-based cancel counting: group by patient+study+cancel_date
   // Prevents bulk-cancelled visits (same cancel date) from inflating counts
-  // NOTE: includes rescheduled cancels — repeat cancellers are a risk signal
-  // even if they rebooked, so riskFlags uses allCategorized, not recentCancels
+  // NOTE: includes rescheduled + no-shows — repeat cancellers are a risk signal
+  // even if they rebooked, and no-shows are an engagement risk signal
   const cancelEventMap = {};  // key -> Set of cancel dates
   const cancelMeta = {};
   allCategorized.forEach(r => {
-    if (EXCLUDED_CANCEL_CATS.has(r._category) && r._category !== 'Rescheduled') return;
+    if (EXCLUDED_CANCEL_CATS.has(r._category) && r._category !== 'Rescheduled' && r._category !== 'No Show') return;
     const key=buildKey(r['Subject Full Name'],r['Study Name']);
     const cd = (r['Cancel Date']||'').substring(0,10);
     if (!cancelEventMap[key]) cancelEventMap[key] = new Set();
@@ -8168,23 +8165,25 @@ function processLiveData(allRows, legacyCancels, auditLog) {
       const wk = weekKey(d);
       if (!byWeek[wk]) byWeek[wk] = { upcoming: 0, cancelled: 0, byStudy: {}, byCoord: {} };
       const status = (r['Appointment Status'] || '').trim().toLowerCase();
-      const isCancelled = status === 'cancelled' || status === 'canceled';
-      if (isCancelled) {
-        byWeek[wk].cancelled++;
+      const isCancelledRaw = status === 'cancelled' || status === 'canceled';
+      // Only count as cancelled if it's a true cancellation (not SF, no-show, withdrew, etc.)
+      const isTrueCancel = isCancelledRaw && !EXCLUDED_CANCEL_CATS.has(categorizeReason(r['Cancel Reason'], r['Appointment Cancellation Type']));
+      if (isCancelledRaw) {
         _trendCancelSeen.add(buildKey(r['Subject Full Name'], r['Study Name'], r['Cancel Date']||r['Scheduled Date']));
       }
-      else byWeek[wk].upcoming++;
+      if (isTrueCancel) byWeek[wk].cancelled++;
+      else if (!isCancelledRaw) byWeek[wk].upcoming++;
       const study = (r['Study Name'] || '').split(' - ').pop().trim();
       if (study) {
         if (!byWeek[wk].byStudy[study]) byWeek[wk].byStudy[study] = { upcoming: 0, cancelled: 0 };
-        if (isCancelled) byWeek[wk].byStudy[study].cancelled++;
-        else byWeek[wk].byStudy[study].upcoming++;
+        if (isTrueCancel) byWeek[wk].byStudy[study].cancelled++;
+        else if (!isCancelledRaw) byWeek[wk].byStudy[study].upcoming++;
       }
       const coord = cleanCoord(r['Full Name'] || r['Staff Full Name'] || '');
       if (coord && isCoord(r['Full Name'] || r['Staff Full Name'] || '')) {
         if (!byWeek[wk].byCoord[coord]) byWeek[wk].byCoord[coord] = { upcoming: 0, cancelled: 0 };
-        if (isCancelled) byWeek[wk].byCoord[coord].cancelled++;
-        else byWeek[wk].byCoord[coord].upcoming++;
+        if (isTrueCancel) byWeek[wk].byCoord[coord].cancelled++;
+        else if (!isCancelledRaw) byWeek[wk].byCoord[coord].upcoming++;
       }
     });
     if (legacyCancels && legacyCancels.length) {
@@ -8194,6 +8193,8 @@ function processLiveData(allRows, legacyCancels, auditLog) {
         _trendCancelSeen.add(dk);
         const d = parseDate(r['Cancel Date'] || r['Scheduled Date']);
         if (!d || isExcludedStudy(r['Study Name'])) return;
+        // Only count true cancellations in trends (not SF, no-show, withdrew, etc.)
+        if (EXCLUDED_CANCEL_CATS.has(categorizeReason(r['Cancel Reason'], r['Appointment Cancellation Type']))) return;
         const wk = weekKey(d);
         if (!byWeek[wk]) byWeek[wk] = { upcoming: 0, cancelled: 0, byStudy: {}, byCoord: {} };
         byWeek[wk].cancelled++;
