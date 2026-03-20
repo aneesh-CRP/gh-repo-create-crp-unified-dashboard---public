@@ -1179,7 +1179,6 @@ function renderAlerts(){
 function renderForecast(){
   let f30=0,f60=0,f90=0;
   [AGING_INV,AGING_AP].forEach(arr=>{arr.forEach(s=>{f30+=s.current*BUCKET_COLLECT_RATES.current;f60+=s.d30_60*BUCKET_COLLECT_RATES.d30_60;f90+=s.d61_90*BUCKET_COLLECT_RATES.d61_90;});});
-let FIN_MERGED_STUDIES=[{"study":"M20-465","full":"Abbvie - M20-465","invAR":76407.62,"apAR":82385.46,"uninvoiced":4750.0,"status":"Active"},{"study":"M23-698","full":"Abbvie - M23-698","invAR":8468.42,"apAR":4525.62,"uninvoiced":12500.0,"status":"Active"},{"study":"M23-714","full":"Abbvie - M23-714","invAR":7174.64,"apAR":89063.0,"uninvoiced":4750.0,"status":"Active"},{"study":"M24-601","full":"Abbvie - M24-601","invAR":33670.95,"apAR":0.0,"uninvoiced":20750.0,"status":"Active"},{"study":"ESK-001-010","full":"Alumis Inc. - ESK-001-010","invAR":2000.0,"apAR":0,"uninvoiced":4798.0,"status":"Active"},{"study":"20230222","full":"Amgen, Inc. - 20230222","invAR":21600.0,"apAR":24362.45,"uninvoiced":28250.0,"status":"Active"},{"study":"D6973C00001","full":"Astrazeneca Pharmaceuticals - D6973C00001","invAR":3884.5,"apAR":13364.2,"uninvoiced":38400.0,"status":"Active"},{"study":"D7960C00015","full":"Astrazeneca Pharmaceuticals - D7960C00015","invAR":18129.0,"apAR":1557.75,"uninvoiced":6050.0,"status":"Active"},{"study":"CDX0159-12","full":"Celldex Therapeutics - CDX0159-12","invAR":1397.13,"apAR":11903.48,"uninvoiced":4500.0,"status":"Active"},{"study":"I8F-MC-GPHE","full":"Eli Lilly and Company - I8F-MC-GPHE","invAR":5368.0,"apAR":2883.0,"uninvoiced":0,"status":"Active"},{"study":"J1G-MC-LAKI","full":"Eli Lilly and Company - J1G-MC-LAKI","invAR":98993.0,"apAR":32318.0,"uninvoiced":4040.0,"status":"Active"},{"study":"J1I-MC-GZBO (TRIUMPH-OUTCOMES)","full":"Eli Lilly and Company - J1I-MC-GZBO (TRIUMPH-OUTCOMES)","invAR":5150.0,"apAR":0.0,"uninvoiced":3950.0,"status":"Active"},{"study":"J1I-MC-GZBY","full":"Eli Lilly and Company - J1I-MC-GZBY","invAR":1700.0,"apAR":0.0,"uninvoiced":3950.0,"status":"Active"},{"study":"J2A-MC-GZGS","full":"Eli Lilly and Company - J2A-MC-GZGS","invAR":5750.0,"apAR":4976.0,"uninvoiced":3950.0,"status":"Active"},{"study":"J2A-MC-GZPO","full":"Eli Lilly and Company - J2A-MC-GZPO","invAR":44853.0,"apAR":47797.0,"uninvoiced":3950.0,"status":"Active"},{"study":"J2A-MC-GZPS","full":"Eli Lilly and Company - J2A-MC-GZPS","invAR":0.0,"apAR":0.0,"uninvoiced":23150.0,"status":"Maintenance"},{"study":"J3F-MC-EZCC","full":"Eli Lilly and Company - J3F-MC-EZCC","invAR":19250.0,"apAR":0.0,"uninvoiced":5950.0,"status":"Active"},{"study":"J3L-MC-EZEF","full":"Eli Lilly and Company - J3L-MC-EZEF","invAR":77371.0,"apAR":63422.0,"uninvoiced":5950.0,"status":"Active"},{"study":"N1T-MC-MALO","full":"Eli Lilly and Company - N1T-MC-MALO","invAR":19975.0,"apAR":12307.0,"uninvoiced":6800.0,"status":"Active"},{"study":"88545223PSA2001","full":"Janssen Pharmaceuticals, Inc. - 88545223PSA2001","invAR":0.0,"apAR":0,"uninvoiced":3000.0,"status":"Active"},{"study":"80202135SJS3001","full":"Janssen Research & Development, LLC - 80202135SJS3001","invAR":5180.0,"apAR":20517.0,"uninvoiced":3000.0,"status":"Active"},{"study":"80202135SLE3001","full":"Janssen Research & Development, LLC - 80202135SLE3001","invAR":0,"apAR":0,"uninvoiced":33000.0,"status":"Active"},{"study":"77242113PSO3006","full":"Johnson & Johnson - 77242113PSO3006","invAR":9000.0,"apAR":31648.0,"uninvoiced":3000.0,"status":"Active"},{"study":"95597528ADM2001","full":"Johnson & Johnson - 95597528ADM2001","invAR":0.0,"apAR":0,"uninvoiced":8250.0,"status":"Active"},{"study":"MR-100A-01-TD-3001","full":"Mylan Inc. - MR-100A-01-TD-3001","invAR":0,"apAR":404.3,"uninvoiced":0,"status":"Active"},{"study":"MR-130A-01-TD-3001","full":"Mylan Inc. - MR-130A-01-TD-3001","invAR":14286.0,"apAR":66264.55,"uninvoiced":4750.0,"status":"Active"},{"study":"C4951063","full":"Pfizer Inc. - C4951063","invAR":0.0,"apAR":16357.23,"uninvoiced":5174.0,"status":"Active"},{"study":"EFC17559","full":"Sanofi US Services Inc. - EFC17559","invAR":12244.0,"apAR":0.0,"uninvoiced":7000.0,"status":"Active"},{"study":"EFC17599","full":"Sanofi US Services Inc. - EFC17599","invAR":1220.0,"apAR":12935.3,"uninvoiced":2500.0,"status":"Active"},{"study":"EFC17600 (ESTUARY)","full":"Sanofi US Services Inc. - EFC17600 (ESTUARY)","invAR":10656.0,"apAR":12424.8,"uninvoiced":2500.0,"status":"Active"},{"study":"EFC18366","full":"Sanofi US Services Inc. - EFC18366","invAR":3000.0,"apAR":0,"uninvoiced":2500.0,"status":"Active"},{"study":"LTS17367","full":"Sanofi US Services Inc. - LTS17367","invAR":1000.0,"apAR":3824.1,"uninvoiced":2500.0,"status":"Active"}];
   document.getElementById('fc30').textContent=fmtK(f30);
   document.getElementById('fc60').textContent=fmtK(f60);
   document.getElementById('fc90').textContent=fmtK(f90);
@@ -6182,6 +6181,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
     cancelByStudy,
     upcomingByStudy,
     upcomingByStudyFull: upcomingByStudy,
+    allStudies: [...new Set([...upcomingByStudy.map(s=>s.name),...cancelByStudy.map(s=>s.name)])].map(n=>({name:n})),
     cancelReasons,
     riskMatrix,
     subjectStatus,
@@ -6525,7 +6525,8 @@ function buildActionSteps() {
   function _isEnrolling(studyName) {
     if (!studyName || _enrollSet.size === 0) return true; // if no CRIO data loaded, don't filter
     var sn = studyName.toLowerCase().trim();
-    for (var p of _enrollSet) { if (p.includes(sn) || sn.includes(p)) return true; }
+    if (sn.length < 4) return true; // too short to match safely
+    for (var p of _enrollSet) { if (p.length >= 4 && (p.includes(sn) || sn.includes(p))) return true; }
     return false;
   }
 
@@ -9054,7 +9055,8 @@ function renderCrioStudies() {
   function isStudyEnrolling(studyName) {
     if (!studyName) return false;
     var sn = studyName.toLowerCase().trim();
-    for (var p of enrollingProtocols) { if (p.includes(sn) || sn.includes(p)) return true; }
+    if (sn.length < 4) return false; // too short to match safely
+    for (var p of enrollingProtocols) { if (p.length >= 4 && (p.includes(sn) || sn.includes(p))) return true; }
     return false;
   }
 
