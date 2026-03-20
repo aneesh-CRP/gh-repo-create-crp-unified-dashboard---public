@@ -189,6 +189,9 @@ const CRP_CONFIG = {
   // When true: uses BQ_CANCELS_CSV for cancellation data instead of LIVE_URL2_LEGACY
   // Set to true only AFTER verifying BQ data matches existing data
   USE_BQ_CANCELS: true,
+  // When true: uses BQ_VISITS_CSV for upcoming visits instead of LIVE_URL1 (Looker)
+  // Set to false initially — enable after verifying BQ data matches Looker data
+  USE_BQ_VISITS: false,
 
   // Brand Colors (match CSS :root variables)
   BRAND: {
@@ -218,6 +221,9 @@ const CRP_CONFIG = {
     // BigQuery Cancellations — synced from CRIO BigQuery by bigquery-cancels-sync.gs
     // After setup: publish the BQ_Cancellations tab as CSV, paste URL here, set USE_BQ_CANCELS: true
     BQ_CANCELS_CSV: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQSVnZBL93Zx5t88q97kGRfKvEvDonnTD6y506i806UAuNLWMvMsQUsvnxJe9BIiRTF0ktF1bUgvkj8/pub?output=csv',
+    // BigQuery Visits — synced from CRIO BigQuery by bigquery-cancels-sync.gs → BQ_Visits tab
+    // After setup: publish the BQ_Visits tab as CSV, paste URL here, set USE_BQ_VISITS: true
+    BQ_VISITS_CSV: '',
     // Looker — Study Status & Key Dates (published Google Sheet)
     LOOKER_STUDY_STATUS_CSV: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQrwoQwKCAiyv5xx_z0uXMQLHS5d2CUbzOj_qjxkZJYYe3Yxdu3i2T-rdQ9vtlDCBRTKfA1jDW_W0YW/pub?output=csv',
     // Finance Master Sheet — published key + tab GIDs for CSV access
@@ -6328,7 +6334,7 @@ async function refreshData() {
   try {
     // Phase 1: CRIO data
     const [rows1, legacyCancels, auditRows] = await Promise.all([
-      fetchCSV(LIVE_URL1),
+      fetchCSV(_getVisitsURL()),
       fetchCSV(_getCancelURL(), true).catch(() => []),
       fetchCSV(AUDIT_LOG_URL).catch(() => [])
     ]);
@@ -10889,6 +10895,13 @@ function _getCancelURL() {
   }
   return LIVE_URL2_LEGACY;
 }
+// BigQuery visits URL — uses BQ source when toggle is on AND URL is configured
+function _getVisitsURL() {
+  if (CRP_CONFIG.USE_BQ_VISITS && CRP_CONFIG.DATA_FEEDS.BQ_VISITS_CSV) {
+    return CRP_CONFIG.DATA_FEEDS.BQ_VISITS_CSV;
+  }
+  return LIVE_URL1;
+}
 
 // ════════════════════════════════════════════════════════════
 // BQ vs Legacy Cancellation Data Comparison Tool
@@ -12277,7 +12290,7 @@ async function _crpInit() {
     let _lastAuditRows = [];
     try {
       const [rows1, legacyCancels, auditRows] = await Promise.all([
-        fetchCSV(LIVE_URL1),
+        fetchCSV(_getVisitsURL()),
         fetchCSV(_getCancelURL(), true).catch(() => []),
         fetchCSV(AUDIT_LOG_URL).catch(e => { console.warn('CRP: Audit log fetch failed, continuing without:', e.message); setHealthChip('dh-audit','fail','Audit Log'); return []; })
       ]);
@@ -12316,7 +12329,7 @@ async function _crpInit() {
       await new Promise(r => setTimeout(r, CRP_CONFIG.RETRY_DELAY));
       try {
         const [rows1b, legacyB, auditB] = await Promise.all([
-          fetchCSV(LIVE_URL1),
+          fetchCSV(_getVisitsURL()),
           fetchCSV(_getCancelURL(), true).catch(() => []),
           fetchCSV(AUDIT_LOG_URL).catch(() => [])
         ]);
@@ -12449,7 +12462,7 @@ async function _crpInit() {
     // Phase 1: CRIO data (critical)
     try {
       const [rows1, legacyCancels, auditRows] = await Promise.all([
-        fetchCSV(LIVE_URL1),
+        fetchCSV(_getVisitsURL()),
         fetchCSV(_getCancelURL(), true).catch(() => []),
         fetchCSV(AUDIT_LOG_URL).catch(() => [])
       ]);
