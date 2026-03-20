@@ -1,0 +1,26 @@
+name: CRP Dashboard CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  schedule:
+    # Daily audit at 7:13am UTC (3:13am ET) — off-minute to avoid fleet contention
+    - cron: '13 7 * * *'
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run lint
+        run: node scripts/lint.js
+
+      - name: Run tests
+        run: node tests/run.js
