@@ -10890,6 +10890,148 @@ function _getCancelURL() {
   return LIVE_URL2_LEGACY;
 }
 
+// ════════════════════════════════════════════════════════════
+// BQ vs Legacy Cancellation Data Comparison Tool
+// Usage: paste BQ CSV URL and run from console:
+//   compareBQvLegacy('https://docs.google.com/spreadsheets/d/e/.../pub?output=csv')
+// ════════════════════════════════════════════════════════════
+async function compareBQvLegacy(bqUrl) {
+  if (!bqUrl) { console.error('Usage: compareBQvLegacy("https://...csv")'); return; }
+  console.log('%c BQ vs Legacy Comparison Starting... ', 'background:#1e40af;color:#fff;font-size:14px');
+
+  var legacy, bq;
+  try {
+    [legacy, bq] = await Promise.all([
+      fetchCSV(LIVE_URL2_LEGACY, true),
+      fetchCSV(bqUrl, true)
+    ]);
+  } catch(e) { console.error('Fetch failed:', e.message); return; }
+
+  // ── Column comparison ──
+  var legacyCols = legacy.length ? Object.keys(legacy[0]).sort() : [];
+  var bqCols = bq.length ? Object.keys(bq[0]).sort() : [];
+  var missingInBQ = legacyCols.filter(function(c) { return bqCols.indexOf(c) === -1 && c !== 'snapshot_date'; });
+  var extraInBQ = bqCols.filter(function(c) { return legacyCols.indexOf(c) === -1 && c !== 'snapshot_date'; });
+
+  // ── Row matching ──
+  function makeKey(r) {
+    return buildKey(r['Subject Full Name'], r['Study Name'], r['Cancel Date']||r['Scheduled Date']);
+  }
+  function latestOnly(rows) {
+    var max = '';
+    rows.forEach(function(r) { var s = (r.snapshot_date||'').trim(); if (/^\d{4}-\d{2}-\d{2}$/.test(s) && s > max) max = s; });
+    if (!max) return rows;
+    return rows.filter(function(r) { return (r.snapshot_date||'').trim() === max; });
+  }
+
+  var legacyLatest = latestOnly(legacy);
+  var bqLatest = latestOnly(bq);
+
+  var legacyMap = new Map();
+  legacyLatest.forEach(function(r) { legacyMap.set(makeKey(r), r); });
+  var bqMap = new Map();
+  bqLatest.forEach(function(r) { bqMap.set(makeKey(r), r); });
+
+  var onlyInLegacy = [], onlyInBQ = [], matched = [], diffs = [];
+  legacyMap.forEach(function(r, key) {
+    if (!bqMap.has(key)) { onlyInLegacy.push(r); }
+    else { matched.push(key); }
+  });
+  bqMap.forEach(function(r, key) {
+    if (!legacyMap.has(key)) { onlyInBQ.push(r); }
+  });
+
+  // ── Field-level diffs for matched rows ──
+  var compareFields = ['Staff Full Name','Cancel Reason','Appointment Cancellation Type','Subject Status','Name','Site Name','Investigator'];
+  matched.forEach(function(key) {
+    var lr = legacyMap.get(key), br = bqMap.get(key);
+    var rowDiffs = [];
+    compareFields.forEach(function(f) {
+      var lv = (lr[f]||'').trim(), bv = (br[f]||'').trim();
+      if (lv !== bv) rowDiffs.push({field: f, legacy: lv, bq: bv});
+    });
+    if (rowDiffs.length) diffs.push({key: key, patient: lr['Subject Full Name'], study: lr['Study Name'], diffs: rowDiffs});
+  });
+
+  // ── Console output ──
+  console.log('%c Summary ', 'background:#059669;color:#fff;font-weight:bold');
+  console.table({
+    'Legacy rows (latest snapshot)': legacyLatest.length,
+    'BQ rows (latest snapshot)': bqLatest.length,
+    'Matched by patient+study+date': matched.length,
+    'Only in Legacy (missing from BQ)': onlyInLegacy.length,
+    'Only in BQ (extra)': onlyInBQ.length,
+    'Matched rows with field diffs': diffs.length
+  });
+
+  if (missingInBQ.length) { console.warn('Columns in Legacy but missing from BQ:', missingInBQ); }
+  if (extraInBQ.length) { console.log('Extra columns in BQ (bonus data):', extraInBQ); }
+  if (onlyInLegacy.length) {
+    console.log('%c Only in Legacy (' + onlyInLegacy.length + ') ', 'background:#dc2626;color:#fff');
+    console.table(onlyInLegacy.slice(0, 25).map(function(r) {
+      return {Patient: r['Subject Full Name'], Study: r['Study Name'], Cancel: r['Cancel Date']||r['Scheduled Date'], Reason: r['Cancel Reason']};
+    }));
+  }
+  if (onlyInBQ.length) {
+    console.log('%c Only in BQ (' + onlyInBQ.length + ') ', 'background:#2563eb;color:#fff');
+    console.table(onlyInBQ.slice(0, 25).map(function(r) {
+      return {Patient: r['Subject Full Name'], Study: r['Study Name'], Cancel: r['Cancel Date']||r['Scheduled Date'], Reason: r['Cancel Reason']};
+    }));
+  }
+  if (diffs.length) {
+    console.log('%c Field Diffs (' + diffs.length + ' rows) ', 'background:#d97706;color:#fff');
+    diffs.slice(0, 30).forEach(function(d) {
+      console.groupCollapsed(d.patient + ' / ' + d.study);
+      console.table(d.diffs);
+      console.groupEnd();
+    });
+  }
+
+  // ── Build visual modal report ──
+  var html = '<div style="font-family:system-ui;font-size:13px;line-height:1.6">';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">';
+  html += '<div style="background:#f0fdf4;padding:12px;border-radius:8px;text-align:center"><div style="font-size:24px;font-weight:700;color:#059669">' + matched.length + '</div><div style="color:#065f46">Matched</div></div>';
+  html += '<div style="background:#fef2f2;padding:12px;border-radius:8px;text-align:center"><div style="font-size:24px;font-weight:700;color:#dc2626">' + onlyInLegacy.length + '</div><div style="color:#991b1b">Only in Legacy</div></div>';
+  html += '<div style="background:#eff6ff;padding:12px;border-radius:8px;text-align:center"><div style="font-size:24px;font-weight:700;color:#2563eb">' + onlyInBQ.length + '</div><div style="color:#1e40af">Only in BQ</div></div>';
+  html += '<div style="background:#fffbeb;padding:12px;border-radius:8px;text-align:center"><div style="font-size:24px;font-weight:700;color:#d97706">' + diffs.length + '</div><div style="color:#92400e">Field Diffs</div></div>';
+  html += '</div>';
+  html += '<div style="font-size:12px;color:#64748b;margin-bottom:8px">Legacy: ' + legacyLatest.length + ' rows | BQ: ' + bqLatest.length + ' rows | Match rate: ' + (matched.length ? Math.round(matched.length / Math.max(legacyLatest.length, bqLatest.length) * 100) : 0) + '%</div>';
+
+  if (onlyInLegacy.length) {
+    html += '<details style="margin:8px 0"><summary style="cursor:pointer;font-weight:600;color:#dc2626">Missing from BQ (' + onlyInLegacy.length + ')</summary><table style="width:100%;font-size:11px;border-collapse:collapse;margin-top:4px">';
+    html += '<tr style="background:#fee2e2"><th style="padding:4px;text-align:left">Patient</th><th style="padding:4px;text-align:left">Study</th><th style="padding:4px;text-align:left">Date</th></tr>';
+    onlyInLegacy.slice(0, 50).forEach(function(r) {
+      html += '<tr><td style="padding:3px;border-top:1px solid #fecaca">' + escapeHTML(r['Subject Full Name']||'') + '</td><td style="padding:3px;border-top:1px solid #fecaca">' + escapeHTML(r['Study Name']||'') + '</td><td style="padding:3px;border-top:1px solid #fecaca">' + escapeHTML(r['Cancel Date']||r['Scheduled Date']||'') + '</td></tr>';
+    });
+    html += '</table></details>';
+  }
+  if (onlyInBQ.length) {
+    html += '<details style="margin:8px 0"><summary style="cursor:pointer;font-weight:600;color:#2563eb">Extra in BQ (' + onlyInBQ.length + ')</summary><table style="width:100%;font-size:11px;border-collapse:collapse;margin-top:4px">';
+    html += '<tr style="background:#dbeafe"><th style="padding:4px;text-align:left">Patient</th><th style="padding:4px;text-align:left">Study</th><th style="padding:4px;text-align:left">Date</th></tr>';
+    onlyInBQ.slice(0, 50).forEach(function(r) {
+      html += '<tr><td style="padding:3px;border-top:1px solid #bfdbfe">' + escapeHTML(r['Subject Full Name']||'') + '</td><td style="padding:3px;border-top:1px solid #bfdbfe">' + escapeHTML(r['Study Name']||'') + '</td><td style="padding:3px;border-top:1px solid #bfdbfe">' + escapeHTML(r['Cancel Date']||r['Scheduled Date']||'') + '</td></tr>';
+    });
+    html += '</table></details>';
+  }
+  if (diffs.length) {
+    html += '<details style="margin:8px 0"><summary style="cursor:pointer;font-weight:600;color:#d97706">Field Differences (' + diffs.length + ')</summary><table style="width:100%;font-size:11px;border-collapse:collapse;margin-top:4px">';
+    html += '<tr style="background:#fef3c7"><th style="padding:4px;text-align:left">Patient</th><th style="padding:4px;text-align:left">Field</th><th style="padding:4px;text-align:left">Legacy</th><th style="padding:4px;text-align:left">BQ</th></tr>';
+    diffs.slice(0, 40).forEach(function(d) {
+      d.diffs.forEach(function(fd, i) {
+        html += '<tr><td style="padding:3px;border-top:1px solid #fde68a">' + (i===0 ? escapeHTML(d.patient||'') : '') + '</td><td style="padding:3px;border-top:1px solid #fde68a;font-weight:600">' + escapeHTML(fd.field) + '</td><td style="padding:3px;border-top:1px solid #fde68a;color:#dc2626">' + escapeHTML(fd.legacy||'(empty)') + '</td><td style="padding:3px;border-top:1px solid #fde68a;color:#2563eb">' + escapeHTML(fd.bq||'(empty)') + '</td></tr>';
+      });
+    });
+    html += '</table></details>';
+  }
+  if (!onlyInLegacy.length && !onlyInBQ.length && !diffs.length) {
+    html += '<div style="text-align:center;padding:20px;color:#059669;font-size:18px;font-weight:700">Perfect Match — Safe to switch!</div>';
+  }
+  html += '</div>';
+
+  openModal('BQ vs Legacy Comparison', 'Cancellation Data Validation', html);
+  return {matched: matched.length, onlyInLegacy: onlyInLegacy.length, onlyInBQ: onlyInBQ.length, diffs: diffs.length};
+}
+
 var _trendsRangeDays = 14;
 
 function filterTrendsByRange(allTrends, days, baseDate) {
