@@ -7795,6 +7795,20 @@ function processLiveData(allRows, legacyCancels, auditLog) {
     return true;
   });
 
+  // Verification: confirm all records are accounted for
+  const _silentDrop = allCategorized.length - rescheduledVisits.length - pendingReschedules.length
+    - noShowList.length - withdrewList.length - screenFailList.length - discontinuedList.length - recentCancels.length;
+  _log('CRP: Cancel split —',
+    'total=' + allCategorized.length,
+    'trueCancels=' + recentCancels.length,
+    'rescheduled=' + rescheduledVisits.length,
+    'pending=' + pendingReschedules.length,
+    'noShow=' + noShowList.length,
+    'withdrew=' + withdrewList.length,
+    'SF=' + screenFailList.length,
+    'disc=' + discontinuedList.length,
+    'other(completed/admin/fibro/closed)=' + _silentDrop);
+
   // Keep all categorized for the full allCancels detail view (including excluded categories, marked as such)
   const allCategorizedForDetail = allCategorized;
 
@@ -7830,7 +7844,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
     if (/weather|snow|storm/.test(r)) return 'Weather';
     if (/study.?clos|visit.*clos.*study/.test(r)) return 'Study Closed';
     if (/wrong study|entered in error|scheduled in error|\bltv\b|scheduled under|\bdemo\b/.test(r)) return 'Admin Error';
-    if (!r || r === 'nan') return 'Not Documented';
+    if (!r || r === 'nan' || r === 'n/a' || r === 'na') return 'Not Documented';
     return 'Other';
   }
 
