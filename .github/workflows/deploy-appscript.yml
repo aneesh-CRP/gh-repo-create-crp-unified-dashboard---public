@@ -40,6 +40,7 @@ jobs:
 
       - name: Push to Apps Script
         run: clasp push --force
-
-      - name: Update web app deployment
-        run: clasp deploy -i AKfycbw1xcyJDv4f2BIaGoFxLgRM86RvWffMyW4QKPbTk8PPEd73cWP8zr9njDooGlNLtWoP -d "Auto-deploy from commit ${{ github.sha }}"
+        # NOTE: Removed `clasp deploy` step — it created a new version on every
+        # push and hit the 200-version limit. `clasp push` updates @HEAD which
+        # the web app deployment already references. The web app uses the latest
+        # pushed code without needing a new versioned deployment.
