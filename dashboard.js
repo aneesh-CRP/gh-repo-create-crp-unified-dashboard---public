@@ -686,7 +686,8 @@ function showApAgingModal(){showFinModal('Autopay AR — Aging Detail',agingModa
 function showTotalARModal(){
   let h='<table><thead><tr><th>Study</th><th class="r">Invoice AR</th><th class="r">Autopay AR</th><th class="r">Total AR</th><th class="r">Collected</th><th class="r">%</th></tr></thead><tbody>';
   TOP_AR_STUDIES.forEach(r=>{const pct=r.collected>0?((r.collected/(r.collected+r.total))*100).toFixed(0):'0';h+='<tr><td>'+slink(r.study)+'</td><td class="r">'+fmt(r.invAR)+'</td><td class="r">'+fmt(r.apAR)+'</td><td class="r">'+fmt(r.total)+'</td><td class="r">'+fmt(r.collected)+'</td><td class="r">'+pct+'%</td></tr>';});
-  h+='<tr class="total-row"><td>TOTAL</td><td class="r">'+fmt(totalInvAR)+'</td><td class="r">'+fmt(totalApAR)+'</td><td class="r">'+fmt(totalInvAR+totalApAR)+'</td><td class="r">$2,483,867.42</td><td class="r">70%</td></tr></tbody></table>';
+  let totalCollected=0;TOP_AR_STUDIES.forEach(r=>{totalCollected+=r.collected||0;});const collPct=totalCollected>0?Math.round(totalCollected/(totalCollected+totalInvAR+totalApAR)*100):0;
+  h+='<tr class="total-row"><td>TOTAL</td><td class="r">'+fmt(totalInvAR)+'</td><td class="r">'+fmt(totalApAR)+'</td><td class="r">'+fmt(totalInvAR+totalApAR)+'</td><td class="r">'+fmt(totalCollected)+'</td><td class="r">'+collPct+'%</td></tr></tbody></table>';
   showFinModal('Total Open AR — Top 15 Studies',h);
 }
 function showPaymentsModal(){
@@ -697,8 +698,8 @@ function showPaymentsModal(){
 }
 function showUnpaidInvModal(){
   let h='<table><thead><tr><th>Study</th><th>Invoice</th><th>Due</th><th class="r">Days</th><th class="r">Amount</th></tr></thead><tbody>';let tot=0;
-  [...UNPAID_INVOICES].sort((a,b)=>b.days-a.days).forEach(r=>{h+='<tr><td>'+slink(r.study)+'</td><td>'+r.invoice+'</td><td>'+(r.due||'—')+'</td><td class="r">'+r.days+'</td><td class="r">'+fmt(r.unpaid)+'</td></tr>';tot+=r.unpaid;});
-  h+='<tr class="total-row"><td colspan="4">TOTAL (42 invoices)</td><td class="r">'+fmt(tot)+'</td></tr></tbody></table>';
+  [...UNPAID_INVOICES].sort((a,b)=>b.days-a.days).forEach(r=>{h+='<tr><td>'+slink(r.study)+'</td><td>'+escapeHTML(r.invoice)+'</td><td>'+escapeHTML(r.due||'—')+'</td><td class="r">'+r.days+'</td><td class="r">'+fmt(r.unpaid)+'</td></tr>';tot+=r.unpaid;});
+  h+='<tr class="total-row"><td colspan="4">TOTAL ('+UNPAID_INVOICES.length+' invoices)</td><td class="r">'+fmt(tot)+'</td></tr></tbody></table>';
   showFinModal('Unpaid Invoices',h);
 }
 function showUnpaidAPModal(){
@@ -710,7 +711,7 @@ function showUnpaidAPModal(){
 function showUninvoicedModal(){
   let h='<table><thead><tr><th>Study</th><th class="r">Amount</th></tr></thead><tbody>';let tot=0;
   UNINVOICED.forEach(r=>{h+='<tr><td>'+slink(r.study)+'</td><td class="r">'+fmt(r.amount)+'</td></tr>';tot+=r.amount;});
-  h+='<tr class="total-row"><td>TOTAL (30 studies)</td><td class="r">'+fmt(tot)+'</td></tr></tbody></table>';
+  h+='<tr class="total-row"><td>TOTAL ('+UNINVOICED.length+' studies)</td><td class="r">'+fmt(tot)+'</td></tr></tbody></table>';
   showFinModal('Uninvoiced Revenue',h);
 }
 function showRev12mModal(){
@@ -743,10 +744,10 @@ function showStudyModal(s){
   if(ar){h+='<div><strong>Invoice AR:</strong> '+fmt(ar.invAR)+'</div><div><strong>Autopay AR:</strong> '+fmt(ar.apAR)+'</div><div><strong>Total AR:</strong> '+fmt(ar.total)+'</div><div><strong>Collected:</strong> '+fmt(ar.collected)+'</div>';}
   h+='<div><strong>12M Revenue:</strong> '+fmt(rev)+'</div>';
   if(ui)h+='<div><strong>Uninvoiced:</strong> '+fmt(ui.amount)+'</div>';
-  if(ms)h+='<div><strong>Status:</strong> '+ms.status+'</div><div><strong>Enrolled:</strong> '+ms.enrolled+'</div>';
+  if(ms)h+='<div><strong>Status:</strong> '+escapeHTML(ms.status)+'</div><div><strong>Enrolled:</strong> '+escapeHTML(String(ms.enrolled))+'</div>';
   h+='</div>';
   const invs=UNPAID_INVOICES.filter(x=>x.study===s);
-  if(invs.length){h+='<h3 style="font-size:13px;font-weight:700;margin-bottom:8px">Unpaid Invoices ('+invs.length+')</h3><table><thead><tr><th>Invoice</th><th>Due</th><th class="r">Days</th><th class="r">Amount</th></tr></thead><tbody>';invs.forEach(i=>{h+='<tr><td>'+i.invoice+'</td><td>'+(i.due||'—')+'</td><td class="r">'+i.days+'</td><td class="r">'+fmt(i.unpaid)+'</td></tr>';});h+='</tbody></table>';}
+  if(invs.length){h+='<h3 style="font-size:13px;font-weight:700;margin-bottom:8px">Unpaid Invoices ('+invs.length+')</h3><table><thead><tr><th>Invoice</th><th>Due</th><th class="r">Days</th><th class="r">Amount</th></tr></thead><tbody>';invs.forEach(i=>{h+='<tr><td>'+escapeHTML(i.invoice)+'</td><td>'+escapeHTML(i.due||'—')+'</td><td class="r">'+i.days+'</td><td class="r">'+fmt(i.unpaid)+'</td></tr>';});h+='</tbody></table>';}
   showFinModal(s,h);
 }
 
@@ -2194,9 +2195,10 @@ function buildRiskFlagCards() {
   if (!el) return;
   const flags = DATA.riskFlags || [];
   const riskStatus = _loadRiskCardStatus();
-  // Auto-prune old entries (>30 days)
-  const now = Date.now();
-  Object.keys(riskStatus).forEach(k => { if (riskStatus[k] && typeof riskStatus[k] === 'object' && riskStatus[k].ts && now - riskStatus[k].ts > 30*86400000) delete riskStatus[k]; });
+  // Keep riskStatus clean — remove entries for patients no longer in flags
+  const flagKeys = new Set(flags.map(f => (f.patient+'|'+f.study).toLowerCase().replace(/\s+/g,'_')));
+  Object.keys(riskStatus).forEach(k => { if (!flagKeys.has(k)) delete riskStatus[k]; });
+  _saveRiskCardStatus(riskStatus);
 
   const today = new Date();
   const urgent = flags.filter(f => {
@@ -2247,7 +2249,7 @@ function buildRiskFlagCards() {
 
   html += activeFlags.map(f => {
     const k = (f.patient+'|'+f.study).toLowerCase().replace(/\s+/g,'_');
-    const ek = k.replace(/'/g,"\\'");
+    const ek = jsAttr(k);
     const urgentFlag = urgent.some(u => u.patient === f.patient && u.study === f.study);
     const sc = sevColors[f.severity] || sevColors.medium;
     // Category breakdown badges
@@ -2298,7 +2300,7 @@ function buildRiskFlagCards() {
       <div id="risk-cleared-list" style="display:none;margin-top:8px;text-align:left;">
         ${[...doneFlags,...naFlags].map(f => {
           const k = (f.patient+'|'+f.study).toLowerCase().replace(/\s+/g,'_');
-          const ek = k.replace(/'/g,"\\'");
+          const ek = jsAttr(k);
           const st = riskStatus[k];
           return `<div style="display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid #f8fafc;opacity:0.5;">
             <span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;background:${st==='done'?'#f0fdf4':'#f8fafc'};color:${st==='done'?'#16a34a':'#94a3b8'}">${st==='done'?'Done':'N/A'}</span>
@@ -3714,7 +3716,7 @@ function renderMedRecPortalFilter() {
   var label = '<span style="font-size:10px;font-weight:600;color:#94a3b8;margin-right:4px;">Portal:</span>';
   var buttons = '<button onclick="filterMedRecByPortal(\'all\')" style="font-size:10px;padding:3px 8px;border-radius:4px;border:1px solid #e2e8f0;background:#1843AD;color:white;cursor:pointer;font-weight:600;">All</button>';
   portalList.forEach(function(p) {
-    buttons += '<button onclick="filterMedRecByPortal(\''+p.replace(/'/g,"\\'")+'\')" style="font-size:10px;padding:3px 8px;border-radius:4px;border:1px solid #e2e8f0;background:white;cursor:pointer;">'+escapeHTML(p)+' ('+portals[p]+')</button>';
+    buttons += '<button onclick="filterMedRecByPortal(\''+jsAttr(p)+'\')" style="font-size:10px;padding:3px 8px;border-radius:4px;border:1px solid #e2e8f0;background:white;cursor:pointer;">'+escapeHTML(p)+' ('+portals[p]+')</button>';
   });
   filterDiv.innerHTML = label + buttons;
   container.insertBefore(filterDiv, container.firstChild);
@@ -5692,11 +5694,11 @@ function processLiveData(allRows, legacyCancels, auditLog) {
     if (/fibroscan|fibrosan|fibro scan|fibroscan only|scan visit/i.test(r) || /fibroscan|fibrosan|fibro scan|fibroscan only|scan visit/i.test(t)) return 'FibroScan Only';
     if (/discontinu/i.test(r)) return 'Discontinued';
     if (t === 'no show') return 'No Show';
-    if (/screen.?fail|screenfail|\bsf\b|s\/f|dnq|does not qualify|not qualify|did not meet|ineligib|not eligible|protocol criteria|exclusion criteria|inclusion criteria|excluded medication|autoimmune|\bbmi\b/.test(r)) return 'Screen Fail / DNQ';
+    if (/screen.?fail|screenfail|\bsf\b|s\/f|\bdnq\b|does not qualify|not qualify|did not meet|ineligib|not eligible|protocol criteria|exclusion criteria|inclusion criteria|excluded medication|autoimmune|\bbmi\b/.test(r)) return 'Screen Fail / DNQ';
     if ((/reschedul|will call back|moved to \w|changed to \w|site (requested|cancel)|coordinator request|sponsor (request|cancel)/.test(r)) && !r.includes('no show') && !r.includes('did not call back') && !r.includes('didn\'t call back')) return 'Rescheduled';
     if (/no.?show|didn.t answer|did not answer|no answer|mailbox|left text|left vm|text sent|unresponsive|lost to follow|never reached/.test(r)) return 'No Show';
     if (/withdrew|no longer interested|not interested|refuses to return|do not solicit|not comfortable/.test(r)) return 'Patient Withdrew';
-    if (/weather|snow|storm/.test(r)) return 'Weather';
+    if (/weather|\bsnow\b|\bstorm\b/.test(r)) return 'Weather';
     if (/study.?clos|visit.*clos.*study/.test(r)) return 'Study Closed';
     if (/wrong study|entered in error|scheduled in error|\bltv\b|scheduled under|\bdemo\b/.test(r)) return 'Admin Error';
     if (!r || r === 'nan' || r === 'n/a' || r === 'na') return 'Not Documented';
@@ -6469,11 +6471,11 @@ function buildActionSteps() {
     const isDone = itemKey && _dimItems[itemKey];
     const dimStyle = isDone ? 'opacity:0.35;' : '';
     const reasonCell = showReason!==false && p.reason
-      ? `<span style="font-size:10px;color:#94a3b8;font-style:italic;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${p.reason}">"${p.reason}"</span>`
+      ? `<span style="font-size:10px;color:#94a3b8;font-style:italic;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHTML(p.reason)}">"${escapeHTML(p.reason)}"</span>`
       : '';
     const typeCell = typeBadge(p.type||'');
     const coordCell = coordChip(p.coord);
-    const esc = itemKey.replace(/'/g,"\\'").replace(/"/g,'&quot;');
+    const esc = jsAttr(itemKey);
     const chk = itemKey ? (isDone
       ? `<button onclick="event.stopPropagation();undismissItem('${esc}')" style="background:none;border:none;cursor:pointer;font-size:12px;padding:0;color:#16a34a;line-height:1;" title="Undo">↩</button>`
       : `<button onclick="event.stopPropagation();dismissItem('${esc}','done')" style="background:none;border:1px solid #d1d5db;border-radius:3px;width:18px;height:18px;cursor:pointer;font-size:11px;padding:0;color:#d1d5db;line-height:1;transition:all .15s;display:flex;align-items:center;justify-content:center;" onmouseover="this.style.color='#16a34a';this.style.borderColor='#16a34a'" onmouseout="this.style.color='#d1d5db';this.style.borderColor='#d1d5db'" title="Mark done">✓</button>`)
@@ -11234,13 +11236,6 @@ function renderMilestoneTimeline() {
 
   if (card) card.style.display = 'block';
 
-  // Helper: days between two date strings
-  function daysBetween(a, b) {
-    if (!a || !b) return null;
-    var da = new Date(a), db = new Date(b);
-    if (isNaN(da) || isNaN(db)) return null;
-    return Math.round((db - da) / 86400000);
-  }
   function fmtDate(d) {
     if (!d) return '';
     var parts = d.split('-');
@@ -11286,8 +11281,8 @@ function renderMilestoneTimeline() {
     var statusColor = r.status === 'Enrolling' ? '#1843ad' : r.status === 'Maintenance' ? '#059669' : r.status === 'Startup' ? '#d97706' : '#94a3b8';
     var statusBg = r.status === 'Enrolling' ? '#e8eeff' : r.status === 'Maintenance' ? '#f0fdf4' : r.status === 'Startup' ? '#fffbeb' : '#f1f5f9';
     html += '<tr style="border-bottom:1px solid var(--border);">';
-    html += '<td style="padding:5px 8px;font-weight:600;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + (r.study||'') + '">' + (r.study||'') + '</td>';
-    html += '<td style="padding:5px 8px;text-align:center;"><span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;background:' + statusBg + ';color:' + statusColor + ';">' + (r.status||'') + '</span></td>';
+    html += '<td style="padding:5px 8px;font-weight:600;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + escapeHTML(r.study||'') + '">' + escapeHTML(r.study||'') + '</td>';
+    html += '<td style="padding:5px 8px;text-align:center;"><span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;background:' + statusBg + ';color:' + statusColor + ';">' + escapeHTML(r.status||'') + '</span></td>';
     STAGES.forEach(function(st) {
       var d = r.dates[st.key];
       html += '<td style="padding:5px 8px;text-align:center;font-size:10px;color:' + (d ? 'var(--text)' : 'var(--muted)') + ';">' + (d ? fmtDate(d) : '—') + '</td>';
@@ -12044,7 +12039,7 @@ function checkDataFreshness(rows) {
   if (snapDates.length === 0) return;
   const latestSnap = snapDates[snapDates.length - 1];
   const today = new Date(); today.setHours(0,0,0,0);
-  const snapDate = new Date(latestSnap); snapDate.setHours(0,0,0,0);
+  const snapDate = _parseDate(latestSnap); snapDate.setHours(0,0,0,0);
   const ageMs = today - snapDate;
   const ageDays = Math.floor(ageMs / 86400000);
   if (ageDays <= 0) {
