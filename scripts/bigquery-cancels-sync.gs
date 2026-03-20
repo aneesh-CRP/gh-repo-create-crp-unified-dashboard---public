@@ -1,52 +1,28 @@
 /**
  * CRP Dashboard — BigQuery Cancellation Data Sync
  *
- * Queries CRIO's BigQuery dataset for cancellation/no-show data and writes
- * it to a Google Sheet with the SAME column headers as the existing Looker CSV.
- * This makes it a drop-in replacement — the dashboard can switch between
- * the legacy Sheet and the BQ Sheet with a single config toggle.
+ * Queries CRIO's BigQuery dataset (appointment_audit_log table) for
+ * cancellation/no-show data and writes it to a Google Sheet with the
+ * SAME column headers as the existing Looker CSV.
  *
- * SETUP:
- * 1. Open your Apps Script project (or create a new one)
- * 2. Paste this file's contents into a new .gs file
- * 3. Go to Services (+) → Add "BigQuery API" (v2)
- * 4. Set BQ_CONFIG.SHEET_ID to your target Google Sheet ID
- * 5. Run syncBigQueryCancels() manually to test
- * 6. Add a time-based trigger: Edit → Triggers → Add → syncBigQueryCancels → every 15 min
- *
- * REQUIREMENTS:
- * - The script owner must have BigQuery Reader access on project crio-468120
- * - The BigQuery API must be enabled in the linked GCP project
- * - The target Sheet must be published to web (File → Share → Publish to web)
- *
- * OUTPUT COLUMNS (matches existing Looker CSV exactly):
- *   Subject Full Name, Study Name, Study Key, Site Name, Cancel Date,
- *   Scheduled Date, Subject Key (Back End), Staff Full Name, Cancel Reason,
- *   Appointment Cancellation Type, Subject Status, Name, Appointment Type,
- *   Appointment Status, Investigator, snapshot_date
+ * Data source: appointment_audit_log.change_type = 4 (Cancelled)
+ * Study name: nickname if set, else sponsor.name + " - " + protocol_number
+ * Staff name: calendar_appointment.organizer_key → user table
  */
 
 var BQ_CONFIG = {
   PROJECT_ID: 'crio-468120',
   DATASET: 'crio_data',
-  SHEET_ID: '', // ← SET THIS to your Google Sheet ID
+  SHEET_ID: '1p-igO6CFkciRvJ16pUhZ3ket0WDpkhNA3d7N2AD5rcY',
   TAB_NAME: 'BQ_Cancellations',
-  LOOKBACK_DAYS: 90,  // Dashboard uses 61 days, pull 90 for safety buffer
+  LOOKBACK_DAYS: 90,
   MAX_ROWS: 10000
 };
 
-/**
- * Main sync function — call this from a trigger or manually.
- */
 function syncBigQueryCancels() {
-  if (!BQ_CONFIG.SHEET_ID) {
-    throw new Error('BQ_CONFIG.SHEET_ID is not set. Edit the script and add your Sheet ID.');
-  }
-
   var query = _buildCancelQuery();
   Logger.log('Running BigQuery cancel sync...');
 
-  // Execute query
   var request = {
     query: query,
     useLegacySql: false,
@@ -62,7 +38,6 @@ function syncBigQueryCancels() {
     throw e;
   }
 
-  // Handle pagination for large result sets
   var allRows = result.rows || [];
   while (result.pageToken) {
     result = BigQuery.Jobs.getQueryResults(BQ_CONFIG.PROJECT_ID, result.jobReference.jobId, {
@@ -72,162 +47,137 @@ function syncBigQueryCancels() {
     allRows = allRows.concat(result.rows || []);
   }
 
-  // Get headers from schema
-  var headers = result.schema.fields.map(function(f) { return f.name; });
+  var HEADER_MAP = {
+    'subject_full_name': 'Subject Full Name',
+    'study_name': 'Study Name',
+    'study_key': 'Study Key',
+    'site_name': 'Site Name',
+    'cancel_date': 'Cancel Date',
+    'scheduled_date': 'Scheduled Date',
+    'subject_key_back_end': 'Subject Key (Back End)',
+    'staff_full_name': 'Staff Full Name',
+    'cancel_reason': 'Cancel Reason',
+    'appointment_cancellation_type': 'Appointment Cancellation Type',
+    'subject_status': 'Subject Status',
+    'visit_name': 'Name',
+    'appointment_type': 'Appointment Type',
+    'appointment_status': 'Appointment Status',
+    'investigator': 'Investigator',
+    'snapshot_date': 'snapshot_date'
+  };
+  var headers = result.schema.fields.map(function(f) { return HEADER_MAP[f.name] || f.name; });
 
-  // Convert rows to 2D array
   var data = allRows.map(function(row) {
     return row.f.map(function(cell) { return cell.v || ''; });
   });
 
-  // Write to Sheet
+  Logger.log('Query returned ' + data.length + ' rows');
+
   var ss = SpreadsheetApp.openById(BQ_CONFIG.SHEET_ID);
   var sheet = ss.getSheetByName(BQ_CONFIG.TAB_NAME);
   if (!sheet) {
-    sheet = ss.insertSheet(BQ_CONFIG.TAB_NAME);
+    sheet = ss.getSheets()[0];
+    sheet.setName(BQ_CONFIG.TAB_NAME);
+  }
+
+  var neededRows = Math.max(data.length + 4, 2);
+  var neededCols = headers.length;
+  if (sheet.getMaxRows() > neededRows) {
+    sheet.deleteRows(neededRows + 1, sheet.getMaxRows() - neededRows);
+  }
+  if (sheet.getMaxColumns() > neededCols) {
+    sheet.deleteColumns(neededCols + 1, sheet.getMaxColumns() - neededCols);
   }
 
   sheet.clear();
+  sheet.getRange(1, 1, neededRows, neededCols).setNumberFormat('@');
   sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
 
   if (data.length > 0) {
     sheet.getRange(2, 1, data.length, headers.length).setValues(data);
   }
 
-  // Add sync timestamp in cell after data
   var tsRow = data.length + 3;
   sheet.getRange(tsRow, 1).setValue('Last synced: ' + new Date().toISOString());
 
   Logger.log('BQ Cancellations synced: ' + data.length + ' rows, ' + headers.length + ' columns');
+  Logger.log('Sheet URL: ' + ss.getUrl());
   return data.length;
 }
 
-/**
- * Builds the BigQuery SQL query for cancellation data.
- * Uses fact_subject_visit (denormalized) joined with dimension tables for names.
- * Output columns match the existing Looker CSV headers exactly.
- */
 function _buildCancelQuery() {
   var project = BQ_CONFIG.PROJECT_ID;
   var ds = BQ_CONFIG.DATASET;
   var days = BQ_CONFIG.LOOKBACK_DAYS;
 
-  return [
-    'SELECT',
-    '  CONCAT(sub.first_name, \' \', sub.last_name) AS `Subject Full Name`,',
-    '  st.nickname AS `Study Name`,',
-    '  fsv.study_key AS `Study Key`,',
-    '  si.name AS `Site Name`,',
-    '',
-    '  -- Cancel date: prefer appointment-level, fall back to visit-level',
-    '  FORMAT_DATETIME(\'%b %e\',',
-    '    COALESCE(fsv.cancel_date, fsv.subject_visit_cancel_date)',
-    '  ) AS `Cancel Date`,',
-    '',
-    '  FORMAT_DATETIME(\'%Y-%m-%d\',',
-    '    fsv.calendar_appointment_scheduled_date',
-    '  ) AS `Scheduled Date`,',
-    '',
-    '  fsv.subject_key AS `Subject Key (Back End)`,',
-    '',
-    '  -- Coordinator assigned to the visit',
-    '  CONCAT(coord.first_name, \' \', coord.last_name) AS `Staff Full Name`,',
-    '',
-    '  COALESCE(fsv.cancel_reason, fsv.subject_visit_cancel_reason, \'\') AS `Cancel Reason`,',
-    '',
-    '  -- Structured cancel type → matches existing CSV values',
-    '  CASE COALESCE(fsv.cancel_type, fsv.subject_visit_cancel_type)',
-    '    WHEN 1 THEN \'No Show\'',
-    '    WHEN 2 THEN \'Site Cancelled\'',
-    '    WHEN 3 THEN \'Patient Cancelled\'',
-    '    ELSE \'\'',
-    '  END AS `Appointment Cancellation Type`,',
-    '',
-    '  -- Subject enrollment status',
-    '  CASE sub.status',
-    '    WHEN 1  THEN \'Interested\'',
-    '    WHEN 2  THEN \'Prequalified\'',
-    '    WHEN 3  THEN \'No Show/Cancelled V1\'',
-    '    WHEN 4  THEN \'Scheduled V1\'',
-    '    WHEN 10 THEN \'Screening\'',
-    '    WHEN 11 THEN \'Enrolled\'',
-    '    WHEN 12 THEN \'Screen Fail\'',
-    '    WHEN 13 THEN \'Discontinued\'',
-    '    WHEN 20 THEN \'Completed\'',
-    '    ELSE \'\'',
-    '  END AS `Subject Status`,',
-    '',
-    '  -- Visit name (e.g. "V1/Screening", "V2/Treatment")',
-    '  COALESCE(fsv.visit_name, fsv.study_visit_name, fsv.calendar_appointment_name, \'\') AS `Name`,',
-    '',
-    '  -- Appointment type label for categorization',
-    '  CASE fsv.calendar_appointment_type',
-    '    WHEN 0 THEN \'Regular Visit\'',
-    '    WHEN 1 THEN \'Ad Hoc Visit\'',
-    '    WHEN 2 THEN \'General Appointment\'',
-    '    WHEN 3 THEN \'Block\'',
-    '    ELSE \'\'',
-    '  END AS `Appointment Type`,',
-    '',
-    '  \'cancelled\' AS `Appointment Status`,',
-    '',
-    '  -- Investigator assigned (bonus: not in legacy CSV)',
-    '  CONCAT(inv.first_name, \' \', inv.last_name) AS `Investigator`,',
-    '',
-    '  FORMAT_DATETIME(\'%Y-%m-%d\', CURRENT_DATETIME()) AS `snapshot_date`',
-    '',
-    'FROM `' + project + '.' + ds + '.fact_subject_visit` fsv',
-    '',
-    'LEFT JOIN `' + project + '.' + ds + '.subject` sub',
-    '  ON fsv.subject_key = sub.subject_key',
-    '',
-    'LEFT JOIN `' + project + '.' + ds + '.study` st',
-    '  ON fsv.study_key = st.study_key',
-    '',
-    'LEFT JOIN `' + project + '.' + ds + '.site` si',
-    '  ON fsv.site_key = si.site_key',
-    '',
-    'LEFT JOIN `' + project + '.' + ds + '.user` coord',
-    '  ON fsv.stats_coordinator_user_key = coord.user_key',
-    '',
-    'LEFT JOIN `' + project + '.' + ds + '.user` inv',
-    '  ON fsv.stats_investigator_user_key = inv.user_key',
-    '',
-    'WHERE',
-    '  -- Only cancelled visits (appointment or visit-level)',
-    '  (fsv.calendar_appointment_status = 0',
-    '   OR fsv.subject_visit_status = 20',
-    '   OR fsv.cancel_type IS NOT NULL',
-    '   OR fsv.subject_visit_cancel_type IS NOT NULL)',
-    '',
-    '  -- Lookback window',
-    '  AND COALESCE(fsv.cancel_date, fsv.subject_visit_cancel_date, fsv.calendar_appointment_scheduled_date)',
-    '      >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL ' + days + ' DAY)',
-    '',
-    '  -- Active, real studies only',
-    '  AND st.is_active = 1',
-    '  AND LOWER(st.nickname) NOT LIKE \'%test%\'',
-    '  AND LOWER(st.nickname) NOT LIKE \'%demo%\'',
-    '  AND LOWER(st.nickname) NOT LIKE \'%sandbox%\'',
-    '  AND LOWER(st.nickname) NOT LIKE \'%pre-screen%\'',
-    '',
-    'ORDER BY COALESCE(fsv.cancel_date, fsv.subject_visit_cancel_date) DESC'
-  ].join('\n');
+  return 'SELECT ' +
+    'CONCAT(sub.first_name, \' \', sub.last_name) AS subject_full_name, ' +
+    'CASE ' +
+    '  WHEN COALESCE(st.nickname, \'\') != \'\' THEN st.nickname ' +
+    '  WHEN spon.name IS NOT NULL AND COALESCE(st.protocol_number, \'\') != \'\' THEN CONCAT(spon.name, \' - \', st.protocol_number) ' +
+    '  WHEN COALESCE(st.protocol_number, \'\') != \'\' THEN st.protocol_number ' +
+    '  ELSE \'\' ' +
+    'END AS study_name, ' +
+    'aal.study_key AS study_key, ' +
+    'COALESCE(si.name, \'\') AS site_name, ' +
+    'FORMAT_DATETIME(\'%Y-%m-%d\', aal.date_created) AS cancel_date, ' +
+    'FORMAT_DATETIME(\'%Y-%m-%d\', COALESCE(aal.old_start, aal.date_created)) AS scheduled_date, ' +
+    'aal.subject_key AS subject_key_back_end, ' +
+    'CONCAT(coord.first_name, \' \', coord.last_name) AS staff_full_name, ' +
+    'COALESCE(aal.cancel_reason, \'\') AS cancel_reason, ' +
+    'CASE aal.cancel_type ' +
+    '  WHEN 1 THEN \'No Show\' ' +
+    '  WHEN 2 THEN \'Site Cancelled\' ' +
+    '  WHEN 3 THEN \'Patient Cancelled\' ' +
+    '  ELSE \'\' ' +
+    'END AS appointment_cancellation_type, ' +
+    'CASE sub.status ' +
+    '  WHEN 1 THEN \'Interested\' ' +
+    '  WHEN 2 THEN \'Prequalified\' ' +
+    '  WHEN 3 THEN \'No Show/Cancelled V1\' ' +
+    '  WHEN 4 THEN \'Scheduled V1\' ' +
+    '  WHEN 10 THEN \'Screening\' ' +
+    '  WHEN 11 THEN \'Enrolled\' ' +
+    '  WHEN 12 THEN \'Screen Fail\' ' +
+    '  WHEN 13 THEN \'Discontinued\' ' +
+    '  WHEN 20 THEN \'Completed\' ' +
+    '  ELSE \'\' ' +
+    'END AS subject_status, ' +
+    'COALESCE(sv.name, \'\') AS visit_name, ' +
+    'CASE aal.appointment_type ' +
+    '  WHEN 0 THEN \'Regular Visit\' ' +
+    '  WHEN 1 THEN \'Ad Hoc Visit\' ' +
+    '  WHEN 2 THEN \'General Appointment\' ' +
+    '  WHEN 3 THEN \'Block\' ' +
+    '  ELSE \'\' ' +
+    'END AS appointment_type, ' +
+    '\'cancelled\' AS appointment_status, ' +
+    'CONCAT(inv.first_name, \' \', inv.last_name) AS investigator, ' +
+    'FORMAT_DATETIME(\'%Y-%m-%d\', CURRENT_DATETIME()) AS snapshot_date ' +
+    'FROM `' + project + '.' + ds + '.appointment_audit_log` aal ' +
+    'LEFT JOIN `' + project + '.' + ds + '.calendar_appointment` ca ON aal.calendar_appointment_key = ca.calendar_appointment_key ' +
+    'LEFT JOIN `' + project + '.' + ds + '.subject` sub ON aal.subject_key = sub.subject_key ' +
+    'LEFT JOIN `' + project + '.' + ds + '.study` st ON aal.study_key = st.study_key ' +
+    'LEFT JOIN `' + project + '.' + ds + '.sponsor` spon ON st.sponsor_key = spon.sponsor_key ' +
+    'LEFT JOIN `' + project + '.' + ds + '.site` si ON aal.site_key = si.site_key ' +
+    'LEFT JOIN `' + project + '.' + ds + '.study_visit` sv ON aal.study_visit_key = sv.study_visit_key ' +
+    'LEFT JOIN `' + project + '.' + ds + '.user` coord ON ca.organizer_key = coord.user_key ' +
+    'LEFT JOIN `' + project + '.' + ds + '.user` inv ON aal.by_user_key = inv.user_key ' +
+    'WHERE aal.change_type = 4 ' +
+    'AND aal.date_created >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL ' + days + ' DAY) ' +
+    'AND aal.subject_key IS NOT NULL ' +
+    'AND st.is_active = 1 ' +
+    'AND LOWER(COALESCE(st.nickname, st.protocol_number, \'\')) NOT LIKE \'%test%\' ' +
+    'AND LOWER(COALESCE(st.nickname, st.protocol_number, \'\')) NOT LIKE \'%demo%\' ' +
+    'AND LOWER(COALESCE(st.nickname, st.protocol_number, \'\')) NOT LIKE \'%sandbox%\' ' +
+    'ORDER BY aal.date_created DESC';
 }
 
-/**
- * Quick test — logs the query without running it.
- */
 function testQueryPreview() {
   Logger.log(_buildCancelQuery());
 }
 
-/**
- * Setup helper — creates a time-based trigger to run every 15 minutes.
- * Run this once manually.
- */
 function createSyncTrigger() {
-  // Remove existing triggers for this function
   var triggers = ScriptApp.getProjectTriggers();
   triggers.forEach(function(t) {
     if (t.getHandlerFunction() === 'syncBigQueryCancels') {
