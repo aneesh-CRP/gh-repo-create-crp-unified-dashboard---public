@@ -1346,7 +1346,6 @@ body {
             <th style="padding:10px 8px;text-align:left;font-weight:700;color:var(--text);white-space:nowrap;">Coordinator</th>
             <th style="padding:10px 8px;text-align:left;font-weight:700;color:var(--text);white-space:nowrap;">PI</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Site</th>
-            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Phase</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Enroll Start</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Enroll Stop</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Referrals</th>
@@ -13382,42 +13381,25 @@ function renderMilestoneTimeline() {
     return d;
   }
 
-  // Milestone stages: IRB → Contract → SIV → Enroll Start → FPS
+  // Milestone stages: Enroll Start only (IRB, Contract, SIV, FPS removed)
   var STAGES = [
-    { key: 'irb_approval', label: 'IRB', color: '#6366f1' },
-    { key: 'contract_signed', label: 'Contract', color: '#8B5CF6' },
-    { key: 'siv_date', label: 'SIV', color: '#3B82F6' },
     { key: 'enrollment_start', label: 'Enroll Start', color: '#10B981' },
-    { key: 'fps_date', label: 'FPS', color: '#059669' },
   ];
 
   // Build rows with milestone data
   var rows = [];
-  var totalIrbToSiv = [], totalSivToFps = [], totalCreatedToFps = [];
   studies.forEach(function(s) {
     var hasAny = STAGES.some(function(st) { return !!s[st.key]; });
     if (!hasAny) return;
     var row = { study: s.study, status: s.enroll_status, dates: {} };
     STAGES.forEach(function(st) { row.dates[st.key] = s[st.key] || ''; });
-    // Calculate durations
-    row.irb_to_siv = daysBetween(s.irb_approval, s.siv_date);
-    row.siv_to_fps = daysBetween(s.siv_date, s.fps_date);
-    row.siv_to_enroll = daysBetween(s.siv_date, s.enrollment_start);
-    if (row.irb_to_siv !== null && row.irb_to_siv >= 0) totalIrbToSiv.push(row.irb_to_siv);
-    if (row.siv_to_fps !== null && row.siv_to_fps >= 0) totalSivToFps.push(row.siv_to_fps);
     rows.push(row);
   });
-  rows.sort(function(a,b) { return (b.dates.siv_date || '').localeCompare(a.dates.siv_date || ''); });
+  rows.sort(function(a,b) { return (b.dates.enrollment_start || '').localeCompare(a.dates.enrollment_start || ''); });
 
   // KPI strip
-  var avgIrbSiv = totalIrbToSiv.length > 0 ? Math.round(totalIrbToSiv.reduce(function(a,b){return a+b;},0) / totalIrbToSiv.length) : null;
-  var avgSivFps = totalSivToFps.length > 0 ? Math.round(totalSivToFps.reduce(function(a,b){return a+b;},0) / totalSivToFps.length) : null;
   if (kpiEl) {
-    var kpiParts = [];
-    if (avgIrbSiv !== null) kpiParts.push('Avg IRB→SIV: <strong>' + avgIrbSiv + 'd</strong>');
-    if (avgSivFps !== null) kpiParts.push('Avg SIV→FPS: <strong>' + avgSivFps + 'd</strong>');
-    kpiParts.push(rows.length + ' studies with milestones');
-    kpiEl.innerHTML = kpiParts.join(' · ');
+    kpiEl.innerHTML = rows.length + ' studies with milestones';
   }
 
   if (rows.length === 0) { el.innerHTML = '<div style="color:var(--muted);font-size:11px;">No milestone dates available.</div>'; return; }
@@ -13430,8 +13412,6 @@ function renderMilestoneTimeline() {
   STAGES.forEach(function(st) {
     html += '<th style="padding:6px 8px;text-align:center;font-weight:700;color:' + st.color + '">' + st.label + '</th>';
   });
-  html += '<th style="padding:6px 8px;text-align:center;font-weight:700;">IRB→SIV</th>';
-  html += '<th style="padding:6px 8px;text-align:center;font-weight:700;">SIV→FPS</th>';
   html += '</tr></thead><tbody>';
 
   rows.forEach(function(r) {
@@ -13444,12 +13424,6 @@ function renderMilestoneTimeline() {
       var d = r.dates[st.key];
       html += '<td style="padding:5px 8px;text-align:center;font-size:10px;color:' + (d ? 'var(--text)' : 'var(--muted)') + ';">' + (d ? fmtDate(d) : '—') + '</td>';
     });
-    // Duration columns
-    var dIrbSiv = r.irb_to_siv;
-    var dSivFps = r.siv_to_fps;
-    var dColor = function(v) { return v === null ? '#94a3b8' : v <= 30 ? '#059669' : v <= 60 ? '#d97706' : '#dc2626'; };
-    html += '<td style="padding:5px 8px;text-align:center;font-weight:600;color:' + dColor(dIrbSiv) + ';">' + (dIrbSiv !== null ? dIrbSiv + 'd' : '—') + '</td>';
-    html += '<td style="padding:5px 8px;text-align:center;font-weight:600;color:' + dColor(dSivFps) + ';">' + (dSivFps !== null ? dSivFps + 'd' : '—') + '</td>';
     html += '</tr>';
   });
   html += '</tbody></table>';
@@ -13590,7 +13564,6 @@ function renderStudiesTable() {
       <td style="padding:10px 8px;font-size:11px;color:#475569;white-space:nowrap">${escapeHTML(s.crio_coordinator||'')}</td>
       <td style="padding:10px 8px;font-size:11px;color:#475569;white-space:nowrap">${escapeHTML(s.crio_investigator||'')}</td>
       <td style="padding:10px 8px;text-align:center">${siteTags}</td>
-      <td style="padding:10px 8px;text-align:center;font-size:10px;color:var(--muted);white-space:nowrap">${s.phase ? escapeHTML(s.phase) : '—'}</td>
       <td style="padding:10px 8px;text-align:center;font-size:10px;color:var(--muted);white-space:nowrap">${s.enrollment_start ? escapeHTML(s.enrollment_start) : '—'}</td>
       <td style="padding:10px 8px;text-align:center;font-size:10px;color:${(function(){if(!s.enrollment_close)return 'var(--muted)';var d=Math.round((new Date(s.enrollment_close)-new Date())/86400000);return d<0?'#94a3b8':d<=30?'#dc2626':d<=60?'#d97706':'var(--muted)'})()};font-weight:${s.enrollment_close?'600':'400'};white-space:nowrap">${s.enrollment_close ? escapeHTML(s.enrollment_close) : '—'}</td>
       <td style="padding:10px 8px;text-align:center">${buildPipelineCell(s.study, safeStudy)}</td>
