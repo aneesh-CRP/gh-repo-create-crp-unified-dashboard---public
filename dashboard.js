@@ -5389,8 +5389,13 @@ function processLiveData(allRows, legacyCancels, auditLog) {
   }
 
   // ── Coordinator definitions (must be before audit log resolution) ──
-  const EXCLUDE_STUDIES = new Set([]);
-  const isExcludedStudy = (name) => false;
+  const EXCLUDE_STUDIES = new Set(['cardiology pre-screening']);
+  const isExcludedStudy = (name) => {
+    if (!name) return false;
+    const lower = name.toLowerCase();
+    for (const ex of EXCLUDE_STUDIES) { if (lower.includes(ex)) return true; }
+    return false;
+  };
   // Recruitment/support staff — resolve to clinical coordinator via audit log
   const SCHED_COORDS = new Set((CRP_CONFIG.SCHEDULE_COORDINATORS || []).map(n => n.toLowerCase()));
   const EXCL_COORD = new Set((CRP_CONFIG.COORDINATORS || []).filter(n => !SCHED_COORDS.has(n.toLowerCase())).map(n => n.toLowerCase()));
