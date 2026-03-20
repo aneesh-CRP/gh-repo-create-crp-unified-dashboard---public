@@ -4313,11 +4313,25 @@ function buildUpcomingStudyChart() {
   });
 }
 
+var RISK_CARD_STATUS_KEY = 'crp_risk_card_status_v1';
+function _loadRiskCardStatus() { try { return JSON.parse(localStorage.getItem(RISK_CARD_STATUS_KEY)||'{}'); } catch(e) { return {}; } }
+function _saveRiskCardStatus(s) { try { localStorage.setItem(RISK_CARD_STATUS_KEY, JSON.stringify(s)); } catch(e) {} }
+function setRiskCardStatus(key, status, btn) {
+  var s = _loadRiskCardStatus();
+  if (s[key] === status) { delete s[key]; } else { s[key] = status; }
+  _saveRiskCardStatus(s);
+  safe(buildRiskFlagCards, 'buildRiskFlagCards');
+}
+
 function buildRiskFlagCards() {
   const el = document.getElementById('risk-flag-cards');
   if (!el) return;
   const flags = DATA.riskFlags || [];
-  document.getElementById('risk-kpi-count').textContent = flags.length;
+  const riskStatus = _loadRiskCardStatus();
+  // Auto-prune old entries (>30 days)
+  const now = Date.now();
+  Object.keys(riskStatus).forEach(k => { if (riskStatus[k] && typeof riskStatus[k] === 'object' && riskStatus[k].ts && now - riskStatus[k].ts > 30*86400000) delete riskStatus[k]; });
+
   const today = new Date();
   const urgent = flags.filter(f => {
     const parts = f.next_visit.split(' ');
@@ -4326,36 +4340,111 @@ function buildRiskFlagCards() {
     if (d < new Date(today.getFullYear(), today.getMonth() - 3, 1)) d.setFullYear(d.getFullYear() + 1);
     return (d - today) / 86400000 <= 14;
   });
+  // Separate critical/high severity counts for KPI
+  const critical = flags.filter(f => f.severity === 'critical');
+  const high = flags.filter(f => f.severity === 'high');
+  document.getElementById('risk-kpi-count').textContent = flags.length;
   document.getElementById('risk-kpi-urgent').textContent = urgent.length;
   const studies = new Set(flags.map(f => f.study));
   document.getElementById('risk-kpi-studies').textContent = studies.size;
 
   if (flags.length === 0) {
-    el.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);font-size:13px;">🟢 No patients with 2+ cancellations have upcoming visits — great retention!</div>';
+    el.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);font-size:13px;">No patients with 2+ cancellations have upcoming visits — great retention!</div>';
     return;
   }
 
-  el.innerHTML = flags.map(f => {
-    const urgentFlag = urgent.some(u => u.patient === f.patient);
-    const borderColor = urgentFlag ? '#dc2626' : '#d97706';
-    const bgColor = urgentFlag ? '#fef2f2' : '#fffbeb';
-    return `<div onclick="showRiskFlags('At-Risk Patients')" style="cursor:pointer;border:1.5px solid ${borderColor};border-radius:10px;padding:14px 16px;background:${bgColor};">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
-        <div>
-          <div style="font-size:14px;font-weight:700;color:#1e293b">${f.patient_url ? `<a href="${escapeHTML(f.patient_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" title="Open ${escapeHTML(f.patient)} in CRIO" style="text-decoration:none;color:#1e293b;font-weight:700;">${escapeHTML(f.patient)}<svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-left:2px;opacity:0.4;vertical-align:middle"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>` : escapeHTML(f.patient)}</div>
-          <div style="font-size:11px;color:#64748b;margin-top:2px">${f.study_url ? `<a href="${escapeHTML(f.study_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="text-decoration:none;font-size:11px;color:#64748b;">${escapeHTML(f.study)}<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-left:3px;opacity:0.45;vertical-align:middle;flex-shrink:0"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>` : escapeHTML(f.study)}</div>
+  const sevColors = {critical:{border:'#dc2626',bg:'#fef2f2',label:'CRITICAL'},high:{border:'#ea580c',bg:'#fff7ed',label:'HIGH'},medium:{border:'#d97706',bg:'#fffbeb',label:'MEDIUM'}};
+  const linkSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-left:2px;opacity:0.4;vertical-align:middle"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>';
+
+  // Split into active vs dismissed
+  const activeFlags = flags.filter(f => {
+    const k = (f.patient+'|'+f.study).toLowerCase().replace(/\s+/g,'_');
+    return !riskStatus[k];
+  });
+  const doneFlags = flags.filter(f => {
+    const k = (f.patient+'|'+f.study).toLowerCase().replace(/\s+/g,'_');
+    return riskStatus[k] === 'done';
+  });
+  const naFlags = flags.filter(f => {
+    const k = (f.patient+'|'+f.study).toLowerCase().replace(/\s+/g,'_');
+    return riskStatus[k] === 'na';
+  });
+
+  let html = '';
+  if (critical.length > 0 || high.length > 0) {
+    html += `<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">`;
+    if (critical.length) html += `<span style="font-size:10px;font-weight:800;padding:3px 10px;border-radius:4px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;">${critical.length} CRITICAL (5+×)</span>`;
+    if (high.length) html += `<span style="font-size:10px;font-weight:800;padding:3px 10px;border-radius:4px;background:#fff7ed;color:#ea580c;border:1px solid #fed7aa;">${high.length} HIGH (3-4×)</span>`;
+    html += `<span style="font-size:10px;font-weight:600;padding:3px 10px;border-radius:4px;background:#fffbeb;color:#d97706;border:1px solid #fde68a;">${flags.length - critical.length - high.length} MEDIUM (2×)</span>`;
+    html += `</div>`;
+  }
+
+  html += activeFlags.map(f => {
+    const k = (f.patient+'|'+f.study).toLowerCase().replace(/\s+/g,'_');
+    const ek = k.replace(/'/g,"\\'");
+    const urgentFlag = urgent.some(u => u.patient === f.patient && u.study === f.study);
+    const sc = sevColors[f.severity] || sevColors.medium;
+    // Category breakdown badges
+    let catBadges = '';
+    if (f.noShowCount > 0) catBadges += `<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:#fef2f2;color:#dc2626;font-weight:600;">${f.noShowCount} no-show</span>`;
+    if (f.cancelCount > 0) catBadges += `<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:#fff7ed;color:#c2410c;font-weight:600;">${f.cancelCount} cancel</span>`;
+    if (f.rescheduleCount > 0) catBadges += `<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:#eff6ff;color:#1843ad;font-weight:600;">${f.rescheduleCount} resched</span>`;
+    // Recency badge
+    const recency = f.daysSinceLast != null ? (f.daysSinceLast <= 7 ? `<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:#fef2f2;color:#dc2626;font-weight:700;">Last cancel ${f.daysSinceLast}d ago</span>` : f.daysSinceLast <= 21 ? `<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:#fffbeb;color:#d97706;">Last cancel ${f.daysSinceLast}d ago</span>` : '') : '';
+    // Cross-study warning
+    const crossStudy = f.crossStudyCount > 1 ? `<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:#fdf4ff;color:#7e22ce;font-weight:700;" title="Cancelling across ${f.crossStudyCount} studies">Cross-study (${f.crossStudyCount})</span>` : '';
+    // Velocity
+    const velocityBadge = f.velocity >= 3 ? `<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:#fef2f2;color:#dc2626;font-weight:600;" title="${f.velocity}/mo cancel rate">Rapid (${f.velocity}/mo)</span>` : '';
+
+    return `<div style="border:1.5px solid ${sc.border};border-radius:10px;padding:14px 16px;background:${sc.bg};position:relative;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">
+            <span style="font-size:9px;font-weight:800;padding:2px 6px;border-radius:3px;background:${sc.border};color:#fff;">${sc.label}</span>
+            <span style="font-size:14px;font-weight:700;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${f.patient_url ? `<a href="${escapeHTML(f.patient_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="text-decoration:none;color:#1e293b;font-weight:700;">${escapeHTML(f.patient)}${linkSvg}</a>` : escapeHTML(f.patient)}</span>
+          </div>
+          <div style="font-size:11px;color:#64748b;">${f.study_url ? `<a href="${escapeHTML(f.study_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="text-decoration:none;color:#64748b;">${escapeHTML(f.study)}${linkSvg}</a>` : escapeHTML(f.study)}</div>
         </div>
-        <div style="text-align:right;">
-          <span style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;background:${borderColor};color:#fff">${f.cancels}× cancelled</span>
+        <div style="display:flex;gap:4px;flex-shrink:0;">
+          <button onclick="event.stopPropagation();setRiskCardStatus('${ek}','done')" style="font-size:10px;font-weight:600;padding:3px 8px;border-radius:5px;border:1px solid #d1d5db;background:#fff;cursor:pointer;color:#64748b;transition:all .15s;" onmouseover="this.style.borderColor='#16a34a';this.style.color='#16a34a'" onmouseout="this.style.borderColor='#d1d5db';this.style.color='#64748b'">Done</button>
+          <button onclick="event.stopPropagation();setRiskCardStatus('${ek}','na')" style="font-size:10px;font-weight:600;padding:3px 8px;border-radius:5px;border:1px solid #d1d5db;background:#fff;cursor:pointer;color:#64748b;transition:all .15s;" onmouseover="this.style.borderColor='#94a3b8';this.style.color='#64748b'" onmouseout="this.style.borderColor='#d1d5db';this.style.color='#64748b'">N/A</button>
         </div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;">
+        <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;background:${sc.border};color:#fff">${f.cancels}× events</span>
+        ${catBadges}${recency}${crossStudy}${velocityBadge}
       </div>
       <div style="display:flex;gap:16px;font-size:12px;color:#475569;">
-        <span>📅 Next visit: <strong style="color:#1e293b">${escapeHTML(f.next_visit)}</strong></span>
-        <span>⏮ Last cancel: <strong style="color:#1e293b">${escapeHTML(f.last_cancel)}</strong></span>
+        <span>Next: <strong style="color:#1e293b">${escapeHTML(f.next_visit)}</strong></span>
+        <span>Last cancel: <strong style="color:#1e293b">${escapeHTML(f.last_cancel)}</strong></span>
       </div>
-      ${urgentFlag ? '<div style="margin-top:8px;font-size:11px;font-weight:700;color:#dc2626;">🔴 CALL NOW — visit within 14 days</div>' : '<div style="margin-top:8px;font-size:11px;color:#d97706;">⚠️ Schedule proactive outreach call</div>'}
+      ${urgentFlag ? '<div style="margin-top:6px;font-size:11px;font-weight:700;color:#dc2626;">CALL NOW — visit within 14 days</div>' : '<div style="margin-top:6px;font-size:11px;color:#d97706;">Schedule proactive outreach call</div>'}
     </div>`;
   }).join('');
+
+  // Show done/N/A items with undo
+  const clearedCount = doneFlags.length + naFlags.length;
+  if (clearedCount > 0) {
+    html += `<div style="padding:12px 0;text-align:center;">
+      <button onclick="var x=document.getElementById('risk-cleared-list');x.style.display=x.style.display==='none'?'block':'none'" style="background:none;border:none;font-size:12px;color:#94a3b8;cursor:pointer;text-decoration:underline dotted;">
+        ${clearedCount} cleared — click to show
+      </button>
+      <div id="risk-cleared-list" style="display:none;margin-top:8px;text-align:left;">
+        ${[...doneFlags,...naFlags].map(f => {
+          const k = (f.patient+'|'+f.study).toLowerCase().replace(/\s+/g,'_');
+          const ek = k.replace(/'/g,"\\'");
+          const st = riskStatus[k];
+          return `<div style="display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid #f8fafc;opacity:0.5;">
+            <span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;background:${st==='done'?'#f0fdf4':'#f8fafc'};color:${st==='done'?'#16a34a':'#94a3b8'}">${st==='done'?'Done':'N/A'}</span>
+            <span style="font-size:12px;flex:1;text-decoration:line-through;">${escapeHTML(f.patient)} · ${escapeHTML(f.study)} (${f.cancels}×)</span>
+            <button onclick="event.stopPropagation();setRiskCardStatus('${ek}','undo')" style="font-size:10px;border:1px solid #e2e8f0;border-radius:4px;padding:2px 8px;background:none;cursor:pointer;color:#94a3b8">Undo</button>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  }
+
+  el.innerHTML = html;
 }
 
 // buildWeeklyBySiteChart removed — canvas element no longer exists
@@ -5812,6 +5901,16 @@ function toggleCoordDayDetail(coordName, date, el) {
   detailDiv.dataset.activeDate = date;
 }
 
+var INSIGHT_STATUS_KEY = 'crp_insight_status_v1';
+function _loadInsightStatus() { try { return JSON.parse(localStorage.getItem(INSIGHT_STATUS_KEY)||'{}'); } catch(e) { return {}; } }
+function _saveInsightStatus(s) { try { localStorage.setItem(INSIGHT_STATUS_KEY, JSON.stringify(s)); } catch(e) {} }
+function setInsightStatus(key, status) {
+  var s = _loadInsightStatus();
+  if (s[key] === status) { delete s[key]; } else { s[key] = status; }
+  _saveInsightStatus(s);
+  safe(buildInsights, 'buildInsights');
+}
+
 function buildInsights() {
   const flags    = DATA.riskFlags || [];
   const cancels  = DATA.cancelByStudy || [];
@@ -5822,8 +5921,30 @@ function buildInsights() {
   const flagEl = document.getElementById('perf-insight-flags');
   if (!flagEl) return;
 
+  const insightStatus = _loadInsightStatus();
   const today = new Date();
   const flagItems = [];
+
+  // Helper: wrap insight HTML with done/N/A buttons
+  function wrapInsight(id, cssClass, iconEmoji, titleHtml, descHtml, isUrgent) {
+    const ek = id.replace(/'/g,"\\'");
+    const st = insightStatus[id];
+    if (st) return null; // hidden if done/na
+    return {
+      urgent: isUrgent || false,
+      html: `<div class="insight-item ${cssClass}" style="position:relative;">
+        <span class="insight-icon">${iconEmoji}</span>
+        <div style="flex:1;min-width:0;">
+          <div class="insight-title">${titleHtml}</div>
+          <div class="insight-desc">${descHtml}</div>
+        </div>
+        <div style="display:flex;gap:4px;flex-shrink:0;align-self:flex-start;margin-top:2px;">
+          <button onclick="event.stopPropagation();setInsightStatus('${ek}','done')" style="font-size:9px;font-weight:600;padding:2px 6px;border-radius:4px;border:1px solid #d1d5db;background:#fff;cursor:pointer;color:#94a3b8;transition:all .15s;" onmouseover="this.style.borderColor='#16a34a';this.style.color='#16a34a'" onmouseout="this.style.borderColor='#d1d5db';this.style.color='#94a3b8'">Done</button>
+          <button onclick="event.stopPropagation();setInsightStatus('${ek}','na')" style="font-size:9px;font-weight:600;padding:2px 6px;border-radius:4px;border:1px solid #d1d5db;background:#fff;cursor:pointer;color:#94a3b8;transition:all .15s;" onmouseover="this.style.borderColor='#94a3b8'" onmouseout="this.style.borderColor='#d1d5db'">N/A</button>
+        </div>
+      </div>`
+    };
+  }
 
   // Risk flag patients — urgent ones first
   flags.forEach(f => {
@@ -5835,36 +5956,25 @@ function buildInsights() {
     const pLink = f.patient_url
       ? `<a href="${f.patient_url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:inherit;font-weight:700;text-decoration:underline;text-decoration-style:dotted;">${maskPHI(f.patient)}</a>`
       : `<strong>${maskPHI(f.patient)}</strong>`;
-    const sLink = f.study_url
+    const sLnk = f.study_url
       ? `<a href="${f.study_url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:inherit;text-decoration:underline;text-decoration-style:dotted;">${f.study}</a>`
       : f.study;
-    flagItems.push({
-      urgent,
-      html: `<div class="insight-item ${urgent ? 'danger' : 'warning'}">
-        <span class="insight-icon">${urgent ? '🔴' : '⚠️'}</span>
-        <div>
-          <div class="insight-title">${pLink} — ${f.cancels}× cancelled</div>
-          <div class="insight-desc">${sLink} · Next visit: <strong>${f.next_visit}</strong>${urgent ? ' <span style="color:#dc2626;font-weight:700;">— CALL NOW</span>' : ''}</div>
-        </div>
-      </div>`
-    });
+    const sevLabel = f.severity === 'critical' ? ' <span style="font-size:9px;font-weight:800;padding:1px 4px;border-radius:3px;background:#dc2626;color:#fff;">CRITICAL</span>' : f.severity === 'high' ? ' <span style="font-size:9px;font-weight:800;padding:1px 4px;border-radius:3px;background:#ea580c;color:#fff;">HIGH</span>' : '';
+    const id = 'risk-' + (f.patient + '-' + f.study).replace(/[^a-z0-9]/gi, '-').toLowerCase();
+    const item = wrapInsight(id, urgent ? 'danger' : 'warning', urgent ? '🔴' : '⚠️',
+      `${pLink} — ${f.cancels}× cancelled${sevLabel}`,
+      `${sLnk} · Next visit: <strong>${f.next_visit}</strong>${urgent ? ' <span style="color:#dc2626;font-weight:700;">— CALL NOW</span>' : ''}`, urgent);
+    if (item) flagItems.push(item);
   });
 
   // High cancel studies
   cancels.filter(c => c.count >= 15).forEach(c => {
-    const sLink = c.study_url
+    const sLnk2 = c.study_url
       ? `<a href="${c.study_url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:inherit;font-weight:700;text-decoration:underline;text-decoration-style:dotted;">${c.name}</a>`
       : `<strong>${c.name}</strong>`;
-    flagItems.push({
-      urgent: false,
-      html: `<div class="insight-item warning">
-        <span class="insight-icon">📉</span>
-        <div>
-          <div class="insight-title">${sLink} — high cancellation volume</div>
-          <div class="insight-desc">${c.count} cancelled visits in last 2 months · Review retention strategy</div>
-        </div>
-      </div>`
-    });
+    const id = 'hicx-' + (c.name||'').replace(/[^a-z0-9]/gi,'-').toLowerCase();
+    const item = wrapInsight(id, 'warning', '📉', `${sLnk2} — high cancellation volume`, `${c.count} cancelled visits in last 2 months · Review retention strategy`);
+    if (item) flagItems.push(item);
   });
 
   // Upcoming visits this week with no-show history
@@ -5883,58 +5993,44 @@ function buildInsights() {
       seenPats.add(key);
       return true;
     });
-    flagItems.push({
-      urgent: false,
-      html: `<div class="insight-item warning">
-        <span class="insight-icon">📅</span>
-        <div>
-          <div class="insight-title">${thisWeek.length} visits scheduled this week (${uniqueThisWeek.length} patients)</div>
-          <div class="insight-desc">Confirm attendance — ${uniqueThisWeek.slice(0, 15).map(d => {
-            var label = PHI_MASKED ? maskPHI(d.patient) : d.patient.split(' ')[0];
-            return d.patient_url
-              ? `<a href="${d.patient_url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:inherit;text-decoration:underline;text-decoration-style:dotted;">${label}</a>`
-              : label;
-          }).join(', ')}${uniqueThisWeek.length > 15 ? ' +' + (uniqueThisWeek.length - 15) + ' more' : ''}</div>
-        </div>
-      </div>`
-    });
+    const wkItem = wrapInsight('thisweek-visits', 'warning', '📅',
+      `${thisWeek.length} visits scheduled this week (${uniqueThisWeek.length} patients)`,
+      `Confirm attendance — ${uniqueThisWeek.slice(0, 15).map(d => {
+        var label = PHI_MASKED ? maskPHI(d.patient) : d.patient.split(' ')[0];
+        return d.patient_url
+          ? `<a href="${d.patient_url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:inherit;text-decoration:underline;text-decoration-style:dotted;">${label}</a>`
+          : label;
+      }).join(', ')}${uniqueThisWeek.length > 15 ? ' +' + (uniqueThisWeek.length - 15) + ' more' : ''}`);
+    if (wkItem) flagItems.push(wkItem);
   }
 
   // Cross-source: referrals without med records
   var refsNoMR = findReferralsWithoutMedRecords();
   if (refsNoMR.length > 0) {
-    flagItems.push({
-      urgent: false,
-      html: `<div class="insight-item warning"><span class="insight-icon">📋</span><div>
-        <div class="insight-title">${refsNoMR.length} active referrals have no medical records entry</div>
-        <div class="insight-desc">Create medical records entries for these referrals to track their intake progress</div>
-      </div></div>`
-    });
+    const mrItem = wrapInsight('refs-no-medrec', 'warning', '📋',
+      `${refsNoMR.length} active referrals have no medical records entry`,
+      `Create medical records entries for these referrals to track their intake progress`);
+    if (mrItem) flagItems.push(mrItem);
   }
 
   // Cross-source: ready to schedule but no visit
   var readyNV = findReadyNoVisit();
   if (readyNV.length > 0) {
-    flagItems.push({
-      urgent: readyNV.length >= 3,
-      html: `<div class="insight-item ${readyNV.length >= 3 ? 'danger' : 'warning'}"><span class="insight-icon">📅</span><div>
-        <div class="insight-title">${readyNV.length} patient${readyNV.length>1?'s':''} ready to schedule but no upcoming visit</div>
-        <div class="insight-desc">${readyNV.slice(0,3).map(r => maskPHI(r.name)).join(', ')}${readyNV.length>3 ? ' +' + (readyNV.length-3) + ' more' : ''} — schedule appointments now</div>
-      </div></div>`
-    });
+    const rvItem = wrapInsight('ready-no-visit', readyNV.length >= 3 ? 'danger' : 'warning', '📅',
+      `${readyNV.length} patient${readyNV.length>1?'s':''} ready to schedule but no upcoming visit`,
+      `${readyNV.slice(0,3).map(r => maskPHI(r.name)).join(', ')}${readyNV.length>3 ? ' +' + (readyNV.length-3) + ' more' : ''} — schedule appointments now`,
+      readyNV.length >= 3);
+    if (rvItem) flagItems.push(rvItem);
   }
 
   // Cross-source: stale referrals
   var _stale60d = Date.now() - 60 * 86400000;
   var staleRefs = REFERRAL_DATA ? REFERRAL_DATA.filter(function(r) { if (r.is_closed || r.days_since_update < 14) return false; if (r.date_created) { var cd = new Date(r.date_created).getTime(); if (cd && cd < _stale60d) return false; } return true; }).length : 0;
   if (staleRefs > 0) {
-    flagItems.push({
-      urgent: false,
-      html: `<div class="insight-item warning"><span class="insight-icon">⏰</span><div>
-        <div class="insight-title">${staleRefs} referrals stale for 14+ days</div>
-        <div class="insight-desc">Review and update stale leads in the referral pipeline to prevent drop-off</div>
-      </div></div>`
-    });
+    const stItem = wrapInsight('stale-referrals', 'warning', '⏰',
+      `${staleRefs} referrals stale for 14+ days`,
+      `Review and update stale leads in the referral pipeline to prevent drop-off`);
+    if (stItem) flagItems.push(stItem);
   }
 
   // Cancel rate by subject status — which funnel stages cancel most?
@@ -5949,24 +6045,39 @@ function buildInsights() {
   }).sort(function(a,b) { return b.count - a.count; });
   if (statusEntries.length > 1) {
     var totalCx = statusEntries.reduce(function(s,e) { return s + e.count; }, 0);
-    var topStatus = statusEntries[0];
-    var topPct = Math.round((topStatus.count / totalCx) * 100);
     var breakdown = statusEntries.slice(0,4).map(function(e) {
       return '<span style="font-size:10px;display:inline-block;margin-right:8px;"><b>' + e.count + '</b> ' + e.status + ' (' + Math.round(e.count/totalCx*100) + '%)</span>';
     }).join('');
-    flagItems.push({
-      urgent: false,
-      html: '<div class="insight-item info"><span class="insight-icon">📊</span><div>' +
-        '<div class="insight-title">Cancellation breakdown by enrollment stage</div>' +
-        '<div class="insight-desc">' + breakdown + '</div>' +
-        '</div></div>'
-    });
+    const cxItem = wrapInsight('cx-by-stage', 'info', '📊',
+      `Cancellation breakdown by enrollment stage`, breakdown);
+    if (cxItem) flagItems.push(cxItem);
   }
 
   // Sort urgent first
   flagItems.sort((a, b) => (b.urgent ? 1 : 0) - (a.urgent ? 1 : 0));
-  flagEl.innerHTML = flagItems.length > 0 ? flagItems.map(f => f.html).join('') :
-    '<div class="insight-item positive"><span class="insight-icon">✅</span><div><div class="insight-title">No critical flags</div></div></div>';
+  // Count cleared insights
+  var clearedInsights = Object.keys(insightStatus).filter(k => insightStatus[k]);
+  var clearedHtml = '';
+  if (clearedInsights.length > 0) {
+    clearedHtml = `<div style="padding:8px 0;text-align:center;">
+      <button onclick="var x=document.getElementById('insight-cleared-list');x.style.display=x.style.display==='none'?'block':'none'" style="background:none;border:none;font-size:11px;color:#94a3b8;cursor:pointer;text-decoration:underline dotted;">
+        ${clearedInsights.length} cleared — click to show
+      </button>
+      <div id="insight-cleared-list" style="display:none;margin-top:6px;text-align:left;">
+        ${clearedInsights.map(k => {
+          const st = insightStatus[k];
+          const ek = k.replace(/'/g,"\\'");
+          return `<div style="display:flex;gap:6px;align-items:center;padding:4px 0;border-bottom:1px solid #f8fafc;opacity:0.5;">
+            <span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;background:${st==='done'?'#f0fdf4':'#f8fafc'};color:${st==='done'?'#16a34a':'#94a3b8'}">${st==='done'?'Done':'N/A'}</span>
+            <span style="font-size:11px;flex:1;text-decoration:line-through;color:#94a3b8;">${k}</span>
+            <button onclick="setInsightStatus('${ek}','undo')" style="font-size:9px;border:1px solid #e2e8f0;border-radius:3px;padding:1px 6px;background:none;cursor:pointer;color:#94a3b8">Undo</button>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  }
+  flagEl.innerHTML = (flagItems.length > 0 ? flagItems.map(f => f.html).join('') :
+    '<div class="insight-item positive"><span class="insight-icon">✅</span><div><div class="insight-title">No critical flags</div></div></div>') + clearedHtml;
 
   // ── Positives ──
   const posEl = document.getElementById('perf-insight-positive');
@@ -7896,25 +8007,40 @@ function processLiveData(allRows, legacyCancels, auditLog) {
     }));
 
   // ── riskFlags: 2+ cancels + upcoming visit ──
-  // Event-based cancel counting: group by patient+study+cancel_date
-  // Prevents bulk-cancelled visits (same cancel date) from inflating counts
-  // NOTE: includes rescheduled + no-shows — repeat cancellers are a risk signal
-  // even if they rebooked, and no-shows are an engagement risk signal
-  const cancelEventMap = {};  // key -> Set of cancel dates
+  // Enhanced: severity tiers, recency, cross-study detection, category breakdown
+  const cancelEventMap = {};  // patientStudyKey -> Set of cancel dates
   const cancelMeta = {};
+  const cancelCatBreakdown = {}; // patientStudyKey -> {noshow:N, cancel:N, reschedule:N}
+  const patientStudyTracker = {}; // patientNameLower -> Set of study names (cross-study detection)
+  const todayMs = today.getTime();
   allCategorized.forEach(r => {
     if (EXCLUDED_CANCEL_CATS.has(r._category) && r._category !== 'Rescheduled' && r._category !== 'No Show') return;
     const key=buildKey(r['Subject Full Name'],r['Study Name']);
     const cd = (r['Cancel Date']||'').substring(0,10);
     if (!cancelEventMap[key]) cancelEventMap[key] = new Set();
     cancelEventMap[key].add(cd);
+    // Track category breakdown
+    if (!cancelCatBreakdown[key]) cancelCatBreakdown[key] = {noshow:0,cancel:0,reschedule:0};
+    if (r._category === 'No Show') cancelCatBreakdown[key].noshow++;
+    else if (r._category === 'Rescheduled') cancelCatBreakdown[key].reschedule++;
+    else cancelCatBreakdown[key].cancel++;
+    // Track cross-study patterns
+    const patLow = (r['Subject Full Name']||'').toLowerCase().trim();
+    const studyShort = (r['Study Name']||'').split(' - ').pop().trim();
+    if (patLow) {
+      if (!patientStudyTracker[patLow]) patientStudyTracker[patLow] = new Set();
+      patientStudyTracker[patLow].add(studyShort);
+    }
     if (!cancelMeta[key] || cd > (cancelMeta[key].last_cancel||'')) {
       cancelMeta[key] = { last_cancel: cd,
+        first_cancel: cancelMeta[key] ? (cd < cancelMeta[key].first_cancel ? cd : cancelMeta[key].first_cancel) : cd,
         display_patient: (r['Subject Full Name']||'').replace(/\s+/g,' ').trim(),
         display_study: (r['Study Name']||'').trim(),
         patient_url: patientUrl(r['Study Key'], r['Subject Key (Back End)'], r['Site Name']),
         study_url:   studyUrl(r['Study Key'], r['Site Name'])
       };
+    } else if (cancelMeta[key] && (!cancelMeta[key].first_cancel || cd < cancelMeta[key].first_cancel)) {
+      cancelMeta[key].first_cancel = cd;
     }
   });
   const cancelCounts = {};
@@ -7937,11 +8063,35 @@ function processLiveData(allRows, legacyCancels, auditLog) {
       const meta = cancelMeta[k]||{}, up = upcomingPats[k];
       const patient = meta.display_patient || k.split('|')[0];
       const study = meta.display_study || k.split('|')[1];
-      return { patient, study: study.split(' - ').pop(),
+      const shortStudy = study.split(' - ').pop();
+      // Severity tier
+      const severity = c >= 5 ? 'critical' : c >= 3 ? 'high' : 'medium';
+      // Recency: days since last cancel
+      const lastD = parseDate(meta.last_cancel);
+      const daysSinceLast = lastD ? Math.round((todayMs - lastD.getTime()) / 86400000) : null;
+      // Velocity: cancels per 30-day period
+      const firstD = parseDate(meta.first_cancel || meta.last_cancel);
+      const spanDays = firstD && lastD ? Math.max(Math.round((lastD.getTime() - firstD.getTime()) / 86400000), 1) : 30;
+      const velocity = Math.round(c / (spanDays / 30) * 10) / 10; // cancels per month
+      // Cross-study: same patient in multiple studies
+      const patLow = patient.toLowerCase().trim();
+      const crossStudyCount = (patientStudyTracker[patLow] || new Set()).size;
+      // Category breakdown
+      const cats = cancelCatBreakdown[k] || {};
+      return { patient, study: shortStudy,
         patient_url: up.patient_url || meta.patient_url,
         study_url:   up.study_url   || meta.study_url,
-        cancels: c, next_visit: up.date_str, _sort_date: up.date, last_cancel: meta.last_cancel||'' };
-    }).sort((a,b) => (a._sort_date||0) - (b._sort_date||0));
+        cancels: c, next_visit: up.date_str, _sort_date: up.date, last_cancel: meta.last_cancel||'',
+        severity, daysSinceLast, velocity, crossStudyCount,
+        noShowCount: cats.noshow || 0, cancelCount: cats.cancel || 0, rescheduleCount: cats.reschedule || 0
+      };
+    })
+    // Sort: critical first, then high, then by next visit date
+    .sort((a,b) => {
+      const sev = {critical:0,high:1,medium:2};
+      if (sev[a.severity] !== sev[b.severity]) return sev[a.severity] - sev[b.severity];
+      return (a._sort_date||0) - (b._sort_date||0);
+    });
 
   // ── Extracted helper: coordinator stats ──
   function buildCoordinatorStats(upcoming, cancels) {
@@ -8596,6 +8746,21 @@ function buildActionSteps() {
       </div>`).join('');
   }
 
+  // Build enrolling study set from CRIO + Looker (for filtering non-enrolling insights)
+  var _enrollSet = new Set();
+  (typeof CRIO_STUDIES_DATA !== 'undefined' ? CRIO_STUDIES_DATA : []).forEach(function(s) {
+    if (s.status === 'ENROLLING') _enrollSet.add(s.protocol_number.toLowerCase().trim());
+  });
+  (typeof FIN_MERGED_STUDIES !== 'undefined' ? FIN_MERGED_STUDIES : []).forEach(function(s) {
+    if (s.status === 'Enrolling') { var n = (s.study||'').split(' - ').pop().trim().toLowerCase(); if (n) _enrollSet.add(n); }
+  });
+  function _isEnrolling(studyName) {
+    if (!studyName || _enrollSet.size === 0) return true; // if no CRIO data loaded, don't filter
+    var sn = studyName.toLowerCase().trim();
+    for (var p of _enrollSet) { if (p.includes(sn) || sn.includes(p)) return true; }
+    return false;
+  }
+
   const steps=[];
 
   // ═══ 1. URGENT CALLS ════════════════════════════════
@@ -8664,8 +8829,8 @@ function buildActionSteps() {
     });
   });
 
-  // ═══ 5. RESCHEDULE PROMISES ═════════════════════════
-  const rp=ad.open_reschedule_promises||[];
+  // ═══ 5. RESCHEDULE PROMISES (enrolling studies only) ═══
+  const rp=(ad.open_reschedule_promises||[]).filter(p=>_isEnrolling(p.study));
   if(rp.length>0){ const sid='followup-'+rp.length; steps.push({pri:5,id:sid,icon:'📅',tag:'FOLLOW UP',tagBg:'#eff6ff',tagColor:'#1843ad',
     title:`${rp.length} patient${rp.length>1?'s':''} said they'd call back — no confirmed date yet`,
     body:`<div style="margin-top:6px;">${rp.map(p=>patRow(p,true,sid)).join('')}</div>`,
@@ -8680,8 +8845,8 @@ function buildActionSteps() {
     action:'Try one alternate contact method (email, alternate number). If still no response in 5 business days: document as Lost to Follow-Up in CRIO and remove from active pipeline.'
   });}
 
-  // ═══ 7. NO SHOW FOLLOW-UP ═══════════════════════════
-  const ns=(ad.reschedule_needed||[]);
+  // ═══ 7. NO SHOW FOLLOW-UP (enrolling studies only) ═══
+  const ns=(ad.reschedule_needed||[]).filter(p=>_isEnrolling(p.study));
   const nsWithUpcoming=ns.filter(p=>p.still_upcoming);
   const nsNoUpcoming=ns.filter(p=>!p.still_upcoming);
   if(nsWithUpcoming.length>0){ const sid='ns-upcoming-'+nsWithUpcoming.length; steps.push({pri:7,id:sid,icon:'📱',tag:'NO SHOW — UPCOMING VISIT',tagBg:'#fdf4ff',tagColor:'#7e22ce',
@@ -8697,8 +8862,8 @@ function buildActionSteps() {
     action:'Reach out to reschedule. If no response in 5 days: document as LTF.'
   });}
 
-  // ═══ 8. RETENTION ═══════════════════════════════════
-  const wr=ad.withdrew_recoverable||[];
+  // ═══ 8. RETENTION (enrolling studies only) ═══════════
+  const wr=(ad.withdrew_recoverable||[]).filter(p=>_isEnrolling(p.study));
   wr.forEach(p=>{
     const action=p.sub==='privacy'?'Patient concerned about releasing medical records — call to clarify what is actually needed. Often resolvable.'
       :p.sub==='compensation'?'Patient withdrew over compensation — review how it is communicated during consent. May be a realistic expectation mismatch.'
@@ -9548,18 +9713,35 @@ function showUpcoming(filterFn, title, sub) {
 
 function showRiskFlags(title) {
   const flags = DATA.riskFlags||[];
-  const body = `<table class="detail-table"><thead><tr>
-    <th>Patient</th><th>Study</th><th>Cancel Events</th><th>Next Visit</th><th>Last Cancel</th>
+  const sevBadge = s => {
+    const m = {critical:['#dc2626','#fef2f2'],high:['#ea580c','#fff7ed'],medium:['#d97706','#fffbeb']};
+    const [c,b] = m[s]||m.medium;
+    return `<span style="font-size:9px;font-weight:800;padding:2px 6px;border-radius:3px;background:${b};color:${c};border:1px solid ${c}30;">${(s||'medium').toUpperCase()}</span>`;
+  };
+  const body = `<table class="detail-table sortable"><thead><tr>
+    <th onclick="sortDetailTable(this)">Risk</th><th onclick="sortDetailTable(this)">Patient</th><th onclick="sortDetailTable(this)">Study</th><th onclick="sortDetailTable(this)">Events</th><th>Breakdown</th><th onclick="sortDetailTable(this)">Next Visit</th><th onclick="sortDetailTable(this)">Last Cancel</th><th>Signals</th>
   </tr></thead><tbody>` +
-  flags.map(f=>`<tr>
+  flags.map(f=>{
+    let signals = [];
+    if (f.crossStudyCount > 1) signals.push(`<span style="font-size:9px;padding:1px 4px;border-radius:3px;background:#fdf4ff;color:#7e22ce;">Cross-study (${f.crossStudyCount})</span>`);
+    if (f.velocity >= 3) signals.push(`<span style="font-size:9px;padding:1px 4px;border-radius:3px;background:#fef2f2;color:#dc2626;">${f.velocity}/mo</span>`);
+    if (f.daysSinceLast != null && f.daysSinceLast <= 7) signals.push(`<span style="font-size:9px;padding:1px 4px;border-radius:3px;background:#fef2f2;color:#dc2626;">Recent</span>`);
+    const breakdown = [f.noShowCount?f.noShowCount+' NS':'',f.cancelCount?f.cancelCount+' CX':'',f.rescheduleCount?f.rescheduleCount+' RS':''].filter(Boolean).join(', ');
+    return `<tr>
+    <td>${sevBadge(f.severity)}</td>
     <td>${patientLink(f.patient,f.patient_url,'color:#dc2626;')}</td>
     <td>${extLink(f.study,f.study_url)}</td>
     <td style="text-align:center"><span style="background:#fef2f2;color:#dc2626;font-weight:700;padding:2px 8px;border-radius:4px">${f.cancels}×</span></td>
+    <td style="font-size:10px;color:#64748b">${breakdown||'—'}</td>
     <td style="font-weight:600;color:#dc2626">${f.next_visit}</td>
     <td style="font-size:11px;color:#64748b">${f.last_cancel||'—'}</td>
-  </tr>`).join('') +
+    <td>${signals.join(' ')||'—'}</td>
+  </tr>`;}).join('') +
   `</tbody></table>`;
-  openModal(title||'At-Risk Patients', flags.length + ' patients with 2+ cancel events & upcoming visit', body);
+  const critical = flags.filter(f=>f.severity==='critical').length;
+  const high = flags.filter(f=>f.severity==='high').length;
+  const sub = flags.length + ' patients' + (critical ? ` · ${critical} critical` : '') + (high ? ` · ${high} high` : '');
+  openModal(title||'At-Risk Patients', sub, body);
 }
 
 /* ── KPI Popup: Rescheduled Visits ────────────────────── */
@@ -11115,10 +11297,24 @@ function renderCrioStudies() {
 
   // ── Build actionable insight lists ──
 
-  // 1. Win-back: All studies with V1 no-shows/cancels (these patients qualified — follow up)
+  // Set of enrolling protocol names (lowercase) — used to filter out non-enrolling study insights
+  var enrollingProtocols = new Set();
+  CRIO_STUDIES_DATA.forEach(function(s) {
+    if (s.status === 'ENROLLING') enrollingProtocols.add(s.protocol_number.toLowerCase().trim());
+  });
+  // Helper: check if a CTMS study short name matches any enrolling protocol
+  function isStudyEnrolling(studyName) {
+    if (!studyName) return false;
+    var sn = studyName.toLowerCase().trim();
+    for (var p of enrollingProtocols) { if (p.includes(sn) || sn.includes(p)) return true; }
+    return false;
+  }
+
+  // 1. Win-back: V1 no-shows/cancels — only for ENROLLING studies (no value chasing non-enrolling)
   var winbacks = [];
   CRIO_STUDIES_DATA.forEach(function(s) {
     if (SKIP[s.protocol_number]) return;
+    if (s.status !== 'ENROLLING') return;  // skip maintenance/closed
     var isPS = s.protocol_number.toLowerCase().indexOf('pre-screen') >= 0
       || s.protocol_number.toLowerCase().indexOf('pre screen') >= 0
       || s.protocol_number === s.indication
@@ -11267,8 +11463,8 @@ function renderCrioStudies() {
     html += '</div>';
   }
 
-  // ── Section 1b: Recent CTMS Cancels Not Rebooked ──
-  var pendingReschedules = (DATA && DATA.pendingReschedules) ? DATA.pendingReschedules : [];
+  // ── Section 1b: Recent CTMS Cancels Not Rebooked (enrolling studies only) ──
+  var pendingReschedules = (DATA && DATA.pendingReschedules) ? DATA.pendingReschedules.filter(function(p) { return isStudyEnrolling(p.study); }) : [];
   if (pendingReschedules.length > 0) {
     // Group by study
     var prByStudy = {};
