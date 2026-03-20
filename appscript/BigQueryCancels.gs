@@ -7,7 +7,7 @@
  *
  * Data source: appointment_audit_log.change_type = 4 (Cancelled)
  * Study name: nickname if set, else sponsor.name + " - " + protocol_number
- * Staff name: calendar_appointment.organizer_key → user table
+ * Staff name: calendar_appointment.creator_key → user table (fallback: aal.by_user_key)
  */
 
 var BQ_CONFIG = {
@@ -20,6 +20,7 @@ var BQ_CONFIG = {
 };
 
 function syncBigQueryCancels() {
+  _ensureSyncTrigger();
   var query = _buildCancelQuery();
   Logger.log('Running BigQuery cancel sync...');
 
@@ -123,7 +124,7 @@ function _buildCancelQuery() {
     'FORMAT_DATETIME(\'%Y-%m-%d\', aal.date_created) AS cancel_date, ' +
     'FORMAT_DATETIME(\'%Y-%m-%d\', COALESCE(aal.old_start, aal.date_created)) AS scheduled_date, ' +
     'aal.subject_key AS subject_key_back_end, ' +
-    'CONCAT(coord.first_name, \' \', coord.last_name) AS staff_full_name, ' +
+    'CONCAT(COALESCE(coord.first_name, by_user.first_name, \'\'), \' \', COALESCE(coord.last_name, by_user.last_name, \'\')) AS staff_full_name, ' +
     'COALESCE(aal.cancel_reason, \'\') AS cancel_reason, ' +
     'CASE aal.cancel_type ' +
     '  WHEN 1 THEN \'No Show\' ' +
@@ -161,7 +162,8 @@ function _buildCancelQuery() {
     'LEFT JOIN `' + project + '.' + ds + '.sponsor` spon ON st.sponsor_key = spon.sponsor_key ' +
     'LEFT JOIN `' + project + '.' + ds + '.site` si ON aal.site_key = si.site_key ' +
     'LEFT JOIN `' + project + '.' + ds + '.study_visit` sv ON aal.study_visit_key = sv.study_visit_key ' +
-    'LEFT JOIN `' + project + '.' + ds + '.user` coord ON ca.organizer_key = coord.user_key ' +
+    'LEFT JOIN `' + project + '.' + ds + '.user` coord ON ca.creator_key = coord.user_key ' +
+    'LEFT JOIN `' + project + '.' + ds + '.user` by_user ON aal.by_user_key = by_user.user_key ' +
     'LEFT JOIN `' + project + '.' + ds + '.user` inv ON aal.by_user_key = inv.user_key ' +
     'WHERE aal.change_type = 4 ' +
     'AND aal.date_created >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL ' + days + ' DAY) ' +
@@ -175,6 +177,29 @@ function _buildCancelQuery() {
 
 function testQueryPreview() {
   Logger.log(_buildCancelQuery());
+}
+
+/**
+ * Auto-creates the 15-minute trigger if it doesn't exist.
+ * Called at the start of syncBigQueryCancels so the trigger
+ * bootstraps itself on first manual run.
+ */
+function _ensureSyncTrigger() {
+  try {
+    var triggers = ScriptApp.getProjectTriggers();
+    var hasTrigger = triggers.some(function(t) {
+      return t.getHandlerFunction() === 'syncBigQueryCancels';
+    });
+    if (!hasTrigger) {
+      ScriptApp.newTrigger('syncBigQueryCancels')
+        .timeBased()
+        .everyMinutes(15)
+        .create();
+      Logger.log('Auto-created 15-minute sync trigger');
+    }
+  } catch (e) {
+    Logger.log('Trigger check skipped: ' + e.message);
+  }
 }
 
 function createSyncTrigger() {
