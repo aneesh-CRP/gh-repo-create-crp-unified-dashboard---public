@@ -1998,7 +1998,7 @@ var SAMPLE = {
   coordinators: [], riskMatrix: [], subjectStatus: [],
   sites: [], weeklyBySite: [], visitTypes: [],
   cancelTotal: 0, noShowTotal: 0, withdrewTotal: 0, screenFailTotal: 0, discontinuedTotal: 0,
-  noShows: [], withdrawals: [], screenFails: [],
+  noShows: [], withdrawals: [], screenFails: [], discontinued: [],
   upcomingTotal: 0, next14Total: 0, phillyTotal: 0,
   pennTotal: 0, marchTotal: 0, aprilTotal: 0, activeStudies: 0,
   riskFlags: [], next14Detail: [], cancelTrend: [], cancelWeekly: [],
@@ -6162,6 +6162,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
     noShows: noShowList.map(mapCancelDetail),
     withdrawals: withdrewList.map(mapCancelDetail),
     screenFails: screenFailList.map(mapCancelDetail),
+    discontinued: discontinuedList.map(mapCancelDetail),
     rescheduledVisits: rescheduledVisits.map(r => {
       const sk=r['Study Key'], subk=r['Subject Key (Back End)'];
       // Find the matching upcoming visit for this patient+study
@@ -7164,6 +7165,8 @@ function renderAll() {
   if (_wdEl) _wdEl.textContent = DATA.withdrewTotal || 0;
   var _sfEl = document.getElementById('kpi-screenfail');
   if (_sfEl) _sfEl.textContent = DATA.screenFailTotal || 0;
+  var _dcEl = document.getElementById('kpi-discontinued');
+  if (_dcEl) _dcEl.textContent = DATA.discontinuedTotal || 0;
   var reschEl = document.getElementById('kpi-rescheduled');
   if (reschEl) reschEl.textContent = (DATA.rescheduledVisits||[]).length;
   var reschSub = reschEl ? reschEl.parentElement.querySelector('.tb-sub') : null;
@@ -11557,7 +11560,7 @@ function generateDailyEmail(type) {
   html += '<div style="background:#f8fafc;padding:16px 24px;border-bottom:2px solid #e2e8f0;">';
   html += '<table style="width:100%;border-collapse:collapse;text-align:center;"><tr>';
   html += '<td style="padding:8px;"><div style="font-size:24px;font-weight:700;color:#072061;">' + (DATA.upcomingTotal || 0) + '</div><div style="font-size:11px;color:#64748b;">Upcoming</div></td>';
-  html += '<td style="padding:8px;"><div style="font-size:24px;font-weight:700;color:#dc2626;">' + (DATA.cancelTotal || 0) + '</div><div style="font-size:11px;color:#64748b;">True Cancellations</div><div style="font-size:10px;color:#94a3b8">' + (DATA.noShowTotal||0) + ' no-shows · ' + (DATA.withdrewTotal||0) + ' withdrew · ' + (DATA.screenFailTotal||0) + ' SF</div></td>';
+  html += '<td style="padding:8px;"><div style="font-size:24px;font-weight:700;color:#dc2626;">' + (DATA.cancelTotal || 0) + '</div><div style="font-size:11px;color:#64748b;">True Cancellations</div><div style="font-size:10px;color:#94a3b8">' + (DATA.noShowTotal||0) + ' no-shows · ' + (DATA.withdrewTotal||0) + ' withdrew · ' + (DATA.screenFailTotal||0) + ' SF · ' + (DATA.discontinuedTotal||0) + ' disc.</div></td>';
   html += '<td style="padding:8px;"><div style="font-size:24px;font-weight:700;color:' + (parseFloat(cancelRate) > 15 ? '#dc2626' : '#059669') + ';">' + cancelRate + '%</div><div style="font-size:11px;color:#64748b;">Cancel Rate</div></td>';
   html += '<td style="padding:8px;"><div style="font-size:24px;font-weight:700;color:#d97706;">' + flags.length + '</div><div style="font-size:11px;color:#64748b;">At-Risk Patients</div></td>';
   html += '</tr></table></div>';
