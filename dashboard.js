@@ -11495,13 +11495,8 @@ function renderStudiesTable() {
       <td style="padding:10px 8px;font-size:11px;color:#475569;white-space:nowrap">${escapeHTML(s.crio_investigator||'')}</td>
       <td style="padding:10px 8px;text-align:center">${siteTags}</td>
       <td style="padding:10px 8px;text-align:center;font-size:10px;color:var(--muted);white-space:nowrap">${s.phase ? escapeHTML(s.phase) : '—'}</td>
-      <td style="padding:10px 8px;text-align:center;font-size:10px;color:var(--muted);white-space:nowrap">${s.irb_approval ? escapeHTML(s.irb_approval) : '—'}</td>
-      <td style="padding:10px 8px;text-align:center;font-size:10px;color:var(--muted);white-space:nowrap">${s.contract_signed ? escapeHTML(s.contract_signed) : '—'}</td>
-      <td style="padding:10px 8px;text-align:center;font-size:10px;color:var(--muted);white-space:nowrap">${s.siv_date ? escapeHTML(s.siv_date) : '—'}</td>
       <td style="padding:10px 8px;text-align:center;font-size:10px;color:var(--muted);white-space:nowrap">${s.enrollment_start ? escapeHTML(s.enrollment_start) : '—'}</td>
-      <td style="padding:10px 8px;text-align:center;font-size:10px;color:var(--muted);white-space:nowrap">${s.fps_date ? escapeHTML(s.fps_date) : '—'}</td>
-      <td style="padding:10px 8px;text-align:center;font-size:10px;font-weight:600;color:${(function(){var d=_daysBetween(s.irb_approval,s.siv_date);return d===null?'var(--muted)':d<=30?'#059669':d<=60?'#d97706':'#dc2626'})()};white-space:nowrap">${(function(){var d=_daysBetween(s.irb_approval,s.siv_date);return d!==null?d+'d':'—'})()}</td>
-      <td style="padding:10px 8px;text-align:center;font-size:10px;font-weight:600;color:${(function(){var d=_daysBetween(s.siv_date,s.fps_date);return d===null?'var(--muted)':d<=30?'#059669':d<=60?'#d97706':'#dc2626'})()};white-space:nowrap">${(function(){var d=_daysBetween(s.siv_date,s.fps_date);return d!==null?d+'d':'—'})()}</td>
+      <td style="padding:10px 8px;text-align:center;font-size:10px;color:${(function(){if(!s.enrollment_close)return 'var(--muted)';var d=Math.round((new Date(s.enrollment_close)-new Date())/86400000);return d<0?'#94a3b8':d<=30?'#dc2626':d<=60?'#d97706':'var(--muted)'})()};font-weight:${s.enrollment_close?'600':'400'};white-space:nowrap">${s.enrollment_close ? escapeHTML(s.enrollment_close) : '—'}</td>
       <td style="padding:10px 8px;text-align:center">${buildPipelineCell(s.study, safeStudy)}</td>
       <td style="padding:10px 8px;text-align:center">${buildFBLeadCell(s.study)}</td>
       <td style="padding:10px 8px;text-align:center">${buildTotalLeadsCell(s.study, safeStudy)}</td>
