@@ -1722,17 +1722,6 @@ body {
       </div>
     </div>
 
-    <!-- Patient Journey Funnel (cross-source) -->
-    <div class="card fade-in" style="margin-bottom:16px;">
-      <div class="card-header">
-        <span class="card-title">🎯 Patient Journey Funnel — Lead to Enrollment</span>
-        <span class="badge badge-purple" id="ref-journey-badge">Cross-source</span>
-      </div>
-      <div style="padding:16px;" id="ref-journey-funnel">
-        <div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">Loading cross-source data...</div>
-      </div>
-    </div>
-
     <!-- Central Campaigns — Unified Metrics + Cross-Reference -->
     <div class="card fade-in" style="margin-bottom:16px;">
       <div class="card-header">
@@ -10503,110 +10492,11 @@ function renderReferralDashboard() {
 
   // Participant Status section removed (duplicative with Schedule tab)
 
-  // Render cross-source patient journey funnel
-  buildPatientJourneyFunnel();
   // Render new analytics sections
   safe(renderVendorAnalytics, 'renderVendorAnalytics');
   safe(renderContactSequence, 'renderContactSequence');
   safe(renderRefConversion, 'renderRefConversion');
 }
-
-function showJourneyFunnelDetail(key) {
-  var _jSG = (CRP_CONFIG.CLICKUP||{}).STAGE_GROUPS||{};
-  var _contactSet = new Set(['Contacted']); if(_jSG.SCREENING) _jSG.SCREENING.forEach(function(s){_contactSet.add(s);});
-  if (key === 'total_leads') {
-    // Show all referrals + FB CRM leads
-    showReferralDetailModal(function() { return true; }, 'Total Leads', 'All referrals + FB CRM leads');
-  } else if (key === 'contacted') {
-    showReferralDetailModal(function(r) { return _contactSet.has(r.stage); }, 'Contacted / Pre-Screen');
-  } else if (key === 'medrec_all') {
-    showMedRecFilteredModal('active');
-  } else if (key === 'medrec_screening') {
-    // In Screening / Visit Scheduled
-    var pts = (MED_RECORDS_DATA||[]).filter(function(r) { return r.status === 'In Screening' || r.status === 'Visit Scheduled'; });
-    _showMedRecList('In Screening / Scheduled', pts);
-  } else if (key === 'medrec_enrolled') {
-    var pts = (MED_RECORDS_DATA||[]).filter(function(r) { return r.status === 'Enrolled' || r.status === 'Complete'; });
-    _showMedRecList('Enrolled / Complete', pts);
-  }
-}
-function _showMedRecList(title, patients) {
-  var recColors = {'Received':'#059669','Pending':'#f59e0b','Not applicable':'#94a3b8','Unavailable':'#dc2626'};
-  function badge(val, cm) { if(!val) return '<span style="color:#cbd5e1;">—</span>'; var c=cm[val]||'#64748b'; return '<span style="padding:1px 5px;border-radius:3px;font-size:9px;font-weight:600;background:'+c+'18;color:'+c+';">'+escapeHTML(val)+'</span>'; }
-  var html = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;min-width:500px;">';
-  html += '<thead><tr style="border-bottom:2px solid #e2e8f0;text-align:left;"><th style="padding:6px 8px;">Patient</th><th style="padding:6px 8px;">Study</th><th style="padding:6px 8px;">Status</th><th style="padding:6px 8px;">Records</th><th style="padding:6px 8px;">Assignee</th></tr></thead><tbody>';
-  patients.forEach(function(r) {
-    var patLink = r.crio_link || r.url || '#';
-    html += '<tr style="border-bottom:1px solid #f1f5f9;">';
-    html += '<td style="padding:4px 8px;"><a href="'+escapeHTML(patLink)+'" target="_blank" style="font-weight:600;color:#1e293b;text-decoration:none;">'+maskPHI(r.name)+'</a></td>';
-    html += '<td style="padding:4px 8px;font-size:10px;">'+escapeHTML(r.study||'—')+'</td>';
-    html += '<td style="padding:4px 8px;">'+badge(r.status,{'Enrolled':'#059669','In Screening':'#8b5cf6','Visit Scheduled':'#06b6d4','Complete':'#059669'})+'</td>';
-    html += '<td style="padding:4px 8px;">'+badge(r.records_received,recColors)+'</td>';
-    html += '<td style="padding:4px 8px;font-size:10px;">'+escapeHTML(r.assignee||'—')+'</td></tr>';
-  });
-  html += '</tbody></table></div>';
-  openModal(title, patients.length + ' patients', html);
-}
-
-function buildPatientJourneyFunnel() {
-  var container = document.getElementById('ref-journey-funnel');
-  if (!container) return;
-
-  // Cross-source funnel stages
-  var totalLeads = (REFERRAL_DATA ? REFERRAL_DATA.length : 0) + (FB_CRM_DATA ? FB_CRM_DATA.length : 0);
-  var _jSG = (CRP_CONFIG.CLICKUP||{}).STAGE_GROUPS||{};
-  var _contactSet = new Set(['Contacted']); if(_jSG.SCREENING) _jSG.SCREENING.forEach(function(s){_contactSet.add(s);});
-  var contacted = REFERRAL_DATA ? REFERRAL_DATA.filter(function(r){ return _contactSet.has(r.stage); }).length : 0;
-  var medRecsCreated = MED_RECORDS_DATA ? MED_RECORDS_DATA.length : 0;
-  var inScreening = (MED_RECORDS_DATA ? MED_RECORDS_DATA.filter(function(r){ return r.status === 'In Screening' || r.status === 'Visit Scheduled'; }).length : 0);
-  var enrolled = (MED_RECORDS_DATA ? MED_RECORDS_DATA.filter(function(r){ return r.status === 'Enrolled' || r.status === 'Complete'; }).length : 0);
-
-  if (totalLeads === 0 && medRecsCreated === 0) {
-    container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">No cross-source data available yet</div>';
-    return;
-  }
-
-  var stages = [
-    { label: 'Total Leads', count: totalLeads, color: '#3b82f6', sources: 'Referrals + FB CRM', clickKey: 'total_leads' },
-    { label: 'Contacted / Pre-Screen', count: contacted, color: '#f59e0b', sources: 'Referral Pipeline', clickKey: 'contacted' },
-    { label: 'Medical Records Created', count: medRecsCreated, color: '#8b5cf6', sources: 'Med Records System', clickKey: 'medrec_all' },
-    { label: 'In Screening / Scheduled', count: inScreening, color: '#06b6d4', sources: 'Med Records + Referrals', clickKey: 'medrec_screening' },
-    { label: 'Enrolled / Complete', count: enrolled, color: '#059669', sources: 'Med Records System', clickKey: 'medrec_enrolled' },
-  ];
-
-  var maxCount = Math.max.apply(null, stages.map(function(s){ return s.count; }).concat([0])) || 1;
-
-  var html = '';
-
-  // Funnel bars
-  stages.forEach(function(stage, i) {
-    var pct = Math.max(stage.count / maxCount * 100, 3);
-    var convPct = i > 0 && stages[i-1].count > 0 ? Math.round(stage.count / stages[i-1].count * 100) : 0;
-    html += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;cursor:pointer;" onclick="showJourneyFunnelDetail(\'' + stage.clickKey + '\')">';
-    html += '<div style="width:180px;text-align:right;"><div style="font-size:12px;font-weight:600;color:#1e293b;">' + stage.label + '</div><div style="font-size:9px;color:#94a3b8;">' + stage.sources + '</div></div>';
-    html += '<div style="flex:1;background:#f1f5f9;border-radius:6px;height:32px;overflow:hidden;position:relative;">';
-    html += '<div style="width:' + pct + '%;background:' + stage.color + ';height:100%;border-radius:6px;display:flex;align-items:center;justify-content:center;transition:width 0.5s;">';
-    html += '<span style="font-size:12px;font-weight:800;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.3);">' + stage.count + '</span>';
-    html += '</div></div>';
-    if (i > 0 && convPct > 0) {
-      html += '<div style="min-width:50px;text-align:center;"><span style="font-size:10px;font-weight:700;color:' + (convPct >= 50 ? '#059669' : convPct >= 20 ? '#d97706' : '#dc2626') + ';">' + convPct + '%</span></div>';
-    } else {
-      html += '<div style="min-width:50px;"></div>';
-    }
-    html += '</div>';
-  });
-
-  // Overall conversion
-  if (totalLeads > 0 && enrolled > 0) {
-    var overallConv = Math.round(enrolled / totalLeads * 100);
-    html += '<div style="margin-top:12px;text-align:center;padding:8px;background:#e8eeff;border-radius:8px;">';
-    html += '<span style="font-size:12px;color:#1843ad;font-weight:600;">Overall Lead → Enrolled: <span style="font-size:16px;font-weight:800;">' + overallConv + '%</span></span>';
-    html += '</div>';
-  }
-
-  container.innerHTML = html;
-}
-
 
 // ── Referral study nickname → protocol number mapping ───────────────
 // Referral CSV uses short nicknames; merged studies use full protocol numbers.
