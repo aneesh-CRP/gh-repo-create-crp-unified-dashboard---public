@@ -2322,7 +2322,7 @@ const CRP_CONFIG = {
   // BigQuery Data Source Toggle
   // When true: uses BQ_CANCELS_CSV for cancellation data instead of LIVE_URL2_LEGACY
   // Set to true only AFTER verifying BQ data matches existing data
-  USE_BQ_CANCELS: false,
+  USE_BQ_CANCELS: true,
 
   // Brand Colors (match CSS :root variables)
   BRAND: {
@@ -2351,7 +2351,7 @@ const CRP_CONFIG = {
     CRIO_SUBJECTS_CSV: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTPrFpOKckIDKYtnV30EBkL9ryI4q4HHKXDLxzgu6ZqVzrALoGU0Tpf_MNYHzg2UxcPajaJWpOONBbP/pub?gid=941302257&single=true&output=csv',
     // BigQuery Cancellations — synced from CRIO BigQuery by bigquery-cancels-sync.gs
     // After setup: publish the BQ_Cancellations tab as CSV, paste URL here, set USE_BQ_CANCELS: true
-    BQ_CANCELS_CSV: '',  // ← Set this to published BQ_Cancellations sheet URL
+    BQ_CANCELS_CSV: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQSVnZBL93Zx5t88q97kGRfKvEvDonnTD6y506i806UAuNLWMvMsQUsvnxJe9BIiRTF0ktF1bUgvkj8/pub?output=csv',
     // Looker — Study Status & Key Dates (published Google Sheet)
     LOOKER_STUDY_STATUS_CSV: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQrwoQwKCAiyv5xx_z0uXMQLHS5d2CUbzOj_qjxkZJYYe3Yxdu3i2T-rdQ9vtlDCBRTKfA1jDW_W0YW/pub?output=csv',
     // Finance Master Sheet — published key + tab GIDs for CSV access
