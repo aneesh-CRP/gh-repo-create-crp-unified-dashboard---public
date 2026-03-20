@@ -5901,139 +5901,77 @@ function toggleCoordDayDetail(coordName, date, el) {
   detailDiv.dataset.activeDate = date;
 }
 
-var INSIGHT_STATUS_KEY = 'crp_insight_status_v1';
-function _loadInsightStatus() { try { return JSON.parse(localStorage.getItem(INSIGHT_STATUS_KEY)||'{}'); } catch(e) { return {}; } }
-function _saveInsightStatus(s) { try { localStorage.setItem(INSIGHT_STATUS_KEY, JSON.stringify(s)); } catch(e) {} }
-function setInsightStatus(key, status) {
-  var s = _loadInsightStatus();
-  if (s[key] === status) { delete s[key]; } else { s[key] = status; }
-  _saveInsightStatus(s);
-  safe(buildInsights, 'buildInsights');
-}
-
 function buildInsights() {
   const flags    = DATA.riskFlags || [];
   const cancels  = DATA.cancelByStudy || [];
   const upcoming = DATA.upcomingByStudyFull || DATA.upcomingByStudy || [];
-  const detail   = DATA.next14Detail || [];
 
-  // ── Flags (warnings) ──
+  // ── Flags: summary counts that link to detail sections (no duplicate detail) ──
   const flagEl = document.getElementById('perf-insight-flags');
   if (!flagEl) return;
 
-  const insightStatus = _loadInsightStatus();
-  const today = new Date();
   const flagItems = [];
 
-  // Helper: wrap insight HTML with done/N/A buttons
-  function wrapInsight(id, cssClass, iconEmoji, titleHtml, descHtml, isUrgent) {
-    const ek = id.replace(/'/g,"\\'");
-    const st = insightStatus[id];
-    if (st) return null; // hidden if done/na
-    return {
-      urgent: isUrgent || false,
-      html: `<div class="insight-item ${cssClass}" style="position:relative;">
-        <span class="insight-icon">${iconEmoji}</span>
-        <div style="flex:1;min-width:0;">
-          <div class="insight-title">${titleHtml}</div>
-          <div class="insight-desc">${descHtml}</div>
-        </div>
-        <div style="display:flex;gap:4px;flex-shrink:0;align-self:flex-start;margin-top:2px;">
-          <button onclick="event.stopPropagation();setInsightStatus('${ek}','done')" style="font-size:9px;font-weight:600;padding:2px 6px;border-radius:4px;border:1px solid #d1d5db;background:#fff;cursor:pointer;color:#94a3b8;transition:all .15s;" onmouseover="this.style.borderColor='#16a34a';this.style.color='#16a34a'" onmouseout="this.style.borderColor='#d1d5db';this.style.color='#94a3b8'">Done</button>
-          <button onclick="event.stopPropagation();setInsightStatus('${ek}','na')" style="font-size:9px;font-weight:600;padding:2px 6px;border-radius:4px;border:1px solid #d1d5db;background:#fff;cursor:pointer;color:#94a3b8;transition:all .15s;" onmouseover="this.style.borderColor='#94a3b8'" onmouseout="this.style.borderColor='#d1d5db'">N/A</button>
-        </div>
-      </div>`
-    };
+  // At-risk patients — summary linking to Schedule tab risk cards
+  const critical = flags.filter(f => f.severity === 'critical').length;
+  const high = flags.filter(f => f.severity === 'high').length;
+  if (flags.length > 0) {
+    const sevDetail = [critical ? critical + ' critical' : '', high ? high + ' high' : ''].filter(Boolean).join(', ');
+    flagItems.push({ urgent: critical > 0, html: `<div class="insight-item ${critical > 0 ? 'danger' : 'warning'}" style="cursor:pointer" onclick="switchTab('schedule')">
+      <span class="insight-icon">${critical > 0 ? '🔴' : '⚠️'}</span><div>
+        <div class="insight-title">${flags.length} at-risk patient${flags.length>1?'s':''} with upcoming visits${sevDetail ? ' — ' + sevDetail : ''}</div>
+        <div class="insight-desc">View details in <strong>Schedule → At-Risk Patients</strong></div>
+      </div></div>` });
   }
 
-  // Risk flag patients — urgent ones first
-  flags.forEach(f => {
-    const parts = f.next_visit.split(' ');
-    const mMap = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
-    const visitDate = new Date(today.getFullYear(), mMap[parts[0]], parseInt(parts[1]));
-    const daysOut = Math.round((visitDate - today) / 86400000);
-    const urgent = daysOut <= 14;
-    const pLink = f.patient_url
-      ? `<a href="${f.patient_url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:inherit;font-weight:700;text-decoration:underline;text-decoration-style:dotted;">${maskPHI(f.patient)}</a>`
-      : `<strong>${maskPHI(f.patient)}</strong>`;
-    const sLnk = f.study_url
-      ? `<a href="${f.study_url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:inherit;text-decoration:underline;text-decoration-style:dotted;">${f.study}</a>`
-      : f.study;
-    const sevLabel = f.severity === 'critical' ? ' <span style="font-size:9px;font-weight:800;padding:1px 4px;border-radius:3px;background:#dc2626;color:#fff;">CRITICAL</span>' : f.severity === 'high' ? ' <span style="font-size:9px;font-weight:800;padding:1px 4px;border-radius:3px;background:#ea580c;color:#fff;">HIGH</span>' : '';
-    const id = 'risk-' + (f.patient + '-' + f.study).replace(/[^a-z0-9]/gi, '-').toLowerCase();
-    const item = wrapInsight(id, urgent ? 'danger' : 'warning', urgent ? '🔴' : '⚠️',
-      `${pLink} — ${f.cancels}× cancelled${sevLabel}`,
-      `${sLnk} · Next visit: <strong>${f.next_visit}</strong>${urgent ? ' <span style="color:#dc2626;font-weight:700;">— CALL NOW</span>' : ''}`, urgent);
-    if (item) flagItems.push(item);
-  });
-
-  // High cancel studies
-  cancels.filter(c => c.count >= 15).forEach(c => {
-    const sLnk2 = c.study_url
-      ? `<a href="${c.study_url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:inherit;font-weight:700;text-decoration:underline;text-decoration-style:dotted;">${c.name}</a>`
-      : `<strong>${c.name}</strong>`;
-    const id = 'hicx-' + (c.name||'').replace(/[^a-z0-9]/gi,'-').toLowerCase();
-    const item = wrapInsight(id, 'warning', '📉', `${sLnk2} — high cancellation volume`, `${c.count} cancelled visits in last 2 months · Review retention strategy`);
-    if (item) flagItems.push(item);
-  });
-
-  // Upcoming visits this week with no-show history
-  const thisWeek = detail.filter(d => {
-    const parts = d.date.split(' ');
-    const mMap = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
-    const daysOut = Math.round((new Date(today.getFullYear(), mMap[parts[0]], parseInt(parts[1])) - today) / 86400000);
-    return daysOut <= 7;
-  });
-  if (thisWeek.length > 0) {
-    // Deduplicate patient names for display
-    const seenPats = new Set();
-    const uniqueThisWeek = thisWeek.filter(d => {
-      const key = d.patient.toLowerCase().trim();
-      if (seenPats.has(key)) return false;
-      seenPats.add(key);
-      return true;
-    });
-    const wkItem = wrapInsight('thisweek-visits', 'warning', '📅',
-      `${thisWeek.length} visits scheduled this week (${uniqueThisWeek.length} patients)`,
-      `Confirm attendance — ${uniqueThisWeek.slice(0, 15).map(d => {
-        var label = PHI_MASKED ? maskPHI(d.patient) : d.patient.split(' ')[0];
-        return d.patient_url
-          ? `<a href="${d.patient_url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:inherit;text-decoration:underline;text-decoration-style:dotted;">${label}</a>`
-          : label;
-      }).join(', ')}${uniqueThisWeek.length > 15 ? ' +' + (uniqueThisWeek.length - 15) + ' more' : ''}`);
-    if (wkItem) flagItems.push(wkItem);
+  // High cancel studies — unique to Overview (study-level, not patient-level)
+  const highCancelStudies = cancels.filter(c => c.count >= 15);
+  if (highCancelStudies.length > 0) {
+    flagItems.push({ urgent: false, html: `<div class="insight-item warning">
+      <span class="insight-icon">📉</span><div>
+        <div class="insight-title">${highCancelStudies.length} stud${highCancelStudies.length>1?'ies':'y'} with high cancellation volume</div>
+        <div class="insight-desc">${highCancelStudies.slice(0,3).map(c => '<strong>' + escapeHTML(c.name) + '</strong> (' + c.count + ')').join(', ')}${highCancelStudies.length > 3 ? ' +' + (highCancelStudies.length-3) + ' more' : ''}</div>
+      </div></div>` });
   }
 
-  // Cross-source: referrals without med records
+  // Action plan summary — link to Schedule tab
+  const actionCount = (DATA.actionDetails || {});
+  const undocCount = (actionCount.undocumented||[]).length;
+  const nsCount = (actionCount.reschedule_needed||[]).length;
+  const rpCount = (actionCount.open_reschedule_promises||[]).length;
+  const totalActions = undocCount + nsCount + rpCount;
+  if (totalActions > 0) {
+    flagItems.push({ urgent: false, html: `<div class="insight-item warning" style="cursor:pointer" onclick="switchTab('schedule')">
+      <span class="insight-icon">📋</span><div>
+        <div class="insight-title">${totalActions} open action items in the pipeline</div>
+        <div class="insight-desc">${[undocCount?undocCount+' undocumented':'', nsCount?nsCount+' no-show follow-ups':'', rpCount?rpCount+' pending reschedules':''].filter(Boolean).join(' · ')} — see <strong>Schedule → Action Plan</strong></div>
+      </div></div>` });
+  }
+
+  // Med records gaps — summary linking to Schedule tab
   var refsNoMR = findReferralsWithoutMedRecords();
-  if (refsNoMR.length > 0) {
-    const mrItem = wrapInsight('refs-no-medrec', 'warning', '📋',
-      `${refsNoMR.length} active referrals have no medical records entry`,
-      `Create medical records entries for these referrals to track their intake progress`);
-    if (mrItem) flagItems.push(mrItem);
-  }
-
-  // Cross-source: ready to schedule but no visit
   var readyNV = findReadyNoVisit();
-  if (readyNV.length > 0) {
-    const rvItem = wrapInsight('ready-no-visit', readyNV.length >= 3 ? 'danger' : 'warning', '📅',
-      `${readyNV.length} patient${readyNV.length>1?'s':''} ready to schedule but no upcoming visit`,
-      `${readyNV.slice(0,3).map(r => maskPHI(r.name)).join(', ')}${readyNV.length>3 ? ' +' + (readyNV.length-3) + ' more' : ''} — schedule appointments now`,
-      readyNV.length >= 3);
-    if (rvItem) flagItems.push(rvItem);
+  if (refsNoMR.length > 0 || readyNV.length > 0) {
+    const parts = [refsNoMR.length ? refsNoMR.length + ' referrals missing records' : '', readyNV.length ? readyNV.length + ' ready but unscheduled' : ''].filter(Boolean);
+    flagItems.push({ urgent: readyNV.length >= 3, html: `<div class="insight-item ${readyNV.length >= 3 ? 'danger' : 'warning'}" style="cursor:pointer" onclick="switchTab('schedule')">
+      <span class="insight-icon">📋</span><div>
+        <div class="insight-title">Medical records pipeline needs attention</div>
+        <div class="insight-desc">${parts.join(' · ')} — see <strong>Schedule → Medical Records</strong></div>
+      </div></div>` });
   }
 
-  // Cross-source: stale referrals
+  // Stale referrals — unique to Overview (referral pipeline health)
   var _stale60d = Date.now() - 60 * 86400000;
   var staleRefs = REFERRAL_DATA ? REFERRAL_DATA.filter(function(r) { if (r.is_closed || r.days_since_update < 14) return false; if (r.date_created) { var cd = new Date(r.date_created).getTime(); if (cd && cd < _stale60d) return false; } return true; }).length : 0;
   if (staleRefs > 0) {
-    const stItem = wrapInsight('stale-referrals', 'warning', '⏰',
-      `${staleRefs} referrals stale for 14+ days`,
-      `Review and update stale leads in the referral pipeline to prevent drop-off`);
-    if (stItem) flagItems.push(stItem);
+    flagItems.push({ urgent: false, html: `<div class="insight-item warning" style="cursor:pointer" onclick="switchTab('referrals')">
+      <span class="insight-icon">⏰</span><div>
+        <div class="insight-title">${staleRefs} referrals stale for 14+ days</div>
+        <div class="insight-desc">Review in <strong>Referrals</strong> tab to prevent drop-off</div>
+      </div></div>` });
   }
 
-  // Cancel rate by subject status — which funnel stages cancel most?
+  // Cancel breakdown by status — unique analytic (not duplicated elsewhere)
   var cancelsBySubjectStatus = {};
   (DATA.allCancels || []).forEach(function(c) {
     var ss = (c.subject_status || '').trim();
@@ -6048,36 +5986,15 @@ function buildInsights() {
     var breakdown = statusEntries.slice(0,4).map(function(e) {
       return '<span style="font-size:10px;display:inline-block;margin-right:8px;"><b>' + e.count + '</b> ' + e.status + ' (' + Math.round(e.count/totalCx*100) + '%)</span>';
     }).join('');
-    const cxItem = wrapInsight('cx-by-stage', 'info', '📊',
-      `Cancellation breakdown by enrollment stage`, breakdown);
-    if (cxItem) flagItems.push(cxItem);
+    flagItems.push({ urgent: false, html: `<div class="insight-item info"><span class="insight-icon">📊</span><div>
+      <div class="insight-title">Cancellation breakdown by enrollment stage</div>
+      <div class="insight-desc">${breakdown}</div>
+    </div></div>` });
   }
 
-  // Sort urgent first
   flagItems.sort((a, b) => (b.urgent ? 1 : 0) - (a.urgent ? 1 : 0));
-  // Count cleared insights
-  var clearedInsights = Object.keys(insightStatus).filter(k => insightStatus[k]);
-  var clearedHtml = '';
-  if (clearedInsights.length > 0) {
-    clearedHtml = `<div style="padding:8px 0;text-align:center;">
-      <button onclick="var x=document.getElementById('insight-cleared-list');x.style.display=x.style.display==='none'?'block':'none'" style="background:none;border:none;font-size:11px;color:#94a3b8;cursor:pointer;text-decoration:underline dotted;">
-        ${clearedInsights.length} cleared — click to show
-      </button>
-      <div id="insight-cleared-list" style="display:none;margin-top:6px;text-align:left;">
-        ${clearedInsights.map(k => {
-          const st = insightStatus[k];
-          const ek = k.replace(/'/g,"\\'");
-          return `<div style="display:flex;gap:6px;align-items:center;padding:4px 0;border-bottom:1px solid #f8fafc;opacity:0.5;">
-            <span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;background:${st==='done'?'#f0fdf4':'#f8fafc'};color:${st==='done'?'#16a34a':'#94a3b8'}">${st==='done'?'Done':'N/A'}</span>
-            <span style="font-size:11px;flex:1;text-decoration:line-through;color:#94a3b8;">${k}</span>
-            <button onclick="setInsightStatus('${ek}','undo')" style="font-size:9px;border:1px solid #e2e8f0;border-radius:3px;padding:1px 6px;background:none;cursor:pointer;color:#94a3b8">Undo</button>
-          </div>`;
-        }).join('')}
-      </div>
-    </div>`;
-  }
-  flagEl.innerHTML = (flagItems.length > 0 ? flagItems.map(f => f.html).join('') :
-    '<div class="insight-item positive"><span class="insight-icon">✅</span><div><div class="insight-title">No critical flags</div></div></div>') + clearedHtml;
+  flagEl.innerHTML = flagItems.length > 0 ? flagItems.map(f => f.html).join('') :
+    '<div class="insight-item positive"><span class="insight-icon">✅</span><div><div class="insight-title">No critical flags — all systems healthy</div></div></div>';
 
   // ── Positives ──
   const posEl = document.getElementById('perf-insight-positive');
@@ -6088,7 +6005,7 @@ function buildInsights() {
   if (cancelRate < 30) {
     posItems.push(`<div class="insight-item positive"><span class="insight-icon">📈</span><div>
       <div class="insight-title">Cancel rate at ${cancelRate}% — within target range</div>
-      <div class="insight-desc">Retention is tracking well across active studies</div>
+      <div class="insight-desc">Retention tracking well across active studies</div>
     </div></div>`);
   }
 
@@ -6096,47 +6013,26 @@ function buildInsights() {
   if (pnjStudies.length > 0) {
     const pnjTotal = pnjStudies.reduce((a,b) => a + b.count, 0);
     posItems.push(`<div class="insight-item positive"><span class="insight-icon">🏥</span><div>
-      <div class="insight-title">Pennington pipeline strong — ${pnjTotal} upcoming visits</div>
-      <div class="insight-desc">Across ${pnjStudies.length} active studies at PNJ</div>
+      <div class="insight-title">Pennington pipeline — ${pnjTotal} upcoming visits</div>
+      <div class="insight-desc">${pnjStudies.length} active studies at PNJ</div>
     </div></div>`);
   }
 
   const highUp = upcoming.filter(s => s.count >= 15);
-  highUp.forEach(s => {
-    const sLink = s.study_url
-      ? `<a href="${escapeHTML(s.study_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:inherit;font-weight:700;text-decoration:underline;text-decoration-style:dotted;">${escapeHTML(s.name)}</a>`
-      : `<strong>${escapeHTML(s.name)}</strong>`;
+  if (highUp.length > 0) {
     posItems.push(`<div class="insight-item positive"><span class="insight-icon">⭐</span><div>
-      <div class="insight-title">${sLink} — ${s.count} upcoming visits</div>
-      <div class="insight-desc">Strong retention and scheduling momentum</div>
+      <div class="insight-title">${highUp.length} high-momentum stud${highUp.length>1?'ies':'y'}</div>
+      <div class="insight-desc">${highUp.slice(0,3).map(s => escapeHTML(s.name) + ' (' + s.count + ')').join(', ')}${highUp.length > 3 ? ' +more' : ''} — 15+ upcoming visits each</div>
     </div></div>`);
-  });
+  }
 
-  // Cross-source: referral pipeline enrolled
+  // Referral pipeline conversion
   var _sgE = (CRP_CONFIG.CLICKUP||{}).STAGE_GROUPS||{};
   var enrolledRefs = REFERRAL_DATA ? REFERRAL_DATA.filter(function(r){ return _sgE.ENROLLED && _sgE.ENROLLED.has(r.stage); }).length : 0;
   if (enrolledRefs > 0) {
     posItems.push(`<div class="insight-item positive"><span class="insight-icon">🎯</span><div>
-      <div class="insight-title">${enrolledRefs} patients enrolled via referral pipeline</div>
-      <div class="insight-desc">From ${REFERRAL_DATA.length} total referrals — ${REFERRAL_DATA.length > 0 ? Math.round(enrolledRefs/REFERRAL_DATA.length*100) : 0}% conversion rate</div>
-    </div></div>`);
-  }
-
-  // Cross-source: medical records flowing
-  var medActive = MED_RECORDS_DATA ? MED_RECORDS_DATA.filter(function(r){ return r.is_active; }).length : 0;
-  if (medActive > 0) {
-    posItems.push(`<div class="insight-item positive"><span class="insight-icon">🏥</span><div>
-      <div class="insight-title">${medActive} patients active in medical records pipeline</div>
-      <div class="insight-desc">Across ${MED_RECORDS_DATA.reduce(function(s,r){ s.add(r.study); return s; }, new Set()).size} studies — records intake tracking active</div>
-    </div></div>`);
-  }
-
-  // Cross-source: campaign activity
-  var campActive = CAMPAIGN_DATA ? CAMPAIGN_DATA.filter(function(c){ return c.first_contact > 0; }).length : 0;
-  if (campActive > 0) {
-    posItems.push(`<div class="insight-item positive"><span class="insight-icon">📣</span><div>
-      <div class="insight-title">${campActive} active campaigns driving referrals</div>
-      <div class="insight-desc">${FB_CRM_DATA.length > 0 ? FB_CRM_DATA.length + ' FB leads captured' : ''}</div>
+      <div class="insight-title">${enrolledRefs} enrolled via referral pipeline</div>
+      <div class="insight-desc">${REFERRAL_DATA.length > 0 ? Math.round(enrolledRefs/REFERRAL_DATA.length*100) : 0}% conversion from ${REFERRAL_DATA.length} referrals</div>
     </div></div>`);
   }
 
@@ -8763,20 +8659,7 @@ function buildActionSteps() {
 
   const steps=[];
 
-  // ═══ 1. URGENT CALLS ════════════════════════════════
-  flags.filter(f=>daysUntil(f.next_visit)<=14).forEach(f=>{
-    const d=daysUntil(f.next_visit);
-    const urgency=d===0?'🔴 TODAY':d===1?'🔴 TOMORROW':`🔴 in ${d} days`;
-    steps.push({pri:1,id:'urgent-'+(f.patient||'').replace(/\s+/g,'-').toLowerCase(),icon:'📞',tag:'URGENT CALL',tagBg:'#fef2f2',tagColor:'#dc2626',
-      title:`Call ${pLink(f.patient,f.patient_url,'#dc2626')} — next visit ${f.next_visit} <strong style="color:#dc2626">${urgency}</strong>`,
-      body:`<div style="display:flex;gap:8px;align-items:center;margin-top:4px;flex-wrap:wrap;">
-        ${sLink(f.study,f.study_url)}
-        <span style="color:#94a3b8">·</span>
-        <span style="font-size:11px;color:#94a3b8">${f.cancels} prior cancel${f.cancels>1?'s':''}</span>
-      </div>`,
-      action:'Call before visit. Confirm attendance, surface barriers. If no answer: try alternate contact, note attempt in CRIO, flag coordinator.'
-    });
-  });
+  // (URGENT CALLS removed — already shown in At-Risk Patient cards with Done/N/A)
 
   // ═══ 2. UNDOCUMENTED ════════════════════════════════
   const undoc=ad.undocumented||[];
@@ -8875,14 +8758,7 @@ function buildActionSteps() {
     });
   });
 
-  // ═══ 9. PROACTIVE (risk flags >14d) ═════════════════
-  flags.filter(f=>daysUntil(f.next_visit)>14).forEach(f=>{
-    steps.push({pri:10,id:'proactive-'+(f.patient||'').replace(/\s+/g,'-').toLowerCase(),icon:'⚠️',tag:'PROACTIVE OUTREACH',tagBg:'#fffbeb',tagColor:'#d97706',
-      title:`Pre-call ${pLink(f.patient,f.patient_url)} — ${f.cancels}× cancelled, next visit ${f.next_visit} (${daysUntil(f.next_visit)} days)`,
-      body:`${sLink(f.study,f.study_url)}`,
-      action:"Don't wait for another no-show. Call now — confirm intent, ask about barriers, lock in the date."
-    });
-  });
+  // (PROACTIVE OUTREACH removed — already shown in At-Risk Patient cards with Done/N/A)
 
   // ═══ 10. ADMIN FIXES ════════════════════════════════
   const ae=ad.admin_fixes||[];
