@@ -11248,9 +11248,10 @@ function renderMilestoneTimeline() {
     return d;
   }
 
-  // Milestone stages: Enroll Start only (IRB, Contract, SIV, FPS removed)
+  // Milestone stages
   var STAGES = [
     { key: 'enrollment_start', label: 'Enroll Start', color: '#10B981' },
+    { key: 'enrollment_close', label: 'Enroll End', color: '#EF4444' },
   ];
 
   // Build rows with milestone data

@@ -1347,7 +1347,7 @@ body {
             <th style="padding:10px 8px;text-align:left;font-weight:700;color:var(--text);white-space:nowrap;">PI</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Site</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Enroll Start</th>
-            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Enroll Stop</th>
+            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Enroll End</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Referrals</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">FB Leads</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Total Leads</th>
@@ -13381,9 +13381,10 @@ function renderMilestoneTimeline() {
     return d;
   }
 
-  // Milestone stages: Enroll Start only (IRB, Contract, SIV, FPS removed)
+  // Milestone stages
   var STAGES = [
     { key: 'enrollment_start', label: 'Enroll Start', color: '#10B981' },
+    { key: 'enrollment_close', label: 'Enroll End', color: '#EF4444' },
   ];
 
   // Build rows with milestone data
