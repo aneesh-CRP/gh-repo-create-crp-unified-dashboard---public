@@ -3,8 +3,16 @@
 ## Build Process
 1. Edit `index.html` (source of truth)
 2. Run `python3 scripts/build-appscript.py`
-3. Commit `index.html` + `dashboard.js` + `appscript/*.gs` together
-4. Push without asking
+3. If `scripts/bigquery-cancels-sync.gs` was changed, copy it: `cp scripts/bigquery-cancels-sync.gs appscript/BigQueryCancels.gs`
+4. Run `clasp push --force` to deploy to Apps Script (auto-deploys all files in `appscript/`)
+5. Commit `index.html` + `dashboard.js` + `appscript/*.gs` together
+6. Push without asking
+
+## Apps Script Deployment
+- `clasp` is configured via `.clasp.json` → script ID `15ZDwJzbYqFVtVc5e4TGl7yEWZFVKq2pQl-RyOKw8vsVnAGBqWrkSO19K`
+- `rootDir: "appscript/"` — all `.gs`, `.html`, `.json` files in this dir get pushed
+- `scripts/bigquery-cancels-sync.gs` is the source of truth for BQ sync; `appscript/BigQueryCancels.gs` is the deploy copy
+- **NEVER** edit files in `appscript/` directly — edit source files, then build/copy
 
 ## Code Rules — MUST follow when writing or reviewing code
 
