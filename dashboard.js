@@ -659,7 +659,7 @@ let CONTACT_ALERTS = [];       // [{patient,study,alert_type,severity,detail,pat
 
 // ══════════ HELPERS ══════════
 const fmt=v=>{const a=Math.abs(v);return a%1===0?'$'+a.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0}):'$'+a.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});};
-const fmtK=v=>'$'+(v/1000).toFixed(0)+'K';
+const fmtK=v=>v>=1000?'$'+Math.round(v/1000).toLocaleString()+'K':'$'+Math.round(v).toLocaleString();
 function pid(s){const m=s.match(/- ([A-Z0-9][A-Za-z0-9\-]+ ?(\(.+?\))?)/);return m?m[1].replace(/ \(.*/,''):null;}
 function slink(s){var es=escapeHTML(s);const p=pid(s);if(p&&CRIO_LINKS[p])return'<a href="'+escapeHTML(CRIO_LINKS[p])+'" target="_blank" class="study-link">'+es+'</a>';return es;}
 
@@ -2252,7 +2252,7 @@ function buildScheduleTable() {
     'screen fail':    {bg:'#ef444420',fg:'#ef4444'},
     'screen failed':  {bg:'#ef444420',fg:'#ef4444'},
   };
-  var esc = typeof escapeHTML === 'function' ? escapeHTML : function(s) { return s; };
+  var esc = escapeHTML;
   // Build no-show history from split no-show array for risk badges
   var noshowByPatient = {};
   (DATA.noShows || []).forEach(function(c) {
@@ -3938,7 +3938,6 @@ function switchView(name, el) {
   if (name === 'schedule') {
     setTimeout(() => {
       safe(buildScheduleTable,       'buildSched');
-      safe(buildRiskFlagCards,       'riskCards');
       safe(buildSchedStudyBars,      'schedBars');
       safe(renderCoordTrendChart,    'coordTrend');
       safe(hidePastVisits,           'hidePast');
@@ -4717,9 +4716,8 @@ async function fetchQuickBooksData() {
 
 function renderCRIOvsQB() {
   if (!QB_DATA.loaded) return;
-  const fmtK = v => v >= 1000 ? '$' + Math.round(v/1000).toLocaleString() + 'K' : '$' + Math.round(v).toLocaleString();
   const fmtD = v => '$' + Math.round(v).toLocaleString();
-  const esc = s => (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const esc = escapeHTML;
 
   const studyRevMap = typeof STUDY_REVENUE_12M !== 'undefined' ? STUDY_REVENUE_12M : {};
   const arStudies = typeof TOP_AR_STUDIES !== 'undefined' ? TOP_AR_STUDIES : [];
@@ -8953,8 +8951,8 @@ var PRESCREEN_OVERRIDES = {
 function renderCrioStudies() {
   var container = document.getElementById('crio-studies-container');
   if (!container || CRIO_STUDIES_DATA.length === 0) return;
-  var esc = typeof escapeHTML === 'function' ? escapeHTML : function(s){ return s; };
-  var cc = typeof cleanCoord === 'function' ? cleanCoord : function(s){ return s; };
+  var esc = escapeHTML;
+  var cc = cleanCoord;
 
   // ── Build subject stats per study_key ──
   var subsByStudy = {};
@@ -9967,7 +9965,7 @@ function showMedRecDetailModal(studyName) {
 
 // ── Generic filtered popup for med records pipeline numbers ──
 function showMedRecSlaModal(type) {
-  var esc = typeof escapeHTML === 'function' ? escapeHTML : function(s){return s;};
+  var esc = escapeHTML;
   var today = new Date();
   var list = MED_RECORDS_DATA.filter(function(r) {
     if (!r.is_active || !r.next_appointment || r.records_received === 'Received') return false;
@@ -11351,15 +11349,6 @@ function renderMilestoneTimeline() {
   el.innerHTML = html;
 }
 
-// Days between two YYYY-MM-DD strings (shared by milestone timeline + studies table)
-function _daysBetween(a, b) {
-  if (!a || !b) return null;
-  var da = new Date(a), db = new Date(b);
-  if (isNaN(da) || isNaN(db)) return null;
-  var d = Math.round((db - da) / 86400000);
-  return d >= 0 ? d : null;
-}
-
 function renderStudiesTable() {
   const studies = (DATA.mergedStudies || []).filter(s => {
     if (_studyFilter === 'all') return true;
@@ -11885,7 +11874,7 @@ function toggleDarkMode() {
     return str;
   }
 
-  function esc(s) { return typeof escapeHTML === 'function' ? escapeHTML(s) : s; }
+  function esc(s) { return escapeHTML(s); }
 
   function runSearch(q) {
     var results = [];
