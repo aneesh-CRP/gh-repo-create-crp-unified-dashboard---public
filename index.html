@@ -3256,7 +3256,7 @@ function defaultStatus(days,amt){
 function initColl(){
   if (!UNPAID_INVOICES || !UNPAID_INVOICES.length) return;
   collData=UNPAID_INVOICES.map(inv=>{const k='crp_coll_'+inv.invoice;const s=localStorage.getItem(k);
-    if(s){const p=JSON.parse(s);return{...inv,...p};}
+    if(s){try{const p=JSON.parse(s);return{...inv,...p};}catch(e){}}
     return{...inv,status:defaultStatus(inv.days,Math.abs(inv.unpaid)),notes:''};});
 }
 function cycleSt(inv){
@@ -4044,14 +4044,16 @@ function renderInsights() {
 
     // 3. Risk patients needing calls (from live data)
     if (typeof DATA !== 'undefined' && DATA.riskFlags && DATA.riskFlags.length) {
+      const _mm={Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+      const _today=new Date(); _today.setHours(0,0,0,0);
       const urgent = DATA.riskFlags.filter(r => {
-        const d = new Date(r.next_visit);
-        return (d - new Date()) / 86400000 <= 14;
+        const p=r.next_visit.split(' ');
+        return Math.round((new Date(_today.getFullYear(),_mm[p[0]],parseInt(p[1]))-_today)/86400000) <= 14;
       });
       if (urgent.length) {
         actions.push({
           priority: 1,
-          html: '<div style="display:flex;gap:12px;align-items:flex-start;padding:14px;background:#FEF2F2;border-radius:10px;border-left:4px solid #EF4444">'+icon('📞','#FEE2E2')+'<div><div style="font-weight:700;font-size:13px;color:#991B1B">'+urgent.length+' at-risk patients with visits in next 14 days</div><div style="font-size:12px;color:#6B7280;margin-top:4px">'+urgent.map(r=>r.patient_name||'Patient').join(', ')+'</div><div style="font-size:12px;font-weight:600;color:#DC2626;margin-top:6px">→ Personal calls within 48 hours. Confirm attendance and address concerns. Document in CTMS.</div></div></div>'
+          html: '<div style="display:flex;gap:12px;align-items:flex-start;padding:14px;background:#FEF2F2;border-radius:10px;border-left:4px solid #EF4444">'+icon('📞','#FEE2E2')+'<div><div style="font-weight:700;font-size:13px;color:#991B1B">'+urgent.length+' at-risk patients with visits in next 14 days</div><div style="font-size:12px;color:#6B7280;margin-top:4px">'+urgent.map(r=>escapeHTML(r.patient||'Patient')).join(', ')+'</div><div style="font-size:12px;font-weight:600;color:#DC2626;margin-top:6px">→ Personal calls within 48 hours. Confirm attendance and address concerns. Document in CTMS.</div></div></div>'
         });
       }
     }
@@ -4965,6 +4967,8 @@ function showHorizonDetail(type, weekLabel) {
     rows = (DATA.allCancels || []).filter(r => {
       const d = new Date(r.cancel_date + ', ' + year);
       if (isNaN(d)) return false;
+      // Year-wrap: if date is >3 months in the future, it likely belongs to last year
+      if (d - new Date() > 90 * 86400000) d.setFullYear(d.getFullYear() - 1);
       const iso = localISO(d);
       return iso >= monISO && iso <= sunISO;
     });
@@ -8585,7 +8589,7 @@ function buildActionSteps() {
     return url?`<a href="${url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:${color};font-weight:700;text-decoration:underline;text-decoration-style:dotted;">${masked}</a>`:`<strong style="color:${color}">${masked}</strong>`;
   }
   function sLink(name,url){
-    return url?`<a href="${url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:inherit;font-weight:600;text-decoration:underline;text-decoration-style:dotted;">${name}</a>`:`<span style="font-weight:600">${name}</span>`;
+    return url?`<a href="${escapeHTML(url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:inherit;font-weight:600;text-decoration:underline;text-decoration-style:dotted;">${escapeHTML(name)}</a>`:`<span style="font-weight:600">${escapeHTML(name)}</span>`;
   }
   function typeBadge(type){
     const map={'No Show':['#fef2f2','#dc2626'],'Patient Cancelled':['#fff7ed','#c2410c'],'Site Cancelled':['#eff6ff','#1843ad']};
@@ -10432,7 +10436,7 @@ function renderReferralDashboard() {
     <tbody>${trackerRows.map(([name, tasks]) => {
       const sc = {};
       tasks.forEach(t => { sc[t.stage] = (sc[t.stage] || 0) + 1; });
-      const tn = escapeHTML(name).replace(/'/g,"\\'");
+      const tn = jsAttr(name);
       const _enrolled = Array.from(SG.ENROLLED||[]).reduce((s,st)=>s+(sc[st]||0),0);
       const _closed = Array.from(SG.CLOSED||[]).reduce((s,st)=>s+(sc[st]||0),0);
       function _td(count, filterExpr, label, color) {
@@ -13491,7 +13495,7 @@ function renderStudiesTable() {
     if (isEnrolling && s.upcoming === 0 && s.enrolled > 0) tags.push({text:'No Visits', color:'#d97706', bg:'#fffbeb'});
     // Enrollment close date warnings
     if (s.enrollment_close) {
-      var _ecDays = Math.round((new Date(s.enrollment_close) - new Date()) / 86400000);
+      var _ecDays = Math.round((_parseDate(s.enrollment_close) - new Date()) / 86400000);
       if (_ecDays < 0) tags.push({text:'Enroll Closed', color:'#94a3b8', bg:'#f1f5f9'});
       else if (_ecDays <= 14) tags.push({text:'Closing ' + _ecDays + 'd', color:'#dc2626', bg:'#fef2f2'});
       else if (_ecDays <= 30) tags.push({text:'Closing ' + _ecDays + 'd', color:'#d97706', bg:'#fffbeb'});
@@ -13499,7 +13503,7 @@ function renderStudiesTable() {
     }
     // Closeout date warnings
     if (s.closeout_date) {
-      var _coDays = Math.round((new Date(s.closeout_date) - new Date()) / 86400000);
+      var _coDays = Math.round((_parseDate(s.closeout_date) - new Date()) / 86400000);
       if (_coDays >= 0 && _coDays <= 30) tags.push({text:'Closeout ' + _coDays + 'd', color:'#dc2626', bg:'#fef2f2'});
     }
     // Opportunity alerts (green/blue)
@@ -13561,7 +13565,7 @@ function renderStudiesTable() {
       <td style="padding:10px 8px;font-size:11px;color:#475569;white-space:nowrap">${escapeHTML(s.crio_investigator||'')}</td>
       <td style="padding:10px 8px;text-align:center">${siteTags}</td>
       <td style="padding:10px 8px;text-align:center;font-size:10px;color:var(--muted);white-space:nowrap">${s.enrollment_start ? escapeHTML(s.enrollment_start) : '—'}</td>
-      <td style="padding:10px 8px;text-align:center;font-size:10px;color:${(function(){if(!s.enrollment_close)return 'var(--muted)';var d=Math.round((new Date(s.enrollment_close)-new Date())/86400000);return d<0?'#94a3b8':d<=30?'#dc2626':d<=60?'#d97706':'var(--muted)'})()};font-weight:${s.enrollment_close?'600':'400'};white-space:nowrap">${s.enrollment_close ? escapeHTML(s.enrollment_close) : '—'}</td>
+      <td style="padding:10px 8px;text-align:center;font-size:10px;color:${(function(){if(!s.enrollment_close)return 'var(--muted)';var d=Math.round((_parseDate(s.enrollment_close)-new Date())/86400000);return d<0?'#94a3b8':d<=30?'#dc2626':d<=60?'#d97706':'var(--muted)'})()};font-weight:${s.enrollment_close?'600':'400'};white-space:nowrap">${s.enrollment_close ? escapeHTML(s.enrollment_close) : '—'}</td>
       <td style="padding:10px 8px;text-align:center">${buildPipelineCell(s.study, safeStudy)}</td>
       <td style="padding:10px 8px;text-align:center">${buildFBLeadCell(s.study)}</td>
       <td style="padding:10px 8px;text-align:center">${buildTotalLeadsCell(s.study, safeStudy)}</td>
@@ -13619,8 +13623,8 @@ function generateDailyEmail(type) {
   const sites = DATA.sites || [];
   const cancelRate = DATA.upcomingTotal ? ((DATA.cancelTotal / (DATA.upcomingTotal + DATA.cancelTotal)) * 100).toFixed(1) : '0';
 
-  function pUrl(name, url) { return url ? '<a href="' + url + '">' + name + '</a>' : name; }
-  function sUrl(name, url) { return url ? '<a href="' + url + '">' + name + '</a>' : name; }
+  function pUrl(name, url) { return url ? '<a href="' + escapeHTML(url) + '">' + escapeHTML(name) + '</a>' : escapeHTML(name); }
+  function sUrl(name, url) { return url ? '<a href="' + escapeHTML(url) + '">' + escapeHTML(name) + '</a>' : escapeHTML(name); }
 
   let html = '<div style="font-family:Arial,Helvetica,sans-serif;max-width:700px;margin:0 auto;color:#1e293b;">';
 
@@ -13683,7 +13687,7 @@ function generateDailyEmail(type) {
     html += '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
     html += '<tr style="border-bottom:1px solid #fde68a;"><th style="text-align:left;padding:4px 6px;">Patient</th><th style="text-align:left;padding:4px 6px;">Study</th><th style="text-align:left;padding:4px 6px;">Coordinator</th><th style="text-align:left;padding:4px 6px;">Date</th></tr>';
     undoc.forEach(p => {
-      html += '<tr style="border-bottom:1px solid #fef3c7;"><td style="padding:4px 6px;font-weight:600;">' + pUrl(p.name, p.url) + '</td><td style="padding:4px 6px;">' + (p.study || '') + '</td><td style="padding:4px 6px;">' + (p.coord || '') + '</td><td style="padding:4px 6px;">' + (p.cancel_date || '') + '</td></tr>';
+      html += '<tr style="border-bottom:1px solid #fef3c7;"><td style="padding:4px 6px;font-weight:600;">' + pUrl(p.name, p.url) + '</td><td style="padding:4px 6px;">' + escapeHTML(p.study || '') + '</td><td style="padding:4px 6px;">' + escapeHTML(p.coord || '') + '</td><td style="padding:4px 6px;">' + escapeHTML(p.cancel_date || '') + '</td></tr>';
     });
     html += '</table>';
     html += '<p style="font-size:11px;color:#92400e;margin:8px 0 0;font-style:italic;">Coordinators: log into CRIO and add the cancellation reason for your patients.</p>';
@@ -13697,7 +13701,7 @@ function generateDailyEmail(type) {
     html += '<h4 style="margin:0 0 8px;color:#1e40af;font-size:13px;">FOLLOW UP — ' + rp.length + ' patient' + (rp.length > 1 ? 's' : '') + ' said they\'d call back</h4>';
     html += '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
     rp.forEach(p => {
-      html += '<tr style="border-bottom:1px solid #dbeafe;"><td style="padding:4px 6px;font-weight:600;">' + pUrl(p.name, p.url) + '</td><td style="padding:4px 6px;">' + (p.study || '') + '</td><td style="padding:4px 6px;">' + (p.coord || '') + '</td></tr>';
+      html += '<tr style="border-bottom:1px solid #dbeafe;"><td style="padding:4px 6px;font-weight:600;">' + pUrl(p.name, p.url) + '</td><td style="padding:4px 6px;">' + escapeHTML(p.study || '') + '</td><td style="padding:4px 6px;">' + escapeHTML(p.coord || '') + '</td></tr>';
     });
     html += '</table>';
     html += '<p style="font-size:11px;color:#1e40af;margin:8px 0 0;font-style:italic;">Do not wait. Reach out today — patients who say they\'ll call back rarely do without a prompt.</p>';
@@ -13712,7 +13716,7 @@ function generateDailyEmail(type) {
     html += '<h4 style="margin:0 0 8px;color:#5b21b6;font-size:13px;">NO-SHOWS & UNREACHABLE — ' + (ns.length + nsu.length) + ' patient' + ((ns.length + nsu.length) > 1 ? 's' : '') + '</h4>';
     html += '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
     ns.concat(nsu).slice(0, 15).forEach(p => {
-      html += '<tr style="border-bottom:1px solid #f5f3ff;"><td style="padding:4px 6px;font-weight:600;">' + pUrl(p.name, p.url) + '</td><td style="padding:4px 6px;">' + (p.study || '') + '</td><td style="padding:4px 6px;">' + (p.reason || '').substring(0, 60) + '</td></tr>';
+      html += '<tr style="border-bottom:1px solid #f5f3ff;"><td style="padding:4px 6px;font-weight:600;">' + pUrl(p.name, p.url) + '</td><td style="padding:4px 6px;">' + escapeHTML(p.study || '') + '</td><td style="padding:4px 6px;">' + escapeHTML((p.reason || '').substring(0, 60)) + '</td></tr>';
     });
     if (ns.length + nsu.length > 15) html += '<tr><td colspan="3" style="padding:4px 6px;color:#94a3b8;">+' + (ns.length + nsu.length - 15) + ' more</td></tr>';
     html += '</table>';
@@ -14402,7 +14406,11 @@ async function _crpInit() {
   let _autoRefreshId = null;
   let _lastRefreshTime = Date.now();
 
+  let _autoRefreshInFlight = false;
   async function autoRefreshAll() {
+    if (_autoRefreshInFlight) { _log('CRP Auto-Refresh: already in progress, skipping'); return; }
+    _autoRefreshInFlight = true;
+    try {
     const badge = document.getElementById('last-refresh-badge');
     const now = new Date();
     _log(`CRP Auto-Refresh: triggered at ${now.toLocaleTimeString()}`);
@@ -14446,6 +14454,7 @@ async function _crpInit() {
 
     if (badge) badge.textContent = `Auto-updated: ${now.toLocaleTimeString()}`;
     _lastRefreshTime = Date.now();
+    } finally { _autoRefreshInFlight = false; }
   }
 
   // Start auto-refresh cycle (only if REFRESH_INTERVAL > 0)
