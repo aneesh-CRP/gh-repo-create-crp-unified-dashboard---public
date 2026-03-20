@@ -1864,7 +1864,7 @@ function renderInsights() {
     insCancelRate.style.cursor = 'pointer';
     insCancelRate.title = 'Click for cancellation breakdown';
     insCancelRate.onclick = () => {
-      if (typeof showCancels === 'function') showCancels(null, 'All Cancellations');
+      if (typeof showCancels === 'function') showCancels(null, 'True Cancellations');
       else {
         let h='<table class="tbl"><thead><tr><th>Study</th><th class="r">Cancellations</th></tr></thead><tbody>';
         (DATA.cancelByStudy||[]).sort((a,b)=>b.count-a.count).forEach(s=>{
@@ -1997,7 +1997,9 @@ var SAMPLE = {
   cancelByStudy: [], upcomingByStudy: {}, upcomingByStudyFull: {},
   coordinators: [], riskMatrix: [], subjectStatus: [],
   sites: [], weeklyBySite: [], visitTypes: [],
-  cancelTotal: 0, upcomingTotal: 0, next14Total: 0, phillyTotal: 0,
+  cancelTotal: 0, noShowTotal: 0, withdrewTotal: 0, screenFailTotal: 0, discontinuedTotal: 0,
+  noShows: [], withdrawals: [], screenFails: [],
+  upcomingTotal: 0, next14Total: 0, phillyTotal: 0,
   pennTotal: 0, marchTotal: 0, aprilTotal: 0, activeStudies: 0,
   riskFlags: [], next14Detail: [], cancelTrend: [], cancelWeekly: [],
   upcomingWeekly: [], enrollmentData: [], enrollSummary: {},
@@ -5601,7 +5603,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
   });
 
   // Categories that should NOT count as true cancellations
-  const EXCLUDED_CANCEL_CATS = new Set(['Rescheduled','Completed','Admin Error','FibroScan Only','Study Closed']);
+  const EXCLUDED_CANCEL_CATS = new Set(['Rescheduled','Completed','Admin Error','FibroScan Only','Study Closed','Screen Fail / DNQ','Discontinued','No Show','Patient Withdrew']);
 
   // Step 3: Categorize and split into true cancellations vs excluded
   const allCategorized = dedupedCancels.map(r => {
@@ -5616,27 +5618,31 @@ function processLiveData(allRows, legacyCancels, auditLog) {
     if (k !== '|') rescheduledPatientStudy.add(k);
   });
 
-  // recentCancels = only TRUE cancellations (excludes rescheduled, completed, admin error, fibroscan, study closed)
-  // Also excludes cancels where the same patient+study has a future appointment (they rescheduled)
+  // recentCancels = only TRUE cancellations (patient-initiated cancels, weather, undocumented, other)
+  // Excluded: rescheduled, screen fail, no show, withdrew, discontinued, completed, admin error, fibroscan, study closed
   const rescheduledVisits = [];   // confirmed rescheduled (have a future appointment)
   const pendingReschedules = [];  // said they'd reschedule but no new appointment yet
+  const noShowList = [];          // no-shows (engagement/reminder issue)
+  const withdrewList = [];        // patient withdrew (retention issue)
+  const screenFailList = [];      // screen fail / DNQ (clinical outcome)
+  const discontinuedList = [];    // discontinued (clinical outcome)
   const recentCancels = allCategorized.filter(r => {
-    if (EXCLUDED_CANCEL_CATS.has(r._category)) {
-      if (r._category === 'Rescheduled') {
-        // Check if they actually have a future appointment
-        var rk = buildKey(r['Subject Full Name'], r['Study Name']);
-        if (rk !== '|' && rescheduledPatientStudy.has(rk)) {
-          rescheduledVisits.push(r);
-        } else {
-          pendingReschedules.push(r);
-        }
-      }
-      return false;
-    }
-    var rk2 = buildKey(r['Subject Full Name'], r['Study Name']);
-    if (rk2 !== '|' && rescheduledPatientStudy.has(rk2)) {
+    // Priority 1: patient has a future appointment → always Rescheduled regardless of category
+    var rk = buildKey(r['Subject Full Name'], r['Study Name']);
+    if (rk !== '|' && rescheduledPatientStudy.has(rk)) {
       r._category = 'Rescheduled';
       rescheduledVisits.push(r);
+      return false;
+    }
+    // Priority 2: excluded categories → route to appropriate split array
+    if (EXCLUDED_CANCEL_CATS.has(r._category)) {
+      switch (r._category) {
+        case 'Rescheduled':       pendingReschedules.push(r); break;
+        case 'No Show':           noShowList.push(r); break;
+        case 'Patient Withdrew':  withdrewList.push(r); break;
+        case 'Screen Fail / DNQ': screenFailList.push(r); break;
+        case 'Discontinued':      discontinuedList.push(r); break;
+      }
       return false;
     }
     return true;
@@ -5670,8 +5676,8 @@ function processLiveData(allRows, legacyCancels, auditLog) {
     if (/fibroscan|fibrosan|fibro scan|fibroscan only|scan visit/i.test(r) || /fibroscan|fibrosan|fibro scan|fibroscan only|scan visit/i.test(t)) return 'FibroScan Only';
     if (/discontinu/i.test(r)) return 'Discontinued';
     if (t === 'no show') return 'No Show';
-    if (/screen.?fail|screenfail|dnq|does not qualify|not qualify|protocol criteria|excluded medication|autoimmune|\bbmi\b/.test(r)) return 'Screen Fail / DNQ';
-    if (/reschedul|will call back/.test(r) && !r.includes('no show') && !r.includes('did not call back') && !r.includes('didn\'t call back')) return 'Rescheduled';
+    if (/screen.?fail|screenfail|\bsf\b|s\/f|dnq|does not qualify|not qualify|did not meet|ineligib|not eligible|protocol criteria|exclusion criteria|inclusion criteria|excluded medication|autoimmune|\bbmi\b/.test(r)) return 'Screen Fail / DNQ';
+    if ((/reschedul|will call back|moved to \w|changed to \w|site (requested|cancel)|coordinator request|sponsor (request|cancel)/.test(r)) && !r.includes('no show') && !r.includes('did not call back') && !r.includes('didn\'t call back')) return 'Rescheduled';
     if (/no.?show|didn.t answer|did not answer|no answer|mailbox|left text|left vm|text sent|unresponsive|lost to follow|never reached/.test(r)) return 'No Show';
     if (/withdrew|no longer interested|not interested|refuses to return|do not solicit|not comfortable/.test(r)) return 'Patient Withdrew';
     if (/weather|snow|storm/.test(r)) return 'Weather';
@@ -6072,12 +6078,35 @@ function processLiveData(allRows, legacyCancels, auditLog) {
   // Default filtered view (±14 days)
   const weeklyTrends = filterTrendsByRange(weeklyTrendsAll, 14, today);
 
+  // Helper: map a raw cancel row to a detail object for popups
+  function mapCancelDetail(r) {
+    return {
+      name: (r['Subject Full Name']||'').replace(/\s{2,}/g,' ').trim(),
+      url: patientUrl(r['Study Key'], r['Subject Key (Back End)'], r['Site Name']) || '',
+      study: (r['Study Name']||'').split(' - ').pop().trim(),
+      study_url: studyUrl(r['Study Key'], r['Site Name']) || '',
+      subject_status: r['Subject Status']||'',
+      coord: cleanCoord(r['Staff Full Name'] || r['Full Name']),
+      investigator: cleanCoord(resolveInvestigator(r)),
+      type: r['Appointment Cancellation Type']||'',
+      reason: r['Cancel Reason']||'',
+      visit: r['Name']||r['Appointment Type']||'',
+      category: r._category || categorizeReason(r['Cancel Reason'], r['Appointment Cancellation Type']),
+      cancel_date: (() => { try { const d=parseDate(r['Cancel Date']);return d?d.toLocaleDateString('en-US',{month:'short',day:'numeric'}):''; }catch(e){return '';}})(),
+      site: r['Site Name'],
+    };
+  }
+
   return {
     actionDetails,
     visitTypes,
     today: today.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),
     upcomingTotal: activeUpcoming.length,
     cancelTotal: recentCancels.length,
+    noShowTotal: noShowList.length,
+    withdrewTotal: withdrewList.length,
+    screenFailTotal: screenFailList.length,
+    discontinuedTotal: discontinuedList.length,
     next14: next14Detail.length,
     atRisk: riskMatrix.filter(r=>r.level==='critical'||r.level==='high').length,
     activeStudies: upcomingByStudy.length,
@@ -6128,21 +6157,10 @@ function processLiveData(allRows, legacyCancels, auditLog) {
         site: r['Site Name'],
       };
     }),
-    allCancels: recentCancels.map(r => ({
-      name: (r['Subject Full Name']||'').replace(/\s{2,}/g,' ').trim(),
-      url: patientUrl(r['Study Key'], r['Subject Key (Back End)'], r['Site Name']) || '',
-      study: (r['Study Name']||'').split(' - ').pop().trim(),
-      study_url: studyUrl(r['Study Key'], r['Site Name']) || '',
-      subject_status: r['Subject Status']||'',
-      coord: cleanCoord(r['Staff Full Name'] || r['Full Name']),
-      investigator: cleanCoord(resolveInvestigator(r)),
-      type: r['Appointment Cancellation Type']||'',
-      reason: r['Cancel Reason']||'',
-      visit: r['Name']||r['Appointment Type']||'',
-      category: r._category || categorizeReason(r['Cancel Reason'], r['Appointment Cancellation Type']),
-      cancel_date: (() => { try { const d=parseDate(r['Cancel Date']);return d?d.toLocaleDateString('en-US',{month:'short',day:'numeric'}):''; }catch(e){return '';}})(),
-      site: r['Site Name'],
-    })),
+    allCancels: recentCancels.map(mapCancelDetail),
+    noShows: noShowList.map(mapCancelDetail),
+    withdrawals: withdrewList.map(mapCancelDetail),
+    screenFails: screenFailList.map(mapCancelDetail),
     rescheduledVisits: rescheduledVisits.map(r => {
       const sk=r['Study Key'], subk=r['Subject Key (Back End)'];
       // Find the matching upcoming visit for this patient+study
@@ -7138,6 +7156,13 @@ function buildMedRecAlerts() {
 
 function renderAll() {
   document.getElementById('kpi-cancels').textContent  = DATA.cancelTotal  || 0;
+  // Split KPI counters
+  var _nsEl = document.getElementById('kpi-noshow');
+  if (_nsEl) _nsEl.textContent = DATA.noShowTotal || 0;
+  var _wdEl = document.getElementById('kpi-withdrew');
+  if (_wdEl) _wdEl.textContent = DATA.withdrewTotal || 0;
+  var _sfEl = document.getElementById('kpi-screenfail');
+  if (_sfEl) _sfEl.textContent = DATA.screenFailTotal || 0;
   var reschEl = document.getElementById('kpi-rescheduled');
   if (reschEl) reschEl.textContent = (DATA.rescheduledVisits||[]).length;
   var reschSub = reschEl ? reschEl.parentElement.querySelector('.tb-sub') : null;
@@ -7327,6 +7352,29 @@ function showCancels(filterFn, title, sub) {
     <td>${siteBadge(r.site)}</td>
   </tr>`).join('') + `</tbody></table>`;
   openModal(title, sub || rows.length + ' records', body);
+}
+
+function showSplitPopup(key, title) {
+  var rows = (DATA[key]||[]);
+  var body = '<table class="detail-table sortable"><thead><tr>' +
+    '<th onclick="sortDetailTable(this)">Patient</th>' +
+    '<th onclick="sortDetailTable(this)">Study</th>' +
+    '<th onclick="sortDetailTable(this)">Type</th>' +
+    '<th onclick="sortDetailTable(this)">Cancel Date</th>' +
+    '<th onclick="sortDetailTable(this)">Reason</th>' +
+    '<th onclick="sortDetailTable(this)">Coordinator</th>' +
+    '<th onclick="sortDetailTable(this)">Site</th>' +
+    '</tr></thead><tbody>' +
+    rows.map(function(r) { return '<tr>' +
+      '<td>' + extLink(r.name, r.study_url||r.url||'') + '</td>' +
+      '<td style="font-size:11px">' + extLink(r.study, r.study_url||'') + '</td>' +
+      '<td>' + typeBadge2(r.type) + '</td>' +
+      '<td style="color:#64748b;font-size:11px;white-space:nowrap">' + (r.cancel_date||'—') + '</td>' +
+      '<td style="font-size:11px;color:#64748b;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + (r.reason||'').replace(/"/g,"'") + '">' + (r.reason||'—') + '</td>' +
+      '<td style="font-size:11px">' + (r.coord||'—') + '</td>' +
+      '<td>' + siteBadge(r.site) + '</td></tr>';
+    }).join('') + '</tbody></table>';
+  openModal(title, rows.length + ' records — excluded from cancel count', body);
 }
 
 function showUpcoming(filterFn, title, sub) {
@@ -11508,7 +11556,7 @@ function generateDailyEmail(type) {
   html += '<div style="background:#f8fafc;padding:16px 24px;border-bottom:2px solid #e2e8f0;">';
   html += '<table style="width:100%;border-collapse:collapse;text-align:center;"><tr>';
   html += '<td style="padding:8px;"><div style="font-size:24px;font-weight:700;color:#072061;">' + (DATA.upcomingTotal || 0) + '</div><div style="font-size:11px;color:#64748b;">Upcoming</div></td>';
-  html += '<td style="padding:8px;"><div style="font-size:24px;font-weight:700;color:#dc2626;">' + (DATA.cancelTotal || 0) + '</div><div style="font-size:11px;color:#64748b;">Cancellations</div></td>';
+  html += '<td style="padding:8px;"><div style="font-size:24px;font-weight:700;color:#dc2626;">' + (DATA.cancelTotal || 0) + '</div><div style="font-size:11px;color:#64748b;">True Cancellations</div><div style="font-size:10px;color:#94a3b8">' + (DATA.noShowTotal||0) + ' no-shows · ' + (DATA.withdrewTotal||0) + ' withdrew · ' + (DATA.screenFailTotal||0) + ' SF</div></td>';
   html += '<td style="padding:8px;"><div style="font-size:24px;font-weight:700;color:' + (parseFloat(cancelRate) > 15 ? '#dc2626' : '#059669') + ';">' + cancelRate + '%</div><div style="font-size:11px;color:#64748b;">Cancel Rate</div></td>';
   html += '<td style="padding:8px;"><div style="font-size:24px;font-weight:700;color:#d97706;">' + flags.length + '</div><div style="font-size:11px;color:#64748b;">At-Risk Patients</div></td>';
   html += '</tr></table></div>';
