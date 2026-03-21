@@ -59,6 +59,15 @@ var SOURCE_RENAME = { 'Practice': 'Princeton CardioMetabolic' };
 // setupCrioToken() — already run, token stored in Script Properties. Removed for security.
 
 // ============================================================
+// DISABLE: Run this once to delete all triggers (sync replaced by Cloud Function)
+// ============================================================
+function disableSync() {
+  var triggers = ScriptApp.getProjectTriggers();
+  triggers.forEach(function(t) { ScriptApp.deleteTrigger(t); });
+  Logger.log('Deleted ' + triggers.length + ' triggers. ClickUp sync is now disabled.');
+  Logger.log('Data is served by Cloud Function: https://us-east1-crio-468120.cloudfunctions.net/crp-bq-api');
+}
+
 // MAIN ENTRY POINT — call this from a 15-min trigger
 // ============================================================
 function syncAll() {
