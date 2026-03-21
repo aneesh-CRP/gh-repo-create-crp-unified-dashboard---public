@@ -12076,6 +12076,17 @@ function mergeCrioIntoStudies() {
       existing.subject_count = (existing.subject_count || 0) + (s.subject_count || 0);
       existing.total_revenue = (existing.total_revenue || 0) + (s.total_revenue || 0);
       existing.revenue_subjects = (existing.revenue_subjects || 0) + (s.revenue_subjects || 0);
+      // Promote status: ENROLLING wins over STARTUP/SITE QUALIFICATION/etc.
+      var STATUS_PRIORITY = {'ENROLLING':5,'MAINTENANCE':4,'CLOSEOUT':3,'STARTUP':2,'START UP':2,'SITE QUALIFICATION':1,'PRE-SITE QUALIFICATION':0};
+      var existPri = STATUS_PRIORITY[existing.status] || 0;
+      var newPri = STATUS_PRIORITY[s.status] || 0;
+      if (newPri > existPri) existing.status = s.status;
+      // Keep coordinator/investigator from the enrolling site
+      if (newPri > existPri) {
+        if (s.coordinator) existing.coordinator = s.coordinator;
+        if (s.investigator) existing.investigator = s.investigator;
+        if (s.study_key) existing.study_key = s.study_key;
+      }
       if (!existing._extra_keys) existing._extra_keys = [];
       existing._extra_keys.push(s.study_key);
     } else {
