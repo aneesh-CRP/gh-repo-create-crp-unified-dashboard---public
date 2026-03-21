@@ -97,8 +97,8 @@ function syncBigQueryCancels() {
     sheet.getRange(2, 1, data.length, headers.length).setValues(data);
   }
 
-  var tsRow = data.length + 3;
-  sheet.getRange(tsRow, 1).setValue('Last synced: ' + new Date().toISOString());
+  // Store timestamp as a note on A1 instead of a data row (avoids polluting CSV)
+  sheet.getRange(1, 1).setNote('Last synced: ' + new Date().toISOString());
 
   Logger.log('BQ Cancellations synced: ' + data.length + ' rows, ' + headers.length + ' columns');
   Logger.log('Sheet URL: ' + ss.getUrl());
@@ -265,8 +265,8 @@ function syncBigQueryVisits() {
     sheet.getRange(2, 1, data.length, headers.length).setValues(data);
   }
 
-  var tsRow = data.length + 3;
-  sheet.getRange(tsRow, 1).setValue('Last synced: ' + new Date().toISOString());
+  // Store timestamp as a note on A1 instead of a data row (avoids polluting CSV)
+  sheet.getRange(1, 1).setNote('Last synced: ' + new Date().toISOString());
 
   Logger.log('BQ Visits synced: ' + data.length + ' rows, ' + headers.length + ' columns');
   Logger.log('Sheet URL: ' + ss.getUrl());
@@ -288,16 +288,20 @@ function _buildVisitsQuery() {
     'ca.study_key AS study_key, ' +
     // Scheduled Date
     'FORMAT_DATETIME(\'%Y-%m-%d\', ca.start) AS scheduled_date, ' +
-    // Subject Full Name
-    'CONCAT(sub.first_name, \' \', sub.last_name) AS subject_full_name, ' +
+    // Subject Full Name (first + middle + last, matching Looker format)
+    'TRIM(CONCAT(COALESCE(sub.first_name, \'\'), \' \', COALESCE(sub.middle_name, \'\'), \' \', COALESCE(sub.last_name, \'\'))) AS subject_full_name, ' +
     'ca.subject_key AS subject_key_back_end, ' +
     // Full Name = coordinator (creator of the appointment)
     'CONCAT(COALESCE(coord.first_name, \'\'), \' \', COALESCE(coord.last_name, \'\')) AS full_name, ' +
     // Appointment Status
     'CASE ca.status ' +
     '  WHEN 0 THEN \'Cancelled\' ' +
+    '  WHEN -1 THEN \'Active\' ' +
     '  WHEN 1 THEN \'Active\' ' +
-    '  ELSE \'\' ' +
+    '  WHEN 10 THEN \'Active\' ' +
+    '  WHEN 12 THEN \'Active\' ' +
+    '  WHEN 20 THEN \'Active\' ' +
+    '  ELSE \'Active\' ' +
     'END AS appointment_status, ' +
     // Visit Name (= "Name" header in Looker CSV)
     'COALESCE(sv.name, \'\') AS visit_name, ' +
