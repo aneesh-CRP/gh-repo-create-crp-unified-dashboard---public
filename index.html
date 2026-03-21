@@ -15418,33 +15418,8 @@ if (typeof window !== 'undefined') {
   </div>
 
   <!-- ═══════════ ACCRUALS (merged into Billing) ═══════════ -->
-  <div class="section-label" style="margin-top:24px">Open Accruals Summary</div>
-  <div class="kpi-row" id="accrualKpiRow">
-    <div class="kpi click" onclick="showUninvoicedModal()">
-      <div class="kpi-stripe" style="background:#8B5CF6"></div>
-      <div class="label">Total Open Accruals</div>
-      <div class="value" id="acc-total" style="color:#8B5CF6">--</div>
-      <div class="sub" id="acc-total-sub"></div>
-    </div>
-    <div class="kpi click" onclick="showUninvoicedModal()">
-      <div class="kpi-stripe" style="background:#EC4899"></div>
-      <div class="label">Uninvoiced Revenue</div>
-      <div class="value" id="acc-uninv" style="color:#EC4899">--</div>
-      <div class="sub" id="acc-uninv-sub"></div>
-    </div>
-    <div class="kpi click" onclick="showUnpaidAPModal()">
-      <div class="kpi-stripe" style="background:#F59E0B"></div>
-      <div class="label">Unpaid Autopay</div>
-      <div class="value" id="acc-unpaid-ap" style="color:#F59E0B">--</div>
-      <div class="sub" id="acc-unpaid-ap-sub"></div>
-    </div>
-    <div class="kpi click" onclick="showUnpaidInvModal()">
-      <div class="kpi-stripe" style="background:#EF4444"></div>
-      <div class="label">Unpaid Invoices</div>
-      <div class="value" id="acc-unpaid-inv" style="color:#EF4444">--</div>
-      <div class="sub" id="acc-unpaid-inv-sub"></div>
-    </div>
-  </div>
+  <!-- Accruals KPI row removed — same data shown in Finance Overview Open Receivables -->
+  <div class="section-label" style="margin-top:24px">Open Accruals Detail</div>
 
   <!-- Uninvoiced by Category + Unpaid AP by Type side by side -->
   <div class="charts-row">
