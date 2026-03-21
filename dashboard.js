@@ -8871,12 +8871,17 @@ async function fetchCrioStudies() {
     try {
       var rows = await fetchCSV(studiesUrl);
       if (rows && rows.length > 0) {
+        // Normalize BQ status to uppercase (BQ sends 'Enrolling', dashboard checks 'ENROLLING')
+        var _bqStatusUp = {'Start Up':'STARTUP','Enrolling':'ENROLLING','Maintenance':'MAINTENANCE',
+          'Closeout':'CLOSEOUT','Closed':'CLOSED','Pre-Site Qualification':'PRE-SITE QUALIFICATION',
+          'Site Qualification':'SITE QUALIFICATION'};
         CRIO_STUDIES_DATA = rows.map(function(r) {
+          var rawStatus = r.status || '';
           return {
             study_key: r.study_key || '',
             protocol_number: r.protocol_number || '',
             study_name: r.study_name || '',
-            status: r.status || '',
+            status: _bqStatusUp[rawStatus] || rawStatus.toUpperCase() || '',
             coordinator: r.coordinator || '',
             investigator: r.investigator || '',
             indication: r.indication || '',
@@ -9717,7 +9722,11 @@ function mergeCrioIntoStudies() {
 
   var STATUS_MAP = {
     'ENROLLING':'Enrolling','MAINTENANCE':'Maintenance','STARTUP':'Startup',
-    'PRECLOSED':'Pre-Closed','CONFIGURING':'Configuring','CLOSED':'Closed'
+    'PRECLOSED':'Pre-Closed','CONFIGURING':'Configuring','CLOSED':'Closed',
+    // BQ sends mixed-case status values — map them too
+    'Enrolling':'Enrolling','Maintenance':'Maintenance','Start Up':'Startup',
+    'Pre-Site Qualification':'Pre-Site Qualification','Site Qualification':'Site Qualification',
+    'Closeout':'Closeout','Closed':'Closed'
   };
 
   // Build CRIO lookup by protocol_number — merge multi-site studies (e.g., PHL+PNJ)
