@@ -1035,7 +1035,8 @@ function renderRevenueItems() {
 }
 // ══════════ ENHANCED ACCRUALS TAB ══════════
 function renderAccruals() {
-  if (!UNINVOICED || !UNINVOICED.length || !UNPAID_AP || !UNPAID_INVOICES) return;
+  // Allow partial data — render what we have (BQ may not have all arrays)
+  if ((!UNINVOICED || !UNINVOICED.length) && (!UNPAID_AP || !UNPAID_AP.length) && (!UNPAID_INVOICES || !UNPAID_INVOICES.length)) return;
   const el = id => document.getElementById(id);
 
   // KPI values
@@ -1483,6 +1484,8 @@ function initFinanceDashboard(forceRefresh) {
   // Guard: ensure finance globals have data before rendering
   if (!AGING_INV || !AGING_INV.length) { _log('CRP Finance: No aging data yet — skipping init'); return; }
   finInitDone = true;
+  // Update all overview KPIs dynamically
+  try { updateFinanceOverviewKPIs(); } catch(e) { _log('updateFinanceOverviewKPIs: ' + e.message); }
   // Overview: alerts, forecast, charts, AR studies
   try { renderAlerts(); } catch(e) { _log('renderAlerts: ' + e.message); }
   try { renderForecast(); } catch(e) { _log('renderForecast: ' + e.message); }
@@ -1496,15 +1499,52 @@ function initFinanceDashboard(forceRefresh) {
   try { renderAgingTables(); } catch(e) { _log('renderAgingTables: ' + e.message); }
   // Revenue (enhanced)
   try { renderRevenueTab(); } catch(e) { _log('renderRevenueTab: ' + e.message); }
-  // Accruals (enhanced)
+  // Accruals (enhanced — allow partial data)
   try { renderAccruals(); } catch(e) { _log('renderAccruals: ' + e.message); }
   // Studies
   try { renderStudies(); } catch(e) { _log('renderStudies: ' + e.message); }
   // Collections
   try { initColl(); renderCollections(); } catch(e) { _log('collections: ' + e.message); }
-  // Emit lifecycle event for plugins
   CRP.emit('financeLoaded', { arrays: ['AGING_INV','AGING_AP','UNPAID_INVOICES','UNPAID_AP','UNINVOICED','MONTHLY_PAYMENTS','MONTHLY_REVENUE','TOP_AR_STUDIES'] });
   _log('CRP: Finance dashboard initialized');
+}
+
+// Dynamically update all Finance overview KPI values from current globals
+function updateFinanceOverviewKPIs() {
+  var _s = function(id, val) { var e = document.getElementById(id); if (e) e.textContent = val; };
+  var sumB = function(r) { return r.current + r.d30_60 + r.d61_90 + r.d91_120 + r.d121_150 + r.d150plus; };
+  var invAR = AGING_INV ? Math.round(AGING_INV.reduce(function(s,r){return s+sumB(r);},0)) : 0;
+  var apAR = AGING_AP ? Math.round(AGING_AP.reduce(function(s,r){return s+sumB(r);},0)) : 0;
+  var totalAR = invAR + apAR;
+  var unpaidInvTotal = UNPAID_INVOICES ? Math.round(UNPAID_INVOICES.reduce(function(s,r){return s+(r.unpaid||0);},0)) : 0;
+  var unpaidApTotal = UNPAID_AP ? Math.round(UNPAID_AP.reduce(function(s,r){return s+(r.total||0);},0)) : 0;
+  var uninvoicedTotal = UNINVOICED ? Math.round(UNINVOICED.reduce(function(s,r){return s+(r.amount||0);},0)) : 0;
+  var revTotal = MONTHLY_REVENUE ? MONTHLY_REVENUE.reduce(function(s,r){return s+(r.autopay||0)+(r.procedures||0)+(r.invoicables||0);},0) : 0;
+  var pmtTotal = MONTHLY_PAYMENTS ? MONTHLY_PAYMENTS.reduce(function(s,r){return s+(r.amount||0);},0) : 0;
+  var pmtMonths = MONTHLY_PAYMENTS ? MONTHLY_PAYMENTS.length : 0;
+  var avgPmt = pmtMonths > 0 ? Math.round(pmtTotal / pmtMonths / 1000) : 0;
+
+  // Heroes
+  _s('fin-hero-ar', '$' + Math.round(totalAR/1000).toLocaleString() + 'K');
+  _s('fin-hero-ar-sub', 'Invoice $' + Math.round(invAR/1000) + 'K + Autopay $' + Math.round(apAR/1000) + 'K');
+  _s('fin-hero-payments', '$' + Math.round(pmtTotal).toLocaleString());
+  _s('fin-hero-payments-sub', pmtMonths + ' months \u00b7 avg $' + avgPmt + 'K/mo');
+
+  // AR KPIs
+  _s('fin-kpi-inv-ar', '$' + Math.round(invAR).toLocaleString());
+  _s('fin-kpi-inv-ar-sub', AGING_INV ? AGING_INV.length + ' studies' : '');
+  _s('fin-kpi-ap-ar', '$' + Math.round(apAR).toLocaleString());
+  _s('fin-kpi-ap-ar-sub', AGING_AP ? AGING_AP.length + ' studies' : '');
+  _s('fin-kpi-rev12m', revTotal >= 1000000 ? '$' + (revTotal/1000000).toFixed(2) + 'M' : '$' + Math.round(revTotal/1000) + 'K');
+  _s('fin-kpi-rev12m-sub', 'All sources');
+
+  // Open receivables
+  _s('fin-kpi-unpaid-inv', '$' + Math.round(unpaidInvTotal).toLocaleString());
+  _s('fin-kpi-unpaid-inv-sub', UNPAID_INVOICES ? UNPAID_INVOICES.length + ' invoices' : '');
+  _s('fin-kpi-unpaid-ap', '$' + Math.round(unpaidApTotal).toLocaleString());
+  _s('fin-kpi-unpaid-ap-sub', UNPAID_AP ? UNPAID_AP.length + ' studies' : '');
+  _s('fin-kpi-uninvoiced', '$' + Math.round(uninvoicedTotal).toLocaleString());
+  _s('fin-kpi-uninvoiced-sub', UNINVOICED ? UNINVOICED.length + ' studies' : '');
 }
 
 // ═══ UNIFIED TAB SWITCHER (wraps perf switchView + finance gating) ═══
@@ -12215,18 +12255,16 @@ async function fetchBQExpansionData() {
   if (!CRP_CONFIG.USE_CLOUD_FUNCTION || !CRP_CONFIG.CF_BASE) return;
   var base = CRP_CONFIG.CF_BASE;
   try {
-    var [funnel, retention, coords, compliance, studyFin] = await Promise.all([
+    var [funnel, retention, coords, compliance] = await Promise.all([
       fetchCSV(base + '?feed=funnel&format=csv').catch(function() { return []; }),
       fetchCSV(base + '?feed=retention&format=csv').catch(function() { return []; }),
       fetchCSV(base + '?feed=coordinators&format=csv').catch(function() { return []; }),
       fetchCSV(base + '?feed=compliance&format=csv').catch(function() { return []; }),
-      fetchCSV(base + '?feed=studyFinance&format=csv').catch(function() { return []; }),
     ]);
     BQ_FUNNEL_DATA = funnel;
     BQ_RETENTION_DATA = retention;
     BQ_COORDINATOR_DATA = coords;
     BQ_COMPLIANCE_DATA = compliance;
-    BQ_STUDY_FINANCE_DATA = studyFin;
     _log('CRP BQ Expansion: funnel=' + funnel.length + ' retention=' + retention.length + ' coords=' + coords.length + ' compliance=' + compliance.length);
     safe(renderPatientFunnel, 'renderPatientFunnel');
     safe(renderRetention, 'renderRetention');
@@ -12798,14 +12836,9 @@ async function _crpInit() {
     try {
       const ok = await fetchFinanceLive();
       if (ok) {
-        _log('CRP Finance: Live data applied — re-rendering finance views');
+        _log('CRP Finance: Live data applied');
         setHealthChip('dh-finance','ok','Finance');
-        if (typeof renderForecast === 'function') try { renderForecast(); } catch(e) { _log('renderForecast re-render: ' + e.message); }
-        if (typeof drawPayChartOverview === 'function') try { drawPayChartOverview(); } catch(e) { _log('drawPayChartOverview: ' + e.message); }
-        if (typeof drawRevChart === 'function') try { drawRevChart(); } catch(e) { _log('drawRevChart: ' + e.message); }
-        if (typeof drawAgingChart === 'function') try { drawAgingChart(); } catch(e) { _log('drawAgingChart: ' + e.message); }
-        if (typeof renderAccruals === 'function') try { renderAccruals(); } catch(e) { _log('renderAccruals: ' + e.message); }
-        if (typeof renderStudiesTable === 'function') try { renderStudiesTable(); } catch(e) { _log('renderStudiesTable: ' + e.message); }
+        // initFinanceDashboard(true) inside fetchFinanceLive already rendered everything
       } else {
         setHealthChip('dh-finance','warn','Finance (no data)');
       }
