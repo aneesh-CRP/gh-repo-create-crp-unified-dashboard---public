@@ -6938,7 +6938,7 @@ function buildActionSteps() {
   if(dormEl){
     const dormant=(DATA.cancelByStudy||[]).filter(c=>{
       const cName=c.name||c.study||c.full||'Unknown';
-      const up=((DATA.upcomingByStudyFull||DATA.upcomingByStudy||[]).find(u=>u.full===c.full||u.name===cName||u.study===c.study)||{}).count||0;
+      const up=((DATA.upcomingByStudyFull||DATA.upcomingByStudy||[]).find(u=>u.full===c.full||u.name===cName)||{}).count||0;
       return c.count>=5&&up<5;
     });
     dormEl.innerHTML=dormant.length>0
@@ -10977,7 +10977,7 @@ function renderEnrollmentVelocity() {
       b.total++;
       var st = (s.status || '').toLowerCase();
       if (st === 'active' || st === 'enrolled' || st === 'randomized') b.active++;
-      else if (st === 'screen failure' || st === 'screen fail') b.screen_fail++;
+      else if (st === 'screen failure' || st === 'screen fail' || st === 'screen_fail') b.screen_fail++;
       else if (st === 'completed') b.completed++;
     });
   }
@@ -11021,6 +11021,12 @@ function renderEnrollmentVelocity() {
     var stLower = (s.status || '').toLowerCase();
     if (stLower !== 'enrolling' && stLower !== 'active') return;
     var target = s.target_enrollment || 0;
+    // Fallback: check DATA.enrollmentData for target if CRIO doesn't have one
+    if (target <= 0 && DATA && DATA.enrollmentData) {
+      var proto = (s.protocol_number || '').toLowerCase();
+      var match = DATA.enrollmentData.find(function(e) { return (e.study || '').toLowerCase() === proto; });
+      if (match && match.target > 0) target = match.target;
+    }
     if (target <= 0) return;
 
     var subs = subsByStudy[s.study_key] || { total: 0, active: 0, screen_fail: 0, completed: 0 };
@@ -12399,8 +12405,14 @@ function renderCompliance() {
   el.innerHTML = html;
 }
 
-// Fetch expansion data after Phase 3
-setTimeout(function() { fetchBQExpansionData().catch(function(e) { console.warn('BQ Expansion:', e); }); }, 3000);
+// Fetch expansion data after Phase 3, then re-render CRIO Intelligence
+setTimeout(function() {
+  fetchBQExpansionData().catch(function(e) { console.warn('BQ Expansion:', e); });
+  // Late re-render: CRIO Intelligence + Enrollment Velocity (needs both CRIO data + Phase 1 data)
+  if (typeof renderCrioStudies === 'function') safe(renderCrioStudies, 'renderCrioStudies-late');
+  if (typeof renderEnrollmentVelocity === 'function') safe(renderEnrollmentVelocity, 'renderEnrollmentVelocity-late');
+  if (typeof mergeCrioIntoStudies === 'function') safe(mergeCrioIntoStudies, 'mergeCrioIntoStudies-late');
+}, 5000);
 
 // ═══ DARK MODE TOGGLE ═══
 function toggleDarkMode() {

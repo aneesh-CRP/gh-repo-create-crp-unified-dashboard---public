@@ -747,7 +747,7 @@ body {
     .panel-head{padding:14px 20px;border-bottom:1px solid var(--border);font-size:13px;font-weight:700;color:var(--text)}
     .panel-body{padding:0}
     .tbl{width:100%;border-collapse:collapse;font-size:12px}
-    .tbl th{background:var(--surface2);padding:10px 14px;text-align:left;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;font-size:10px;border-bottom:2px solid var(--border);white-space:nowrap}
+    .tbl th{background:var(--surface2);padding:10px 14px;text-align:left;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;font-size:10px;border-bottom:2px solid var(--border);white-space:nowrap;position:sticky;top:0;z-index:1}
     .tbl td{padding:10px 14px;border-bottom:1px solid var(--border)}
     .tbl tr:hover{background:var(--surface2)}
     .tbl .r{text-align:right;white-space:nowrap}
@@ -1152,7 +1152,7 @@ body {
       <div class="tb-sub">Cancelled but rebooked</div>
     </div>
     <div class="tb-divider" id="kpi-today-divider">TODAY</div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showUpcoming(r=>{ const d=parseDate(r.date_iso||''); const now=new Date(); now.setHours(0,0,0,0); return (d-now)/86400000<=14; },'Next 14 Days')" title="Click to see next 14 days">
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showUpcoming(r=>{ const d=_parseDate(r.date_iso||''); if(!d) return false; const now=new Date(); now.setHours(0,0,0,0); return (d-now)/86400000<=14; },'Next 14 Days')" title="Click to see next 14 days">
       <div class="tb-label">⚡ Next 14 Days</div>
       <div class="tb-value blue" id="kpi-next14">78</div>
       <div class="tb-sub">Scheduled visits (CRIO)</div>
@@ -9116,7 +9116,7 @@ function buildActionSteps() {
   if(dormEl){
     const dormant=(DATA.cancelByStudy||[]).filter(c=>{
       const cName=c.name||c.study||c.full||'Unknown';
-      const up=((DATA.upcomingByStudyFull||DATA.upcomingByStudy||[]).find(u=>u.full===c.full||u.name===cName||u.study===c.study)||{}).count||0;
+      const up=((DATA.upcomingByStudyFull||DATA.upcomingByStudy||[]).find(u=>u.full===c.full||u.name===cName)||{}).count||0;
       return c.count>=5&&up<5;
     });
     dormEl.innerHTML=dormant.length>0
@@ -13155,7 +13155,7 @@ function renderEnrollmentVelocity() {
       b.total++;
       var st = (s.status || '').toLowerCase();
       if (st === 'active' || st === 'enrolled' || st === 'randomized') b.active++;
-      else if (st === 'screen failure' || st === 'screen fail') b.screen_fail++;
+      else if (st === 'screen failure' || st === 'screen fail' || st === 'screen_fail') b.screen_fail++;
       else if (st === 'completed') b.completed++;
     });
   }
@@ -13199,6 +13199,12 @@ function renderEnrollmentVelocity() {
     var stLower = (s.status || '').toLowerCase();
     if (stLower !== 'enrolling' && stLower !== 'active') return;
     var target = s.target_enrollment || 0;
+    // Fallback: check DATA.enrollmentData for target if CRIO doesn't have one
+    if (target <= 0 && DATA && DATA.enrollmentData) {
+      var proto = (s.protocol_number || '').toLowerCase();
+      var match = DATA.enrollmentData.find(function(e) { return (e.study || '').toLowerCase() === proto; });
+      if (match && match.target > 0) target = match.target;
+    }
     if (target <= 0) return;
 
     var subs = subsByStudy[s.study_key] || { total: 0, active: 0, screen_fail: 0, completed: 0 };
@@ -14577,8 +14583,14 @@ function renderCompliance() {
   el.innerHTML = html;
 }
 
-// Fetch expansion data after Phase 3
-setTimeout(function() { fetchBQExpansionData().catch(function(e) { console.warn('BQ Expansion:', e); }); }, 3000);
+// Fetch expansion data after Phase 3, then re-render CRIO Intelligence
+setTimeout(function() {
+  fetchBQExpansionData().catch(function(e) { console.warn('BQ Expansion:', e); });
+  // Late re-render: CRIO Intelligence + Enrollment Velocity (needs both CRIO data + Phase 1 data)
+  if (typeof renderCrioStudies === 'function') safe(renderCrioStudies, 'renderCrioStudies-late');
+  if (typeof renderEnrollmentVelocity === 'function') safe(renderEnrollmentVelocity, 'renderEnrollmentVelocity-late');
+  if (typeof mergeCrioIntoStudies === 'function') safe(mergeCrioIntoStudies, 'mergeCrioIntoStudies-late');
+}, 5000);
 
 // ═══ DARK MODE TOGGLE ═══
 function toggleDarkMode() {
@@ -15270,20 +15282,15 @@ if (typeof window !== 'undefined') {
     <div id="fin-meta-ads-table" style="overflow-x:auto;"></div>
   </div>
 
-  <!-- ── CHARTS: Side by side ── -->
+  <!-- ── CHARTS: Compact overview linking to detail tab ── -->
   <div class="charts-row">
-    <div class="panel">
-      <div class="panel-head">Revenue Trend (Last 12 Months)</div>
-      <div class="chart-wrap"><svg id="revChart" viewBox="0 0 1000 310" style="width:100%;height:280px"></svg></div>
-      <div style="display:flex;gap:16px;justify-content:center;padding:0 16px 14px;font-size:10px;color:#718096">
-        <span><span style="display:inline-block;width:8px;height:8px;background:#60A5FA;border-radius:2px;margin-right:3px"></span>Autopay</span>
-        <span><span style="display:inline-block;width:8px;height:8px;background:#34D399;border-radius:2px;margin-right:3px"></span>Procedures</span>
-        <span><span style="display:inline-block;width:8px;height:8px;background:#FBBF24;border-radius:2px;margin-right:3px"></span>Invoicables</span>
-      </div>
+    <div class="panel" style="cursor:pointer" onclick="switchTab('fin-revenue',document.querySelector('.nav-tab[onclick*=fin-revenue]'))">
+      <div class="panel-head">Revenue Trend <span style="font-size:10px;color:var(--muted);font-weight:400">→ click for detail</span></div>
+      <div class="chart-wrap"><svg id="revChart" viewBox="0 0 1000 310" style="width:100%;height:200px"></svg></div>
     </div>
-    <div class="panel">
-      <div class="panel-head">Monthly Payments Collected</div>
-      <div class="chart-wrap"><svg id="payChartOverview" viewBox="0 0 1000 310" style="width:100%;height:280px"></svg></div>
+    <div class="panel" style="cursor:pointer" onclick="switchTab('fin-revenue',document.querySelector('.nav-tab[onclick*=fin-revenue]'))">
+      <div class="panel-head">Payments Collected <span style="font-size:10px;color:var(--muted);font-weight:400">→ click for detail</span></div>
+      <div class="chart-wrap"><svg id="payChartOverview" viewBox="0 0 1000 310" style="width:100%;height:200px"></svg></div>
     </div>
   </div>
 
@@ -15483,16 +15490,7 @@ if (typeof window !== 'undefined') {
     </div>
   </div>
 
-  <!-- Simple Uninvoiced by Study (collapsed rollup) -->
-  <div class="section-label">Uninvoiced Summary by Study</div>
-  <div class="panel">
-    <div class="panel-body" style="overflow-x:auto">
-      <table class="tbl">
-        <thead><tr><th>Study</th><th class="r">Amount</th></tr></thead>
-        <tbody id="uninvBody"></tbody>
-      </table>
-    </div>
-  </div>
+  <!-- Uninvoiced summary removed — detail table above shows same data with more columns -->
 </div>
 
 <!-- ═══════════ CRIO vs QUICKBOOKS ═══════════ -->
