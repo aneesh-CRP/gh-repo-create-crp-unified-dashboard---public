@@ -5351,7 +5351,7 @@ async function connectSheets() {
     </div>`;
 
   try {
-    const [rows1, legacyCancels, auditRows] = await Promise.all([fetchCSV(url1), fetchCSV(url2).catch(() => []), fetchCSV(_getAuditLogURL()).catch(() => [])]);
+    const [rows1, legacyCancels, auditRows] = await Promise.all([fetchCSV(url1), fetchCSV(url2).catch(() => []), _fetchAuditLog().catch(() => [])]);
     DATA = processLiveData(rows1, legacyCancels, auditRows);
     window._lastLiveData = DATA;
     document.getElementById('data-source-badge').textContent = '🔗 Live Google Sheets';
@@ -6353,7 +6353,7 @@ async function refreshData() {
     const [rows1, legacyCancels, auditRows] = await Promise.all([
       _fetchWithFallback(_getVisitsURL(), LIVE_URL1, 'Visits', 10),
       _fetchWithFallback(_getCancelURL(), LIVE_URL2_LEGACY, 'Cancels', 5).catch(() => []),
-      fetchCSV(_getAuditLogURL()).catch(() => [])
+      _fetchAuditLog().catch(() => [])
     ]);
     const newData = processLiveData(rows1, legacyCancels, auditRows);
     if ((newData.upcomingTotal || 0) < 5 && (DATA.upcomingTotal || 0) > 5) {
@@ -10935,12 +10935,26 @@ function _getVisitsURL() {
   return LIVE_URL1;
 }
 
-// Audit log URL — CF → BQ Sheet → legacy sheet
-function _getAuditLogURL() {
-  var cf = _cfUrl('auditLog');
-  if (cf) return cf;
-  if (CRP_CONFIG.USE_BQ_AUDIT_LOG && CRP_CONFIG.DATA_FEEDS.BQ_AUDIT_LOG_CSV) return CRP_CONFIG.DATA_FEEDS.BQ_AUDIT_LOG_CSV;
-  return AUDIT_LOG_URL;
+// Audit log — use fetchWithFallback for 3-tier resilience
+async function _fetchAuditLog() {
+  var cfUrl = _cfUrl('auditLog');
+  var sheetsUrl = (CRP_CONFIG.USE_BQ_AUDIT_LOG && CRP_CONFIG.DATA_FEEDS.BQ_AUDIT_LOG_CSV)
+    ? CRP_CONFIG.DATA_FEEDS.BQ_AUDIT_LOG_CSV : null;
+  // Try CF first (with 8s timeout race)
+  if (cfUrl) {
+    try {
+      var cfPromise = fetchCSV(cfUrl);
+      var timeout = new Promise(function(_, rej) { setTimeout(function() { rej(new Error('CF timeout')); }, 8000); });
+      var rows = await Promise.race([cfPromise, timeout]);
+      if (rows.length >= 100) { _log('CRP CF: Audit log loaded ' + rows.length + ' rows'); return rows; }
+    } catch(e) { _log('CRP CF: Audit log failed (' + e.message + ') — trying Sheets'); }
+  }
+  // Try Sheets CSV
+  if (sheetsUrl) {
+    try { var sr = await fetchCSV(sheetsUrl); if (sr.length >= 100) return sr; } catch(e) {}
+  }
+  // Legacy
+  return fetchCSV(AUDIT_LOG_URL);
 }
 // Patient DB URL — CF → BQ Sheet → legacy CRIO export
 function _getPatientDBURL() {
@@ -12389,7 +12403,7 @@ async function _crpInit() {
       const [rows1, legacyCancels, auditRows] = await Promise.all([
         _fetchWithFallback(_getVisitsURL(), LIVE_URL1, 'Visits', 10),
         _fetchWithFallback(_getCancelURL(), LIVE_URL2_LEGACY, 'Cancels', 5).catch(() => []),
-        fetchCSV(_getAuditLogURL()).catch(e => { console.warn('CRP: Audit log fetch failed, continuing without:', e.message); setHealthChip('dh-audit','fail','Audit Log'); return []; })
+        _fetchAuditLog().catch(e => { console.warn('CRP: Audit log fetch failed, continuing without:', e.message); setHealthChip('dh-audit','fail','Audit Log'); return []; })
       ]);
       _lastCrioRows = rows1;
       _lastAuditRows = auditRows;
@@ -12428,7 +12442,7 @@ async function _crpInit() {
         const [rows1b, legacyB, auditB] = await Promise.all([
           _fetchWithFallback(_getVisitsURL(), LIVE_URL1, 'Visits-retry', 10),
           _fetchWithFallback(_getCancelURL(), LIVE_URL2_LEGACY, 'Cancels-retry', 5).catch(() => []),
-          fetchCSV(_getAuditLogURL()).catch(() => [])
+          _fetchAuditLog().catch(() => [])
         ]);
         _lastCrioRows = rows1b;
         _lastAuditRows = auditB;
@@ -12561,7 +12575,7 @@ async function _crpInit() {
       const [rows1, legacyCancels, auditRows] = await Promise.all([
         _fetchWithFallback(_getVisitsURL(), LIVE_URL1, 'Visits-auto', 10),
         _fetchWithFallback(_getCancelURL(), LIVE_URL2_LEGACY, 'Cancels-auto', 5).catch(() => []),
-        fetchCSV(_getAuditLogURL()).catch(() => [])
+        _fetchAuditLog().catch(() => [])
       ]);
       const newData = processLiveData(rows1, legacyCancels, auditRows);
       if ((newData.upcomingTotal || 0) < 5 && (DATA.upcomingTotal || 0) > 5) {
