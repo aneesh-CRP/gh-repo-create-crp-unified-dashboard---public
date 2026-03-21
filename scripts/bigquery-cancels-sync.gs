@@ -314,11 +314,11 @@ function _buildVisitsQuery() {
     '  WHEN 20 THEN \'Completed\' ' +
     '  ELSE \'\' ' +
     'END AS subject_status, ' +
-    // Subject ID (CRIO subject_id, not subject_key)
-    'COALESCE(CAST(sub.subject_id AS STRING), \'\') AS subject_id, ' +
+    // Subject ID (CRIO patient_id on subject table)
+    'COALESCE(sub.patient_id, \'\') AS subject_id, ' +
     // Cancel fields — populated only for cancelled appointments
-    'CASE WHEN ca.status = 0 THEN FORMAT_DATETIME(\'%Y-%m-%d\', ca.date_modified) ELSE \'\' END AS cancel_date, ' +
-    'CASE WHEN ca.status = 0 THEN COALESCE(REGEXP_REPLACE(ca.notes, r\'[\\x00-\\x1f]\', \' \'), \'\') ELSE \'\' END AS cancel_reason, ' +
+    'CASE WHEN ca.status = 0 THEN FORMAT_DATETIME(\'%Y-%m-%d\', ca.cancel_date) ELSE \'\' END AS cancel_date, ' +
+    'CASE WHEN ca.status = 0 THEN COALESCE(REGEXP_REPLACE(ca.cancel_reason, r\'[\\x00-\\x1f]\', \' \'), \'\') ELSE \'\' END AS cancel_reason, ' +
     'CASE WHEN ca.status = 0 THEN ' +
     '  CASE ca.cancel_type ' +
     '    WHEN 1 THEN \'No Show\' ' +
@@ -336,7 +336,7 @@ function _buildVisitsQuery() {
     // Calendar Appointment Key
     'CAST(ca.calendar_appointment_key AS STRING) AS calendar_appointment_key, ' +
     // Appointment Type
-    'CASE ca.appointment_type ' +
+    'CASE ca.type ' +
     '  WHEN 0 THEN \'Regular Visit\' ' +
     '  WHEN 1 THEN \'Ad Hoc Visit\' ' +
     '  WHEN 2 THEN \'General Appointment\' ' +

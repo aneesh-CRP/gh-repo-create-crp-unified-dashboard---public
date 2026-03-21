@@ -191,7 +191,7 @@ const CRP_CONFIG = {
   USE_BQ_CANCELS: true,
   // When true: uses BQ_VISITS_CSV for upcoming visits instead of LIVE_URL1 (Looker)
   // Set to false initially — enable after verifying BQ data matches Looker data
-  USE_BQ_VISITS: false,
+  USE_BQ_VISITS: true,
 
   // Brand Colors (match CSS :root variables)
   BRAND: {
@@ -223,7 +223,7 @@ const CRP_CONFIG = {
     BQ_CANCELS_CSV: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQSVnZBL93Zx5t88q97kGRfKvEvDonnTD6y506i806UAuNLWMvMsQUsvnxJe9BIiRTF0ktF1bUgvkj8/pub?output=csv',
     // BigQuery Visits — synced from CRIO BigQuery by bigquery-cancels-sync.gs → BQ_Visits tab
     // After setup: publish the BQ_Visits tab as CSV, paste URL here, set USE_BQ_VISITS: true
-    BQ_VISITS_CSV: '',
+    BQ_VISITS_CSV: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQSVnZBL93Zx5t88q97kGRfKvEvDonnTD6y506i806UAuNLWMvMsQUsvnxJe9BIiRTF0ktF1bUgvkj8/pub?gid=1281180825&single=true&output=csv',
     // Looker — Study Status & Key Dates (published Google Sheet)
     LOOKER_STUDY_STATUS_CSV: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQrwoQwKCAiyv5xx_z0uXMQLHS5d2CUbzOj_qjxkZJYYe3Yxdu3i2T-rdQ9vtlDCBRTKfA1jDW_W0YW/pub?output=csv',
     // Finance Master Sheet — published key + tab GIDs for CSV access
