@@ -9069,12 +9069,14 @@ function buildActionSteps() {
     </div>`;
   }
 
-  // ── Dormant ──
+  // ── Dormant (only flag ENROLLING studies — maintenance/closed naturally wind down) ──
   if(dormEl){
     const dormant=(DATA.cancelByStudy||[]).filter(c=>{
       const cName=c.name||c.study||c.full||'Unknown';
       const up=((DATA.upcomingByStudyFull||DATA.upcomingByStudy||[]).find(u=>u.full===c.full||u.name===cName)||{}).count||0;
-      return c.count>=5&&up<5;
+      const ms=(DATA.mergedStudies||[]).find(m=>m.study===cName||m.study===c.full);
+      const isEnrolling=ms&&ms.enroll_status==='Enrolling';
+      return c.count>=5&&up<5&&isEnrolling;
     });
     dormEl.innerHTML=dormant.length>0
       ?dormant.map(c=>{const label=c.name||c.study||c.full||'Unknown';return c.study_url
@@ -12090,7 +12092,8 @@ function mergeCrioIntoStudies() {
       existing.total_revenue = (existing.total_revenue || 0) + (s.total_revenue || 0);
       existing.revenue_subjects = (existing.revenue_subjects || 0) + (s.revenue_subjects || 0);
       // Promote status: ENROLLING wins over STARTUP/SITE QUALIFICATION/etc.
-      var STATUS_PRIORITY = {'ENROLLING':5,'MAINTENANCE':4,'CLOSEOUT':3,'STARTUP':2,'START UP':2,'SITE QUALIFICATION':1,'PRE-SITE QUALIFICATION':0};
+      var STATUS_PRIORITY = {'ENROLLING':5,'MAINTENANCE':4,'PRECLOSED':3,'CLOSED':3,'STARTUP':2,'CONFIGURING':1,'SUSPENDED':0,'WITHDRAWN':0,
+        'CLOSEOUT':3,'START UP':2,'SITE QUALIFICATION':1,'PRE-SITE QUALIFICATION':0};
       var existPri = STATUS_PRIORITY[existing.status] || 0;
       var newPri = STATUS_PRIORITY[s.status] || 0;
       if (newPri > existPri) existing.status = s.status;
@@ -12131,7 +12134,7 @@ function mergeCrioIntoStudies() {
 
     // Coordinator & PI
     e.crio_coordinator = typeof cleanCoord === 'function' ? cleanCoord(crio.coordinator || '') : (crio.coordinator || '');
-    e.crio_investigator = crio.investigator || '';
+    e.crio_investigator = crio.investigator || e.crio_investigator || '';
     e.crio_subject_count = crio.subject_count;
     e.crio_study_key = crio.study_key;
     e.crio_indication = crio.indication || '';
@@ -13954,7 +13957,7 @@ function renderStudiesTable() {
     if (_studyFilter === 'enrolling') return s.enroll_status === 'Enrolling';
     if (_studyFilter === 'maintenance') return s.enroll_status === 'Maintenance';
     if (_studyFilter === 'startup') return s.enroll_status === 'Startup';
-    if (_studyFilter === 'preclosed') return s.enroll_status === 'Pre-Closed' || s.enroll_status === 'Closed';
+    if (_studyFilter === 'preclosed') return s.enroll_status === 'Pre-Closed' || s.enroll_status === 'Closed' || s.enroll_status === 'Suspended' || s.enroll_status === 'Withdrawn';
     if (_studyFilter === 'goal_met') return s.pct !== null && s.pct >= 100;
     if (_studyFilter === 'behind') return s.enroll_status === 'Enrolling' && s.target && s.pct !== null && s.pct < 50;
     if (_studyFilter === 'phl') return (s.sites || []).indexOf('PHL') !== -1;
@@ -13993,8 +13996,11 @@ function renderStudiesTable() {
     const safeStudy = jsAttr(s.study);
     const studyCell = `<span style="font-weight:700;color:var(--navy);cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px;" data-action="studyUnified" data-study="${escapeHTML(s.study)}">${escapeHTML(s.study)}</span>` +
       (s.study_url ? `<a href="${escapeHTML(s.study_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="margin-left:4px;opacity:0.4;vertical-align:middle"><svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>` : '');
-    const statusBadge = s.enroll_status
-      ? `<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;margin-left:5px;background:${s.enroll_status==='Enrolling'?'#e8eeff':s.enroll_status==='Maintenance'?'#f0fdf4':s.enroll_status==='Startup'?'#fffbeb':'#f1f5f9'};color:${s.enroll_status==='Enrolling'?'#1843ad':s.enroll_status==='Maintenance'?'#059669':s.enroll_status==='Startup'?'#d97706':'#94a3b8'}">${s.enroll_status}</span>` : '';
+    const _sb = s.enroll_status||'';
+    const _sbBg = _sb==='Enrolling'?'#e8eeff':_sb==='Maintenance'?'#f0fdf4':_sb==='Startup'?'#fffbeb':_sb==='Pre-Closed'?'#fef2f2':_sb==='Suspended'?'#fef2f2':_sb==='Withdrawn'?'#f1f5f9':'#f1f5f9';
+    const _sbFg = _sb==='Enrolling'?'#1843ad':_sb==='Maintenance'?'#059669':_sb==='Startup'?'#d97706':_sb==='Pre-Closed'?'#dc2626':_sb==='Suspended'?'#dc2626':_sb==='Withdrawn'?'#64748b':'#94a3b8';
+    const statusBadge = _sb
+      ? `<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;margin-left:5px;background:${_sbBg};color:${_sbFg}">${_sb}</span>` : '';
     const indicationTag = s.crio_indication ? `<div style="font-size:9px;color:#94a3b8;margin-top:1px">${escapeHTML(s.crio_indication)}${s.crio_end_date ? ' · End: '+escapeHTML(s.crio_end_date) : ''}</div>` : (s.crio_end_date ? `<div style="font-size:9px;color:#94a3b8;margin-top:1px">End: ${escapeHTML(s.crio_end_date)}</div>` : '');
 
     const isEnrolling = s.enroll_status === 'Enrolling';
