@@ -172,6 +172,7 @@ const FEEDS = {
       COALESCE(sub.mobile_phone, '') AS mobile_phone,
       CAST(ca.calendar_appointment_key AS STRING) AS calendar_appointment_key,
       CASE ca.type WHEN 0 THEN 'Regular Visit' WHEN 1 THEN 'Ad Hoc Visit' WHEN 2 THEN 'General Appointment' WHEN 3 THEN 'Block' ELSE '' END AS appointment_type,
+      COALESCE(pi.name, '') AS investigator,
       FORMAT_DATETIME('%Y-%m-%d', CURRENT_DATETIME()) AS snapshot_date
     FROM ${tbl('calendar_appointment')} ca
     LEFT JOIN ${tbl('subject')} sub ON ca.subject_key = sub.subject_key
@@ -180,6 +181,9 @@ const FEEDS = {
     LEFT JOIN ${tbl('site')} si ON ca.site_key = si.site_key
     LEFT JOIN ${tbl('study_visit')} sv ON ca.study_visit_key = sv.study_visit_key
     LEFT JOIN ${tbl('user')} coord ON ca.creator_key = coord.user_key
+    LEFT JOIN (SELECT su.study_key, CONCAT(u.first_name, ' ', u.last_name) AS name
+      FROM ${tbl('study_user')} su JOIN ${tbl('user')} u ON su.user_key = u.user_key
+      WHERE su.role = 1 AND su.is_role_leader = 1 AND su._fivetran_deleted = false) pi ON ca.study_key = pi.study_key
     WHERE ca.subject_key IS NOT NULL AND st.is_active = 1
       AND ca.start >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 7 DAY)
       AND ca.start <= DATETIME_ADD(CURRENT_DATETIME(), INTERVAL 365 DAY)
@@ -195,7 +199,7 @@ const FEEDS = {
       cancel_reason: 'Cancel Reason', appointment_cancellation_type: 'Appointment Cancellation Type',
       staff_full_name: 'Staff Full Name', site_name: 'Site Name', mobile_phone: 'Mobile Phone',
       calendar_appointment_key: 'Calendar Appointment Key (back end)',
-      appointment_type: 'Appointment Type', snapshot_date: 'snapshot_date'
+      appointment_type: 'Appointment Type', investigator: 'Investigator', snapshot_date: 'snapshot_date'
     }
   },
 

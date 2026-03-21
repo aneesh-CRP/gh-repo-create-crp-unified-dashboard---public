@@ -318,6 +318,7 @@ function syncBigQueryVisits() {
     'mobile_phone': 'Mobile Phone',
     'calendar_appointment_key': 'Calendar Appointment Key (back end)',
     'appointment_type': 'Appointment Type',
+    'investigator': 'Investigator',
     'snapshot_date': 'snapshot_date'
   };
   var headers = result.schema.fields.map(function(f) { return HEADER_MAP[f.name] || f.name; });
@@ -433,6 +434,8 @@ function _buildVisitsQuery() {
     '  WHEN 3 THEN \'Block\' ' +
     '  ELSE \'\' ' +
     'END AS appointment_type, ' +
+    // Investigator (PI from study_user role=1)
+    'COALESCE((SELECT CONCAT(u.first_name, \' \', u.last_name) FROM `' + project + '.' + ds + '.study_user` su JOIN `' + project + '.' + ds + '.user` u ON su.user_key = u.user_key WHERE su.study_key = ca.study_key AND su.role = 1 AND su.is_role_leader = 1 AND su._fivetran_deleted = false LIMIT 1), \'\') AS investigator, ' +
     // Snapshot date
     'FORMAT_DATETIME(\'%Y-%m-%d\', CURRENT_DATETIME()) AS snapshot_date ' +
     // FROM + JOINs

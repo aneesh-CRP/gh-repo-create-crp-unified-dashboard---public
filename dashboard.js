@@ -5496,8 +5496,12 @@ function processLiveData(allRows, legacyCancels, auditLog) {
   });
   _log('CRP: Audit log —', (auditLog||[]).length, 'rows, coord keys:', Object.keys(_auditByApptKey).length, ', inv keys:', Object.keys(_invByApptKey).length, ', inv subjKeys:', Object.keys(_invBySubjKey).length);
 
-  // Resolve investigator for a row from the audit log
+  // Resolve investigator for a row — BQ provides Investigator column directly
   function resolveInvestigator(row) {
+    // Tier 1: direct Investigator column from BQ (study_user PI)
+    var direct = (row['Investigator'] || '').trim();
+    if (direct) return direct;
+    // Tier 2: audit log lookup
     const apptKey = (row['Calendar Appointment Key (back end)'] || row['Calendar Appointment Key'] || '').toString().trim();
     if (apptKey && _invByApptKey[apptKey]) {
       for (const name of _invByApptKey[apptKey]) return name;
@@ -5506,7 +5510,13 @@ function processLiveData(allRows, legacyCancels, auditLog) {
     if (subjKey && _invBySubjKey[subjKey]) {
       for (const name of _invBySubjKey[subjKey]) return name;
     }
-    // Fallback: match study name against STUDY_INVESTIGATORS config
+    // Tier 3: CRIO studies data lookup by study key
+    var studyKey = (row['Study Key'] || row['Study Key (Back End)'] || '').toString().trim();
+    if (studyKey && typeof CRIO_STUDIES_DATA !== 'undefined') {
+      var match = CRIO_STUDIES_DATA.find(function(s) { return s.study_key === studyKey; });
+      if (match && match.investigator) return match.investigator;
+    }
+    // Tier 4: config fallback
     const studyInvMap = CRP_CONFIG.STUDY_INVESTIGATORS || {};
     const studyName = (row['Study Name'] || row['Study'] || '').toLowerCase();
     for (const [fragment, invName] of Object.entries(studyInvMap)) {
