@@ -4444,7 +4444,139 @@ function buildMergedStudies(agingInv, agingAp, uninvoiced) {
   });
 }
 
+// ═══ BQ FINANCE: fetch from Cloud Function and transform to dashboard format ═══
+async function fetchFinanceBQ() {
+  if (!CRP_CONFIG.USE_CLOUD_FUNCTION || !CRP_CONFIG.CF_BASE) return false;
+  var base = CRP_CONFIG.CF_BASE;
+  _log('CRP Finance BQ: Fetching from Cloud Function...');
+
+  try {
+    var [invRows, pmtRows, sfRows, mrevRows, stipRows] = await Promise.all([
+      fetchCSV(base + '?feed=agingInvoices&format=csv'),
+      fetchCSV(base + '?feed=payments&format=csv'),
+      fetchCSV(base + '?feed=studyFinance&format=csv'),
+      fetchCSV(base + '?feed=monthlyRevenue&format=csv'),
+      fetchCSV(base + '?feed=stipends&format=csv'),
+    ]);
+
+    if (invRows.length === 0 && sfRows.length === 0) {
+      _log('CRP Finance BQ: empty — falling back to Sheets');
+      return false;
+    }
+
+    // ── Aging Invoices: group by study into aging buckets ──
+    var agingByStudy = {};
+    invRows.forEach(function(r) {
+      var study = (r['study_name'] || r['Study Name'] || '').trim();
+      var unpaid = num(r['amount_unpaid'] || r['Amount Unpaid']);
+      var overdue = parseInt(r['days_overdue'] || r['Days Overdue'] || 0) || 0;
+      if (!study || unpaid <= 0) return;
+      if (!agingByStudy[study]) agingByStudy[study] = { study: study, current: 0, d30_60: 0, d61_90: 0, d91_120: 0, d121_150: 0, d150plus: 0 };
+      var a = agingByStudy[study];
+      if (overdue <= 0) a.current += unpaid;
+      else if (overdue <= 60) a.d30_60 += unpaid;
+      else if (overdue <= 90) a.d61_90 += unpaid;
+      else if (overdue <= 120) a.d91_120 += unpaid;
+      else if (overdue <= 150) a.d121_150 += unpaid;
+      else a.d150plus += unpaid;
+    });
+    var newAgingInv = Object.values(agingByStudy).sort(function(a, b) {
+      var sa = a.current + a.d30_60 + a.d61_90 + a.d91_120 + a.d121_150 + a.d150plus;
+      var sb = b.current + b.d30_60 + b.d61_90 + b.d91_120 + b.d121_150 + b.d150plus;
+      return sb - sa;
+    });
+
+    // ── Unpaid Invoices ──
+    var newUnpaidInv = invRows.filter(function(r) {
+      return num(r['amount_unpaid'] || r['Amount Unpaid']) > 0;
+    }).map(function(r) {
+      return {
+        study: (r['study_name'] || r['Study Name'] || '').trim(),
+        invoice: (r['invoice_number'] || r['Invoice Number'] || '').trim(),
+        due: (r['date_due'] || r['Due Date'] || '').trim() || null,
+        days: parseInt(r['days_overdue'] || r['Days Overdue'] || 0) || 0,
+        amount: num(r['amount'] || r['Amount']),
+        unpaid: num(r['amount_unpaid'] || r['Amount Unpaid'])
+      };
+    }).sort(function(a, b) { return b.unpaid - a.unpaid; });
+
+    // ── Monthly Revenue from BQ ──
+    var newRevenue = mrevRows.map(function(r) {
+      var m = (r['month'] || '').trim();
+      var parts = m.split('-');
+      var monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      var mk = parts.length === 2 ? monthNames[parseInt(parts[1]) - 1] + " '" + parts[0].slice(2) : m;
+      return {
+        month: mk,
+        autopay: Math.round(num(r['total_receivable'] || r['Total Receivable'])),
+        procedures: 0,
+        invoicables: Math.round(num(r['total_revenue'] || r['Total Revenue']) - num(r['total_receivable'] || r['Total Receivable']))
+      };
+    });
+
+    // ── Monthly Payments from BQ ──
+    var pmtByMonth = {};
+    pmtRows.forEach(function(r) {
+      var dateStr = (r['date_received'] || r['Date Received'] || '').trim();
+      if (!dateStr) return;
+      var parts = dateStr.split('-');
+      if (parts.length < 2) return;
+      var monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      var mk = monthNames[parseInt(parts[1]) - 1] + " '" + parts[0].slice(2);
+      pmtByMonth[mk] = (pmtByMonth[mk] || 0) + num(r['amount'] || r['Amount']);
+    });
+    var newPayments = Object.entries(pmtByMonth).map(function(e) { return { month: e[0], amount: Math.round(e[1]) }; });
+
+    // ── Study Finance Summary → Top AR Studies ──
+    var newTopAR = sfRows.filter(function(r) {
+      return num(r['invoice_unpaid'] || r['Invoice Unpaid']) > 0;
+    }).map(function(r) {
+      return {
+        study: (r['study_name'] || r['Study Name'] || '').trim(),
+        ar: Math.round(num(r['invoice_unpaid'] || r['Invoice Unpaid'])),
+        revenue: Math.round(num(r['total_revenue'] || r['Total Revenue'])),
+        receivable: Math.round(num(r['total_receivable'] || r['Total Receivable']))
+      };
+    }).sort(function(a, b) { return b.ar - a.ar; });
+
+    // ── Totals ──
+    var sumB = function(r) { return r.current + r.d30_60 + r.d61_90 + r.d91_120 + r.d121_150 + r.d150plus; };
+    var newTotalInvAR = Math.round(newAgingInv.reduce(function(s, r) { return s + sumB(r); }, 0) * 100) / 100;
+
+    // ── Assign to globals ──
+    AGING_INV = newAgingInv;
+    AGING_AP = []; // BQ doesn't have separate autopay aging
+    UNPAID_INVOICES = newUnpaidInv;
+    UNPAID_AP = [];
+    UNINVOICED = [];
+    MONTHLY_REVENUE = newRevenue;
+    MONTHLY_PAYMENTS = newPayments;
+    TOP_AR_STUDIES = newTopAR;
+    totalInvAR = newTotalInvAR;
+    totalApAR = 0;
+
+    // Update hero
+    var heroAR = document.querySelector('.hero-val[style*="8B5CF6"]');
+    if (heroAR) heroAR.textContent = '$' + Math.round(newTotalInvAR / 1000).toLocaleString() + 'K';
+    var heroSub = heroAR ? heroAR.parentElement.querySelector('.hero-sub') : null;
+    if (heroSub) heroSub.textContent = 'Invoice AR $' + Math.round(newTotalInvAR / 1000) + 'K · ' + newUnpaidInv.length + ' unpaid invoices';
+
+    _log('CRP Finance BQ: loaded — ' + newAgingInv.length + ' aging studies, $' + newTotalInvAR.toLocaleString() + ' total AR, ' + newRevenue.length + ' months revenue');
+    return true;
+  } catch (e) {
+    _log('CRP Finance BQ: failed — ' + e.message);
+    return false;
+  }
+}
+
 async function fetchFinanceLive() {
+  // Try BQ Cloud Function first
+  if (CRP_CONFIG.USE_CLOUD_FUNCTION) {
+    var bqOk = await fetchFinanceBQ();
+    if (bqOk) return true;
+    _log('CRP Finance: BQ failed, falling back to Sheets...');
+  }
+
   const pk = CRP_CONFIG.DATA_FEEDS.FINANCE_PUB_KEY;
   if (!pk) { _log('CRP Finance: No published key configured'); return false; }
   const tabs = CRP_CONFIG.FINANCE_TABS;
