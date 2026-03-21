@@ -555,6 +555,162 @@ const FEEDS = {
       AND st.is_active = 1
     ORDER BY sv.subject_visit_appointment_end DESC`
   },
+
+  // ═══════════════════════════════════════════════════════════
+  // FINANCE FEEDS — direct from CRIO BQ finance tables
+  // ═══════════════════════════════════════════════════════════
+
+  // ── 13. Aging Invoices (unpaid) ──
+  agingInvoices: {
+    query: () => `SELECT
+      i.invoice_number, CAST(i.invoice_key AS STRING) AS invoice_key,
+      ${STUDY_NAME_SQL} AS study_name,
+      CAST(i.study_key AS STRING) AS study_key,
+      COALESCE(spon.name, '') AS sponsor,
+      CAST(i.amount AS FLOAT64) AS amount,
+      CAST(i.amount_paid AS FLOAT64) AS amount_paid,
+      CAST(i.amount_unpaid AS FLOAT64) AS amount_unpaid,
+      FORMAT_DATETIME('%Y-%m-%d', i.date_created) AS date_created,
+      FORMAT_DATETIME('%Y-%m-%d', i.date_due) AS date_due,
+      FORMAT_DATETIME('%Y-%m-%d', i.date_sent) AS date_sent,
+      i.days_until_due,
+      CASE i.status WHEN 0 THEN 'Draft' WHEN 1 THEN 'Sent' WHEN 2 THEN 'Paid' ELSE CAST(i.status AS STRING) END AS status,
+      DATE_DIFF(CURRENT_DATE(), DATE(i.date_due), DAY) AS days_overdue
+    FROM ${tbl('invoice')} i
+    LEFT JOIN ${tbl('study')} st ON i.study_key = st.study_key
+    LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
+    ORDER BY i.amount_unpaid DESC`
+  },
+
+  // ── 14. Payments received ──
+  payments: {
+    query: () => `SELECT
+      p.payment_number, CAST(p.payment_key AS STRING) AS payment_key,
+      ${STUDY_NAME_SQL} AS study_name,
+      CAST(p.study_key AS STRING) AS study_key,
+      COALESCE(spon.name, '') AS sponsor,
+      CAST(p.amount AS FLOAT64) AS amount,
+      FORMAT_DATETIME('%Y-%m-%d', p.date_received) AS date_received,
+      FORMAT_DATETIME('%Y-%m-%d', p.date_issued) AS date_issued,
+      FORMAT_DATETIME('%Y-%m-%d', p.date_reconciled) AS date_reconciled,
+      CASE WHEN p.is_reconciled = 1 THEN 'Reconciled' ELSE 'Pending' END AS reconciled,
+      CASE p.type WHEN 0 THEN 'Revenue' WHEN 1 THEN 'Holdback' WHEN 2 THEN 'External' ELSE CAST(p.type AS STRING) END AS payment_type,
+      CAST(p.total_invoices AS FLOAT64) AS total_invoices,
+      CAST(p.total_holdbacks AS FLOAT64) AS total_holdbacks,
+      p.comments
+    FROM ${tbl('payment')} p
+    LEFT JOIN ${tbl('study')} st ON p.study_key = st.study_key
+    LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
+    ORDER BY p.date_received DESC`
+  },
+
+  // ── 15. Revenue line items ──
+  revenueItems: {
+    query: (params) => {
+      const days = parseInt(params.days) || 730;
+      return `SELECT
+        CAST(ri.study_key AS STRING) AS study_key,
+        ${STUDY_NAME_SQL} AS study_name,
+        COALESCE(spon.name, '') AS sponsor,
+        FORMAT_DATETIME('%Y-%m-%d', ri.service_date) AS service_date,
+        CAST(ri.revenue_amount AS FLOAT64) AS revenue,
+        CAST(ri.holdback_amount AS FLOAT64) AS holdback,
+        CAST(ri.receivable_amount AS FLOAT64) AS receivable,
+        CAST(ri.paid_amount AS FLOAT64) AS paid,
+        CAST(ri.due_amount AS FLOAT64) AS due,
+        COALESCE(ri.details, '') AS details,
+        CASE ri.type WHEN 0 THEN 'Visit' WHEN 1 THEN 'Procedure' WHEN 2 THEN 'Screen Fail' WHEN 3 THEN 'Ad Hoc' ELSE CAST(ri.type AS STRING) END AS type,
+        CASE WHEN ri.requires_invoice = 1 THEN 'Yes' ELSE 'No' END AS requires_invoice,
+        ri.invoice_key
+      FROM ${tbl('revenue_item')} ri
+      LEFT JOIN ${tbl('study')} st ON ri.study_key = st.study_key
+      LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
+      WHERE ri.service_date >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL ${days} DAY)
+      ORDER BY ri.service_date DESC`;
+    }
+  },
+
+  // ── 16. Monthly revenue summary ──
+  monthlyRevenue: {
+    query: () => `SELECT
+      FORMAT_DATE('%Y-%m', DATE(ri.service_date)) AS month,
+      CAST(SUM(ri.revenue_amount) AS FLOAT64) AS total_revenue,
+      CAST(SUM(ri.holdback_amount) AS FLOAT64) AS total_holdback,
+      CAST(SUM(ri.receivable_amount) AS FLOAT64) AS total_receivable,
+      CAST(SUM(ri.paid_amount) AS FLOAT64) AS total_paid,
+      CAST(SUM(ri.due_amount) AS FLOAT64) AS total_due,
+      COUNT(*) AS line_items,
+      COUNT(DISTINCT ri.study_key) AS studies
+    FROM ${tbl('revenue_item')} ri
+    WHERE ri.service_date >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 730 DAY)
+    GROUP BY month
+    ORDER BY month DESC`
+  },
+
+  // ── 17. Subject stipend payments ──
+  stipends: {
+    query: () => `SELECT
+      CAST(sp.subject_key AS STRING) AS subject_key,
+      CAST(sp.study_key AS STRING) AS study_key,
+      ${STUDY_NAME_SQL} AS study_name,
+      ${SUBJECT_NAME_SQL} AS subject_name,
+      CAST(sp.amount AS FLOAT64) AS amount,
+      CASE WHEN sp.is_paid = 1 THEN 'Paid' ELSE 'Pending' END AS status,
+      FORMAT_DATETIME('%Y-%m-%d', sp.payment_date) AS payment_date,
+      FORMAT_DATETIME('%Y-%m-%d', sp.date_created) AS date_created,
+      sp.comments
+    FROM ${tbl('subject_payment')} sp
+    LEFT JOIN ${tbl('study')} st ON sp.study_key = st.study_key
+    LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
+    LEFT JOIN ${tbl('subject')} sub ON sp.subject_key = sub.subject_key
+    WHERE sp.is_active = 1
+    ORDER BY sp.date_created DESC`
+  },
+
+  // ── 18. Study finance summary (enhanced) ──
+  studyFinance: {
+    query: () => `WITH
+      inv_stats AS (SELECT study_key, COUNT(*) AS inv_count, SUM(amount) AS inv_total, SUM(amount_unpaid) AS inv_unpaid,
+        COUNTIF(status = 1) AS inv_sent, COUNTIF(status = 2) AS inv_paid FROM ${tbl('invoice')} GROUP BY study_key),
+      pmt_stats AS (SELECT study_key, COUNT(*) AS pmt_count, SUM(amount) AS pmt_total FROM ${tbl('payment')} GROUP BY study_key),
+      stip_stats AS (SELECT study_key, COUNT(*) AS stip_count, SUM(amount) AS stip_total, COUNTIF(is_paid=1) AS stip_paid FROM ${tbl('subject_payment')} WHERE is_active = 1 GROUP BY study_key)
+    SELECT
+      CAST(sf.study_key AS STRING) AS study_key,
+      ${STUDY_NAME_SQL} AS study_name,
+      COALESCE(spon.name, '') AS sponsor,
+      CAST(sf.total_revenue AS FLOAT64) AS total_revenue,
+      CAST(sf.projected_revenue AS FLOAT64) AS projected_revenue,
+      CAST(sf.total_cost AS FLOAT64) AS total_cost,
+      CAST(sf.total_receivable AS FLOAT64) AS total_receivable,
+      CAST(sf.total_invoice_receivable AS FLOAT64) AS total_invoice_receivable,
+      CAST(sf.total_holdback AS FLOAT64) AS total_holdback,
+      CAST(sf.total_revenue_paid AS FLOAT64) AS total_revenue_paid,
+      CAST(sf.total_patient_stipend AS FLOAT64) AS total_patient_stipend,
+      sf.total_randomized,
+      sf.total_screen_fails,
+      sf.total_screen_fails_allocated,
+      CAST(sf.revenue_base AS FLOAT64) AS revenue_per_visit,
+      CAST(sf.revenue_screen_fail AS FLOAT64) AS revenue_per_screen_fail,
+      CAST(sf.patient_stipend AS FLOAT64) AS stipend_per_patient,
+      COALESCE(inv.inv_count, 0) AS invoice_count,
+      COALESCE(CAST(inv.inv_total AS FLOAT64), 0) AS invoice_total,
+      COALESCE(CAST(inv.inv_unpaid AS FLOAT64), 0) AS invoice_unpaid,
+      COALESCE(inv.inv_sent, 0) AS invoices_sent,
+      COALESCE(inv.inv_paid, 0) AS invoices_paid,
+      COALESCE(pmt.pmt_count, 0) AS payment_count,
+      COALESCE(CAST(pmt.pmt_total AS FLOAT64), 0) AS payment_total,
+      COALESCE(stip.stip_count, 0) AS stipend_count,
+      COALESCE(CAST(stip.stip_total AS FLOAT64), 0) AS stipend_total,
+      COALESCE(stip.stip_paid, 0) AS stipends_paid
+    FROM ${tbl('study_finance')} sf
+    JOIN ${tbl('study')} st ON sf.study_key = st.study_key
+    LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
+    LEFT JOIN inv_stats inv ON sf.study_key = inv.study_key
+    LEFT JOIN pmt_stats pmt ON sf.study_key = pmt.study_key
+    LEFT JOIN stip_stats stip ON sf.study_key = stip.study_key
+    WHERE st.is_active = 1
+    ORDER BY sf.total_revenue DESC`
+  },
 };
 
 // ═══════════════════════════════════════════════════════════
