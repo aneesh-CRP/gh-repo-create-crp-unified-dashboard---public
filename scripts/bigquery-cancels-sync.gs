@@ -473,9 +473,11 @@ function _buildStudiesQuery() {
   var ds = BQ_CONFIG.DATASET;
   var t = '`' + project + '.' + ds + '.';
 
-  // Pre-aggregate coordinator, PI, and subject counts to avoid correlated subqueries
+  // Pre-aggregate coordinator (most active by appt count), PI, and subject counts
   return 'WITH ' +
-    'coord_first AS (SELECT study_key, MIN(su_key) AS su_key FROM (SELECT study_key, study_user_key AS su_key FROM ' + t + 'study_user` WHERE role = 3 AND _fivetran_deleted = false) GROUP BY study_key), ' +
+    'active_coords AS (SELECT ca.study_key, ca.creator_key, COUNT(*) AS appt_count FROM ' + t + 'calendar_appointment` ca WHERE ca.start >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 90 DAY) AND ca.subject_key IS NOT NULL AND ca.creator_key IS NOT NULL GROUP BY ca.study_key, ca.creator_key), ' +
+    'ranked_coords AS (SELECT study_key, creator_key, ROW_NUMBER() OVER (PARTITION BY study_key ORDER BY appt_count DESC) AS rn FROM active_coords), ' +
+    'coord_best AS (SELECT study_key, creator_key AS user_key FROM ranked_coords WHERE rn = 1), ' +
     'pi_leaders AS (SELECT study_key, MIN(user_key) AS user_key FROM ' + t + 'study_user` WHERE role = 1 AND is_role_leader = 1 AND _fivetran_deleted = false GROUP BY study_key), ' +
     'sub_counts AS (SELECT study_key, COUNT(*) AS cnt FROM ' + t + 'subject` WHERE _fivetran_deleted = false GROUP BY study_key) ' +
     'SELECT ' +
@@ -509,9 +511,8 @@ function _buildStudiesQuery() {
     'LEFT JOIN ' + t + 'clinical_trial` ct ON st.clinical_trial_key = ct.clinical_trial_key ' +
     'LEFT JOIN ' + t + 'study_details` sd ON st.study_key = sd.study_key ' +
     'LEFT JOIN ' + t + 'study_finance` sf ON st.study_key = sf.study_key ' +
-    'LEFT JOIN coord_first cf ON st.study_key = cf.study_key ' +
-    'LEFT JOIN ' + t + 'study_user` coord_su ON cf.su_key = coord_su.study_user_key ' +
-    'LEFT JOIN ' + t + 'user` coord_u ON coord_su.user_key = coord_u.user_key ' +
+    'LEFT JOIN coord_best cb ON st.study_key = cb.study_key ' +
+    'LEFT JOIN ' + t + 'user` coord_u ON cb.user_key = coord_u.user_key ' +
     'LEFT JOIN pi_leaders pl ON st.study_key = pl.study_key ' +
     'LEFT JOIN ' + t + 'user` pi_u ON pl.user_key = pi_u.user_key ' +
     'LEFT JOIN sub_counts sc ON st.study_key = sc.study_key ' +

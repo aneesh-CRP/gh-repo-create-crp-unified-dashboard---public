@@ -253,10 +253,14 @@ const FEEDS = {
   // ── 3. Studies (uses CTEs to avoid correlated subqueries) ──
   studies: {
     query: () => `WITH
-      coord_leaders AS (SELECT study_key, ARRAY_AGG(name ORDER BY is_leader DESC, date_created ASC LIMIT 1)[OFFSET(0)] AS name FROM (
-        SELECT su.study_key, CONCAT(u.first_name, ' ', u.last_name) AS name, su.is_role_leader AS is_leader, su.date_created
-        FROM ${tbl('study_user')} su JOIN ${tbl('user')} u ON su.user_key = u.user_key
-        WHERE su.role = 3 AND su._fivetran_deleted = false) GROUP BY study_key),
+      active_coords AS (SELECT ca.study_key, ca.creator_key, COUNT(*) AS appt_count
+        FROM ${tbl('calendar_appointment')} ca
+        WHERE ca.start >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 90 DAY)
+          AND ca.subject_key IS NOT NULL AND ca.creator_key IS NOT NULL
+        GROUP BY ca.study_key, ca.creator_key),
+      ranked_coords AS (SELECT study_key, creator_key, ROW_NUMBER() OVER (PARTITION BY study_key ORDER BY appt_count DESC) AS rn FROM active_coords),
+      coord_leaders AS (SELECT rc.study_key, CONCAT(u.first_name, ' ', u.last_name) AS name
+        FROM ranked_coords rc JOIN ${tbl('user')} u ON rc.creator_key = u.user_key WHERE rc.rn = 1),
       pi_leaders AS (SELECT su.study_key, CONCAT(u.first_name, ' ', u.last_name) AS name
         FROM ${tbl('study_user')} su JOIN ${tbl('user')} u ON su.user_key = u.user_key
         WHERE su.role = 1 AND su.is_role_leader = 1 AND su._fivetran_deleted = false),
