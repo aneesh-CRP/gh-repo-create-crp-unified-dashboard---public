@@ -192,6 +192,8 @@ const CRP_CONFIG = {
   // When true: uses BQ_VISITS_CSV for upcoming visits instead of LIVE_URL1 (Looker)
   // Set to false initially — enable after verifying BQ data matches Looker data
   USE_BQ_VISITS: true,
+  // When true: uses BQ_STUDIES_CSV + BQ_SUBJECTS_CSV instead of ClickUp CRIO sync
+  USE_BQ_STUDIES: false,
 
   // Brand Colors (match CSS :root variables)
   BRAND: {
@@ -224,7 +226,11 @@ const CRP_CONFIG = {
     // BigQuery Visits — synced from CRIO BigQuery by bigquery-cancels-sync.gs → BQ_Visits tab
     // After setup: publish the BQ_Visits tab as CSV, paste URL here, set USE_BQ_VISITS: true
     BQ_VISITS_CSV: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQSVnZBL93Zx5t88q97kGRfKvEvDonnTD6y506i806UAuNLWMvMsQUsvnxJe9BIiRTF0ktF1bUgvkj8/pub?gid=1281180825&single=true&output=csv',
-    // Looker — Study Status & Key Dates (published Google Sheet)
+    // BigQuery Studies — synced from CRIO BigQuery → BQ_Studies tab
+    BQ_STUDIES_CSV: '',
+    // BigQuery Subjects — synced from CRIO BigQuery → BQ_Subjects tab
+    BQ_SUBJECTS_CSV: '',
+    // Looker — Study Status & Key Dates (published Google Sheet) — CANNOT migrate to BQ (no milestone dates)
     LOOKER_STUDY_STATUS_CSV: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQrwoQwKCAiyv5xx_z0uXMQLHS5d2CUbzOj_qjxkZJYYe3Yxdu3i2T-rdQ9vtlDCBRTKfA1jDW_W0YW/pub?output=csv',
     // Finance Master Sheet — published key + tab GIDs for CSV access
     FINANCE_PUB_KEY: '2PACX-1vQXxreb6lrZHej3luMOSI07ditFm6mmGHIHrxWu9BkTfsvk0OLk_gx7o_JIY34UIgroGIKgEYbVdC_V',
@@ -6332,10 +6338,10 @@ async function refreshData() {
   const badge = document.getElementById('last-refresh-badge');
   if (badge) badge.textContent = 'Refreshing...';
   try {
-    // Phase 1: CRIO data
+    // Phase 1: CRIO data (BQ primary, Looker fallback)
     const [rows1, legacyCancels, auditRows] = await Promise.all([
-      fetchCSV(_getVisitsURL()),
-      fetchCSV(_getCancelURL(), true).catch(() => []),
+      _fetchWithFallback(_getVisitsURL(), LIVE_URL1, 'Visits', 10),
+      _fetchWithFallback(_getCancelURL(), LIVE_URL2_LEGACY, 'Cancels', 5).catch(() => []),
       fetchCSV(AUDIT_LOG_URL).catch(() => [])
     ]);
     const newData = processLiveData(rows1, legacyCancels, auditRows);
@@ -8842,8 +8848,10 @@ async function fetchCrioStudies() {
   if (_crioFetchInFlight) return;
   _crioFetchInFlight = true;
   try {
-    var studiesUrl = CRP_CONFIG.DATA_FEEDS.CRIO_STUDIES_CSV;
-    var subjectsUrl = CRP_CONFIG.DATA_FEEDS.CRIO_SUBJECTS_CSV;
+    var studiesUrl = (CRP_CONFIG.USE_BQ_STUDIES && CRP_CONFIG.DATA_FEEDS.BQ_STUDIES_CSV)
+      ? CRP_CONFIG.DATA_FEEDS.BQ_STUDIES_CSV : CRP_CONFIG.DATA_FEEDS.CRIO_STUDIES_CSV;
+    var subjectsUrl = (CRP_CONFIG.USE_BQ_STUDIES && CRP_CONFIG.DATA_FEEDS.BQ_SUBJECTS_CSV)
+      ? CRP_CONFIG.DATA_FEEDS.BQ_SUBJECTS_CSV : CRP_CONFIG.DATA_FEEDS.CRIO_SUBJECTS_CSV;
     if (!studiesUrl) { _log('CRIO Studies CSV URL not configured'); return; }
     try {
       var rows = await fetchCSV(studiesUrl);
@@ -10903,6 +10911,27 @@ function _getVisitsURL() {
   return LIVE_URL1;
 }
 
+// ═══ BQ FALLBACK: fetch with automatic Looker fallback ═══
+// If BQ fetch fails or returns < minRows, silently falls back to Looker
+async function _fetchWithFallback(bqUrl, lookerUrl, label, minRows) {
+  minRows = minRows || 5;
+  if (!bqUrl || bqUrl === lookerUrl) return fetchCSV(lookerUrl);
+  try {
+    var rows = await fetchCSV(bqUrl);
+    if (rows.length >= minRows) {
+      _log('CRP BQ: ' + label + ' loaded ' + rows.length + ' rows from BigQuery');
+      return rows;
+    }
+    _log('CRP BQ: ' + label + ' returned only ' + rows.length + ' rows — falling back to Looker');
+  } catch(e) {
+    console.warn('CRP BQ: ' + label + ' fetch failed (' + e.message + ') — falling back to Looker');
+  }
+  var fallback = await fetchCSV(lookerUrl);
+  _log('CRP BQ: ' + label + ' fallback loaded ' + fallback.length + ' rows from Looker');
+  setHealthChip('dh-crio', 'warn', 'CRIO (Looker fallback)');
+  return fallback;
+}
+
 // ════════════════════════════════════════════════════════════
 // BQ vs Legacy Cancellation Data Comparison Tool
 // Usage: paste BQ CSV URL and run from console:
@@ -12290,8 +12319,8 @@ async function _crpInit() {
     let _lastAuditRows = [];
     try {
       const [rows1, legacyCancels, auditRows] = await Promise.all([
-        fetchCSV(_getVisitsURL()),
-        fetchCSV(_getCancelURL(), true).catch(() => []),
+        _fetchWithFallback(_getVisitsURL(), LIVE_URL1, 'Visits', 10),
+        _fetchWithFallback(_getCancelURL(), LIVE_URL2_LEGACY, 'Cancels', 5).catch(() => []),
         fetchCSV(AUDIT_LOG_URL).catch(e => { console.warn('CRP: Audit log fetch failed, continuing without:', e.message); setHealthChip('dh-audit','fail','Audit Log'); return []; })
       ]);
       _lastCrioRows = rows1;
@@ -12329,8 +12358,8 @@ async function _crpInit() {
       await new Promise(r => setTimeout(r, CRP_CONFIG.RETRY_DELAY));
       try {
         const [rows1b, legacyB, auditB] = await Promise.all([
-          fetchCSV(_getVisitsURL()),
-          fetchCSV(_getCancelURL(), true).catch(() => []),
+          _fetchWithFallback(_getVisitsURL(), LIVE_URL1, 'Visits-retry', 10),
+          _fetchWithFallback(_getCancelURL(), LIVE_URL2_LEGACY, 'Cancels-retry', 5).catch(() => []),
           fetchCSV(AUDIT_LOG_URL).catch(() => [])
         ]);
         _lastCrioRows = rows1b;
@@ -12462,8 +12491,8 @@ async function _crpInit() {
     // Phase 1: CRIO data (critical)
     try {
       const [rows1, legacyCancels, auditRows] = await Promise.all([
-        fetchCSV(_getVisitsURL()),
-        fetchCSV(_getCancelURL(), true).catch(() => []),
+        _fetchWithFallback(_getVisitsURL(), LIVE_URL1, 'Visits-auto', 10),
+        _fetchWithFallback(_getCancelURL(), LIVE_URL2_LEGACY, 'Cancels-auto', 5).catch(() => []),
         fetchCSV(AUDIT_LOG_URL).catch(() => [])
       ]);
       const newData = processLiveData(rows1, legacyCancels, auditRows);

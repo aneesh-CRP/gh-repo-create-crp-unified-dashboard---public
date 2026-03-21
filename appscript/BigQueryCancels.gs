@@ -368,13 +368,196 @@ function _buildVisitsQuery() {
     'ORDER BY ca.start ASC';
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// CRIO STUDIES SYNC — replaces ClickUp CRIO_STUDIES_CSV
+// ═══════════════════════════════════════════════════════════════════
+
+function syncBigQueryStudies() {
+  var query = _buildStudiesQuery();
+  Logger.log('Running BigQuery studies sync...');
+
+  var result;
+  try {
+    result = BigQuery.Jobs.query({ query: query, useLegacySql: false, maxResults: BQ_CONFIG.MAX_ROWS, timeoutMs: 60000 }, BQ_CONFIG.PROJECT_ID);
+  } catch (e) {
+    Logger.log('BigQuery studies query failed: ' + e.message);
+    throw e;
+  }
+
+  var allRows = result.rows || [];
+  while (result.pageToken) {
+    result = BigQuery.Jobs.getQueryResults(BQ_CONFIG.PROJECT_ID, result.jobReference.jobId, { pageToken: result.pageToken, maxResults: BQ_CONFIG.MAX_ROWS });
+    allRows = allRows.concat(result.rows || []);
+  }
+
+  var HEADER_MAP = {
+    'study_key': 'study_key', 'protocol_number': 'protocol_number', 'study_name': 'study_name',
+    'status': 'status', 'coordinator': 'coordinator', 'investigator': 'investigator',
+    'indication': 'indication', 'subject_count': 'subject_count', 'target_enrollment': 'target_enrollment',
+    'sponsor': 'sponsor', 'phase': 'phase', 'date_created': 'date_created', 'last_updated': 'last_updated',
+    'start_date': 'start_date', 'end_date': 'end_date', 'external_study_number': 'external_study_number',
+    'site_name': 'site_name', 'site_key': 'site_key', 'total_revenue': 'total_revenue',
+    'revenue_subjects': 'revenue_subjects', 'snapshot_date': 'snapshot_date'
+  };
+
+  var schema = result.schema.fields.map(function(f) { return f.name; });
+  var headers = schema.map(function(name) { return HEADER_MAP[name] || name; });
+  var data = allRows.map(function(row) { return row.f.map(function(cell) { return cell.v || ''; }); });
+
+  Logger.log('Studies query returned ' + data.length + ' rows');
+
+  var ss = SpreadsheetApp.openById(BQ_CONFIG.SHEET_ID);
+  var sheet = ss.getSheetByName('BQ_Studies');
+  if (!sheet) sheet = ss.insertSheet('BQ_Studies');
+
+  var neededRows = Math.max(data.length + 4, 2);
+  var neededCols = headers.length;
+  if (sheet.getMaxRows() > neededRows) sheet.deleteRows(neededRows + 1, sheet.getMaxRows() - neededRows);
+  if (sheet.getMaxColumns() > neededCols) sheet.deleteColumns(neededCols + 1, sheet.getMaxColumns() - neededCols);
+
+  sheet.clear();
+  sheet.getRange(1, 1, neededRows, neededCols).setNumberFormat('@');
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  if (data.length > 0) sheet.getRange(2, 1, data.length, headers.length).setValues(data);
+  sheet.getRange(1, 1).setNote('Last synced: ' + new Date().toISOString());
+
+  Logger.log('BQ Studies synced: ' + data.length + ' rows, ' + headers.length + ' columns');
+  return data.length;
+}
+
+function _buildStudiesQuery() {
+  var project = BQ_CONFIG.PROJECT_ID;
+  var ds = BQ_CONFIG.DATASET;
+
+  return 'SELECT ' +
+    'CAST(st.study_key AS STRING) AS study_key, ' +
+    'COALESCE(st.protocol_number, \'\') AS protocol_number, ' +
+    'CASE ' +
+    '  WHEN COALESCE(st.nickname, \'\') != \'\' THEN st.nickname ' +
+    '  WHEN spon.name IS NOT NULL AND COALESCE(st.protocol_number, \'\') != \'\' THEN CONCAT(spon.name, \' - \', st.protocol_number) ' +
+    '  WHEN COALESCE(st.protocol_number, \'\') != \'\' THEN st.protocol_number ' +
+    '  ELSE \'\' ' +
+    'END AS study_name, ' +
+    'CASE st.status ' +
+    '  WHEN 0 THEN \'Pre-Site Qualification\' ' +
+    '  WHEN 1 THEN \'Site Qualification\' ' +
+    '  WHEN 2 THEN \'Start Up\' ' +
+    '  WHEN 3 THEN \'Enrolling\' ' +
+    '  WHEN 4 THEN \'Maintenance\' ' +
+    '  WHEN 5 THEN \'Closeout\' ' +
+    '  WHEN 6 THEN \'Closed\' ' +
+    '  ELSE CAST(st.status AS STRING) ' +
+    'END AS status, ' +
+    // Coordinator — first user linked to study via study_team or creator
+    '\'\' AS coordinator, ' +
+    '\'\' AS investigator, ' +
+    'COALESCE(st.indications, \'\') AS indication, ' +
+    '(SELECT COUNT(*) FROM `' + project + '.' + ds + '.subject` sub WHERE sub.study_key = st.study_key AND sub._fivetran_deleted = false) AS subject_count, ' +
+    'COALESCE(CAST(st.target_enrollment AS STRING), \'\') AS target_enrollment, ' +
+    'COALESCE(spon.name, \'\') AS sponsor, ' +
+    'COALESCE(ct.phase, \'\') AS phase, ' +
+    'FORMAT_DATETIME(\'%Y-%m-%d\', st.date_created) AS date_created, ' +
+    'FORMAT_DATETIME(\'%Y-%m-%d\', st.last_updated) AS last_updated, ' +
+    '\'\' AS start_date, ' +
+    '\'\' AS end_date, ' +
+    'COALESCE(st.external_id, \'\') AS external_study_number, ' +
+    'COALESCE(si.name, \'\') AS site_name, ' +
+    'CAST(st.site_key AS STRING) AS site_key, ' +
+    // Revenue — not available in BQ Fivetran sync (no study_payment table)
+    '0 AS total_revenue, ' +
+    '0 AS revenue_subjects, ' +
+    'FORMAT_DATETIME(\'%Y-%m-%d\', CURRENT_DATETIME()) AS snapshot_date ' +
+    'FROM `' + project + '.' + ds + '.study` st ' +
+    'LEFT JOIN `' + project + '.' + ds + '.sponsor` spon ON st.sponsor_key = spon.sponsor_key ' +
+    'LEFT JOIN `' + project + '.' + ds + '.site` si ON st.site_key = si.site_key ' +
+    'LEFT JOIN `' + project + '.' + ds + '.clinical_trial` ct ON st.clinical_trial_key = ct.clinical_trial_key ' +
+    'WHERE st._fivetran_deleted = false ' +
+    'AND st.is_active = 1 ' +
+    'ORDER BY st.study_key';
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CRIO SUBJECTS SYNC — replaces ClickUp CRIO_SUBJECTS_CSV
+// ═══════════════════════════════════════════════════════════════════
+
+function syncBigQuerySubjects() {
+  var query = _buildSubjectsQuery();
+  Logger.log('Running BigQuery subjects sync...');
+
+  var result;
+  try {
+    result = BigQuery.Jobs.query({ query: query, useLegacySql: false, maxResults: BQ_CONFIG.MAX_ROWS, timeoutMs: 60000 }, BQ_CONFIG.PROJECT_ID);
+  } catch (e) {
+    Logger.log('BigQuery subjects query failed: ' + e.message);
+    throw e;
+  }
+
+  var allRows = result.rows || [];
+  while (result.pageToken) {
+    result = BigQuery.Jobs.getQueryResults(BQ_CONFIG.PROJECT_ID, result.jobReference.jobId, { pageToken: result.pageToken, maxResults: BQ_CONFIG.MAX_ROWS });
+    allRows = allRows.concat(result.rows || []);
+  }
+
+  var schema = result.schema.fields.map(function(f) { return f.name; });
+  var data = allRows.map(function(row) { return row.f.map(function(cell) { return cell.v || ''; }); });
+
+  Logger.log('Subjects query returned ' + data.length + ' rows');
+
+  var ss = SpreadsheetApp.openById(BQ_CONFIG.SHEET_ID);
+  var sheet = ss.getSheetByName('BQ_Subjects');
+  if (!sheet) sheet = ss.insertSheet('BQ_Subjects');
+
+  var neededRows = Math.max(data.length + 4, 2);
+  var neededCols = schema.length;
+  if (sheet.getMaxRows() > neededRows) sheet.deleteRows(neededRows + 1, sheet.getMaxRows() - neededRows);
+  if (sheet.getMaxColumns() > neededCols) sheet.deleteColumns(neededCols + 1, sheet.getMaxColumns() - neededCols);
+
+  sheet.clear();
+  sheet.getRange(1, 1, neededRows, neededCols).setNumberFormat('@');
+  sheet.getRange(1, 1, 1, schema.length).setValues([schema]);
+  if (data.length > 0) sheet.getRange(2, 1, data.length, schema.length).setValues(data);
+  sheet.getRange(1, 1).setNote('Last synced: ' + new Date().toISOString());
+
+  Logger.log('BQ Subjects synced: ' + data.length + ' rows, ' + schema.length + ' columns');
+  return data.length;
+}
+
+function _buildSubjectsQuery() {
+  var project = BQ_CONFIG.PROJECT_ID;
+  var ds = BQ_CONFIG.DATASET;
+
+  return 'SELECT ' +
+    'CAST(sub.subject_key AS STRING) AS subject_id, ' +
+    'CAST(sub.study_key AS STRING) AS study_key, ' +
+    'COALESCE(st.protocol_number, \'\') AS protocol_number, ' +
+    'CASE sub.status ' +
+    '  WHEN 1 THEN \'Interested\' ' +
+    '  WHEN 2 THEN \'Prequalified\' ' +
+    '  WHEN 3 THEN \'No Show/Cancelled V1\' ' +
+    '  WHEN 4 THEN \'Scheduled V1\' ' +
+    '  WHEN 10 THEN \'Screening\' ' +
+    '  WHEN 11 THEN \'Enrolled\' ' +
+    '  WHEN 12 THEN \'Screen Fail\' ' +
+    '  WHEN 13 THEN \'Discontinued\' ' +
+    '  WHEN 20 THEN \'Completed\' ' +
+    '  ELSE CAST(sub.status AS STRING) ' +
+    'END AS status ' +
+    'FROM `' + project + '.' + ds + '.subject` sub ' +
+    'JOIN `' + project + '.' + ds + '.study` st ON sub.study_key = st.study_key ' +
+    'WHERE sub._fivetran_deleted = false ' +
+    'AND st.is_active = 1 ' +
+    'ORDER BY sub.study_key, sub.subject_key';
+}
+
 /**
- * Runs both syncs in sequence. Use this as the single trigger target.
+ * Runs all syncs in sequence. Use this as the single trigger target.
  */
 function syncAllBigQuery() {
   _ensureAllTriggers();
   syncBigQueryCancels();
   syncBigQueryVisits();
+  syncBigQueryStudies();
+  syncBigQuerySubjects();
   Logger.log('All BQ syncs complete');
 }
 
