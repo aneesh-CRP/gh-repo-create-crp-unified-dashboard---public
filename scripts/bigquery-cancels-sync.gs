@@ -237,8 +237,7 @@ function _buildCancelQuery() {
     'END AS appointment_type, ' +
     '\'cancelled\' AS appointment_status, ' +
     'CAST(aal.calendar_appointment_key AS STRING) AS calendar_appointment_key, ' +
-    // Investigator: PI from study_user role=1 (not the coordinator/canceller)
-    'COALESCE((SELECT CONCAT(u.first_name, \' \', u.last_name) FROM `' + project + '.' + ds + '.study_user` su JOIN `' + project + '.' + ds + '.user` u ON su.user_key = u.user_key WHERE su.study_key = aal.study_key AND su.role = 1 AND su.is_role_leader = 1 AND su._fivetran_deleted = false LIMIT 1), \'\') AS investigator, ' +
+    'COALESCE(CONCAT(pi_u.first_name, \' \', pi_u.last_name), \'\') AS investigator, ' +
     'FORMAT_DATETIME(\'%Y-%m-%d\', CURRENT_DATETIME()) AS snapshot_date ' +
     'FROM `' + project + '.' + ds + '.appointment_audit_log` aal ' +
     'LEFT JOIN `' + project + '.' + ds + '.calendar_appointment` ca ON aal.calendar_appointment_key = ca.calendar_appointment_key ' +
@@ -249,7 +248,8 @@ function _buildCancelQuery() {
     'LEFT JOIN `' + project + '.' + ds + '.study_visit` sv ON aal.study_visit_key = sv.study_visit_key ' +
     'LEFT JOIN `' + project + '.' + ds + '.user` coord ON ca.creator_key = coord.user_key ' +
     'LEFT JOIN `' + project + '.' + ds + '.user` by_user ON aal.by_user_key = by_user.user_key ' +
-    'LEFT JOIN `' + project + '.' + ds + '.user` inv ON aal.by_user_key = inv.user_key ' +
+    'LEFT JOIN `' + project + '.' + ds + '.study_user` pi_su ON aal.study_key = pi_su.study_key AND pi_su.role = 1 AND pi_su.is_role_leader = 1 AND pi_su._fivetran_deleted = false ' +
+    'LEFT JOIN `' + project + '.' + ds + '.user` pi_u ON pi_su.user_key = pi_u.user_key ' +
     'WHERE aal.change_type = 4 ' +
     'AND aal.date_created >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL ' + days + ' DAY) ' +
     'AND aal.subject_key IS NOT NULL ' +
@@ -434,8 +434,8 @@ function _buildVisitsQuery() {
     '  WHEN 3 THEN \'Block\' ' +
     '  ELSE \'\' ' +
     'END AS appointment_type, ' +
-    // Investigator (PI from study_user role=1)
-    'COALESCE((SELECT CONCAT(u.first_name, \' \', u.last_name) FROM `' + project + '.' + ds + '.study_user` su JOIN `' + project + '.' + ds + '.user` u ON su.user_key = u.user_key WHERE su.study_key = ca.study_key AND su.role = 1 AND su.is_role_leader = 1 AND su._fivetran_deleted = false LIMIT 1), \'\') AS investigator, ' +
+    // Investigator (PI from study_user role=1 via JOIN)
+    'COALESCE(CONCAT(pi_u.first_name, \' \', pi_u.last_name), \'\') AS investigator, ' +
     // Snapshot date
     'FORMAT_DATETIME(\'%Y-%m-%d\', CURRENT_DATETIME()) AS snapshot_date ' +
     // FROM + JOINs
@@ -446,6 +446,8 @@ function _buildVisitsQuery() {
     'LEFT JOIN `' + project + '.' + ds + '.site` si ON ca.site_key = si.site_key ' +
     'LEFT JOIN `' + project + '.' + ds + '.study_visit` sv ON ca.study_visit_key = sv.study_visit_key ' +
     'LEFT JOIN `' + project + '.' + ds + '.user` coord ON ca.creator_key = coord.user_key ' +
+    'LEFT JOIN `' + project + '.' + ds + '.study_user` pi_su ON ca.study_key = pi_su.study_key AND pi_su.role = 1 AND pi_su.is_role_leader = 1 AND pi_su._fivetran_deleted = false ' +
+    'LEFT JOIN `' + project + '.' + ds + '.user` pi_u ON pi_su.user_key = pi_u.user_key ' +
     // WHERE — active studies, date range, non-test
     'WHERE ca.subject_key IS NOT NULL ' +
     'AND st.is_active = 1 ' +
@@ -471,20 +473,23 @@ function _buildStudiesQuery() {
   var ds = BQ_CONFIG.DATASET;
   var t = '`' + project + '.' + ds + '.';
 
-  return 'SELECT ' +
+  // Pre-aggregate coordinator, PI, and subject counts to avoid correlated subqueries
+  return 'WITH ' +
+    'coord_first AS (SELECT study_key, MIN(su_key) AS su_key FROM (SELECT study_key, study_user_key AS su_key FROM ' + t + 'study_user` WHERE role = 3 AND _fivetran_deleted = false) GROUP BY study_key), ' +
+    'pi_leaders AS (SELECT study_key, MIN(user_key) AS user_key FROM ' + t + 'study_user` WHERE role = 1 AND is_role_leader = 1 AND _fivetran_deleted = false GROUP BY study_key), ' +
+    'sub_counts AS (SELECT study_key, COUNT(*) AS cnt FROM ' + t + 'subject` WHERE _fivetran_deleted = false GROUP BY study_key) ' +
+    'SELECT ' +
     'CAST(st.study_key AS STRING) AS study_key, ' +
     'COALESCE(st.protocol_number, \'\') AS protocol_number, ' +
     'CASE WHEN COALESCE(st.nickname, \'\') != \'\' THEN st.nickname ' +
     '  WHEN spon.name IS NOT NULL AND COALESCE(st.protocol_number, \'\') != \'\' THEN CONCAT(spon.name, \' - \', st.protocol_number) ' +
     '  WHEN COALESCE(st.protocol_number, \'\') != \'\' THEN st.protocol_number ELSE \'\' END AS study_name, ' +
     'CASE st.status WHEN 0 THEN \'Pre-Site Qualification\' WHEN 1 THEN \'Site Qualification\' WHEN 2 THEN \'Start Up\' WHEN 3 THEN \'Enrolling\' WHEN 4 THEN \'Maintenance\' WHEN 5 THEN \'Closeout\' WHEN 6 THEN \'Closed\' ELSE CAST(st.status AS STRING) END AS status, ' +
-    // Coordinator: first role=3 user per study (no leaders flagged, so pick earliest created)
-    'COALESCE((SELECT CONCAT(u.first_name, \' \', u.last_name) FROM ' + t + 'study_user` su JOIN ' + t + 'user` u ON su.user_key = u.user_key WHERE su.study_key = st.study_key AND su.role = 3 AND su._fivetran_deleted = false ORDER BY su.date_created ASC LIMIT 1), \'\') AS coordinator, ' +
-    // Investigator: role=1 lead PI per study
-    'COALESCE((SELECT CONCAT(u.first_name, \' \', u.last_name) FROM ' + t + 'study_user` su JOIN ' + t + 'user` u ON su.user_key = u.user_key WHERE su.study_key = st.study_key AND su.role = 1 AND su.is_role_leader = 1 AND su._fivetran_deleted = false LIMIT 1), sd.investigator_name, \'\') AS investigator, ' +
+    'COALESCE(CONCAT(coord_u.first_name, \' \', coord_u.last_name), \'\') AS coordinator, ' +
+    'COALESCE(CONCAT(pi_u.first_name, \' \', pi_u.last_name), sd.investigator_name, \'\') AS investigator, ' +
     'COALESCE(st.indications, sd.primary_indication, \'\') AS indication, ' +
     'COALESCE(sd.specialty, \'\') AS specialty, ' +
-    '(SELECT COUNT(*) FROM ' + t + 'subject` sub WHERE sub.study_key = st.study_key AND sub._fivetran_deleted = false) AS subject_count, ' +
+    'COALESCE(sc.cnt, 0) AS subject_count, ' +
     'COALESCE(CAST(st.target_enrollment AS STRING), \'\') AS target_enrollment, ' +
     'COALESCE(spon.name, \'\') AS sponsor, ' +
     'CASE ct.phase WHEN 1 THEN \'Phase I\' WHEN 2 THEN \'Phase II\' WHEN 3 THEN \'Phase III\' WHEN 4 THEN \'Phase IV\' ELSE \'\' END AS phase, ' +
@@ -504,6 +509,12 @@ function _buildStudiesQuery() {
     'LEFT JOIN ' + t + 'clinical_trial` ct ON st.clinical_trial_key = ct.clinical_trial_key ' +
     'LEFT JOIN ' + t + 'study_details` sd ON st.study_key = sd.study_key ' +
     'LEFT JOIN ' + t + 'study_finance` sf ON st.study_key = sf.study_key ' +
+    'LEFT JOIN coord_first cf ON st.study_key = cf.study_key ' +
+    'LEFT JOIN ' + t + 'study_user` coord_su ON cf.su_key = coord_su.study_user_key ' +
+    'LEFT JOIN ' + t + 'user` coord_u ON coord_su.user_key = coord_u.user_key ' +
+    'LEFT JOIN pi_leaders pl ON st.study_key = pl.study_key ' +
+    'LEFT JOIN ' + t + 'user` pi_u ON pl.user_key = pi_u.user_key ' +
+    'LEFT JOIN sub_counts sc ON st.study_key = sc.study_key ' +
     'WHERE st._fivetran_deleted = false AND st.is_active = 1 ' +
     'ORDER BY st.study_key';
 }
