@@ -2137,6 +2137,7 @@ function mkChart(id, config) {
 }
 
 function buildReasonChart() {
+  if (!DATA || !DATA.cancelReasons || !DATA.cancelReasons.length) return;
   const top6 = DATA.cancelReasons.slice(0, 6);
   mkChart('reasonChart', {
     type: 'doughnut',
@@ -2173,6 +2174,7 @@ function buildReasonChart() {
 }
 
 function buildSiteChart() {
+  if (!DATA || !DATA.sites || !DATA.sites.length) return;
   const s = DATA.sites;
   mkChart('siteChart', {
     type: 'bar',
@@ -2853,6 +2855,7 @@ function injectVisitConfirmButtons() {
 // ═══════════════════════════════════════════════════
 function buildHorizon() {
   const grid = document.getElementById('horizon-grid');
+  if (!grid || !DATA || !DATA.cancelWeekly || !DATA.upcomingWeekly) return;
   const pastWeeks = DATA.cancelWeekly.slice(-4);
   const futureWeeks = DATA.upcomingWeekly.slice(0, 4);
   let html = '';
@@ -4481,7 +4484,9 @@ function buildMergedStudies(agingInv, agingAp, uninvoiced) {
     const inv = agingInv.find(r => r.study === s);
     const ap = agingAp.find(r => r.study === s);
     const un = uninvoiced.find(r => r.study === s);
-    return { study: code, full: s, invAR: inv ? Math.round(sumBuckets(inv) * 100) / 100 : 0, apAR: ap ? Math.round(sumBuckets(ap) * 100) / 100 : 0, uninvoiced: un ? un.amount : 0, status: 'Active' };
+    var crioMatch = (typeof CRIO_STUDIES_DATA !== 'undefined') && CRIO_STUDIES_DATA.find(function(cs) { return cs.protocol_number === code || s.includes(cs.protocol_number); });
+    var enrollStatus = crioMatch ? ({'ENROLLING':'Enrolling','MAINTENANCE':'Maintenance','STARTUP':'Startup','PRECLOSED':'Pre-Closed','CLOSED':'Closed','SUSPENDED':'Suspended','WITHDRAWN':'Withdrawn','CONFIGURING':'Configuring'}[crioMatch.status] || crioMatch.status || 'Active') : 'Active';
+    return { study: code, full: s, invAR: inv ? Math.round(sumBuckets(inv) * 100) / 100 : 0, apAR: ap ? Math.round(sumBuckets(ap) * 100) / 100 : 0, uninvoiced: un ? un.amount : 0, status: enrollStatus, enrolled: crioMatch ? crioMatch.subject_count : 0 };
   });
 }
 
