@@ -217,10 +217,13 @@ const FEEDS = {
       CASE aal.appointment_type WHEN 0 THEN 'Regular Visit' WHEN 1 THEN 'Ad Hoc Visit' WHEN 2 THEN 'General Appointment' WHEN 3 THEN 'Block' ELSE '' END AS appointment_type,
       'cancelled' AS appointment_status,
       CAST(aal.calendar_appointment_key AS STRING) AS calendar_appointment_key,
-      COALESCE((SELECT CONCAT(u.first_name, ' ', u.last_name) FROM ${tbl('study_user')} su JOIN ${tbl('user')} u ON su.user_key = u.user_key WHERE su.study_key = aal.study_key AND su.role = 1 AND su.is_role_leader = 1 AND su._fivetran_deleted = false LIMIT 1), '') AS investigator,
+      COALESCE(pi.name, '') AS investigator,
       FORMAT_DATETIME('%Y-%m-%d', CURRENT_DATETIME()) AS snapshot_date
     FROM ${tbl('appointment_audit_log')} aal
     LEFT JOIN ${tbl('study')} st ON aal.study_key = st.study_key
+    LEFT JOIN (SELECT su.study_key, CONCAT(u.first_name, ' ', u.last_name) AS name
+      FROM ${tbl('study_user')} su JOIN ${tbl('user')} u ON su.user_key = u.user_key
+      WHERE su.role = 1 AND su.is_role_leader = 1 AND su._fivetran_deleted = false) pi ON aal.study_key = pi.study_key
     LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
     LEFT JOIN ${tbl('site')} si ON aal.site_key = si.site_key
     LEFT JOIN ${tbl('subject')} sub ON aal.subject_key = sub.subject_key
@@ -228,7 +231,6 @@ const FEEDS = {
     LEFT JOIN ${tbl('calendar_appointment')} ca ON aal.calendar_appointment_key = ca.calendar_appointment_key
     LEFT JOIN ${tbl('user')} coord ON ca.creator_key = coord.user_key
     LEFT JOIN ${tbl('user')} by_user ON aal.by_user_key = by_user.user_key
-    LEFT JOIN ${tbl('user')} inv ON aal.by_user_key = inv.user_key
     WHERE aal.change_type = 4
       AND aal.date_created >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 90 DAY)
       AND st.is_active = 1
@@ -244,18 +246,27 @@ const FEEDS = {
     }
   },
 
-  // ── 3. Studies ──
+  // ── 3. Studies (uses CTEs to avoid correlated subqueries) ──
   studies: {
-    query: () => `SELECT
+    query: () => `WITH
+      coord_leaders AS (SELECT study_key, ARRAY_AGG(name ORDER BY is_leader DESC, date_created ASC LIMIT 1)[OFFSET(0)] AS name FROM (
+        SELECT su.study_key, CONCAT(u.first_name, ' ', u.last_name) AS name, su.is_role_leader AS is_leader, su.date_created
+        FROM ${tbl('study_user')} su JOIN ${tbl('user')} u ON su.user_key = u.user_key
+        WHERE su.role = 3 AND su._fivetran_deleted = false) GROUP BY study_key),
+      pi_leaders AS (SELECT su.study_key, CONCAT(u.first_name, ' ', u.last_name) AS name
+        FROM ${tbl('study_user')} su JOIN ${tbl('user')} u ON su.user_key = u.user_key
+        WHERE su.role = 1 AND su.is_role_leader = 1 AND su._fivetran_deleted = false),
+      sub_counts AS (SELECT study_key, COUNT(*) AS cnt FROM ${tbl('subject')} WHERE _fivetran_deleted = false GROUP BY study_key)
+    SELECT
       CAST(st.study_key AS STRING) AS study_key,
       COALESCE(st.protocol_number, '') AS protocol_number,
       ${STUDY_NAME_SQL} AS study_name,
       ${STUDY_STATUS_SQL} AS status,
-      COALESCE((SELECT CONCAT(u.first_name, ' ', u.last_name) FROM ${tbl('study_user')} su JOIN ${tbl('user')} u ON su.user_key = u.user_key WHERE su.study_key = st.study_key AND su.role = 3 AND su.is_role_leader = 1 AND su._fivetran_deleted = false LIMIT 1), '') AS coordinator,
-      COALESCE((SELECT CONCAT(u.first_name, ' ', u.last_name) FROM ${tbl('study_user')} su JOIN ${tbl('user')} u ON su.user_key = u.user_key WHERE su.study_key = st.study_key AND su.role = 1 AND su.is_role_leader = 1 AND su._fivetran_deleted = false LIMIT 1), sd.investigator_name, '') AS investigator,
+      COALESCE(cl.name, '') AS coordinator,
+      COALESCE(pi.name, sd.investigator_name, '') AS investigator,
       COALESCE(st.indications, sd.primary_indication, '') AS indication,
       COALESCE(sd.specialty, '') AS specialty,
-      (SELECT COUNT(*) FROM ${tbl('subject')} sub WHERE sub.study_key = st.study_key AND sub._fivetran_deleted = false) AS subject_count,
+      COALESCE(sc.cnt, 0) AS subject_count,
       COALESCE(CAST(st.target_enrollment AS STRING), '') AS target_enrollment,
       COALESCE(spon.name, '') AS sponsor,
       ${PHASE_SQL} AS phase,
@@ -274,6 +285,9 @@ const FEEDS = {
     LEFT JOIN ${tbl('site')} si ON st.site_key = si.site_key
     LEFT JOIN ${tbl('clinical_trial')} ct ON st.clinical_trial_key = ct.clinical_trial_key
     LEFT JOIN ${tbl('study_details')} sd ON st.study_key = sd.study_key
+    LEFT JOIN coord_leaders cl ON st.study_key = cl.study_key
+    LEFT JOIN pi_leaders pi ON st.study_key = pi.study_key
+    LEFT JOIN sub_counts sc ON st.study_key = sc.study_key
     LEFT JOIN ${tbl('study_finance')} sf ON st.study_key = sf.study_key
     WHERE st._fivetran_deleted = false AND st.is_active = 1
     ORDER BY st.study_key`

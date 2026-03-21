@@ -475,8 +475,8 @@ function _buildStudiesQuery() {
     '  WHEN spon.name IS NOT NULL AND COALESCE(st.protocol_number, \'\') != \'\' THEN CONCAT(spon.name, \' - \', st.protocol_number) ' +
     '  WHEN COALESCE(st.protocol_number, \'\') != \'\' THEN st.protocol_number ELSE \'\' END AS study_name, ' +
     'CASE st.status WHEN 0 THEN \'Pre-Site Qualification\' WHEN 1 THEN \'Site Qualification\' WHEN 2 THEN \'Start Up\' WHEN 3 THEN \'Enrolling\' WHEN 4 THEN \'Maintenance\' WHEN 5 THEN \'Closeout\' WHEN 6 THEN \'Closed\' ELSE CAST(st.status AS STRING) END AS status, ' +
-    // Coordinator: role=3 lead coordinator per study
-    'COALESCE((SELECT CONCAT(u.first_name, \' \', u.last_name) FROM ' + t + 'study_user` su JOIN ' + t + 'user` u ON su.user_key = u.user_key WHERE su.study_key = st.study_key AND su.role = 3 AND su.is_role_leader = 1 AND su._fivetran_deleted = false LIMIT 1), \'\') AS coordinator, ' +
+    // Coordinator: first role=3 user per study (no leaders flagged, so pick earliest created)
+    'COALESCE((SELECT CONCAT(u.first_name, \' \', u.last_name) FROM ' + t + 'study_user` su JOIN ' + t + 'user` u ON su.user_key = u.user_key WHERE su.study_key = st.study_key AND su.role = 3 AND su._fivetran_deleted = false ORDER BY su.date_created ASC LIMIT 1), \'\') AS coordinator, ' +
     // Investigator: role=1 lead PI per study
     'COALESCE((SELECT CONCAT(u.first_name, \' \', u.last_name) FROM ' + t + 'study_user` su JOIN ' + t + 'user` u ON su.user_key = u.user_key WHERE su.study_key = st.study_key AND su.role = 1 AND su.is_role_leader = 1 AND su._fivetran_deleted = false LIMIT 1), sd.investigator_name, \'\') AS investigator, ' +
     'COALESCE(st.indications, sd.primary_indication, \'\') AS indication, ' +
