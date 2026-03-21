@@ -718,6 +718,183 @@ const FEEDS = {
 };
 
 // ═══════════════════════════════════════════════════════════
+// CLICKUP API FEEDS — Referrals, Campaigns, Medical Records
+// ═══════════════════════════════════════════════════════════
+
+const CLICKUP_TOKEN = process.env.CLICKUP_TOKEN || '';
+const CLICKUP_API = 'https://api.clickup.com/api/v2';
+
+const REFERRAL_LISTS = [
+  { id: '901413202462', name: 'Dr. Modarressi', source_type: 'physician' },
+  { id: '901413613356', name: 'Connolly Dermatology', source_type: 'physician' },
+  { id: '901413613360', name: 'Dr. Savita Singh', source_type: 'physician' },
+  { id: '901414013590', name: 'Center for Primary Care Medicine', source_type: 'physician' },
+];
+const CAMPAIGN_LIST_ID = '901407896291';
+const MED_RECORDS_FOLDER_ID = '90147290121';
+
+const PIPELINE_MAP = {
+  'pending provider outreach': 'New Lead', 'recruiter to contact': 'New Lead',
+  'schedule directly': 'Contacted', 'participant interested': 'Contacted', 'in contact': 'Contacted',
+  'scheduled pre-screening': 'Pre-Screening', 'scheduled screening': 'Screening',
+  'screening completed': 'Screened', 'randomization completed': 'Enrolled',
+  'dnq': 'DNQ', 'unable to reach': 'Lost', 'screen fail': 'Screen Fail',
+  'complete': 'Enrolled', 'pending release': 'New Lead', 'under review': 'New Lead',
+  'not interested': 'Lost', 'ready to schedule': 'Contacted', 'no show': 'Lost',
+  'in screening': 'Screening', 'scheduled': 'Screening', 'enrolled': 'Enrolled',
+};
+const CLOSED_STAGES = new Set(['DNQ', 'Screen Fail', 'Lost']);
+const SOURCE_RENAME = { 'Practice': 'Princeton CardioMetabolic' };
+
+const MED_STATUS_MAP = {
+  'unable to reach': 'Unable to Reach', 'not interested': 'Not Interested',
+  'pending release': 'Pending Release', 'under review': 'Under Review', 'dnq': 'DNQ',
+  'ready to schedule': 'Ready to Schedule', 'enrolled': 'Enrolled',
+  'in screening': 'In Screening', 'screen fail': 'Screen Fail',
+  'no show': 'No Show', 'no show not rescheduled': 'No Show',
+  'complete': 'Complete', 'discontinued': 'Discontinued', 'cancelled': 'Cancelled',
+  'in another study': 'In Another Study', 'withdrawn': 'Withdrawn',
+};
+['visit 0','visit 1','visit 2','visit 3','visit 4','visit 5','visit 6','visit 7'].forEach(
+  v => { MED_STATUS_MAP[v + ' scheduled'] = 'Visit Scheduled'; });
+const MED_ACTIVE = new Set(['Pending Release','Under Review','Ready to Schedule','Visit Scheduled','In Screening','Enrolled']);
+const MED_CLOSED = new Set(['DNQ','Screen Fail','Not Interested','Unable to Reach','No Show','Complete','Discontinued','Cancelled','In Another Study','Withdrawn']);
+
+async function clickupFetch(path) {
+  if (!CLICKUP_TOKEN) throw new Error('No CLICKUP_TOKEN configured');
+  return new Promise((resolve, reject) => {
+    const u = new URL(CLICKUP_API + path);
+    const req = https.request({ hostname: u.hostname, path: u.pathname + u.search, method: 'GET',
+      headers: { 'Authorization': CLICKUP_TOKEN }
+    }, res => { let d = ''; res.on('data', c => d += c); res.on('end', () => {
+      try { resolve(JSON.parse(d)); } catch(e) { reject(new Error('ClickUp parse error')); }
+    }); });
+    req.on('error', reject); req.end();
+  });
+}
+
+async function fetchAllClickUpTasks(listId) {
+  let all = [], page = 0;
+  while (true) {
+    const d = await clickupFetch('/list/' + listId + '/task?page=' + page + '&limit=100&include_closed=true');
+    all = all.concat(d.tasks || []);
+    if (!d.tasks || d.tasks.length < 100) break;
+    page++;
+  }
+  return all;
+}
+
+function parseCustomFields(fields) {
+  const obj = {};
+  (fields || []).forEach(f => {
+    if (f.value != null) obj[f.name] = typeof f.value === 'object' ? JSON.stringify(f.value) : String(f.value);
+  });
+  return obj;
+}
+
+// ── ClickUp Feed Handlers ──
+
+async function fetchReferrals() {
+  const rows = [];
+  for (const list of REFERRAL_LISTS) {
+    const tasks = await fetchAllClickUpTasks(list.id);
+    for (const t of tasks) {
+      const f = parseCustomFields(t.custom_fields);
+      const statusRaw = ((t.status || {}).status || '').toLowerCase();
+      const stage = PIPELINE_MAP[statusRaw] || 'Other';
+      const source = SOURCE_RENAME[f['Source']] || f['Source'] || list.name;
+      const dc = t.date_created ? new Date(parseInt(t.date_created)).toISOString().split('T')[0] : '';
+      const du = t.date_updated ? new Date(parseInt(t.date_updated)).toISOString().split('T')[0] : '';
+      const days = t.date_updated ? Math.floor((Date.now() - parseInt(t.date_updated)) / 86400000) : 999;
+      const closed = CLOSED_STAGES.has(stage) || (t.status||{}).type === 'closed' || (t.status||{}).type === 'done';
+      rows.push({
+        id: t.id, name: t.name||'', tracker: list.name, source_type: list.source_type,
+        source, study: f['Study']||'', status_raw: (t.status||{}).status||'', stage,
+        phone: f['Phone #']||'', dob: f['Patient DOB']||'',
+        referring_physician: f['Referring Physician']||'',
+        next_appt: f['Next Appointment Date']||'',
+        date_created: dc, date_updated: du, days_since_update: days,
+        url: t.url || 'https://app.clickup.com/t/' + t.id,
+        is_closed: closed ? 'TRUE' : 'FALSE'
+      });
+    }
+  }
+  return rows;
+}
+
+async function fetchCampaigns() {
+  const tasks = await fetchAllClickUpTasks(CAMPAIGN_LIST_ID);
+  return tasks.map(t => {
+    const f = parseCustomFields(t.custom_fields);
+    return {
+      study: t.name||'', vendor: ((t.status||{}).status||'').trim(),
+      first_contact: parseInt(f['FIRST CONTACT']||'0')||0,
+      second_contact: parseInt(f['SECOND CONTACT']||'0')||0,
+      third_contact: parseInt(f['THIRD CONTACT']||'0')||0,
+      new_referrals: parseInt(f['New Referrals']||'0')||0,
+      scheduled: parseInt(f['Scheduled']||f['SCHEDULED']||'0')||0,
+      url: t.url || 'https://app.clickup.com/t/' + t.id
+    };
+  });
+}
+
+async function fetchMedRecords() {
+  const folderData = await clickupFetch('/folder/' + MED_RECORDS_FOLDER_ID + '/list');
+  const lists = folderData.lists || [];
+  const rows = [];
+  for (const list of lists) {
+    const tasks = await fetchAllClickUpTasks(list.id);
+    for (const t of tasks) {
+      const f = parseCustomFields(t.custom_fields);
+      const statusRaw = ((t.status||{}).status||'').toLowerCase();
+      const status = MED_STATUS_MAP[statusRaw] || statusRaw || 'Unknown';
+      const isActive = MED_ACTIVE.has(status);
+      const isClosed = MED_CLOSED.has(status) || (t.status||{}).type === 'closed' || (t.status||{}).type === 'done';
+      const dc = t.date_created ? new Date(parseInt(t.date_created)).toISOString().split('T')[0] : '';
+      const du = t.date_updated ? new Date(parseInt(t.date_updated)).toISOString().split('T')[0] : '';
+      const days = t.date_updated ? Math.floor((Date.now() - parseInt(t.date_updated)) / 86400000) : 999;
+      const assignees = (t.assignees||[]).map(a => a.username||'').join(', ');
+      let recordsInCrio = '';
+      (t.custom_fields||[]).forEach(cf => {
+        if (cf.name === 'Medical records added to CRIO' && cf.type === 'checkbox')
+          recordsInCrio = cf.value === 'true' || cf.value === true ? 'Yes' : 'No';
+      });
+      rows.push({
+        id: t.id, name: t.name||'', study: list.name, status_raw: (t.status||{}).status||'',
+        status, assignee: assignees,
+        phone: f['Phone #']||f['Phone']||'', dob: f['Patient DOB']||f['DOB']||'',
+        crio_link: f['CRIO Link']||'',
+        records_received: f['Medical records received?']||'',
+        medical_release: f['Medical release (Jotform)']||'',
+        records_in_crio: recordsInCrio,
+        records_portal: f['Medical Records Portal']||'',
+        retrieval_deadline: f['Retrieval Deadline']||'',
+        investigator_approval: f['Investigator Approval']||f['PI Approval']||'',
+        pre_screening_date: f['Pre-Screening Visit (Date)']||'',
+        screening_date: f['Screening Visit (Date)']||'',
+        randomization_date: f['Randomization Visit (Date)']||'',
+        next_visit_date: f['Next Visit']||f['Next visit date']||'',
+        next_appointment: f['Next Appointment Date']||f['Next Appointment']||'',
+        last_contact_date: f['Last Contact Date']||'',
+        same_day_cancel: f['Same day cancellation?']||'',
+        notes: f['Notes']||'', ops_notes: f['Operations Team Notes']||'',
+        date_created: dc, date_updated: du, days_since_update: days,
+        url: t.url || 'https://app.clickup.com/t/' + t.id,
+        is_active: isActive ? 'TRUE' : 'FALSE', is_closed: isClosed ? 'TRUE' : 'FALSE'
+      });
+    }
+  }
+  return rows;
+}
+
+// ── Register ClickUp feeds ──
+const CLICKUP_FEEDS = {
+  referrals: fetchReferrals,
+  campaigns: fetchCampaigns,
+  medRecords: fetchMedRecords,
+};
+
+// ═══════════════════════════════════════════════════════════
 // HTTP HANDLER
 // ═══════════════════════════════════════════════════════════
 
@@ -734,17 +911,46 @@ functions.http('crpBqApi', async (req, res) => {
   // List available feeds
   if (!feed) {
     res.json({
-      feeds: Object.keys(FEEDS),
+      feeds: [...Object.keys(FEEDS), ...Object.keys(CLICKUP_FEEDS)],
       usage: '?feed=visits&format=csv',
       formats: ['csv', 'json'],
-      note: 'Add &days=N for feeds that support date range parameters'
+      note: 'BQ feeds + ClickUp feeds (referrals, campaigns, medRecords)'
     });
     return;
   }
 
+  // ── ClickUp feeds (direct API, no BQ) ──
+  const clickupHandler = CLICKUP_FEEDS[feed];
+  if (clickupHandler) {
+    try {
+      console.log(`Feed ${feed}: fetching from ClickUp API`);
+      const rows = await clickupHandler();
+      console.log(`Feed ${feed}: ${rows.length} rows from ClickUp`);
+      if (format === 'json') {
+        res.json({ feed, rows: rows.length, data: rows, source: 'clickup', timestamp: new Date().toISOString() });
+      } else {
+        if (rows.length === 0) { res.type('text/csv').send(''); return; }
+        const fields = Object.keys(rows[0]);
+        const csvLines = [fields.join(',')];
+        for (const row of rows) {
+          csvLines.push(fields.map(f => {
+            const val = (row[f] == null ? '' : String(row[f])).replace(/"/g, '""');
+            return val.includes(',') || val.includes('"') || val.includes('\n') ? `"${val}"` : val;
+          }).join(','));
+        }
+        res.type('text/csv').send(csvLines.join('\n'));
+      }
+    } catch (err) {
+      console.error(`ClickUp feed ${feed} failed:`, err.message);
+      res.status(500).json({ error: err.message, feed, source: 'clickup' });
+    }
+    return;
+  }
+
+  // ── BQ feeds ──
   const feedDef = FEEDS[feed];
   if (!feedDef) {
-    res.status(404).json({ error: `Unknown feed: ${feed}`, available: Object.keys(FEEDS) });
+    res.status(404).json({ error: `Unknown feed: ${feed}`, available: [...Object.keys(FEEDS), ...Object.keys(CLICKUP_FEEDS)] });
     return;
   }
 

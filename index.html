@@ -10422,10 +10422,12 @@ async function refreshReferrals() {
   if (badge) badge.textContent = '⏳ Fetching...';
 
   try {
-    // Fetch referral + campaign data from Google Sheets CSV (synced from ClickUp)
+    // Fetch referral + campaign data — Cloud Function (ClickUp API) or Sheets fallback
+    var _refUrl = _cfUrl('referrals') || CRP_CONFIG.DATA_FEEDS.REFERRALS_CSV;
+    var _campUrl = _cfUrl('campaigns') || CRP_CONFIG.DATA_FEEDS.CAMPAIGNS_CSV;
     const [refRows, campRows] = await Promise.all([
-      fetchCSV(CRP_CONFIG.DATA_FEEDS.REFERRALS_CSV),
-      fetchCSV(CRP_CONFIG.DATA_FEEDS.CAMPAIGNS_CSV),
+      fetchCSV(_refUrl).catch(function() { return fetchCSV(CRP_CONFIG.DATA_FEEDS.REFERRALS_CSV); }),
+      fetchCSV(_campUrl).catch(function() { return fetchCSV(CRP_CONFIG.DATA_FEEDS.CAMPAIGNS_CSV); }),
     ]);
 
     // Normalize stage values — CSV may have case variants ("dnq" vs "DNQ") or blanks
@@ -11083,7 +11085,7 @@ function showReferralDetailModal(filterFn, title, subtitle) {
 // ══════════════════════════════════════════════════════════════
 async function fetchMedicalRecords(attempt) {
   attempt = attempt || 1;
-  const url = CRP_CONFIG.DATA_FEEDS.MED_RECORDS_CSV;
+  const url = _cfUrl('medRecords') || CRP_CONFIG.DATA_FEEDS.MED_RECORDS_CSV;
   if (!url) return;
   try {
     const rows = await fetchCSV(url);
