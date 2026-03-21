@@ -8176,6 +8176,13 @@ let CRIO_SUBJECTS_DATA = [];   // CRIO API — individual subject IDs and status
 let _referralsLoaded = false;
 let _referralByStudy = new Map();
 
+// ═══ BQ EXPANSION DATA (fetched from Cloud Function) ═══
+let BQ_FUNNEL_DATA = [];
+let BQ_RETENTION_DATA = [];
+let BQ_COORDINATOR_DATA = [];
+let BQ_COMPLIANCE_DATA = [];
+let BQ_STUDY_FINANCE_DATA = [];
+
 function getClickUpToken() { return localStorage.getItem('crp_clickup_token') || ''; }
 function saveClickUpToken() {
   const token = document.getElementById('clickup-token-input').value.trim();
@@ -12197,6 +12204,163 @@ function showToast(message, type, durationMs) {
     setTimeout(function() { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 350);
   }, durationMs);
 }
+
+// ═══════════════════════════════════════════════════════════════════
+// BQ EXPANSION VISUALIZATIONS
+// ═══════════════════════════════════════════════════════════════════
+
+async function fetchBQExpansionData() {
+  if (!CRP_CONFIG.USE_CLOUD_FUNCTION || !CRP_CONFIG.CF_BASE) return;
+  var base = CRP_CONFIG.CF_BASE;
+  try {
+    var [funnel, retention, coords, compliance, studyFin] = await Promise.all([
+      fetchCSV(base + '?feed=funnel&format=csv').catch(function() { return []; }),
+      fetchCSV(base + '?feed=retention&format=csv').catch(function() { return []; }),
+      fetchCSV(base + '?feed=coordinators&format=csv').catch(function() { return []; }),
+      fetchCSV(base + '?feed=compliance&format=csv').catch(function() { return []; }),
+      fetchCSV(base + '?feed=studyFinance&format=csv').catch(function() { return []; }),
+    ]);
+    BQ_FUNNEL_DATA = funnel;
+    BQ_RETENTION_DATA = retention;
+    BQ_COORDINATOR_DATA = coords;
+    BQ_COMPLIANCE_DATA = compliance;
+    BQ_STUDY_FINANCE_DATA = studyFin;
+    _log('CRP BQ Expansion: funnel=' + funnel.length + ' retention=' + retention.length + ' coords=' + coords.length + ' compliance=' + compliance.length);
+    safe(renderPatientFunnel, 'renderPatientFunnel');
+    safe(renderRetention, 'renderRetention');
+    safe(renderCoordProductivity, 'renderCoordProductivity');
+    safe(renderCompliance, 'renderCompliance');
+  } catch (e) { _log('BQ Expansion fetch failed: ' + e.message); }
+}
+
+function renderPatientFunnel() {
+  var el = document.getElementById('ref-funnel-container');
+  var badge = document.getElementById('ref-funnel-badge');
+  if (!el || BQ_FUNNEL_DATA.length === 0) return;
+  var data = BQ_FUNNEL_DATA.filter(function(r) { return parseInt(r.total_patients) > 100; })
+    .sort(function(a, b) { return parseInt(b.scheduled_v1 || 0) - parseInt(a.scheduled_v1 || 0); }).slice(0, 15);
+  if (badge) badge.textContent = data.length + ' studies';
+  var html = '<table class="tbl" style="width:100%;font-size:11px;"><tr style="background:var(--surface2);">' +
+    '<th style="padding:6px 8px;text-align:left">Study</th>' +
+    '<th style="padding:6px;text-align:right">Patients</th>' +
+    '<th style="padding:6px;text-align:right">Talked</th>' +
+    '<th style="padding:6px;text-align:right">Connected</th>' +
+    '<th style="padding:6px;text-align:right">Eligible</th>' +
+    '<th style="padding:6px;text-align:right">Sched V1</th>' +
+    '<th style="padding:6px;text-align:right">Conv %</th></tr>';
+  data.forEach(function(r) {
+    var total = parseInt(r.total_patients) || 1;
+    var v1 = parseInt(r.scheduled_v1) || 0;
+    var conv = (v1 / total * 100).toFixed(1);
+    var barW = Math.min(100, parseFloat(conv) * 10);
+    html += '<tr><td style="padding:6px 8px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHTML(r.study_name || '') + '</td>' +
+      '<td style="padding:6px;text-align:right">' + parseInt(r.total_patients).toLocaleString() + '</td>' +
+      '<td style="padding:6px;text-align:right">' + (r.talked || 0) + '</td>' +
+      '<td style="padding:6px;text-align:right">' + (r.connected || 0) + '</td>' +
+      '<td style="padding:6px;text-align:right">' + (r.eligible || 0) + '</td>' +
+      '<td style="padding:6px;text-align:right;font-weight:700;color:#059669">' + v1 + '</td>' +
+      '<td style="padding:6px;text-align:right"><div style="display:inline-block;width:50px;background:#e5e7eb;border-radius:3px;height:14px;position:relative;">' +
+      '<div style="width:' + barW + '%;background:linear-gradient(90deg,#3b82f6,#8b5cf6);height:100%;border-radius:3px;"></div>' +
+      '<span style="position:absolute;right:2px;top:0;font-size:9px;color:#374151;line-height:14px;">' + conv + '%</span></div></td></tr>';
+  });
+  html += '</table>';
+  el.innerHTML = html;
+}
+
+function renderRetention() {
+  var el = document.getElementById('retention-container');
+  var badge = document.getElementById('retention-badge');
+  if (!el || BQ_RETENTION_DATA.length === 0) return;
+  var data = BQ_RETENTION_DATA.filter(function(r) { return parseInt(r.enrolled || 0) > 0 || parseInt(r.screen_fail || 0) > 0; })
+    .sort(function(a, b) { return parseInt(b.enrolled || 0) - parseInt(a.enrolled || 0); }).slice(0, 20);
+  if (badge) badge.textContent = data.length + ' studies';
+  var html = '<table class="tbl" style="width:100%;font-size:11px;"><tr style="background:var(--surface2);">' +
+    '<th style="padding:6px 8px;text-align:left">Study</th>' +
+    '<th style="padding:6px;text-align:right">Total</th>' +
+    '<th style="padding:6px;text-align:right;color:#059669">Enrolled</th>' +
+    '<th style="padding:6px;text-align:right;color:#3b82f6">Screening</th>' +
+    '<th style="padding:6px;text-align:right;color:#dc2626">SF</th>' +
+    '<th style="padding:6px;text-align:right;color:#d97706">Disc</th>' +
+    '<th style="padding:6px;text-align:right">SF Rate</th></tr>';
+  data.forEach(function(r) {
+    var total = parseInt(r.total_subjects) || 1;
+    var enrolled = parseInt(r.enrolled) || 0;
+    var sf = parseInt(r.screen_fail) || 0;
+    var sfRate = ((sf / Math.max(enrolled + sf, 1)) * 100).toFixed(0);
+    var sfColor = parseInt(sfRate) > 50 ? '#dc2626' : parseInt(sfRate) > 30 ? '#d97706' : '#059669';
+    html += '<tr><td style="padding:6px 8px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHTML(r.study_name || '') + '</td>' +
+      '<td style="padding:6px;text-align:right">' + total + '</td>' +
+      '<td style="padding:6px;text-align:right;font-weight:700;color:#059669">' + enrolled + '</td>' +
+      '<td style="padding:6px;text-align:right">' + (r.screening || 0) + '</td>' +
+      '<td style="padding:6px;text-align:right">' + sf + '</td>' +
+      '<td style="padding:6px;text-align:right">' + (r.discontinued || 0) + '</td>' +
+      '<td style="padding:6px;text-align:right;font-weight:700;color:' + sfColor + '">' + sfRate + '%</td></tr>';
+  });
+  html += '</table>';
+  el.innerHTML = html;
+}
+
+function renderCoordProductivity() {
+  var el = document.getElementById('coord-prod-container');
+  var badge = document.getElementById('coord-prod-badge');
+  if (!el || BQ_COORDINATOR_DATA.length === 0) return;
+  var data = BQ_COORDINATOR_DATA.sort(function(a, b) { return parseInt(b.visits_managed || 0) - parseInt(a.visits_managed || 0); });
+  if (badge) badge.textContent = data.length + ' coordinators';
+  var maxVisits = parseInt(data[0].visits_managed) || 1;
+  var html = '';
+  data.forEach(function(r, i) {
+    var visits = parseInt(r.visits_managed) || 0;
+    var subjects = parseInt(r.unique_subjects) || 0;
+    var studies = parseInt(r.studies) || 0;
+    var cancelled = parseInt(r.cancelled) || 0;
+    var active = parseInt(r.active) || 0;
+    var cancelRate = visits > 0 ? ((cancelled / visits) * 100).toFixed(0) : '0';
+    var barW = (visits / maxVisits * 100).toFixed(0);
+    var medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '';
+    html += '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">' +
+      '<div style="width:22px;text-align:center;font-size:' + (medal ? '16px' : '11px') + ';color:var(--muted)">' + (medal || (i + 1)) + '</div>' +
+      '<div style="flex:1;min-width:0;"><div style="font-weight:600;font-size:12px;">' + escapeHTML(r.coordinator || '') + '</div>' +
+      '<div style="font-size:10px;color:var(--muted);">' + subjects + ' subjects · ' + studies + ' studies · ' + cancelRate + '% cancel</div></div>' +
+      '<div style="width:120px;"><div style="background:var(--surface2);border-radius:4px;height:18px;position:relative;">' +
+      '<div style="width:' + barW + '%;background:linear-gradient(90deg,#3b82f6,#8b5cf6);height:100%;border-radius:4px;"></div>' +
+      '<span style="position:absolute;right:4px;top:1px;font-size:10px;font-weight:700;color:' + (parseInt(barW) > 40 ? '#fff' : '#374151') + ';">' + visits + '</span>' +
+      '</div></div></div>';
+  });
+  el.innerHTML = html;
+}
+
+function renderCompliance() {
+  var el = document.getElementById('compliance-container');
+  var badge = document.getElementById('compliance-badge');
+  if (!el || BQ_COMPLIANCE_DATA.length === 0) return;
+  // Aggregate by status
+  var byStatus = {};
+  BQ_COMPLIANCE_DATA.forEach(function(r) {
+    var s = r.status === '1' ? 'Active' : r.status === '0' ? 'Cancelled' : 'Status ' + r.status;
+    byStatus[s] = (byStatus[s] || 0) + 1;
+  });
+  var oow = BQ_COMPLIANCE_DATA.filter(function(r) { return parseInt(r.days_oow || 0) > 0; });
+  var total = BQ_COMPLIANCE_DATA.length;
+  if (badge) badge.textContent = total + ' visits';
+
+  html = '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;">';
+  Object.entries(byStatus).forEach(function(e) {
+    var color = e[0] === 'Active' ? '#059669' : e[0] === 'Cancelled' ? '#dc2626' : '#6b7280';
+    html += '<div style="background:var(--surface2);padding:10px 16px;border-radius:8px;text-align:center;">' +
+      '<div style="font-size:20px;font-weight:800;color:' + color + '">' + e[1] + '</div>' +
+      '<div style="font-size:10px;color:var(--muted)">' + escapeHTML(e[0]) + '</div></div>';
+  });
+  if (oow.length > 0) {
+    html += '<div style="background:#fef2f2;padding:10px 16px;border-radius:8px;text-align:center;">' +
+      '<div style="font-size:20px;font-weight:800;color:#dc2626">' + oow.length + '</div>' +
+      '<div style="font-size:10px;color:#dc2626">Out of Window</div></div>';
+  }
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+// Fetch expansion data after Phase 3
+setTimeout(function() { fetchBQExpansionData().catch(function(e) { console.warn('BQ Expansion:', e); }); }, 3000);
 
 // ═══ DARK MODE TOGGLE ═══
 function toggleDarkMode() {
