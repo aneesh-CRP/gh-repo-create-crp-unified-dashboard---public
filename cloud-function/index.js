@@ -133,6 +133,7 @@ const STUDY_NAME_SQL = `CASE
 const SUBJECT_NAME_SQL = `REGEXP_REPLACE(TRIM(CONCAT(COALESCE(sub.first_name, ''), ' ', COALESCE(sub.middle_name, ''), ' ', COALESCE(sub.last_name, ''))), r'\\s+', ' ')`;
 
 const SUBJECT_STATUS_SQL = `CASE sub.status
+  WHEN -2 THEN 'Not Interested' WHEN -1 THEN 'Not Eligible'
   WHEN 1 THEN 'Interested' WHEN 2 THEN 'Prequalified'
   WHEN 3 THEN 'No Show/Cancelled V1' WHEN 4 THEN 'Scheduled V1'
   WHEN 10 THEN 'Screening' WHEN 11 THEN 'Enrolled'
@@ -276,14 +277,14 @@ const FEEDS = {
   // ── 3. Studies (uses CTEs to avoid correlated subqueries) ──
   studies: {
     query: () => `WITH
-      active_coords AS (SELECT ca.study_key, ca.creator_key, COUNT(*) AS appt_count
-        FROM ${tbl('calendar_appointment')} ca
-        WHERE ca.start >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 90 DAY)
-          AND ca.subject_key IS NOT NULL AND ca.creator_key IS NOT NULL
-        GROUP BY ca.study_key, ca.creator_key),
-      ranked_coords AS (SELECT study_key, creator_key, ROW_NUMBER() OVER (PARTITION BY study_key ORDER BY appt_count DESC) AS rn FROM active_coords),
+      svs_coords AS (SELECT svi.study_key, svs.coordinator_user_key, COUNT(*) AS visit_count
+        FROM ${tbl('subject_visit_stats')} svs
+        JOIN ${tbl('subject_visit')} svi ON svs.subject_visit_key = svi.subject_visit_key
+        WHERE svs.coordinator_user_key IS NOT NULL AND svi._fivetran_deleted = false
+        GROUP BY svi.study_key, svs.coordinator_user_key),
+      ranked_coords AS (SELECT study_key, coordinator_user_key, ROW_NUMBER() OVER (PARTITION BY study_key ORDER BY visit_count DESC) AS rn FROM svs_coords),
       coord_leaders AS (SELECT rc.study_key, CONCAT(u.first_name, ' ', u.last_name) AS name
-        FROM ranked_coords rc JOIN ${tbl('user')} u ON rc.creator_key = u.user_key WHERE rc.rn = 1),
+        FROM ranked_coords rc JOIN ${tbl('user')} u ON rc.coordinator_user_key = u.user_key WHERE rc.rn = 1),
       pi_leaders AS (SELECT su.study_key, CONCAT(u.first_name, ' ', u.last_name) AS name
         FROM ${tbl('study_user')} su JOIN ${tbl('user')} u ON su.user_key = u.user_key
         WHERE su.role = 1 AND su.is_role_leader = 1 AND su._fivetran_deleted = false),
@@ -427,7 +428,7 @@ const FEEDS = {
   patientDB: {
     query: () => `SELECT
       REGEXP_REPLACE(TRIM(CONCAT(COALESCE(p.first_name, ''), ' ', COALESCE(p.middle_name, ''), ' ', COALESCE(p.last_name, ''))), r'\\s+', ' ') AS patient_full_name,
-      CASE p.status WHEN 0 THEN 'Available' WHEN 1 THEN 'Not Available' WHEN 2 THEN 'Active' WHEN 3 THEN 'Do Not Contact' ELSE 'Available' END AS patient_status,
+      CASE p.status WHEN -20 THEN 'Deceased' WHEN -10 THEN 'Do Not Enroll' WHEN -5 THEN 'Bad Contact Info' WHEN -1 THEN 'Do Not Solicit' WHEN 1 THEN 'Available' ELSE 'Available' END AS patient_status,
       COALESCE(p.email, '') AS email,
       COALESCE(p.mobile_phone, '') AS mobile_phone,
       COALESCE(p.home_phone, '') AS home_phone,
@@ -436,7 +437,7 @@ const FEEDS = {
       COALESCE(si.name, '') AS site_name,
       COALESCE(p.city, '') AS city,
       COALESCE(p.state, '') AS state,
-      CASE p.gender WHEN 0 THEN 'Unknown' WHEN 1 THEN 'Male' WHEN 2 THEN 'Female' WHEN 3 THEN 'Other' ELSE '' END AS gender,
+      CASE p.sex WHEN 0 THEN 'Female' WHEN 1 THEN 'Male' WHEN 2 THEN 'Intersex' ELSE '' END AS gender,
       COALESCE(FORMAT_DATETIME('%Y-%m-%d', p.birth_date), '') AS birth_date,
       CAST(p.patient_key AS STRING) AS patient_key,
       COALESCE(FORMAT_DATETIME('%Y-%m-%d', p.last_interaction_date), '') AS last_interaction_date,
@@ -444,7 +445,7 @@ const FEEDS = {
       FORMAT_DATETIME('%Y-%m-%d', CURRENT_DATETIME()) AS snapshot_date
     FROM ${tbl('patient')} p
     LEFT JOIN ${tbl('site')} si ON p.site_key = si.site_key
-    WHERE p._fivetran_deleted = false AND p.status != 3
+    WHERE p._fivetran_deleted = false AND p.status NOT IN (-20, -1)
     ORDER BY p.last_name, p.first_name`,
     headers: {
       patient_full_name: 'Patient Full Name', patient_status: 'Patient Status',
@@ -541,15 +542,16 @@ const FEEDS = {
       const days = parseInt(params.days) || 30;
       return `SELECT
         CONCAT(u.first_name, ' ', u.last_name) AS coordinator,
-        COUNT(DISTINCT ca.calendar_appointment_key) AS visits_managed,
-        COUNT(DISTINCT ca.subject_key) AS unique_subjects,
-        COUNT(DISTINCT ca.study_key) AS studies,
-        COUNTIF(ca.status = 0) AS cancelled,
-        COUNTIF(ca.status = 1) AS active
-      FROM ${tbl('calendar_appointment')} ca
-      JOIN ${tbl('user')} u ON ca.creator_key = u.user_key
-      WHERE ca.start >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL ${days} DAY)
-        AND ca.subject_key IS NOT NULL
+        COUNT(DISTINCT svi.subject_visit_key) AS visits_managed,
+        COUNT(DISTINCT svi.subject_key) AS unique_subjects,
+        COUNT(DISTINCT svi.study_key) AS studies,
+        COUNTIF(svi.status = 20) AS cancelled,
+        COUNTIF(svi.status IN (22, 23)) AS completed
+      FROM ${tbl('subject_visit_stats')} svs
+      JOIN ${tbl('subject_visit')} svi ON svs.subject_visit_key = svi.subject_visit_key
+      JOIN ${tbl('user')} u ON svs.coordinator_user_key = u.user_key
+      WHERE svi.last_updated >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL ${days} DAY)
+        AND svi._fivetran_deleted = false
       GROUP BY coordinator
       HAVING visits_managed > 0
       ORDER BY visits_managed DESC`;
@@ -594,7 +596,7 @@ const FEEDS = {
       FORMAT_DATETIME('%Y-%m-%d', i.date_due) AS date_due,
       FORMAT_DATETIME('%Y-%m-%d', i.date_sent) AS date_sent,
       i.days_until_due,
-      CASE i.status WHEN 0 THEN 'Draft' WHEN 1 THEN 'Sent' WHEN 2 THEN 'Paid' ELSE CAST(i.status AS STRING) END AS status,
+      CASE i.status WHEN 0 THEN 'Draft' WHEN 1 THEN 'Unpaid' WHEN 2 THEN 'Paid' WHEN 3 THEN 'Partially Paid' ELSE CAST(i.status AS STRING) END AS status,
       DATE_DIFF(CURRENT_DATE(), DATE(i.date_due), DAY) AS days_overdue
     FROM ${tbl('invoice')} i
     LEFT JOIN ${tbl('study')} st ON i.study_key = st.study_key
