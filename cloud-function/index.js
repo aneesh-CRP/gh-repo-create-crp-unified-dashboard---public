@@ -140,10 +140,11 @@ const SUBJECT_STATUS_SQL = `CASE sub.status
   WHEN 20 THEN 'Completed' ELSE CAST(sub.status AS STRING) END`;
 
 const STUDY_STATUS_SQL = `CASE st.status
-  WHEN 0 THEN 'Pre-Site Qualification' WHEN 1 THEN 'Site Qualification'
-  WHEN 2 THEN 'Start Up' WHEN 3 THEN 'Enrolling'
-  WHEN 4 THEN 'Maintenance' WHEN 5 THEN 'Closeout'
-  WHEN 6 THEN 'Closed' ELSE CAST(st.status AS STRING) END`;
+  WHEN 0 THEN 'Configuring' WHEN 1 THEN 'Startup'
+  WHEN 2 THEN 'Enrolling' WHEN 3 THEN 'Maintenance'
+  WHEN 4 THEN 'Pre-Closed' WHEN 10 THEN 'Closed'
+  WHEN 11 THEN 'Suspended' WHEN 12 THEN 'Withdrawn'
+  ELSE CAST(st.status AS STRING) END`;
 
 const PHASE_SQL = `CASE ct.phase
   WHEN 1 THEN 'Phase I' WHEN 2 THEN 'Phase II'
@@ -159,7 +160,10 @@ const FEEDS = {
       FORMAT_DATETIME('%Y-%m-%d', ca.start) AS scheduled_date,
       ${SUBJECT_NAME_SQL} AS subject_full_name,
       CAST(ca.subject_key AS STRING) AS subject_key_back_end,
-      CONCAT(COALESCE(coord.first_name, ''), ' ', COALESCE(coord.last_name, '')) AS full_name,
+      COALESCE(
+        NULLIF(TRIM(CONCAT(COALESCE(svs_coord.first_name, ''), ' ', COALESCE(svs_coord.last_name, ''))), ''),
+        TRIM(CONCAT(COALESCE(coord.first_name, ''), ' ', COALESCE(coord.last_name, '')))
+      ) AS full_name,
       CASE ca.status WHEN 0 THEN 'Cancelled' ELSE 'Active' END AS appointment_status,
       COALESCE(sv.name, '') AS visit_name,
       ${SUBJECT_STATUS_SQL} AS subject_status,
@@ -167,12 +171,18 @@ const FEEDS = {
       CASE WHEN ca.status = 0 THEN FORMAT_DATETIME('%Y-%m-%d', ca.cancel_date) ELSE '' END AS cancel_date,
       CASE WHEN ca.status = 0 THEN COALESCE(REGEXP_REPLACE(ca.cancel_reason, r'[\\x00-\\x1f]', ' '), '') ELSE '' END AS cancel_reason,
       CASE WHEN ca.status = 0 THEN CASE ca.cancel_type WHEN 1 THEN 'No Show' WHEN 2 THEN 'Site Cancelled' WHEN 3 THEN 'Patient Cancelled' ELSE '' END ELSE '' END AS appointment_cancellation_type,
-      CONCAT(COALESCE(coord.first_name, ''), ' ', COALESCE(coord.last_name, '')) AS staff_full_name,
+      COALESCE(
+        NULLIF(TRIM(CONCAT(COALESCE(svs_coord.first_name, ''), ' ', COALESCE(svs_coord.last_name, ''))), ''),
+        TRIM(CONCAT(COALESCE(coord.first_name, ''), ' ', COALESCE(coord.last_name, '')))
+      ) AS staff_full_name,
       COALESCE(si.name, '') AS site_name,
       COALESCE(sub.mobile_phone, '') AS mobile_phone,
       CAST(ca.calendar_appointment_key AS STRING) AS calendar_appointment_key,
       CASE ca.type WHEN 0 THEN 'Regular Visit' WHEN 1 THEN 'Ad Hoc Visit' WHEN 2 THEN 'General Appointment' WHEN 3 THEN 'Block' ELSE '' END AS appointment_type,
-      COALESCE(pi.name, '') AS investigator,
+      COALESCE(
+        NULLIF(TRIM(CONCAT(COALESCE(svs_inv.first_name, ''), ' ', COALESCE(svs_inv.last_name, ''))), ''),
+        pi.name, ''
+      ) AS investigator,
       FORMAT_DATETIME('%Y-%m-%d', CURRENT_DATETIME()) AS snapshot_date
     FROM ${tbl('calendar_appointment')} ca
     LEFT JOIN ${tbl('subject')} sub ON ca.subject_key = sub.subject_key
@@ -181,6 +191,9 @@ const FEEDS = {
     LEFT JOIN ${tbl('site')} si ON ca.site_key = si.site_key
     LEFT JOIN ${tbl('study_visit')} sv ON ca.study_visit_key = sv.study_visit_key
     LEFT JOIN ${tbl('user')} coord ON ca.creator_key = coord.user_key
+    LEFT JOIN ${tbl('subject_visit_stats')} svs ON ca.subject_visit_key = svs.subject_visit_key
+    LEFT JOIN ${tbl('user')} svs_coord ON svs.coordinator_user_key = svs_coord.user_key
+    LEFT JOIN ${tbl('user')} svs_inv ON svs.investigator_user_key = svs_inv.user_key
     LEFT JOIN (SELECT su.study_key, CONCAT(u.first_name, ' ', u.last_name) AS name
       FROM ${tbl('study_user')} su JOIN ${tbl('user')} u ON su.user_key = u.user_key
       WHERE su.role = 1 AND su.is_role_leader = 1 AND su._fivetran_deleted = false) pi ON ca.study_key = pi.study_key
@@ -213,7 +226,11 @@ const FEEDS = {
       FORMAT_DATETIME('%Y-%m-%d', aal.date_created) AS cancel_date,
       FORMAT_DATETIME('%Y-%m-%d', COALESCE(aal.old_start, aal.date_created)) AS scheduled_date,
       CAST(aal.subject_key AS STRING) AS subject_key_back_end,
-      CONCAT(COALESCE(coord.first_name, by_user.first_name, ''), ' ', COALESCE(coord.last_name, by_user.last_name, '')) AS staff_full_name,
+      COALESCE(
+        NULLIF(TRIM(CONCAT(COALESCE(svs_coord.first_name, ''), ' ', COALESCE(svs_coord.last_name, ''))), ''),
+        NULLIF(TRIM(CONCAT(COALESCE(coord.first_name, ''), ' ', COALESCE(coord.last_name, ''))), ''),
+        TRIM(CONCAT(COALESCE(by_user.first_name, ''), ' ', COALESCE(by_user.last_name, '')))
+      ) AS staff_full_name,
       COALESCE(aal.cancel_reason, '') AS cancel_reason,
       CASE aal.cancel_type WHEN 1 THEN 'No Show' WHEN 2 THEN 'Site Cancelled' WHEN 3 THEN 'Patient Cancelled' ELSE '' END AS appointment_cancellation_type,
       ${SUBJECT_STATUS_SQL} AS subject_status,
@@ -221,7 +238,10 @@ const FEEDS = {
       CASE aal.appointment_type WHEN 0 THEN 'Regular Visit' WHEN 1 THEN 'Ad Hoc Visit' WHEN 2 THEN 'General Appointment' WHEN 3 THEN 'Block' ELSE '' END AS appointment_type,
       'cancelled' AS appointment_status,
       CAST(aal.calendar_appointment_key AS STRING) AS calendar_appointment_key,
-      COALESCE(pi.name, '') AS investigator,
+      COALESCE(
+        NULLIF(TRIM(CONCAT(COALESCE(svs_inv.first_name, ''), ' ', COALESCE(svs_inv.last_name, ''))), ''),
+        pi.name, ''
+      ) AS investigator,
       FORMAT_DATETIME('%Y-%m-%d', CURRENT_DATETIME()) AS snapshot_date
     FROM ${tbl('appointment_audit_log')} aal
     LEFT JOIN ${tbl('study')} st ON aal.study_key = st.study_key
@@ -235,6 +255,9 @@ const FEEDS = {
     LEFT JOIN ${tbl('calendar_appointment')} ca ON aal.calendar_appointment_key = ca.calendar_appointment_key
     LEFT JOIN ${tbl('user')} coord ON ca.creator_key = coord.user_key
     LEFT JOIN ${tbl('user')} by_user ON aal.by_user_key = by_user.user_key
+    LEFT JOIN ${tbl('subject_visit_stats')} svs ON ca.subject_visit_key = svs.subject_visit_key
+    LEFT JOIN ${tbl('user')} svs_coord ON svs.coordinator_user_key = svs_coord.user_key
+    LEFT JOIN ${tbl('user')} svs_inv ON svs.investigator_user_key = svs_inv.user_key
     WHERE aal.change_type = 4
       AND aal.date_created >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 90 DAY)
       AND st.is_active = 1
@@ -373,7 +396,7 @@ const FEEDS = {
       CONCAT(COALESCE(by_u.first_name, ''), ' ', COALESCE(by_u.last_name, '')) AS affected_user,
       CONCAT(COALESCE(coord.first_name, ''), ' ', COALESCE(coord.last_name, '')) AS appointment_for,
       CASE aal.appointment_type WHEN 0 THEN 'Regular Visit' WHEN 1 THEN 'Ad Hoc Visit' WHEN 2 THEN 'General Appointment' WHEN 3 THEN 'Block' ELSE '' END AS appointment_type,
-      CASE aal.change_type WHEN 0 THEN 'User Added' WHEN 1 THEN 'Created' WHEN 2 THEN 'Rescheduled' WHEN 3 THEN 'Modified' WHEN 4 THEN 'Cancelled' WHEN 5 THEN 'Restored' ELSE CAST(aal.change_type AS STRING) END AS change_type,
+      CASE aal.change_type WHEN 0 THEN 'Created' WHEN 1 THEN 'User Added' WHEN 2 THEN 'User Removed' WHEN 3 THEN 'Rescheduled' WHEN 4 THEN 'Cancelled' WHEN 5 THEN 'Deleted' WHEN 6 THEN 'Restored' ELSE CAST(aal.change_type AS STRING) END AS change_type,
       CASE aal.cancel_type WHEN 1 THEN 'No Show' WHEN 2 THEN 'Site Cancelled' WHEN 3 THEN 'Patient Cancelled' ELSE '' END AS cancel_type,
       COALESCE(REGEXP_REPLACE(aal.cancel_reason, r'[\\x00-\\x1f]', ' '), '') AS cancel_reason
     FROM ${tbl('appointment_audit_log')} aal

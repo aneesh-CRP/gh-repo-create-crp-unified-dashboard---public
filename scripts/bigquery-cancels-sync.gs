@@ -486,7 +486,7 @@ function _buildStudiesQuery() {
     'CASE WHEN COALESCE(st.nickname, \'\') != \'\' THEN st.nickname ' +
     '  WHEN spon.name IS NOT NULL AND COALESCE(st.protocol_number, \'\') != \'\' THEN CONCAT(spon.name, \' - \', st.protocol_number) ' +
     '  WHEN COALESCE(st.protocol_number, \'\') != \'\' THEN st.protocol_number ELSE \'\' END AS study_name, ' +
-    'CASE st.status WHEN 0 THEN \'Pre-Site Qualification\' WHEN 1 THEN \'Site Qualification\' WHEN 2 THEN \'Start Up\' WHEN 3 THEN \'Enrolling\' WHEN 4 THEN \'Maintenance\' WHEN 5 THEN \'Closeout\' WHEN 6 THEN \'Closed\' ELSE CAST(st.status AS STRING) END AS status, ' +
+    'CASE st.status WHEN 0 THEN \'Configuring\' WHEN 1 THEN \'Startup\' WHEN 2 THEN \'Enrolling\' WHEN 3 THEN \'Maintenance\' WHEN 4 THEN \'Pre-Closed\' WHEN 10 THEN \'Closed\' WHEN 11 THEN \'Suspended\' WHEN 12 THEN \'Withdrawn\' ELSE CAST(st.status AS STRING) END AS status,' +
     'COALESCE(CONCAT(coord_u.first_name, \' \', coord_u.last_name), \'\') AS coordinator, ' +
     'COALESCE(CONCAT(pi_u.first_name, \' \', pi_u.last_name), sd.investigator_name, \'\') AS investigator, ' +
     'COALESCE(st.indications, sd.primary_indication, \'\') AS indication, ' +
@@ -586,7 +586,7 @@ function _buildStudyStatusQuery() {
     '  WHEN spon.name IS NOT NULL AND COALESCE(st.protocol_number, \'\') != \'\' THEN CONCAT(spon.name, \' - \', st.protocol_number) ' +
     '  WHEN COALESCE(st.protocol_number, \'\') != \'\' THEN st.protocol_number ELSE \'\' END AS study_name, ' +
     'CASE ct.phase WHEN 1 THEN \'Phase I\' WHEN 2 THEN \'Phase II\' WHEN 3 THEN \'Phase III\' WHEN 4 THEN \'Phase IV\' ELSE \'\' END AS phase, ' +
-    'CASE st.status WHEN 0 THEN \'Pre-Site Qualification\' WHEN 1 THEN \'Site Qualification\' WHEN 2 THEN \'Start Up\' WHEN 3 THEN \'Enrolling\' WHEN 4 THEN \'Maintenance\' WHEN 5 THEN \'Closeout\' WHEN 6 THEN \'Closed\' ELSE \'\' END AS status, ' +
+    'CASE st.status WHEN 0 THEN \'Configuring\' WHEN 1 THEN \'Startup\' WHEN 2 THEN \'Enrolling\' WHEN 3 THEN \'Maintenance\' WHEN 4 THEN \'Pre-Closed\' WHEN 10 THEN \'Closed\' WHEN 11 THEN \'Suspended\' WHEN 12 THEN \'Withdrawn\' ELSE \'\' END AS status,' +
     // CRIO stores dates as next-day midnight UTC (e.g. Sept 19 ET → Sept 20 00:00 UTC)
     // Subtract 1 day to get the actual local date matching Looker/CRIO UI
     'COALESCE(FORMAT_DATE(\'%Y-%m-%d\', DATE_SUB(DATE(sd.enrollment_start_date), INTERVAL 1 DAY)), \'\') AS enrollment_start, ' +

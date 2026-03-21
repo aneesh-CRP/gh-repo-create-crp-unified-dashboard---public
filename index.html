@@ -11200,8 +11200,14 @@ async function fetchCrioStudies() {
       var rows = await fetchCSV(studiesUrl);
       if (rows && rows.length > 0) {
         // Normalize BQ status to uppercase (BQ sends 'Enrolling', dashboard checks 'ENROLLING')
-        var _bqStatusUp = {'Start Up':'STARTUP','Enrolling':'ENROLLING','Maintenance':'MAINTENANCE',
-          'Closeout':'CLOSEOUT','Closed':'CLOSED','Pre-Site Qualification':'PRE-SITE QUALIFICATION',
+        var _bqStatusUp = {
+          // Looker-correct labels (from CRIO Looker Formulas)
+          'Configuring':'CONFIGURING','Startup':'STARTUP','Enrolling':'ENROLLING',
+          'Maintenance':'MAINTENANCE','Pre-Closed':'PRECLOSED','Closed':'CLOSED',
+          'Suspended':'SUSPENDED','Withdrawn':'WITHDRAWN',
+          // Legacy labels (backward compat with cached data)
+          'Start Up':'STARTUP','Closeout':'CLOSEOUT',
+          'Pre-Site Qualification':'PRE-SITE QUALIFICATION',
           'Site Qualification':'SITE QUALIFICATION'};
         CRIO_STUDIES_DATA = rows.map(function(r) {
           var rawStatus = r.status || '';
@@ -12057,12 +12063,19 @@ function mergeCrioIntoStudies() {
   if (!DATA || !DATA.enrollmentData) return;
 
   var STATUS_MAP = {
-    'ENROLLING':'Enrolling','MAINTENANCE':'Maintenance','STARTUP':'Startup',
-    'PRECLOSED':'Pre-Closed','CONFIGURING':'Configuring','CLOSED':'Closed',
-    // BQ sends mixed-case status values — map them too
-    'Enrolling':'Enrolling','Maintenance':'Maintenance','Start Up':'Startup',
+    // Uppercase normalized forms (Looker-correct)
+    'CONFIGURING':'Configuring','STARTUP':'Startup','ENROLLING':'Enrolling',
+    'MAINTENANCE':'Maintenance','PRECLOSED':'Pre-Closed','CLOSED':'Closed',
+    'SUSPENDED':'Suspended','WITHDRAWN':'Withdrawn',
+    // Mixed-case passthrough (Looker-correct labels from cloud function)
+    'Configuring':'Configuring','Startup':'Startup','Enrolling':'Enrolling',
+    'Maintenance':'Maintenance','Pre-Closed':'Pre-Closed','Closed':'Closed',
+    'Suspended':'Suspended','Withdrawn':'Withdrawn',
+    // Legacy labels (backward compat with cached/old data)
+    'Start Up':'Startup','Closeout':'Closeout',
     'Pre-Site Qualification':'Pre-Site Qualification','Site Qualification':'Site Qualification',
-    'Closeout':'Closeout','Closed':'Closed'
+    'PRE-SITE QUALIFICATION':'Pre-Site Qualification','SITE QUALIFICATION':'Site Qualification',
+    'CLOSEOUT':'Closeout'
   };
 
   // Build CRIO lookup by protocol_number — merge multi-site studies (e.g., PHL+PNJ)
