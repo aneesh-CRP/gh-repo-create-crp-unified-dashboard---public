@@ -440,8 +440,8 @@ function _buildStudiesQuery() {
     'CASE ct.phase WHEN 1 THEN \'Phase 1\' WHEN 2 THEN \'Phase 2\' WHEN 3 THEN \'Phase 3\' WHEN 4 THEN \'Phase 4\' ELSE \'\' END AS phase, ' +
     'FORMAT_DATETIME(\'%Y-%m-%d\', st.date_created) AS date_created, ' +
     'FORMAT_DATETIME(\'%Y-%m-%d\', st.last_updated) AS last_updated, ' +
-    'COALESCE(FORMAT_DATE(\'%Y-%m-%d\', DATE(sd.enrollment_start_date)), \'\') AS start_date, ' +
-    'COALESCE(FORMAT_DATE(\'%Y-%m-%d\', DATE(sd.enrollment_close_date)), \'\') AS end_date, ' +
+    'COALESCE(FORMAT_DATE(\'%Y-%m-%d\', DATE_SUB(DATE(sd.enrollment_start_date), INTERVAL 1 DAY)), \'\') AS start_date, ' +
+    'COALESCE(FORMAT_DATE(\'%Y-%m-%d\', DATE_SUB(DATE(sd.enrollment_close_date), INTERVAL 1 DAY)), \'\') AS end_date, ' +
     'COALESCE(st.external_id, \'\') AS external_study_number, ' +
     'COALESCE(si.name, \'\') AS site_name, ' +
     'CAST(st.site_key AS STRING) AS site_key, ' +
@@ -525,20 +525,21 @@ function _buildStudyStatusQuery() {
     '  WHEN COALESCE(st.protocol_number, \'\') != \'\' THEN st.protocol_number ELSE \'\' END AS study_name, ' +
     'CASE ct.phase WHEN 1 THEN \'Phase 1\' WHEN 2 THEN \'Phase 2\' WHEN 3 THEN \'Phase 3\' WHEN 4 THEN \'Phase 4\' ELSE \'\' END AS phase, ' +
     'CASE st.status WHEN 0 THEN \'Pre-Site Qualification\' WHEN 1 THEN \'Site Qualification\' WHEN 2 THEN \'Start Up\' WHEN 3 THEN \'Enrolling\' WHEN 4 THEN \'Maintenance\' WHEN 5 THEN \'Closeout\' WHEN 6 THEN \'Closed\' ELSE \'\' END AS status, ' +
-    // All dates cast to DATE to avoid UTC→ET off-by-one (DATETIME stores midnight UTC = prev day ET)
-    'COALESCE(FORMAT_DATE(\'%Y-%m-%d\', DATE(sd.enrollment_start_date)), \'\') AS enrollment_start, ' +
-    'COALESCE(FORMAT_DATE(\'%Y-%m-%d\', DATE(sd.enrollment_close_date)), \'\') AS enrollment_close, ' +
-    'COALESCE(FORMAT_DATE(\'%Y-%m-%d\', DATE(sd.first_patient_screened_date)), \'\') AS first_patient_screened, ' +
-    'COALESCE(FORMAT_DATE(\'%Y-%m-%d\', DATE(sd.first_patient_randomized_date)), \'\') AS first_patient_randomized, ' +
-    'COALESCE(FORMAT_DATE(\'%Y-%m-%d\', DATE(sd.site_initiation_date)), \'\') AS site_initiation, ' +
-    'COALESCE(FORMAT_DATE(\'%Y-%m-%d\', DATE(sd.irb_approval_date)), \'\') AS irb_approval, ' +
-    'COALESCE(FORMAT_DATE(\'%Y-%m-%d\', DATE(sd.irb_renewal_date)), \'\') AS irb_renewal, ' +
-    'COALESCE(FORMAT_DATE(\'%Y-%m-%d\', DATE(sd.contract_signed_date)), \'\') AS contract_signed, ' +
-    'COALESCE(FORMAT_DATE(\'%Y-%m-%d\', DATE(sd.regulatory_confirmed_date)), \'\') AS regulatory_confirmed, ' +
-    'COALESCE(FORMAT_DATE(\'%Y-%m-%d\', DATE(sd.closeout_date)), \'\') AS closeout, ' +
+    // CRIO stores dates as next-day midnight UTC (e.g. Sept 19 ET → Sept 20 00:00 UTC)
+    // Subtract 1 day to get the actual local date matching Looker/CRIO UI
+    'COALESCE(FORMAT_DATE(\'%Y-%m-%d\', DATE_SUB(DATE(sd.enrollment_start_date), INTERVAL 1 DAY)), \'\') AS enrollment_start, ' +
+    'COALESCE(FORMAT_DATE(\'%Y-%m-%d\', DATE_SUB(DATE(sd.enrollment_close_date), INTERVAL 1 DAY)), \'\') AS enrollment_close, ' +
+    'COALESCE(FORMAT_DATE(\'%Y-%m-%d\', DATE_SUB(DATE(sd.first_patient_screened_date), INTERVAL 1 DAY)), \'\') AS first_patient_screened, ' +
+    'COALESCE(FORMAT_DATE(\'%Y-%m-%d\', DATE_SUB(DATE(sd.first_patient_randomized_date), INTERVAL 1 DAY)), \'\') AS first_patient_randomized, ' +
+    'COALESCE(FORMAT_DATE(\'%Y-%m-%d\', DATE_SUB(DATE(sd.site_initiation_date), INTERVAL 1 DAY)), \'\') AS site_initiation, ' +
+    'COALESCE(FORMAT_DATE(\'%Y-%m-%d\', DATE_SUB(DATE(sd.irb_approval_date), INTERVAL 1 DAY)), \'\') AS irb_approval, ' +
+    'COALESCE(FORMAT_DATE(\'%Y-%m-%d\', DATE_SUB(DATE(sd.irb_renewal_date), INTERVAL 1 DAY)), \'\') AS irb_renewal, ' +
+    'COALESCE(FORMAT_DATE(\'%Y-%m-%d\', DATE_SUB(DATE(sd.contract_signed_date), INTERVAL 1 DAY)), \'\') AS contract_signed, ' +
+    'COALESCE(FORMAT_DATE(\'%Y-%m-%d\', DATE_SUB(DATE(sd.regulatory_confirmed_date), INTERVAL 1 DAY)), \'\') AS regulatory_confirmed, ' +
+    'COALESCE(FORMAT_DATE(\'%Y-%m-%d\', DATE_SUB(DATE(sd.closeout_date), INTERVAL 1 DAY)), \'\') AS closeout, ' +
     'COALESCE(FORMAT_DATE(\'%Y-%m-%d\', DATE(sd.last_updated)), FORMAT_DATE(\'%Y-%m-%d\', DATE(st.last_updated)), \'\') AS last_updated, ' +
-    'COALESCE(FORMAT_DATE(\'%Y-%m-%d\', DATE(sd.investigator_meeting_date)), \'\') AS investigator_meeting, ' +
-    'COALESCE(FORMAT_DATE(\'%Y-%m-%d\', DATE(sd.presite_selection_date)), \'\') AS presite_selection, ' +
+    'COALESCE(FORMAT_DATE(\'%Y-%m-%d\', DATE_SUB(DATE(sd.investigator_meeting_date), INTERVAL 1 DAY)), \'\') AS investigator_meeting, ' +
+    'COALESCE(FORMAT_DATE(\'%Y-%m-%d\', DATE_SUB(DATE(sd.presite_selection_date), INTERVAL 1 DAY)), \'\') AS presite_selection, ' +
     'FORMAT_DATETIME(\'%Y-%m-%d\', CURRENT_DATETIME()) AS snapshot_date ' +
     'FROM ' + t + 'study` st ' +
     'LEFT JOIN ' + t + 'study_details` sd ON st.study_key = sd.study_key ' +
