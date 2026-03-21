@@ -1,0 +1,13 @@
+{
+  "name": "crp-bq-api",
+  "version": "1.0.0",
+  "description": "CRP Dashboard — BigQuery direct API (replaces Google Sheets CSV pipeline)",
+  "main": "index.js",
+  "dependencies": {
+    "@google-cloud/bigquery": "^7.0.0",
+    "@google-cloud/functions-framework": "^3.0.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
