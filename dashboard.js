@@ -193,13 +193,13 @@ const CRP_CONFIG = {
   // Set to false initially — enable after verifying BQ data matches Looker data
   USE_BQ_VISITS: true,
   // When true: uses BQ_STUDIES_CSV + BQ_SUBJECTS_CSV instead of ClickUp CRIO sync
-  USE_BQ_STUDIES: false,
+  USE_BQ_STUDIES: true,
   // When true: uses BQ_STUDY_STATUS_CSV instead of Looker Study Status
-  USE_BQ_STUDY_STATUS: false,
+  USE_BQ_STUDY_STATUS: true,
   // When true: uses BQ_AUDIT_LOG_CSV instead of Audit Log Google Sheet
-  USE_BQ_AUDIT_LOG: false,
+  USE_BQ_AUDIT_LOG: true,
   // When true: uses BQ_PATIENT_DB_CSV instead of CRIO daily export
-  USE_BQ_PATIENT_DB: false,
+  USE_BQ_PATIENT_DB: true,
 
   // Brand Colors (match CSS :root variables)
   BRAND: {
@@ -233,15 +233,15 @@ const CRP_CONFIG = {
     // After setup: publish the BQ_Visits tab as CSV, paste URL here, set USE_BQ_VISITS: true
     BQ_VISITS_CSV: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQSVnZBL93Zx5t88q97kGRfKvEvDonnTD6y506i806UAuNLWMvMsQUsvnxJe9BIiRTF0ktF1bUgvkj8/pub?gid=1281180825&single=true&output=csv',
     // BigQuery Studies — synced from CRIO BigQuery → BQ_Studies tab
-    BQ_STUDIES_CSV: '',
+    BQ_STUDIES_CSV: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQSVnZBL93Zx5t88q97kGRfKvEvDonnTD6y506i806UAuNLWMvMsQUsvnxJe9BIiRTF0ktF1bUgvkj8/pub?gid=1386284017&single=true&output=csv',
     // BigQuery Subjects — synced from CRIO BigQuery → BQ_Subjects tab
-    BQ_SUBJECTS_CSV: '',
+    BQ_SUBJECTS_CSV: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQSVnZBL93Zx5t88q97kGRfKvEvDonnTD6y506i806UAuNLWMvMsQUsvnxJe9BIiRTF0ktF1bUgvkj8/pub?gid=1716126752&single=true&output=csv',
     // BigQuery Study Status — study_details milestone dates → BQ_StudyStatus tab
-    BQ_STUDY_STATUS_CSV: '',
+    BQ_STUDY_STATUS_CSV: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQSVnZBL93Zx5t88q97kGRfKvEvDonnTD6y506i806UAuNLWMvMsQUsvnxJe9BIiRTF0ktF1bUgvkj8/pub?gid=1176065764&single=true&output=csv',
     // BigQuery Audit Log — appointment_audit_log → BQ_AuditLog tab
-    BQ_AUDIT_LOG_CSV: '',
+    BQ_AUDIT_LOG_CSV: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQSVnZBL93Zx5t88q97kGRfKvEvDonnTD6y506i806UAuNLWMvMsQUsvnxJe9BIiRTF0ktF1bUgvkj8/pub?gid=1290402264&single=true&output=csv',
     // BigQuery Patient DB — patient demographics → BQ_PatientDB tab
-    BQ_PATIENT_DB_CSV: '',
+    BQ_PATIENT_DB_CSV: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQSVnZBL93Zx5t88q97kGRfKvEvDonnTD6y506i806UAuNLWMvMsQUsvnxJe9BIiRTF0ktF1bUgvkj8/pub?gid=996237458&single=true&output=csv',
     // Looker — Study Status & Key Dates (published Google Sheet)
     LOOKER_STUDY_STATUS_CSV: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQrwoQwKCAiyv5xx_z0uXMQLHS5d2CUbzOj_qjxkZJYYe3Yxdu3i2T-rdQ9vtlDCBRTKfA1jDW_W0YW/pub?output=csv',
     // Finance Master Sheet — published key + tab GIDs for CSV access
