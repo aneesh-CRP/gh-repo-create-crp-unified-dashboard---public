@@ -2328,6 +2328,12 @@ const CRP_CONFIG = {
   USE_BQ_VISITS: true,
   // When true: uses BQ_STUDIES_CSV + BQ_SUBJECTS_CSV instead of ClickUp CRIO sync
   USE_BQ_STUDIES: false,
+  // When true: uses BQ_STUDY_STATUS_CSV instead of Looker Study Status
+  USE_BQ_STUDY_STATUS: false,
+  // When true: uses BQ_AUDIT_LOG_CSV instead of Audit Log Google Sheet
+  USE_BQ_AUDIT_LOG: false,
+  // When true: uses BQ_PATIENT_DB_CSV instead of CRIO daily export
+  USE_BQ_PATIENT_DB: false,
 
   // Brand Colors (match CSS :root variables)
   BRAND: {
@@ -2364,7 +2370,13 @@ const CRP_CONFIG = {
     BQ_STUDIES_CSV: '',
     // BigQuery Subjects — synced from CRIO BigQuery → BQ_Subjects tab
     BQ_SUBJECTS_CSV: '',
-    // Looker — Study Status & Key Dates (published Google Sheet) — CANNOT migrate to BQ (no milestone dates)
+    // BigQuery Study Status — study_details milestone dates → BQ_StudyStatus tab
+    BQ_STUDY_STATUS_CSV: '',
+    // BigQuery Audit Log — appointment_audit_log → BQ_AuditLog tab
+    BQ_AUDIT_LOG_CSV: '',
+    // BigQuery Patient DB — patient demographics → BQ_PatientDB tab
+    BQ_PATIENT_DB_CSV: '',
+    // Looker — Study Status & Key Dates (published Google Sheet)
     LOOKER_STUDY_STATUS_CSV: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQrwoQwKCAiyv5xx_z0uXMQLHS5d2CUbzOj_qjxkZJYYe3Yxdu3i2T-rdQ9vtlDCBRTKfA1jDW_W0YW/pub?output=csv',
     // Finance Master Sheet — published key + tab GIDs for CSV access
     FINANCE_PUB_KEY: '2PACX-1vQXxreb6lrZHej3luMOSI07ditFm6mmGHIHrxWu9BkTfsvk0OLk_gx7o_JIY34UIgroGIKgEYbVdC_V',
@@ -7199,7 +7211,7 @@ function renderCRIOvsQB() {
 // PATIENT DATABASE — Cross-reference with active study patients
 // ═══════════════════════════════════════════════════
 async function fetchPatientDB() {
-  const url = CRP_CONFIG.PATIENT_DB_URL;
+  const url = _getPatientDBURL();
   if (!url) { _log('CRP: No patient DB URL configured'); return false; }
   _log('CRP: Fetching patient database...');
   try {
@@ -7474,7 +7486,7 @@ async function connectSheets() {
     </div>`;
 
   try {
-    const [rows1, legacyCancels, auditRows] = await Promise.all([fetchCSV(url1), fetchCSV(url2).catch(() => []), fetchCSV(AUDIT_LOG_URL).catch(() => [])]);
+    const [rows1, legacyCancels, auditRows] = await Promise.all([fetchCSV(url1), fetchCSV(url2).catch(() => []), fetchCSV(_getAuditLogURL()).catch(() => [])]);
     DATA = processLiveData(rows1, legacyCancels, auditRows);
     window._lastLiveData = DATA;
     document.getElementById('data-source-badge').textContent = '🔗 Live Google Sheets';
@@ -8476,7 +8488,7 @@ async function refreshData() {
     const [rows1, legacyCancels, auditRows] = await Promise.all([
       _fetchWithFallback(_getVisitsURL(), LIVE_URL1, 'Visits', 10),
       _fetchWithFallback(_getCancelURL(), LIVE_URL2_LEGACY, 'Cancels', 5).catch(() => []),
-      fetchCSV(AUDIT_LOG_URL).catch(() => [])
+      fetchCSV(_getAuditLogURL()).catch(() => [])
     ]);
     const newData = processLiveData(rows1, legacyCancels, auditRows);
     if ((newData.upcomingTotal || 0) < 5 && (DATA.upcomingTotal || 0) > 5) {
@@ -10935,7 +10947,8 @@ async function fetchMedicalRecords(attempt) {
 // ============================================================
 var LOOKER_STUDY_STATUS = {};  // Indexed by study_key (string)
 async function fetchLookerStudyStatus() {
-  var url = CRP_CONFIG.DATA_FEEDS.LOOKER_STUDY_STATUS_CSV;
+  var url = (CRP_CONFIG.USE_BQ_STUDY_STATUS && CRP_CONFIG.DATA_FEEDS.BQ_STUDY_STATUS_CSV)
+    ? CRP_CONFIG.DATA_FEEDS.BQ_STUDY_STATUS_CSV : CRP_CONFIG.DATA_FEEDS.LOOKER_STUDY_STATUS_CSV;
   if (!url) return;
   try {
     var rows = await fetchCSV(url);
@@ -13045,6 +13058,21 @@ function _getVisitsURL() {
   return LIVE_URL1;
 }
 
+// Audit log URL — BQ or legacy sheet
+function _getAuditLogURL() {
+  if (CRP_CONFIG.USE_BQ_AUDIT_LOG && CRP_CONFIG.DATA_FEEDS.BQ_AUDIT_LOG_CSV) {
+    return CRP_CONFIG.DATA_FEEDS.BQ_AUDIT_LOG_CSV;
+  }
+  return AUDIT_LOG_URL;
+}
+// Patient DB URL — BQ or legacy CRIO export
+function _getPatientDBURL() {
+  if (CRP_CONFIG.USE_BQ_PATIENT_DB && CRP_CONFIG.DATA_FEEDS.BQ_PATIENT_DB_CSV) {
+    return CRP_CONFIG.DATA_FEEDS.BQ_PATIENT_DB_CSV;
+  }
+  return CRP_CONFIG.PATIENT_DB_URL;
+}
+
 // ═══ BQ FALLBACK: fetch with automatic Looker fallback ═══
 // If BQ fetch fails or returns < minRows, silently falls back to Looker
 async function _fetchWithFallback(bqUrl, lookerUrl, label, minRows) {
@@ -14455,7 +14483,7 @@ async function _crpInit() {
       const [rows1, legacyCancels, auditRows] = await Promise.all([
         _fetchWithFallback(_getVisitsURL(), LIVE_URL1, 'Visits', 10),
         _fetchWithFallback(_getCancelURL(), LIVE_URL2_LEGACY, 'Cancels', 5).catch(() => []),
-        fetchCSV(AUDIT_LOG_URL).catch(e => { console.warn('CRP: Audit log fetch failed, continuing without:', e.message); setHealthChip('dh-audit','fail','Audit Log'); return []; })
+        fetchCSV(_getAuditLogURL()).catch(e => { console.warn('CRP: Audit log fetch failed, continuing without:', e.message); setHealthChip('dh-audit','fail','Audit Log'); return []; })
       ]);
       _lastCrioRows = rows1;
       _lastAuditRows = auditRows;
@@ -14494,7 +14522,7 @@ async function _crpInit() {
         const [rows1b, legacyB, auditB] = await Promise.all([
           _fetchWithFallback(_getVisitsURL(), LIVE_URL1, 'Visits-retry', 10),
           _fetchWithFallback(_getCancelURL(), LIVE_URL2_LEGACY, 'Cancels-retry', 5).catch(() => []),
-          fetchCSV(AUDIT_LOG_URL).catch(() => [])
+          fetchCSV(_getAuditLogURL()).catch(() => [])
         ]);
         _lastCrioRows = rows1b;
         _lastAuditRows = auditB;
@@ -14627,7 +14655,7 @@ async function _crpInit() {
       const [rows1, legacyCancels, auditRows] = await Promise.all([
         _fetchWithFallback(_getVisitsURL(), LIVE_URL1, 'Visits-auto', 10),
         _fetchWithFallback(_getCancelURL(), LIVE_URL2_LEGACY, 'Cancels-auto', 5).catch(() => []),
-        fetchCSV(AUDIT_LOG_URL).catch(() => [])
+        fetchCSV(_getAuditLogURL()).catch(() => [])
       ]);
       const newData = processLiveData(rows1, legacyCancels, auditRows);
       if ((newData.upcomingTotal || 0) < 5 && (DATA.upcomingTotal || 0) > 5) {

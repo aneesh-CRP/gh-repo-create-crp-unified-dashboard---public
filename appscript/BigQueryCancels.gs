@@ -1,12 +1,16 @@
 /**
  * CRP Dashboard — BigQuery Data Sync
  *
- * Two sync functions:
- *   syncBigQueryCancels()  — appointment_audit_log (change_type=4) → BQ_Cancellations tab
- *   syncBigQueryVisits()   — calendar_appointment (all statuses)   → BQ_Visits tab
+ * Sync functions (all write to same Google Sheet, different tabs):
+ *   syncBigQueryCancels()     — appointment_audit_log (change_type=4) → BQ_Cancellations
+ *   syncBigQueryVisits()      — calendar_appointment (all statuses)   → BQ_Visits
+ *   syncBigQueryStudies()     — study + study_details + study_finance → BQ_Studies
+ *   syncBigQuerySubjects()    — subject enrollment statuses           → BQ_Subjects
+ *   syncBigQueryStudyStatus() — study_details milestone dates         → BQ_StudyStatus
+ *   syncBigQueryAuditLog()    — appointment_audit_log (all changes)   → BQ_AuditLog
+ *   syncBigQueryPatientDB()   — patient demographics                  → BQ_PatientDB
  *
- * Both write to the same Google Sheet with headers matching the Looker CSV format.
- * Self-bootstrapping: first manual run auto-creates 15-minute triggers for both.
+ * Self-bootstrapping: first manual run auto-creates 15-minute trigger.
  */
 
 var BQ_CONFIG = {
@@ -15,8 +19,46 @@ var BQ_CONFIG = {
   SHEET_ID: '1p-igO6CFkciRvJ16pUhZ3ket0WDpkhNA3d7N2AD5rcY',
   TAB_NAME: 'BQ_Cancellations',
   LOOKBACK_DAYS: 90,
-  MAX_ROWS: 10000
+  MAX_ROWS: 50000
 };
+
+/** Generic: run query, write to sheet tab, return row count */
+function _syncQueryToSheet(query, tabName, label, headerMap) {
+  Logger.log('Running ' + label + '...');
+  var result;
+  try {
+    result = BigQuery.Jobs.query({ query: query, useLegacySql: false, maxResults: BQ_CONFIG.MAX_ROWS, timeoutMs: 120000 }, BQ_CONFIG.PROJECT_ID);
+  } catch (e) {
+    Logger.log(label + ' query failed: ' + e.message);
+    throw e;
+  }
+  var allRows = result.rows || [];
+  while (result.pageToken) {
+    result = BigQuery.Jobs.getQueryResults(BQ_CONFIG.PROJECT_ID, result.jobReference.jobId, { pageToken: result.pageToken, maxResults: BQ_CONFIG.MAX_ROWS });
+    allRows = allRows.concat(result.rows || []);
+  }
+  var schema = result.schema.fields.map(function(f) { return f.name; });
+  var headers = headerMap ? schema.map(function(n) { return headerMap[n] || n; }) : schema;
+  var data = allRows.map(function(row) { return row.f.map(function(cell) { return cell.v || ''; }); });
+  Logger.log(label + ' returned ' + data.length + ' rows');
+
+  var ss = SpreadsheetApp.openById(BQ_CONFIG.SHEET_ID);
+  var sheet = ss.getSheetByName(tabName);
+  if (!sheet) sheet = ss.insertSheet(tabName);
+  var neededRows = Math.max(data.length + 2, 2);
+  var neededCols = headers.length;
+  if (sheet.getMaxRows() > neededRows) sheet.deleteRows(neededRows + 1, sheet.getMaxRows() - neededRows);
+  if (sheet.getMaxColumns() > neededCols) sheet.deleteColumns(neededCols + 1, sheet.getMaxColumns() - neededCols);
+  sheet.clear();
+  sheet.getRange(1, 1, neededRows, neededCols).setNumberFormat('@');
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  if (data.length > 0) sheet.getRange(2, 1, data.length, headers.length).setValues(data);
+  sheet.getRange(1, 1).setNote('Last synced: ' + new Date().toISOString());
+
+  Logger.log(tabName + ' synced: ' + data.length + ' rows, ' + headers.length + ' columns');
+  Logger.log('Sheet URL: ' + ss.getUrl());
+  return data.length;
+}
 
 function syncBigQueryCancels() {
   _ensureSyncTrigger();
@@ -370,109 +412,49 @@ function _buildVisitsQuery() {
 
 // ═══════════════════════════════════════════════════════════════════
 // CRIO STUDIES SYNC — replaces ClickUp CRIO_STUDIES_CSV
+// Includes study_details for milestone dates + study_finance for revenue
 // ═══════════════════════════════════════════════════════════════════
 
 function syncBigQueryStudies() {
-  var query = _buildStudiesQuery();
-  Logger.log('Running BigQuery studies sync...');
-
-  var result;
-  try {
-    result = BigQuery.Jobs.query({ query: query, useLegacySql: false, maxResults: BQ_CONFIG.MAX_ROWS, timeoutMs: 60000 }, BQ_CONFIG.PROJECT_ID);
-  } catch (e) {
-    Logger.log('BigQuery studies query failed: ' + e.message);
-    throw e;
-  }
-
-  var allRows = result.rows || [];
-  while (result.pageToken) {
-    result = BigQuery.Jobs.getQueryResults(BQ_CONFIG.PROJECT_ID, result.jobReference.jobId, { pageToken: result.pageToken, maxResults: BQ_CONFIG.MAX_ROWS });
-    allRows = allRows.concat(result.rows || []);
-  }
-
-  var HEADER_MAP = {
-    'study_key': 'study_key', 'protocol_number': 'protocol_number', 'study_name': 'study_name',
-    'status': 'status', 'coordinator': 'coordinator', 'investigator': 'investigator',
-    'indication': 'indication', 'subject_count': 'subject_count', 'target_enrollment': 'target_enrollment',
-    'sponsor': 'sponsor', 'phase': 'phase', 'date_created': 'date_created', 'last_updated': 'last_updated',
-    'start_date': 'start_date', 'end_date': 'end_date', 'external_study_number': 'external_study_number',
-    'site_name': 'site_name', 'site_key': 'site_key', 'total_revenue': 'total_revenue',
-    'revenue_subjects': 'revenue_subjects', 'snapshot_date': 'snapshot_date'
-  };
-
-  var schema = result.schema.fields.map(function(f) { return f.name; });
-  var headers = schema.map(function(name) { return HEADER_MAP[name] || name; });
-  var data = allRows.map(function(row) { return row.f.map(function(cell) { return cell.v || ''; }); });
-
-  Logger.log('Studies query returned ' + data.length + ' rows');
-
-  var ss = SpreadsheetApp.openById(BQ_CONFIG.SHEET_ID);
-  var sheet = ss.getSheetByName('BQ_Studies');
-  if (!sheet) sheet = ss.insertSheet('BQ_Studies');
-
-  var neededRows = Math.max(data.length + 4, 2);
-  var neededCols = headers.length;
-  if (sheet.getMaxRows() > neededRows) sheet.deleteRows(neededRows + 1, sheet.getMaxRows() - neededRows);
-  if (sheet.getMaxColumns() > neededCols) sheet.deleteColumns(neededCols + 1, sheet.getMaxColumns() - neededCols);
-
-  sheet.clear();
-  sheet.getRange(1, 1, neededRows, neededCols).setNumberFormat('@');
-  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
-  if (data.length > 0) sheet.getRange(2, 1, data.length, headers.length).setValues(data);
-  sheet.getRange(1, 1).setNote('Last synced: ' + new Date().toISOString());
-
-  Logger.log('BQ Studies synced: ' + data.length + ' rows, ' + headers.length + ' columns');
-  return data.length;
+  return _syncQueryToSheet(_buildStudiesQuery(), 'BQ_Studies', 'BigQuery studies sync', null);
 }
 
 function _buildStudiesQuery() {
   var project = BQ_CONFIG.PROJECT_ID;
   var ds = BQ_CONFIG.DATASET;
+  var t = '`' + project + '.' + ds + '.';
 
   return 'SELECT ' +
     'CAST(st.study_key AS STRING) AS study_key, ' +
     'COALESCE(st.protocol_number, \'\') AS protocol_number, ' +
-    'CASE ' +
-    '  WHEN COALESCE(st.nickname, \'\') != \'\' THEN st.nickname ' +
+    'CASE WHEN COALESCE(st.nickname, \'\') != \'\' THEN st.nickname ' +
     '  WHEN spon.name IS NOT NULL AND COALESCE(st.protocol_number, \'\') != \'\' THEN CONCAT(spon.name, \' - \', st.protocol_number) ' +
-    '  WHEN COALESCE(st.protocol_number, \'\') != \'\' THEN st.protocol_number ' +
-    '  ELSE \'\' ' +
-    'END AS study_name, ' +
-    'CASE st.status ' +
-    '  WHEN 0 THEN \'Pre-Site Qualification\' ' +
-    '  WHEN 1 THEN \'Site Qualification\' ' +
-    '  WHEN 2 THEN \'Start Up\' ' +
-    '  WHEN 3 THEN \'Enrolling\' ' +
-    '  WHEN 4 THEN \'Maintenance\' ' +
-    '  WHEN 5 THEN \'Closeout\' ' +
-    '  WHEN 6 THEN \'Closed\' ' +
-    '  ELSE CAST(st.status AS STRING) ' +
-    'END AS status, ' +
-    // Coordinator — first user linked to study via study_team or creator
-    '\'\' AS coordinator, ' +
-    '\'\' AS investigator, ' +
-    'COALESCE(st.indications, \'\') AS indication, ' +
-    '(SELECT COUNT(*) FROM `' + project + '.' + ds + '.subject` sub WHERE sub.study_key = st.study_key AND sub._fivetran_deleted = false) AS subject_count, ' +
+    '  WHEN COALESCE(st.protocol_number, \'\') != \'\' THEN st.protocol_number ELSE \'\' END AS study_name, ' +
+    'CASE st.status WHEN 0 THEN \'Pre-Site Qualification\' WHEN 1 THEN \'Site Qualification\' WHEN 2 THEN \'Start Up\' WHEN 3 THEN \'Enrolling\' WHEN 4 THEN \'Maintenance\' WHEN 5 THEN \'Closeout\' WHEN 6 THEN \'Closed\' ELSE CAST(st.status AS STRING) END AS status, ' +
+    'COALESCE(sd.investigator_name, \'\') AS investigator, ' +
+    'COALESCE(st.indications, sd.primary_indication, \'\') AS indication, ' +
+    'COALESCE(sd.specialty, \'\') AS specialty, ' +
+    '(SELECT COUNT(*) FROM ' + t + 'subject` sub WHERE sub.study_key = st.study_key AND sub._fivetran_deleted = false) AS subject_count, ' +
     'COALESCE(CAST(st.target_enrollment AS STRING), \'\') AS target_enrollment, ' +
     'COALESCE(spon.name, \'\') AS sponsor, ' +
-    'COALESCE(ct.phase, \'\') AS phase, ' +
+    'CASE ct.phase WHEN 1 THEN \'Phase 1\' WHEN 2 THEN \'Phase 2\' WHEN 3 THEN \'Phase 3\' WHEN 4 THEN \'Phase 4\' ELSE \'\' END AS phase, ' +
     'FORMAT_DATETIME(\'%Y-%m-%d\', st.date_created) AS date_created, ' +
     'FORMAT_DATETIME(\'%Y-%m-%d\', st.last_updated) AS last_updated, ' +
-    '\'\' AS start_date, ' +
-    '\'\' AS end_date, ' +
+    'COALESCE(FORMAT_DATETIME(\'%Y-%m-%d\', sd.enrollment_start_date), \'\') AS start_date, ' +
+    'COALESCE(FORMAT_DATETIME(\'%Y-%m-%d\', sd.enrollment_close_date), \'\') AS end_date, ' +
     'COALESCE(st.external_id, \'\') AS external_study_number, ' +
     'COALESCE(si.name, \'\') AS site_name, ' +
     'CAST(st.site_key AS STRING) AS site_key, ' +
-    // Revenue — not available in BQ Fivetran sync (no study_payment table)
-    '0 AS total_revenue, ' +
-    '0 AS revenue_subjects, ' +
+    'COALESCE(CAST(sf.total_revenue AS STRING), \'0\') AS total_revenue, ' +
+    'COALESCE(CAST(sf.total_randomized AS STRING), \'0\') AS revenue_subjects, ' +
     'FORMAT_DATETIME(\'%Y-%m-%d\', CURRENT_DATETIME()) AS snapshot_date ' +
-    'FROM `' + project + '.' + ds + '.study` st ' +
-    'LEFT JOIN `' + project + '.' + ds + '.sponsor` spon ON st.sponsor_key = spon.sponsor_key ' +
-    'LEFT JOIN `' + project + '.' + ds + '.site` si ON st.site_key = si.site_key ' +
-    'LEFT JOIN `' + project + '.' + ds + '.clinical_trial` ct ON st.clinical_trial_key = ct.clinical_trial_key ' +
-    'WHERE st._fivetran_deleted = false ' +
-    'AND st.is_active = 1 ' +
+    'FROM ' + t + 'study` st ' +
+    'LEFT JOIN ' + t + 'sponsor` spon ON st.sponsor_key = spon.sponsor_key ' +
+    'LEFT JOIN ' + t + 'site` si ON st.site_key = si.site_key ' +
+    'LEFT JOIN ' + t + 'clinical_trial` ct ON st.clinical_trial_key = ct.clinical_trial_key ' +
+    'LEFT JOIN ' + t + 'study_details` sd ON st.study_key = sd.study_key ' +
+    'LEFT JOIN ' + t + 'study_finance` sf ON st.study_key = sf.study_key ' +
+    'WHERE st._fivetran_deleted = false AND st.is_active = 1 ' +
     'ORDER BY st.study_key';
 }
 
@@ -481,45 +463,7 @@ function _buildStudiesQuery() {
 // ═══════════════════════════════════════════════════════════════════
 
 function syncBigQuerySubjects() {
-  var query = _buildSubjectsQuery();
-  Logger.log('Running BigQuery subjects sync...');
-
-  var result;
-  try {
-    result = BigQuery.Jobs.query({ query: query, useLegacySql: false, maxResults: BQ_CONFIG.MAX_ROWS, timeoutMs: 60000 }, BQ_CONFIG.PROJECT_ID);
-  } catch (e) {
-    Logger.log('BigQuery subjects query failed: ' + e.message);
-    throw e;
-  }
-
-  var allRows = result.rows || [];
-  while (result.pageToken) {
-    result = BigQuery.Jobs.getQueryResults(BQ_CONFIG.PROJECT_ID, result.jobReference.jobId, { pageToken: result.pageToken, maxResults: BQ_CONFIG.MAX_ROWS });
-    allRows = allRows.concat(result.rows || []);
-  }
-
-  var schema = result.schema.fields.map(function(f) { return f.name; });
-  var data = allRows.map(function(row) { return row.f.map(function(cell) { return cell.v || ''; }); });
-
-  Logger.log('Subjects query returned ' + data.length + ' rows');
-
-  var ss = SpreadsheetApp.openById(BQ_CONFIG.SHEET_ID);
-  var sheet = ss.getSheetByName('BQ_Subjects');
-  if (!sheet) sheet = ss.insertSheet('BQ_Subjects');
-
-  var neededRows = Math.max(data.length + 4, 2);
-  var neededCols = schema.length;
-  if (sheet.getMaxRows() > neededRows) sheet.deleteRows(neededRows + 1, sheet.getMaxRows() - neededRows);
-  if (sheet.getMaxColumns() > neededCols) sheet.deleteColumns(neededCols + 1, sheet.getMaxColumns() - neededCols);
-
-  sheet.clear();
-  sheet.getRange(1, 1, neededRows, neededCols).setNumberFormat('@');
-  sheet.getRange(1, 1, 1, schema.length).setValues([schema]);
-  if (data.length > 0) sheet.getRange(2, 1, data.length, schema.length).setValues(data);
-  sheet.getRange(1, 1).setNote('Last synced: ' + new Date().toISOString());
-
-  Logger.log('BQ Subjects synced: ' + data.length + ' rows, ' + schema.length + ' columns');
-  return data.length;
+  return _syncQueryToSheet(_buildSubjectsQuery(), 'BQ_Subjects', 'BigQuery subjects sync', null);
 }
 
 function _buildSubjectsQuery() {
@@ -549,6 +493,170 @@ function _buildSubjectsQuery() {
     'ORDER BY sub.study_key, sub.subject_key';
 }
 
+// ═══════════════════════════════════════════════════════════════════
+// STUDY STATUS SYNC — replaces Looker Study Status CSV
+// study_details has ALL milestone dates: IRB, SIV, enrollment, etc.
+// ═══════════════════════════════════════════════════════════════════
+
+function syncBigQueryStudyStatus() {
+  var HEADER_MAP = {
+    'study_key': 'Study Key (Back End)', 'study_name': 'Study Name',
+    'phase': 'Phase', 'status': 'Study Status',
+    'enrollment_start': 'Enrollment Start Date', 'enrollment_close': 'Enrollment Close Date',
+    'first_patient_screened': 'First Patient Screened Date', 'first_patient_randomized': 'First Patient Randomized Date',
+    'site_initiation': 'Site Initiation Date', 'irb_approval': 'Irb Approval Date',
+    'irb_renewal': 'Irb Renewal Date', 'contract_signed': 'Contract Signed Date',
+    'regulatory_confirmed': 'Regulatory Confirmed Date', 'closeout': 'Closeout Date',
+    'last_updated': 'Last Updated Date', 'investigator_meeting': 'Investigator Meeting Date',
+    'presite_selection': 'Presite Selection Date', 'snapshot_date': 'snapshot_date'
+  };
+  return _syncQueryToSheet(_buildStudyStatusQuery(), 'BQ_StudyStatus', 'BigQuery study status sync', HEADER_MAP);
+}
+
+function _buildStudyStatusQuery() {
+  var project = BQ_CONFIG.PROJECT_ID;
+  var ds = BQ_CONFIG.DATASET;
+  var t = '`' + project + '.' + ds + '.';
+
+  return 'SELECT ' +
+    'CAST(st.study_key AS STRING) AS study_key, ' +
+    'CASE WHEN COALESCE(st.nickname, \'\') != \'\' THEN st.nickname ' +
+    '  WHEN spon.name IS NOT NULL AND COALESCE(st.protocol_number, \'\') != \'\' THEN CONCAT(spon.name, \' - \', st.protocol_number) ' +
+    '  WHEN COALESCE(st.protocol_number, \'\') != \'\' THEN st.protocol_number ELSE \'\' END AS study_name, ' +
+    'CASE ct.phase WHEN 1 THEN \'Phase 1\' WHEN 2 THEN \'Phase 2\' WHEN 3 THEN \'Phase 3\' WHEN 4 THEN \'Phase 4\' ELSE \'\' END AS phase, ' +
+    'CASE st.status WHEN 0 THEN \'Pre-Site Qualification\' WHEN 1 THEN \'Site Qualification\' WHEN 2 THEN \'Start Up\' WHEN 3 THEN \'Enrolling\' WHEN 4 THEN \'Maintenance\' WHEN 5 THEN \'Closeout\' WHEN 6 THEN \'Closed\' ELSE \'\' END AS status, ' +
+    'COALESCE(FORMAT_DATETIME(\'%Y-%m-%d\', sd.enrollment_start_date), \'\') AS enrollment_start, ' +
+    'COALESCE(FORMAT_DATETIME(\'%Y-%m-%d\', sd.enrollment_close_date), \'\') AS enrollment_close, ' +
+    'COALESCE(FORMAT_DATETIME(\'%Y-%m-%d\', sd.first_patient_screened_date), \'\') AS first_patient_screened, ' +
+    'COALESCE(FORMAT_DATETIME(\'%Y-%m-%d\', sd.first_patient_randomized_date), \'\') AS first_patient_randomized, ' +
+    'COALESCE(FORMAT_DATETIME(\'%Y-%m-%d\', sd.site_initiation_date), \'\') AS site_initiation, ' +
+    'COALESCE(FORMAT_DATETIME(\'%Y-%m-%d\', sd.irb_approval_date), \'\') AS irb_approval, ' +
+    'COALESCE(FORMAT_DATETIME(\'%Y-%m-%d\', sd.irb_renewal_date), \'\') AS irb_renewal, ' +
+    'COALESCE(FORMAT_DATETIME(\'%Y-%m-%d\', sd.contract_signed_date), \'\') AS contract_signed, ' +
+    'COALESCE(FORMAT_DATETIME(\'%Y-%m-%d\', sd.regulatory_confirmed_date), \'\') AS regulatory_confirmed, ' +
+    'COALESCE(FORMAT_DATETIME(\'%Y-%m-%d\', sd.closeout_date), \'\') AS closeout, ' +
+    'COALESCE(FORMAT_DATETIME(\'%Y-%m-%d\', sd.last_updated), FORMAT_DATETIME(\'%Y-%m-%d\', st.last_updated), \'\') AS last_updated, ' +
+    'COALESCE(FORMAT_DATETIME(\'%Y-%m-%d\', sd.investigator_meeting_date), \'\') AS investigator_meeting, ' +
+    'COALESCE(FORMAT_DATETIME(\'%Y-%m-%d\', sd.presite_selection_date), \'\') AS presite_selection, ' +
+    'FORMAT_DATETIME(\'%Y-%m-%d\', CURRENT_DATETIME()) AS snapshot_date ' +
+    'FROM ' + t + 'study` st ' +
+    'LEFT JOIN ' + t + 'study_details` sd ON st.study_key = sd.study_key ' +
+    'LEFT JOIN ' + t + 'sponsor` spon ON st.sponsor_key = spon.sponsor_key ' +
+    'LEFT JOIN ' + t + 'clinical_trial` ct ON st.clinical_trial_key = ct.clinical_trial_key ' +
+    'WHERE st._fivetran_deleted = false AND st.is_active = 1 ' +
+    'ORDER BY st.study_key';
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// AUDIT LOG SYNC — replaces Audit Log Google Sheet
+// appointment_audit_log has all appointment changes (not just cancels)
+// ═══════════════════════════════════════════════════════════════════
+
+function syncBigQueryAuditLog() {
+  var HEADER_MAP = {
+    'site_name': 'Site Name', 'study_key': 'Study Key (Back End)', 'study_name': 'Study Name',
+    'subject_key': 'Subject Key (Back End)', 'subject_full_name': 'Subject Full Name',
+    'calendar_appointment_key': 'Calendar Appointment Key (back end)',
+    'visit_name': 'Name', 'date_changed': 'Date Changed',
+    'old_start': 'Old Start Time', 'new_start': 'New Start Time',
+    'old_end': 'Old End Time', 'new_end': 'New End Time',
+    'modified_by': 'Modified by user', 'affected_user': 'Affected user',
+    'appointment_for': 'Appointment For User', 'appointment_type': 'Appointment Type',
+    'change_type': 'Appointment Change Type', 'cancel_type': 'Appointment Cancellation Type',
+    'cancel_reason': 'Cancel Reason'
+  };
+  return _syncQueryToSheet(_buildAuditLogQuery(), 'BQ_AuditLog', 'BigQuery audit log sync', HEADER_MAP);
+}
+
+function _buildAuditLogQuery() {
+  var project = BQ_CONFIG.PROJECT_ID;
+  var ds = BQ_CONFIG.DATASET;
+  var t = '`' + project + '.' + ds + '.';
+
+  return 'SELECT ' +
+    'COALESCE(si.name, \'\') AS site_name, ' +
+    'CAST(aal.study_key AS STRING) AS study_key, ' +
+    'CASE WHEN COALESCE(st.nickname, \'\') != \'\' THEN st.nickname ' +
+    '  WHEN spon.name IS NOT NULL AND COALESCE(st.protocol_number, \'\') != \'\' THEN CONCAT(spon.name, \' - \', st.protocol_number) ' +
+    '  WHEN COALESCE(st.protocol_number, \'\') != \'\' THEN st.protocol_number ELSE \'\' END AS study_name, ' +
+    'CAST(aal.subject_key AS STRING) AS subject_key, ' +
+    'TRIM(CONCAT(COALESCE(sub.first_name, \'\'), \' \', COALESCE(sub.middle_name, \'\'), \' \', COALESCE(sub.last_name, \'\'))) AS subject_full_name, ' +
+    'CAST(aal.calendar_appointment_key AS STRING) AS calendar_appointment_key, ' +
+    'COALESCE(sv.name, \'\') AS visit_name, ' +
+    'FORMAT_DATETIME(\'%Y-%m-%d %H:%M:%S\', aal.date_created) AS date_changed, ' +
+    'COALESCE(FORMAT_DATETIME(\'%Y-%m-%d %H:%M\', aal.old_start), \'\') AS old_start, ' +
+    'COALESCE(FORMAT_DATETIME(\'%Y-%m-%d %H:%M\', aal.new_start), \'\') AS new_start, ' +
+    'COALESCE(FORMAT_DATETIME(\'%Y-%m-%d %H:%M\', aal.old_end), \'\') AS old_end, ' +
+    'COALESCE(FORMAT_DATETIME(\'%Y-%m-%d %H:%M\', aal.new_end), \'\') AS new_end, ' +
+    'CONCAT(COALESCE(mod_u.first_name, \'\'), \' \', COALESCE(mod_u.last_name, \'\')) AS modified_by, ' +
+    'CONCAT(COALESCE(by_u.first_name, \'\'), \' \', COALESCE(by_u.last_name, \'\')) AS affected_user, ' +
+    'CONCAT(COALESCE(coord.first_name, \'\'), \' \', COALESCE(coord.last_name, \'\')) AS appointment_for, ' +
+    'CASE aal.appointment_type WHEN 0 THEN \'Regular Visit\' WHEN 1 THEN \'Ad Hoc Visit\' WHEN 2 THEN \'General Appointment\' WHEN 3 THEN \'Block\' ELSE \'\' END AS appointment_type, ' +
+    'CASE aal.change_type WHEN 1 THEN \'Created\' WHEN 2 THEN \'Rescheduled\' WHEN 3 THEN \'Modified\' WHEN 4 THEN \'Cancelled\' WHEN 5 THEN \'Restored\' ELSE CAST(aal.change_type AS STRING) END AS change_type, ' +
+    'CASE aal.cancel_type WHEN 1 THEN \'No Show\' WHEN 2 THEN \'Site Cancelled\' WHEN 3 THEN \'Patient Cancelled\' ELSE \'\' END AS cancel_type, ' +
+    'COALESCE(REGEXP_REPLACE(aal.cancel_reason, r\'[\\x00-\\x1f]\', \' \'), \'\') AS cancel_reason ' +
+    'FROM ' + t + 'appointment_audit_log` aal ' +
+    'LEFT JOIN ' + t + 'study` st ON aal.study_key = st.study_key ' +
+    'LEFT JOIN ' + t + 'sponsor` spon ON st.sponsor_key = spon.sponsor_key ' +
+    'LEFT JOIN ' + t + 'site` si ON aal.site_key = si.site_key ' +
+    'LEFT JOIN ' + t + 'subject` sub ON aal.subject_key = sub.subject_key ' +
+    'LEFT JOIN ' + t + 'study_visit` sv ON aal.study_visit_key = sv.study_visit_key ' +
+    'LEFT JOIN ' + t + 'user` mod_u ON aal.by_user_key = mod_u.user_key ' +
+    'LEFT JOIN ' + t + 'user` by_u ON aal.by_user_key = by_u.user_key ' +
+    'LEFT JOIN ' + t + 'calendar_appointment` ca ON aal.calendar_appointment_key = ca.calendar_appointment_key ' +
+    'LEFT JOIN ' + t + 'user` coord ON ca.creator_key = coord.user_key ' +
+    'WHERE aal.date_created >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL ' + BQ_CONFIG.LOOKBACK_DAYS + ' DAY) ' +
+    'AND st.is_active = 1 ' +
+    'ORDER BY aal.date_created DESC';
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PATIENT DB SYNC — replaces CRIO Patient DB daily export
+// patient table has full demographics + contact info
+// ═══════════════════════════════════════════════════════════════════
+
+function syncBigQueryPatientDB() {
+  var HEADER_MAP = {
+    'patient_full_name': 'Patient Full Name', 'patient_status': 'Patient Status',
+    'email': 'Email', 'mobile_phone': 'Mobile Phone', 'home_phone': 'Home Phone',
+    'work_phone': 'Work Phone', 'record_number': 'Record Number',
+    'site_name': 'Site Name', 'city': 'City', 'state': 'State',
+    'gender': 'Gender', 'birth_date': 'Birth Date', 'patient_key': 'Patient Key',
+    'last_interaction_date': 'Last Interaction Date', 'rating': 'Rating',
+    'snapshot_date': 'snapshot_date'
+  };
+  return _syncQueryToSheet(_buildPatientDBQuery(), 'BQ_PatientDB', 'BigQuery patient DB sync', HEADER_MAP);
+}
+
+function _buildPatientDBQuery() {
+  var project = BQ_CONFIG.PROJECT_ID;
+  var ds = BQ_CONFIG.DATASET;
+  var t = '`' + project + '.' + ds + '.';
+
+  return 'SELECT ' +
+    'TRIM(CONCAT(COALESCE(p.first_name, \'\'), \' \', COALESCE(p.middle_name, \'\'), \' \', COALESCE(p.last_name, \'\'))) AS patient_full_name, ' +
+    'CASE p.status WHEN 0 THEN \'Available\' WHEN 1 THEN \'Not Available\' WHEN 2 THEN \'Active\' WHEN 3 THEN \'Do Not Contact\' ELSE \'Available\' END AS patient_status, ' +
+    'COALESCE(p.email, \'\') AS email, ' +
+    'COALESCE(p.mobile_phone, \'\') AS mobile_phone, ' +
+    'COALESCE(p.home_phone, \'\') AS home_phone, ' +
+    'COALESCE(p.work_phone, \'\') AS work_phone, ' +
+    'COALESCE(p.patient_id, CAST(p.patient_key AS STRING)) AS record_number, ' +
+    'COALESCE(si.name, \'\') AS site_name, ' +
+    'COALESCE(p.city, \'\') AS city, ' +
+    'COALESCE(p.state, \'\') AS state, ' +
+    'CASE p.gender WHEN 0 THEN \'Unknown\' WHEN 1 THEN \'Male\' WHEN 2 THEN \'Female\' WHEN 3 THEN \'Other\' ELSE \'\' END AS gender, ' +
+    'COALESCE(FORMAT_DATETIME(\'%Y-%m-%d\', p.birth_date), \'\') AS birth_date, ' +
+    'CAST(p.patient_key AS STRING) AS patient_key, ' +
+    'COALESCE(FORMAT_DATETIME(\'%Y-%m-%d\', p.last_interaction_date), \'\') AS last_interaction_date, ' +
+    'CAST(COALESCE(p.rating, 0) AS STRING) AS rating, ' +
+    'FORMAT_DATETIME(\'%Y-%m-%d\', CURRENT_DATETIME()) AS snapshot_date ' +
+    'FROM ' + t + 'patient` p ' +
+    'LEFT JOIN ' + t + 'site` si ON p.site_key = si.site_key ' +
+    'WHERE p._fivetran_deleted = false ' +
+    'AND p.status != 3 ' +  // Exclude "Do Not Contact"
+    'ORDER BY p.last_name, p.first_name';
+}
+
 /**
  * Runs all syncs in sequence. Use this as the single trigger target.
  */
@@ -558,7 +666,10 @@ function syncAllBigQuery() {
   syncBigQueryVisits();
   syncBigQueryStudies();
   syncBigQuerySubjects();
-  Logger.log('All BQ syncs complete');
+  syncBigQueryStudyStatus();
+  syncBigQueryAuditLog();
+  syncBigQueryPatientDB();
+  Logger.log('All BQ syncs complete — 7 tabs updated');
 }
 
 /**
