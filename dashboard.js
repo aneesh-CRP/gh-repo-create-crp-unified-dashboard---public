@@ -2455,11 +2455,12 @@ function buildScheduleTable() {
     var studyHtml = v.study_url
       ? '<a href="' + v.study_url + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="text-decoration:none;color:var(--navy);font-weight:600">' + studyText + linkSvg + '</a>'
       : studyText;
-    // Patient cell (escaped)
-    var patText = esc(v.patient||'—');
+    // Patient cell (PHI masked + escaped)
+    var patRaw = v.patient||'—';
+    var patText = esc(PHI_MASKED ? maskPHI(patRaw) : patRaw);
     var patHtml = v.patient_url
-      ? '<a href="' + v.patient_url + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="text-decoration:none;color:var(--navy);font-weight:600">' + patText + linkSvg + '</a>'
-      : patText;
+      ? '<a href="' + v.patient_url + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="text-decoration:none;color:var(--navy);font-weight:600" data-phi-original="' + esc(patRaw) + '">' + patText + linkSvg + '</a>'
+      : '<span data-phi-original="' + esc(patRaw) + '">' + patText + '</span>';
     // Investigator
     var invText = esc(v.investigator || '—');
     var invStyle = v.investigator ? 'font-size:11px;color:#7c3aed' : 'font-size:11px;color:#cbd5e1';
@@ -5621,6 +5622,8 @@ function processLiveData(allRows, legacyCancels, auditLog) {
   function normName(n)   { return (n||'').trim().replace(/\s+/g,' '); }
   function cleanCoord(n) { return COORD_MAP[normName(n).toLowerCase()] || normName(n); }
   function isCoord(n)    { return !EXCL_COORD.has(normName(n).toLowerCase()); }
+  // Expose globally for renderCrioStudies + mergeCrioIntoStudies
+  window.cleanCoord = cleanCoord;
 
   // ── Audit Log Coordinator Resolution ──
   // Build lookup maps from audit log to resolve the actual clinical coordinator
@@ -9159,7 +9162,7 @@ function renderCrioStudies() {
   var container = document.getElementById('crio-studies-container');
   if (!container || CRIO_STUDIES_DATA.length === 0) return;
   var esc = escapeHTML;
-  var cc = cleanCoord;
+  var cc = typeof cleanCoord === 'function' ? cleanCoord : function(n) { return (n || '').trim(); };
 
   // ── Build subject stats per study_key ──
   var subsByStudy = {};
@@ -12350,7 +12353,11 @@ function renderCoordProductivity() {
   var el = document.getElementById('coord-prod-container');
   var badge = document.getElementById('coord-prod-badge');
   if (!el || BQ_COORDINATOR_DATA.length === 0) return;
-  var data = BQ_COORDINATOR_DATA.sort(function(a, b) { return parseInt(b.visits_managed || 0) - parseInt(a.visits_managed || 0); });
+  // Filter to COORDINATORS only (exclude recruiters, admins, PIs)
+  var coordSet = new Set((CRP_CONFIG.COORDINATORS || []).map(function(n) { return n.toLowerCase(); }));
+  var data = BQ_COORDINATOR_DATA.filter(function(r) {
+    return coordSet.has((r.coordinator || '').toLowerCase());
+  }).sort(function(a, b) { return parseInt(b.visits_managed || 0) - parseInt(a.visits_managed || 0); });
   if (badge) badge.textContent = data.length + ' coordinators';
   var maxVisits = parseInt(data[0].visits_managed) || 1;
   var html = '';
