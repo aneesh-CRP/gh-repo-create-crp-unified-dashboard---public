@@ -750,7 +750,7 @@ const FEEDS = {
     FROM ${tbl('patient')} p WHERE p._fivetran_deleted = false
     UNION ALL
     SELECT 'fivetran_sync', 0, MAX(FORMAT_TIMESTAMP('%Y-%m-%d %H:%M', _fivetran_synced))
-    FROM ${tbl('study')}`
+    FROM ${tbl('patient')}`
   },
 };
 
