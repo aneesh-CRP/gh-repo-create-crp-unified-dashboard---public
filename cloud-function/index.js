@@ -216,7 +216,8 @@ const FEEDS = {
       COALESCE(sv.name, '') AS visit_name,
       CASE aal.appointment_type WHEN 0 THEN 'Regular Visit' WHEN 1 THEN 'Ad Hoc Visit' WHEN 2 THEN 'General Appointment' WHEN 3 THEN 'Block' ELSE '' END AS appointment_type,
       'cancelled' AS appointment_status,
-      CONCAT(COALESCE(inv.first_name, ''), ' ', COALESCE(inv.last_name, '')) AS investigator,
+      CAST(aal.calendar_appointment_key AS STRING) AS calendar_appointment_key,
+      COALESCE((SELECT CONCAT(u.first_name, ' ', u.last_name) FROM ${tbl('study_user')} su JOIN ${tbl('user')} u ON su.user_key = u.user_key WHERE su.study_key = aal.study_key AND su.role = 1 AND su.is_role_leader = 1 AND su._fivetran_deleted = false LIMIT 1), '') AS investigator,
       FORMAT_DATETIME('%Y-%m-%d', CURRENT_DATETIME()) AS snapshot_date
     FROM ${tbl('appointment_audit_log')} aal
     LEFT JOIN ${tbl('study')} st ON aal.study_key = st.study_key
@@ -238,7 +239,8 @@ const FEEDS = {
       subject_key_back_end: 'Subject Key (Back End)', staff_full_name: 'Staff Full Name',
       cancel_reason: 'Cancel Reason', appointment_cancellation_type: 'Appointment Cancellation Type',
       subject_status: 'Subject Status', visit_name: 'Name', appointment_type: 'Appointment Type',
-      appointment_status: 'Appointment Status', investigator: 'Investigator', snapshot_date: 'snapshot_date'
+      appointment_status: 'Appointment Status', calendar_appointment_key: 'Calendar Appointment Key (back end)',
+      investigator: 'Investigator', snapshot_date: 'snapshot_date'
     }
   },
 
@@ -249,7 +251,8 @@ const FEEDS = {
       COALESCE(st.protocol_number, '') AS protocol_number,
       ${STUDY_NAME_SQL} AS study_name,
       ${STUDY_STATUS_SQL} AS status,
-      COALESCE(sd.investigator_name, '') AS investigator,
+      COALESCE((SELECT CONCAT(u.first_name, ' ', u.last_name) FROM ${tbl('study_user')} su JOIN ${tbl('user')} u ON su.user_key = u.user_key WHERE su.study_key = st.study_key AND su.role = 3 AND su.is_role_leader = 1 AND su._fivetran_deleted = false LIMIT 1), '') AS coordinator,
+      COALESCE((SELECT CONCAT(u.first_name, ' ', u.last_name) FROM ${tbl('study_user')} su JOIN ${tbl('user')} u ON su.user_key = u.user_key WHERE su.study_key = st.study_key AND su.role = 1 AND su.is_role_leader = 1 AND su._fivetran_deleted = false LIMIT 1), sd.investigator_name, '') AS investigator,
       COALESCE(st.indications, sd.primary_indication, '') AS indication,
       COALESCE(sd.specialty, '') AS specialty,
       (SELECT COUNT(*) FROM ${tbl('subject')} sub WHERE sub.study_key = st.study_key AND sub._fivetran_deleted = false) AS subject_count,

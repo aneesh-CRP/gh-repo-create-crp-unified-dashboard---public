@@ -11052,12 +11052,20 @@ async function fetchCrioStudies() {
       try {
         var sRows = await fetchCSV(subjectsUrl);
         if (sRows && sRows.length > 0) {
+          // BQ sends mixed-case statuses — normalize to uppercase keys the dashboard expects
+          var _subStatusUp = {
+            'Enrolled':'ENROLLED','Screen Fail':'SCREEN_FAIL','Screening':'SCREENING',
+            'Scheduled V1':'SCHEDULED_V1','Prequalified':'PREQUALIFIED',
+            'No Show/Cancelled V1':'SCHEDULED_V1_NO_SHOW_CANCELLED',
+            'Discontinued':'DISCONTINUED','Completed':'COMPLETED','Interested':'INTERESTED'
+          };
           CRIO_SUBJECTS_DATA = sRows.map(function(r) {
+            var rawSt = r.status || '';
             return {
               subject_id: r.subject_id || '',
               study_key: r.study_key || '',
               protocol_number: r.protocol_number || '',
-              status: r.status || '',
+              status: _subStatusUp[rawSt] || rawSt,
             };
           });
           _log('CRIO Subjects loaded: ' + CRIO_SUBJECTS_DATA.length);

@@ -145,6 +145,7 @@ function syncBigQueryCancels() {
     'visit_name': 'Name',
     'appointment_type': 'Appointment Type',
     'appointment_status': 'Appointment Status',
+    'calendar_appointment_key': 'Calendar Appointment Key (back end)',
     'investigator': 'Investigator',
     'snapshot_date': 'snapshot_date'
   };
@@ -235,7 +236,9 @@ function _buildCancelQuery() {
     '  ELSE \'\' ' +
     'END AS appointment_type, ' +
     '\'cancelled\' AS appointment_status, ' +
-    'CONCAT(inv.first_name, \' \', inv.last_name) AS investigator, ' +
+    'CAST(aal.calendar_appointment_key AS STRING) AS calendar_appointment_key, ' +
+    // Investigator: PI from study_user role=1 (not the coordinator/canceller)
+    'COALESCE((SELECT CONCAT(u.first_name, \' \', u.last_name) FROM `' + project + '.' + ds + '.study_user` su JOIN `' + project + '.' + ds + '.user` u ON su.user_key = u.user_key WHERE su.study_key = aal.study_key AND su.role = 1 AND su.is_role_leader = 1 AND su._fivetran_deleted = false LIMIT 1), \'\') AS investigator, ' +
     'FORMAT_DATETIME(\'%Y-%m-%d\', CURRENT_DATETIME()) AS snapshot_date ' +
     'FROM `' + project + '.' + ds + '.appointment_audit_log` aal ' +
     'LEFT JOIN `' + project + '.' + ds + '.calendar_appointment` ca ON aal.calendar_appointment_key = ca.calendar_appointment_key ' +
@@ -472,7 +475,10 @@ function _buildStudiesQuery() {
     '  WHEN spon.name IS NOT NULL AND COALESCE(st.protocol_number, \'\') != \'\' THEN CONCAT(spon.name, \' - \', st.protocol_number) ' +
     '  WHEN COALESCE(st.protocol_number, \'\') != \'\' THEN st.protocol_number ELSE \'\' END AS study_name, ' +
     'CASE st.status WHEN 0 THEN \'Pre-Site Qualification\' WHEN 1 THEN \'Site Qualification\' WHEN 2 THEN \'Start Up\' WHEN 3 THEN \'Enrolling\' WHEN 4 THEN \'Maintenance\' WHEN 5 THEN \'Closeout\' WHEN 6 THEN \'Closed\' ELSE CAST(st.status AS STRING) END AS status, ' +
-    'COALESCE(sd.investigator_name, \'\') AS investigator, ' +
+    // Coordinator: role=3 lead coordinator per study
+    'COALESCE((SELECT CONCAT(u.first_name, \' \', u.last_name) FROM ' + t + 'study_user` su JOIN ' + t + 'user` u ON su.user_key = u.user_key WHERE su.study_key = st.study_key AND su.role = 3 AND su.is_role_leader = 1 AND su._fivetran_deleted = false LIMIT 1), \'\') AS coordinator, ' +
+    // Investigator: role=1 lead PI per study
+    'COALESCE((SELECT CONCAT(u.first_name, \' \', u.last_name) FROM ' + t + 'study_user` su JOIN ' + t + 'user` u ON su.user_key = u.user_key WHERE su.study_key = st.study_key AND su.role = 1 AND su.is_role_leader = 1 AND su._fivetran_deleted = false LIMIT 1), sd.investigator_name, \'\') AS investigator, ' +
     'COALESCE(st.indications, sd.primary_indication, \'\') AS indication, ' +
     'COALESCE(sd.specialty, \'\') AS specialty, ' +
     '(SELECT COUNT(*) FROM ' + t + 'subject` sub WHERE sub.study_key = st.study_key AND sub._fivetran_deleted = false) AS subject_count, ' +
