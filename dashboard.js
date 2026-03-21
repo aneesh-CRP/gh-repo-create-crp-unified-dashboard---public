@@ -4570,11 +4570,13 @@ async function fetchFinanceBQ() {
 }
 
 async function fetchFinanceLive() {
-  // Try BQ Cloud Function first
+  // BQ provides CRIO-side finance (invoices, revenue, stipends)
+  // Sheets provides the FULL picture including QuickBooks data
+  // Always load Sheets so QB vs CRIO tab works; BQ supplements with fresher CRIO data
+  var bqLoaded = false;
   if (CRP_CONFIG.USE_CLOUD_FUNCTION) {
-    var bqOk = await fetchFinanceBQ();
-    if (bqOk) return true;
-    _log('CRP Finance: BQ failed, falling back to Sheets...');
+    bqLoaded = await fetchFinanceBQ().catch(function() { return false; });
+    if (bqLoaded) _log('CRP Finance: BQ CRIO data loaded, continuing to Sheets for QB data...');
   }
 
   const pk = CRP_CONFIG.DATA_FEEDS.FINANCE_PUB_KEY;
