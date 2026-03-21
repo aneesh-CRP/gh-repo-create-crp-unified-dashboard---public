@@ -189,17 +189,16 @@ const CRP_CONFIG = {
   // When true: uses BQ_CANCELS_CSV for cancellation data instead of LIVE_URL2_LEGACY
   // Set to true only AFTER verifying BQ data matches existing data
   USE_BQ_CANCELS: true,
-  // When true: uses BQ_VISITS_CSV for upcoming visits instead of LIVE_URL1 (Looker)
-  // Set to false initially — enable after verifying BQ data matches Looker data
   USE_BQ_VISITS: true,
-  // When true: uses BQ_STUDIES_CSV + BQ_SUBJECTS_CSV instead of ClickUp CRIO sync
   USE_BQ_STUDIES: true,
-  // When true: uses BQ_STUDY_STATUS_CSV instead of Looker Study Status
   USE_BQ_STUDY_STATUS: true,
-  // When true: uses BQ_AUDIT_LOG_CSV instead of Audit Log Google Sheet
   USE_BQ_AUDIT_LOG: true,
-  // When true: uses BQ_PATIENT_DB_CSV instead of CRIO daily export
   USE_BQ_PATIENT_DB: true,
+
+  // Cloud Function — real-time BQ queries (1-3s, replaces Sheets CSV pipeline)
+  // Sheets CSV URLs remain as fallback if CF is down
+  CF_BASE: 'https://us-east1-crio-468120.cloudfunctions.net/crp-bq-api',
+  USE_CLOUD_FUNCTION: true,
 
   // Brand Colors (match CSS :root variables)
   BRAND: {
@@ -8813,8 +8812,9 @@ async function fetchMedicalRecords(attempt) {
 // ============================================================
 var LOOKER_STUDY_STATUS = {};  // Indexed by study_key (string)
 async function fetchLookerStudyStatus() {
-  var url = (CRP_CONFIG.USE_BQ_STUDY_STATUS && CRP_CONFIG.DATA_FEEDS.BQ_STUDY_STATUS_CSV)
-    ? CRP_CONFIG.DATA_FEEDS.BQ_STUDY_STATUS_CSV : CRP_CONFIG.DATA_FEEDS.LOOKER_STUDY_STATUS_CSV;
+  var url = _cfUrl('studyStatus')
+    || (CRP_CONFIG.USE_BQ_STUDY_STATUS && CRP_CONFIG.DATA_FEEDS.BQ_STUDY_STATUS_CSV)
+    || CRP_CONFIG.DATA_FEEDS.LOOKER_STUDY_STATUS_CSV;
   if (!url) return;
   try {
     var rows = await fetchCSV(url);
@@ -8861,10 +8861,12 @@ async function fetchCrioStudies() {
   if (_crioFetchInFlight) return;
   _crioFetchInFlight = true;
   try {
-    var studiesUrl = (CRP_CONFIG.USE_BQ_STUDIES && CRP_CONFIG.DATA_FEEDS.BQ_STUDIES_CSV)
-      ? CRP_CONFIG.DATA_FEEDS.BQ_STUDIES_CSV : CRP_CONFIG.DATA_FEEDS.CRIO_STUDIES_CSV;
-    var subjectsUrl = (CRP_CONFIG.USE_BQ_STUDIES && CRP_CONFIG.DATA_FEEDS.BQ_SUBJECTS_CSV)
-      ? CRP_CONFIG.DATA_FEEDS.BQ_SUBJECTS_CSV : CRP_CONFIG.DATA_FEEDS.CRIO_SUBJECTS_CSV;
+    var studiesUrl = _cfUrl('studies')
+      || (CRP_CONFIG.USE_BQ_STUDIES && CRP_CONFIG.DATA_FEEDS.BQ_STUDIES_CSV)
+      || CRP_CONFIG.DATA_FEEDS.CRIO_STUDIES_CSV;
+    var subjectsUrl = _cfUrl('subjects')
+      || (CRP_CONFIG.USE_BQ_STUDIES && CRP_CONFIG.DATA_FEEDS.BQ_SUBJECTS_CSV)
+      || CRP_CONFIG.DATA_FEEDS.CRIO_SUBJECTS_CSV;
     if (!studiesUrl) { _log('CRIO Studies CSV URL not configured'); return; }
     try {
       var rows = await fetchCSV(studiesUrl);
@@ -10924,38 +10926,67 @@ function _getVisitsURL() {
   return LIVE_URL1;
 }
 
-// Audit log URL — BQ or legacy sheet
+// Audit log URL — CF → BQ Sheet → legacy sheet
 function _getAuditLogURL() {
-  if (CRP_CONFIG.USE_BQ_AUDIT_LOG && CRP_CONFIG.DATA_FEEDS.BQ_AUDIT_LOG_CSV) {
-    return CRP_CONFIG.DATA_FEEDS.BQ_AUDIT_LOG_CSV;
-  }
+  var cf = _cfUrl('auditLog');
+  if (cf) return cf;
+  if (CRP_CONFIG.USE_BQ_AUDIT_LOG && CRP_CONFIG.DATA_FEEDS.BQ_AUDIT_LOG_CSV) return CRP_CONFIG.DATA_FEEDS.BQ_AUDIT_LOG_CSV;
   return AUDIT_LOG_URL;
 }
-// Patient DB URL — BQ or legacy CRIO export
+// Patient DB URL — CF → BQ Sheet → legacy CRIO export
 function _getPatientDBURL() {
-  if (CRP_CONFIG.USE_BQ_PATIENT_DB && CRP_CONFIG.DATA_FEEDS.BQ_PATIENT_DB_CSV) {
-    return CRP_CONFIG.DATA_FEEDS.BQ_PATIENT_DB_CSV;
-  }
+  var cf = _cfUrl('patientDB');
+  if (cf) return cf;
+  if (CRP_CONFIG.USE_BQ_PATIENT_DB && CRP_CONFIG.DATA_FEEDS.BQ_PATIENT_DB_CSV) return CRP_CONFIG.DATA_FEEDS.BQ_PATIENT_DB_CSV;
   return CRP_CONFIG.PATIENT_DB_URL;
 }
 
-// ═══ BQ FALLBACK: fetch with automatic Looker fallback ═══
-// If BQ fetch fails or returns < minRows, silently falls back to Looker
+// ═══ CLOUD FUNCTION URL BUILDER ═══
+function _cfUrl(feed) {
+  if (CRP_CONFIG.USE_CLOUD_FUNCTION && CRP_CONFIG.CF_BASE) {
+    return CRP_CONFIG.CF_BASE + '?feed=' + feed + '&format=csv';
+  }
+  return null;
+}
+
+// ═══ DATA FETCH: Cloud Function → Sheets CSV → Legacy fallback ═══
 async function _fetchWithFallback(bqUrl, lookerUrl, label, minRows) {
   minRows = minRows || 5;
-  if (!bqUrl || bqUrl === lookerUrl) return fetchCSV(lookerUrl);
-  try {
-    var rows = await fetchCSV(bqUrl);
-    if (rows.length >= minRows) {
-      _log('CRP BQ: ' + label + ' loaded ' + rows.length + ' rows from BigQuery');
-      return rows;
+
+  // Tier 1: Cloud Function (real-time, 1-3s)
+  var cfFeed = { 'Visits': 'visits', 'Cancels': 'cancels', 'Visits-retry': 'visits',
+    'Cancels-retry': 'cancels', 'Visits-auto': 'visits', 'Cancels-auto': 'cancels' }[label];
+  if (cfFeed) {
+    var cfEndpoint = _cfUrl(cfFeed);
+    if (cfEndpoint) {
+      try {
+        var cfRows = await fetchCSV(cfEndpoint);
+        if (cfRows.length >= minRows) {
+          _log('CRP CF: ' + label + ' loaded ' + cfRows.length + ' rows (real-time)');
+          return cfRows;
+        }
+      } catch(e) {
+        _log('CRP CF: ' + label + ' failed (' + e.message + ') — trying Sheets CSV');
+      }
     }
-    _log('CRP BQ: ' + label + ' returned only ' + rows.length + ' rows — falling back to Looker');
-  } catch(e) {
-    console.warn('CRP BQ: ' + label + ' fetch failed (' + e.message + ') — falling back to Looker');
   }
+
+  // Tier 2: Sheets CSV (5-10 min cache)
+  if (bqUrl && bqUrl !== lookerUrl) {
+    try {
+      var rows = await fetchCSV(bqUrl);
+      if (rows.length >= minRows) {
+        _log('CRP BQ: ' + label + ' loaded ' + rows.length + ' rows from Sheets CSV');
+        return rows;
+      }
+    } catch(e) {
+      console.warn('CRP BQ: ' + label + ' Sheets fetch failed (' + e.message + ')');
+    }
+  }
+
+  // Tier 3: Legacy (Looker/ClickUp)
   var fallback = await fetchCSV(lookerUrl);
-  _log('CRP BQ: ' + label + ' fallback loaded ' + fallback.length + ' rows from Looker');
+  _log('CRP: ' + label + ' fallback loaded ' + fallback.length + ' rows from legacy');
   setHealthChip('dh-crio', 'warn', 'CRIO (Looker fallback)');
   return fallback;
 }
