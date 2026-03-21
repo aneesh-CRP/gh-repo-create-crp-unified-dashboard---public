@@ -67,35 +67,52 @@ function getBqClient() {
   return { client: new BigQuery({ projectId: PROJECT }) };
 }
 
+function httpPost(url, body, token) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(url);
+    const req = https.request({ hostname: u.hostname, path: u.pathname + u.search, method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
+    }, res => { let d = ''; res.on('data', c => d += c); res.on('end', () => resolve(d)); });
+    req.on('error', reject); req.write(body); req.end();
+  });
+}
+
+function httpGet(url, token) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(url);
+    const req = https.request({ hostname: u.hostname, path: u.pathname + u.search, method: 'GET',
+      headers: { 'Authorization': 'Bearer ' + token }
+    }, res => { let d = ''; res.on('data', c => d += c); res.on('end', () => resolve(d)); });
+    req.on('error', reject); req.end();
+  });
+}
+
 async function runQuery(sql) {
   if (OAUTH.refreshToken) {
-    // Use REST API with user token
+    // Use REST API with user token + pagination
     const token = await getAccessToken();
-    const body = JSON.stringify({ query: sql, useLegacySql: false, maxResults: 50000 });
-    return new Promise((resolve, reject) => {
-      const req = https.request(`https://bigquery.googleapis.com/bigquery/v2/projects/${PROJECT}/queries`, {
-        method: 'POST',
-        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
-      }, res => {
-        let d = ''; res.on('data', c => d += c);
-        res.on('end', () => {
-          try {
-            const j = JSON.parse(d);
-            if (j.error) { reject(new Error(j.error.message)); return; }
-            const schema = (j.schema?.fields || []).map(f => f.name);
-            const rows = (j.rows || []).map(r => {
-              const obj = {};
-              r.f.forEach((c, i) => { obj[schema[i]] = c.v || ''; });
-              return obj;
-            });
-            resolve(rows);
-          } catch (e) { reject(new Error('BQ parse failed: ' + d.slice(0, 200))); }
-        });
-      });
-      req.on('error', reject);
-      req.write(body);
-      req.end();
+    const body = JSON.stringify({ query: sql, useLegacySql: false, maxResults: 50000, timeoutMs: 60000 });
+    const firstResult = await httpPost(`https://bigquery.googleapis.com/bigquery/v2/projects/${PROJECT}/queries`, body, token);
+    const j = JSON.parse(firstResult);
+    if (j.error) throw new Error(j.error.message);
+    const schema = (j.schema?.fields || []).map(f => f.name);
+    const parseRows = (rows) => (rows || []).map(r => {
+      const obj = {};
+      r.f.forEach((c, i) => { obj[schema[i]] = c.v || ''; });
+      return obj;
     });
+    let allRows = parseRows(j.rows);
+    // Paginate if needed
+    let pageToken = j.pageToken;
+    const jobId = j.jobReference?.jobId;
+    while (pageToken && jobId) {
+      const url = `https://bigquery.googleapis.com/bigquery/v2/projects/${PROJECT}/queries/${jobId}?pageToken=${pageToken}&maxResults=50000`;
+      const pageResult = await httpGet(url, token);
+      const p = JSON.parse(pageResult);
+      allRows = allRows.concat(parseRows(p.rows));
+      pageToken = p.pageToken;
+    }
+    return allRows;
   }
   // Fallback: use default SA
   const bq = new BigQuery({ projectId: PROJECT });
@@ -214,7 +231,15 @@ const FEEDS = {
     WHERE aal.change_type = 4
       AND aal.date_created >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 90 DAY)
       AND st.is_active = 1
-    ORDER BY aal.date_created DESC`
+    ORDER BY aal.date_created DESC`,
+    headers: {
+      subject_full_name: 'Subject Full Name', study_name: 'Study Name', study_key: 'Study Key',
+      site_name: 'Site Name', cancel_date: 'Cancel Date', scheduled_date: 'Scheduled Date',
+      subject_key_back_end: 'Subject Key (Back End)', staff_full_name: 'Staff Full Name',
+      cancel_reason: 'Cancel Reason', appointment_cancellation_type: 'Appointment Cancellation Type',
+      subject_status: 'Subject Status', visit_name: 'Name', appointment_type: 'Appointment Type',
+      appointment_status: 'Appointment Status', investigator: 'Investigator', snapshot_date: 'snapshot_date'
+    }
   },
 
   // ── 3. Studies ──
