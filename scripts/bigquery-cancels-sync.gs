@@ -22,6 +22,13 @@ var BQ_CONFIG = {
   MAX_ROWS: 50000
 };
 
+// Minimum expected rows per tab — if BQ returns fewer, something is wrong
+var MIN_ROWS = {
+  'BQ_Cancellations': 50, 'BQ_Visits': 50, 'BQ_Studies': 20,
+  'BQ_Subjects': 1000, 'BQ_StudyStatus': 20, 'BQ_AuditLog': 100,
+  'BQ_PatientDB': 5000
+};
+
 /** Generic: run query, write to sheet tab, return row count */
 function _syncQueryToSheet(query, tabName, label, headerMap) {
   Logger.log('Running ' + label + '...');
@@ -30,6 +37,7 @@ function _syncQueryToSheet(query, tabName, label, headerMap) {
     result = BigQuery.Jobs.query({ query: query, useLegacySql: false, maxResults: BQ_CONFIG.MAX_ROWS, timeoutMs: 120000 }, BQ_CONFIG.PROJECT_ID);
   } catch (e) {
     Logger.log(label + ' query failed: ' + e.message);
+    _logSyncHealth(tabName, 'FAIL', 0, e.message);
     throw e;
   }
   var allRows = result.rows || [];
@@ -41,6 +49,15 @@ function _syncQueryToSheet(query, tabName, label, headerMap) {
   var headers = headerMap ? schema.map(function(n) { return headerMap[n] || n; }) : schema;
   var data = allRows.map(function(row) { return row.f.map(function(cell) { return cell.v || ''; }); });
   Logger.log(label + ' returned ' + data.length + ' rows');
+
+  // Safety check: don't overwrite good data with empty/tiny results
+  var minExpected = MIN_ROWS[tabName] || 5;
+  if (data.length < minExpected) {
+    var msg = tabName + ': only ' + data.length + ' rows (min ' + minExpected + ') — keeping previous data';
+    Logger.log('WARNING: ' + msg);
+    _logSyncHealth(tabName, 'WARN', data.length, msg);
+    return -1;  // Signal: don't overwrite
+  }
 
   var ss = SpreadsheetApp.openById(BQ_CONFIG.SHEET_ID);
   var sheet = ss.getSheetByName(tabName);
@@ -57,7 +74,31 @@ function _syncQueryToSheet(query, tabName, label, headerMap) {
 
   Logger.log(tabName + ' synced: ' + data.length + ' rows, ' + headers.length + ' columns');
   Logger.log('Sheet URL: ' + ss.getUrl());
+  _logSyncHealth(tabName, 'OK', data.length, '');
   return data.length;
+}
+
+/** Log sync health to BQ_SyncHealth tab for monitoring */
+function _logSyncHealth(tabName, status, rows, error) {
+  try {
+    var ss = SpreadsheetApp.openById(BQ_CONFIG.SHEET_ID);
+    var sheet = ss.getSheetByName('BQ_SyncHealth');
+    if (!sheet) {
+      sheet = ss.insertSheet('BQ_SyncHealth');
+      sheet.getRange(1, 1, 1, 5).setValues([['Timestamp', 'Tab', 'Status', 'Rows', 'Error']]);
+    }
+    var lastRow = Math.min(sheet.getLastRow(), 500); // Cap at 500 rows
+    if (lastRow >= 500) {
+      // Trim old entries — keep last 400
+      sheet.deleteRows(2, 100);
+      lastRow = sheet.getLastRow();
+    }
+    sheet.getRange(lastRow + 1, 1, 1, 5).setValues([
+      [new Date().toISOString(), tabName, status, rows, error || '']
+    ]);
+  } catch (e) {
+    Logger.log('SyncHealth log failed: ' + e.message);
+  }
 }
 
 function syncBigQueryCancels() {
@@ -664,14 +705,21 @@ function _buildPatientDBQuery() {
  */
 function syncAllBigQuery() {
   _ensureAllTriggers();
-  syncBigQueryCancels();
-  syncBigQueryVisits();
-  syncBigQueryStudies();
-  syncBigQuerySubjects();
-  syncBigQueryStudyStatus();
-  syncBigQueryAuditLog();
-  syncBigQueryPatientDB();
-  Logger.log('All BQ syncs complete — 7 tabs updated');
+  var syncs = [
+    ['Cancels', syncBigQueryCancels],
+    ['Visits', syncBigQueryVisits],
+    ['Studies', syncBigQueryStudies],
+    ['Subjects', syncBigQuerySubjects],
+    ['StudyStatus', syncBigQueryStudyStatus],
+    ['AuditLog', syncBigQueryAuditLog],
+    ['PatientDB', syncBigQueryPatientDB]
+  ];
+  var ok = 0, fail = 0;
+  syncs.forEach(function(s) {
+    try { s[1](); ok++; }
+    catch (e) { fail++; Logger.log('SYNC FAILED: ' + s[0] + ' — ' + e.message); }
+  });
+  Logger.log('BQ sync complete: ' + ok + '/7 OK' + (fail ? ', ' + fail + ' failed' : ''));
 }
 
 /**
@@ -710,18 +758,41 @@ function _ensureTriggerFor(funcName) {
 }
 
 function createSyncTrigger() {
-  var triggers = ScriptApp.getProjectTriggers();
-  triggers.forEach(function(t) {
+  // Remove ALL old sync triggers
+  ScriptApp.getProjectTriggers().forEach(function(t) {
     var fn = t.getHandlerFunction();
-    if (fn === 'syncBigQueryCancels' || fn === 'syncBigQueryVisits' || fn === 'syncAllBigQuery') {
+    if (fn.indexOf('syncBigQuery') === 0 || fn === 'syncAllBigQuery') {
       ScriptApp.deleteTrigger(t);
     }
   });
-
   ScriptApp.newTrigger('syncAllBigQuery')
     .timeBased()
     .everyMinutes(15)
     .create();
-
   Logger.log('Trigger created: syncAllBigQuery every 15 minutes');
+}
+
+/** Check sync health — run from Apps Script editor to see status of all tabs */
+function getSyncStatus() {
+  var ss = SpreadsheetApp.openById(BQ_CONFIG.SHEET_ID);
+  var tabs = ['BQ_Cancellations','BQ_Visits','BQ_Studies','BQ_Subjects','BQ_StudyStatus','BQ_AuditLog','BQ_PatientDB'];
+  Logger.log('═══ BQ SYNC STATUS ═══');
+  tabs.forEach(function(name) {
+    var sheet = ss.getSheetByName(name);
+    if (!sheet) { Logger.log('  ✗ ' + name + ': TAB MISSING'); return; }
+    var rows = Math.max(sheet.getLastRow() - 1, 0);
+    var note = sheet.getRange(1, 1).getNote() || '';
+    var lastSync = note.replace('Last synced: ', '');
+    var age = lastSync ? Math.round((Date.now() - new Date(lastSync).getTime()) / 60000) : '?';
+    var min = MIN_ROWS[name] || 5;
+    var status = rows >= min ? '✓' : '⚠';
+    Logger.log('  ' + status + ' ' + name + ': ' + rows + ' rows, synced ' + age + ' min ago');
+  });
+  // Show triggers
+  var triggers = ScriptApp.getProjectTriggers();
+  var syncTriggers = triggers.filter(function(t) { return t.getHandlerFunction().indexOf('sync') >= 0; });
+  Logger.log('\n  Triggers: ' + syncTriggers.length);
+  syncTriggers.forEach(function(t) {
+    Logger.log('    ' + t.getHandlerFunction() + ' every ' + t.getEventType());
+  });
 }
