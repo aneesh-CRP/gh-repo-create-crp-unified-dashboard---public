@@ -897,6 +897,122 @@ const FEEDS = {
     WHERE st.is_active = 1 AND srp._fivetran_deleted = false
     ORDER BY srp.status_date DESC`
   },
+
+  // ═══════════════════════════════════════════════════════════
+  // GAAP REVENUE — live from CRIO's GAAP accounting tables
+  // Replaces hardcoded STUDY_REVENUE_12M, TOP_AR_STUDIES, MONTHLY_REVENUE
+  // ═══════════════════════════════════════════════════════════
+
+  // ── 24. GAAP Revenue per Study (upfront/holdback/invoiced/uninvoiced) ──
+  gaapStudyRevenue: {
+    query: () => `SELECT
+      CAST(st.study_key AS STRING) AS study_key,
+      ${STUDY_NAME_SQL} AS study_name,
+      COALESCE(spon.name, '') AS sponsor,
+      COALESCE(st.protocol_number, '') AS protocol_number,
+      ROUND(SUM(CASE WHEN rg.type NOT IN (6, 7) THEN rdp.amount ELSE 0 END), 2) AS total_revenue,
+      ROUND(SUM(CASE WHEN rg.amount_type = 1 AND rg.type NOT IN (6, 7) THEN rdp.amount ELSE 0 END), 2) AS total_upfront,
+      ROUND(SUM(CASE WHEN rg.amount_type = 2 AND rg.type NOT IN (6, 7) THEN rdp.amount ELSE 0 END), 2) AS total_holdback,
+      ROUND(SUM(CASE WHEN rg.requires_invoice = true THEN rdp.amount ELSE 0 END), 2) AS total_invoiceable,
+      ROUND(SUM(CASE WHEN rg.invoice_item_id IS NOT NULL THEN rdp.amount ELSE 0 END), 2) AS invoiced,
+      ROUND(SUM(CASE WHEN rg.requires_invoice = true AND rg.invoice_item_id IS NULL THEN rdp.amount ELSE 0 END), 2) AS uninvoiced,
+      ROUND(SUM(CASE WHEN rg.requires_invoice = false THEN rdp.amount ELSE 0 END), 2) AS total_autopay,
+      ROUND(SUM(CASE WHEN rg.type NOT IN (6, 7) AND rdp.service_date >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 365 DAY) THEN rdp.amount ELSE 0 END), 2) AS revenue_12m,
+      COUNT(DISTINCT rdp.revenue_data_point_id) AS line_items
+    FROM ${tbl('gaap_revenue_data_point')} rdp
+    JOIN ${tbl('gaap_revenue_group')} rg ON rdp.group_id = rg.group_id
+    JOIN ${tbl('study')} st ON rg.study_id = CAST(st.study_key AS STRING)
+    LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
+    WHERE st.is_active = 1
+    GROUP BY st.study_key, study_name, spon.name, st.protocol_number
+    HAVING total_revenue > 0
+    ORDER BY total_revenue DESC`
+  },
+
+  // ── 25. GAAP Monthly Revenue Time Series ──
+  gaapMonthly: {
+    query: () => `SELECT
+      FORMAT_DATE('%Y-%m', DATE(rdp.service_date)) AS month,
+      ROUND(SUM(CASE WHEN rg.type NOT IN (6, 7) THEN rdp.amount ELSE 0 END), 2) AS total_revenue,
+      ROUND(SUM(CASE WHEN rg.amount_type = 1 AND rg.type NOT IN (6, 7) THEN rdp.amount ELSE 0 END), 2) AS upfront,
+      ROUND(SUM(CASE WHEN rg.amount_type = 2 AND rg.type NOT IN (6, 7) THEN rdp.amount ELSE 0 END), 2) AS holdback,
+      ROUND(SUM(CASE WHEN rg.requires_invoice = false THEN rdp.amount ELSE 0 END), 2) AS autopay,
+      ROUND(SUM(CASE WHEN rg.requires_invoice = true THEN rdp.amount ELSE 0 END), 2) AS invoiceable,
+      ROUND(SUM(CASE WHEN rg.invoice_item_id IS NOT NULL THEN rdp.amount ELSE 0 END), 2) AS invoiced,
+      COUNT(DISTINCT rg.study_id) AS studies
+    FROM ${tbl('gaap_revenue_data_point')} rdp
+    JOIN ${tbl('gaap_revenue_group')} rg ON rdp.group_id = rg.group_id
+    WHERE rdp.service_date >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 730 DAY)
+    GROUP BY month
+    ORDER BY month DESC`
+  },
+
+  // ── 26. GAAP AR Aging (invoiced but unpaid, by study) ──
+  gaapAging: {
+    query: () => `WITH
+      reconciled AS (
+        SELECT revenue_data_point_id, SUM(amount) AS paid
+        FROM ${tbl('gaap_reconciliation')}
+        GROUP BY revenue_data_point_id
+      )
+    SELECT
+      CAST(st.study_key AS STRING) AS study_key,
+      ${STUDY_NAME_SQL} AS study_name,
+      COALESCE(spon.name, '') AS sponsor,
+      COALESCE(st.protocol_number, '') AS protocol_number,
+      ROUND(SUM(CASE WHEN rg.requires_invoice = true THEN rdp.amount - COALESCE(rec.paid, 0) ELSE 0 END), 2) AS invoice_ar,
+      ROUND(SUM(CASE WHEN rg.requires_invoice = false THEN rdp.amount - COALESCE(rec.paid, 0) ELSE 0 END), 2) AS autopay_ar,
+      ROUND(SUM(rdp.amount - COALESCE(rec.paid, 0)), 2) AS total_ar,
+      ROUND(SUM(COALESCE(rec.paid, 0)), 2) AS collected
+    FROM ${tbl('gaap_revenue_data_point')} rdp
+    JOIN ${tbl('gaap_revenue_group')} rg ON rdp.group_id = rg.group_id
+    JOIN ${tbl('study')} st ON rg.study_id = CAST(st.study_key AS STRING)
+    LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
+    LEFT JOIN reconciled rec ON rdp.revenue_data_point_id = rec.revenue_data_point_id
+    WHERE rdp.amount > COALESCE(rec.paid, 0)
+    GROUP BY st.study_key, study_name, spon.name, st.protocol_number
+    HAVING total_ar > 0
+    ORDER BY total_ar DESC`
+  },
+
+  // ── 27. Enrollment Forecast vs Actual ──
+  enrollmentForecast: {
+    query: () => `SELECT
+      CAST(f.study_key AS STRING) AS study_key,
+      ${STUDY_NAME_SQL} AS study_name,
+      FORMAT_DATE('%Y-%m', DATE(f.month)) AS month,
+      f.enrollment_target AS target,
+      f.enrollment_scheduled AS scheduled,
+      f.enrollment_actual AS actual
+    FROM ${tbl('study_month_forecast')} f
+    JOIN ${tbl('study')} st ON f.study_key = st.study_key
+    LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
+    WHERE st.is_active = 1
+      AND f.month >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 365 DAY)
+    ORDER BY f.study_key, f.month`
+  },
+
+  // ── 28. Site Financial Overview (cache_reports_overview) ──
+  siteFinance: {
+    query: () => `SELECT
+      COALESCE(si.name, '') AS site_name,
+      CAST(cro.site_key AS STRING) AS site_key,
+      ROUND(CAST(cro.revenue_total_year_to_date AS FLOAT64), 2) AS ytd_revenue,
+      ROUND(CAST(cro.cost_total_year_to_date AS FLOAT64), 2) AS ytd_cost,
+      ROUND(CAST(cro.paid_total_year_to_date AS FLOAT64), 2) AS ytd_paid,
+      ROUND(CAST(cro.invoices_unpaid AS FLOAT64), 2) AS invoices_unpaid,
+      ROUND(CAST(cro.holdback_unpaid AS FLOAT64), 2) AS holdback_unpaid,
+      ROUND(CAST(cro.autopay_unpaid AS FLOAT64), 2) AS autopay_unpaid,
+      ROUND(CAST(cro.receivables_total AS FLOAT64), 2) AS receivables_total,
+      cro.num_patients_randomized AS patients_randomized,
+      cro.num_patients_screening AS patients_screening,
+      cro.num_studies_open_for_enrollment AS studies_enrolling,
+      cro.num_visits_completed AS visits_completed,
+      cro.num_total_visits AS total_visits,
+      FORMAT_DATETIME('%Y-%m-%d %H:%M', cro.last_updated) AS last_updated
+    FROM ${tbl('cache_reports_overview')} cro
+    LEFT JOIN ${tbl('site')} si ON cro.site_key = si.site_key`
+  },
 };
 
 // ═══════════════════════════════════════════════════════════
