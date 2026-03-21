@@ -533,13 +533,6 @@ const FEEDS = {
     }
   },
 
-  // ── TEST: minimal query to debug ──
-  test: {
-    query: () => `SELECT 'hello' AS msg, CURRENT_TIMESTAMP() AS ts`
-  },
-  test2: {
-    query: () => `SELECT COUNT(*) AS cnt FROM \`crio-468120.crio_data.study\``
-  },
 
   // ── 12. Visit Compliance ──
   compliance: {
@@ -714,6 +707,50 @@ const FEEDS = {
     LEFT JOIN stip_stats stip ON sf.study_key = stip.study_key
     WHERE st.is_active = 1
     ORDER BY sf.total_revenue DESC`
+  },
+
+  // ── 19. Revenue per Subject ──
+  revenuePerSubject: {
+    query: () => `SELECT CAST(sf.study_key AS STRING) AS study_key,
+      ${STUDY_NAME_SQL} AS study_name,
+      CAST(sf.total_revenue AS FLOAT64) AS total_revenue,
+      sf.total_randomized,
+      CASE WHEN sf.total_randomized > 0 THEN ROUND(sf.total_revenue / sf.total_randomized) ELSE 0 END AS rev_per_subject,
+      sf.total_screen_fails,
+      CASE WHEN sf.total_randomized + sf.total_screen_fails > 0
+        THEN ROUND(sf.total_screen_fails / (sf.total_randomized + sf.total_screen_fails) * 100)
+        ELSE 0 END AS sf_rate_pct,
+      CAST(sf.projected_revenue AS FLOAT64) AS projected_revenue,
+      CAST(sf.revenue_base AS FLOAT64) AS revenue_per_visit
+    FROM ${tbl('study_finance')} sf
+    JOIN ${tbl('study')} st ON sf.study_key = st.study_key
+    LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
+    WHERE sf.total_revenue > 0 AND st.is_active = 1
+    ORDER BY rev_per_subject DESC`
+  },
+
+  // ── 20. System Health (for monitoring) ──
+  health: {
+    query: () => `SELECT
+      'visits' AS feed, COUNT(*) AS row_count,
+      MAX(FORMAT_DATETIME('%Y-%m-%d %H:%M', ca.start)) AS latest_date
+    FROM ${tbl('calendar_appointment')} ca
+    WHERE ca.start >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 7 DAY) AND ca.subject_key IS NOT NULL
+    UNION ALL
+    SELECT 'cancels', COUNT(*), MAX(FORMAT_DATETIME('%Y-%m-%d %H:%M', aal.date_created))
+    FROM ${tbl('appointment_audit_log')} aal WHERE aal.change_type = 4 AND aal.date_created >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 90 DAY)
+    UNION ALL
+    SELECT 'studies', COUNT(*), MAX(FORMAT_DATETIME('%Y-%m-%d %H:%M', st.last_updated))
+    FROM ${tbl('study')} st WHERE st.is_active = 1 AND st._fivetran_deleted = false
+    UNION ALL
+    SELECT 'subjects', COUNT(*), NULL
+    FROM ${tbl('subject')} sub WHERE sub._fivetran_deleted = false
+    UNION ALL
+    SELECT 'patients', COUNT(*), MAX(FORMAT_DATETIME('%Y-%m-%d %H:%M', p.last_updated))
+    FROM ${tbl('patient')} p WHERE p._fivetran_deleted = false
+    UNION ALL
+    SELECT 'fivetran_sync', 0, MAX(FORMAT_TIMESTAMP('%Y-%m-%d %H:%M', _fivetran_synced))
+    FROM ${tbl('study')}`
   },
 };
 

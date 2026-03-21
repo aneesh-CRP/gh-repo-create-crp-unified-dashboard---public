@@ -14582,6 +14582,32 @@ setTimeout(function() {
   if (typeof mergeCrioIntoStudies === 'function') safe(mergeCrioIntoStudies, 'mergeCrioIntoStudies-late');
 }, 5000);
 
+// ═══ DATA FRESHNESS MONITOR ═══
+// Checks CF health endpoint and warns if data is stale
+async function checkSystemHealth() {
+  if (!CRP_CONFIG.USE_CLOUD_FUNCTION || !CRP_CONFIG.CF_BASE) return;
+  try {
+    var rows = await fetchCSV(CRP_CONFIG.CF_BASE + '?feed=health&format=csv');
+    if (!rows || rows.length === 0) return;
+    var issues = [];
+    rows.forEach(function(r) {
+      var feed = r.feed || '';
+      var latest = r.latest_date || '';
+      if (feed === 'fivetran_sync' && latest) {
+        var syncAge = (Date.now() - new Date(latest + ':00Z').getTime()) / 3600000;
+        if (syncAge > 24) issues.push('Fivetran sync is ' + Math.round(syncAge) + 'h old');
+      }
+    });
+    if (issues.length > 0) {
+      _log('CRP Health: ' + issues.join(', '));
+      showToast('Data Warning: ' + issues[0], 'warning', 10000);
+    }
+  } catch(e) { /* silent */ }
+}
+// Run health check 10s after load, then every 30 min
+setTimeout(checkSystemHealth, 10000);
+setInterval(checkSystemHealth, 1800000);
+
 // ═══ DARK MODE TOGGLE ═══
 function toggleDarkMode() {
   var html = document.documentElement;
