@@ -496,7 +496,9 @@ const FEEDS = {
       COUNTIF(sub.status = 4) AS scheduled_v1,
       COUNTIF(sub.status = 3) AS no_show_v1,
       COUNTIF(sub.status = 1) AS interested,
-      COUNTIF(sub.status = 2) AS prequalified
+      COUNTIF(sub.status = 2) AS prequalified,
+      COUNTIF(sub.status = -1) AS not_eligible,
+      COUNTIF(sub.status = -2) AS not_interested
     FROM ${tbl('subject')} sub
     JOIN ${tbl('study')} st ON sub.study_key = st.study_key
     LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
@@ -563,7 +565,7 @@ const FEEDS = {
   compliance: {
     query: () => `SELECT
       CAST(sv.study_key AS STRING) AS study_key,
-      st.nickname AS study_name,
+      ${STUDY_NAME_SQL} AS study_name,
       sv.visit_name,
       sv.subject_visit_appointment_status AS status,
       sv.days_oow,
@@ -573,6 +575,7 @@ const FEEDS = {
       CAST(sv.subject_key AS STRING) AS subject_key
     FROM ${tbl('fact_subject_visit')} sv
     JOIN ${tbl('study')} st ON sv.study_key = st.study_key
+    LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
     WHERE sv.subject_visit_appointment_end >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 90 DAY)
       AND st.is_active = 1
     ORDER BY sv.subject_visit_appointment_end DESC`
@@ -693,7 +696,7 @@ const FEEDS = {
   studyFinance: {
     query: () => `WITH
       inv_stats AS (SELECT study_key, COUNT(*) AS inv_count, SUM(amount) AS inv_total, SUM(amount_unpaid) AS inv_unpaid,
-        COUNTIF(status = 1) AS inv_sent, COUNTIF(status = 2) AS inv_paid FROM ${tbl('invoice')} GROUP BY study_key),
+        COUNTIF(status = 1) AS inv_unpaid, COUNTIF(status = 2) AS inv_paid, COUNTIF(status = 3) AS inv_partial FROM ${tbl('invoice')} GROUP BY study_key),
       pmt_stats AS (SELECT study_key, COUNT(*) AS pmt_count, SUM(amount) AS pmt_total FROM ${tbl('payment')} GROUP BY study_key),
       stip_stats AS (SELECT study_key, COUNT(*) AS stip_count, SUM(amount) AS stip_total, COUNTIF(is_paid=1) AS stip_paid FROM ${tbl('subject_payment')} WHERE is_active = 1 GROUP BY study_key)
     SELECT
@@ -717,7 +720,8 @@ const FEEDS = {
       COALESCE(inv.inv_count, 0) AS invoice_count,
       COALESCE(CAST(inv.inv_total AS FLOAT64), 0) AS invoice_total,
       COALESCE(CAST(inv.inv_unpaid AS FLOAT64), 0) AS invoice_unpaid,
-      COALESCE(inv.inv_sent, 0) AS invoices_sent,
+      COALESCE(inv.inv_unpaid, 0) AS invoices_unpaid,
+      COALESCE(inv.inv_partial, 0) AS invoices_partial,
       COALESCE(inv.inv_paid, 0) AS invoices_paid,
       COALESCE(pmt.pmt_count, 0) AS payment_count,
       COALESCE(CAST(pmt.pmt_total AS FLOAT64), 0) AS payment_total,
@@ -776,6 +780,122 @@ const FEEDS = {
     UNION ALL
     SELECT 'fivetran_sync', 0, MAX(FORMAT_TIMESTAMP('%Y-%m-%d %H:%M', _fivetran_synced))
     FROM ${tbl('patient')}`
+  },
+
+  // ═══════════════════════════════════════════════════════════
+  // NEW FEEDS — from CRIO Looker Formulas deep dive
+  // ═══════════════════════════════════════════════════════════
+
+  // ── 21. Regulatory Compliance (training + delegation status per study) ──
+  regulatory: {
+    query: () => `WITH
+      training AS (SELECT rtu.study_key,
+        COUNT(*) AS total_trainings,
+        COUNTIF(rtu.status = 0) AS pending,
+        COUNTIF(rtu.status = 1) AS provided,
+        COUNTIF(rtu.status = -1) AS expired,
+        COUNTIF(rtu.status = 10) AS offline,
+        COUNTIF(rtu.status = 11) AS exempt,
+        COUNTIF(rtu.is_training_currently_required = 1 AND rtu.status NOT IN (1, 10, 11)) AS missing
+      FROM ${tbl('regulatory_training_user')} rtu
+      WHERE rtu._fivetran_deleted = false
+      GROUP BY rtu.study_key),
+      duties AS (SELECT rdu.study_key,
+        COUNT(*) AS total_duties,
+        COUNTIF(rdu.status = 0) AS pending_approval,
+        COUNTIF(rdu.status = 1) AS approved,
+        COUNTIF(rdu.status = -1) AS ended,
+        COUNTIF(rdu.status IN (-10, -11)) AS rejected,
+        COUNTIF(rdu.status = 20) AS pending_end,
+        COUNTIF(rdu.is_active = 1) AS active_duties
+      FROM ${tbl('regulatory_duty_user')} rdu
+      WHERE rdu._fivetran_deleted = false
+      GROUP BY rdu.study_key)
+    SELECT
+      CAST(st.study_key AS STRING) AS study_key,
+      ${STUDY_NAME_SQL} AS study_name,
+      COALESCE(t.total_trainings, 0) AS total_trainings,
+      COALESCE(t.pending, 0) AS trainings_pending,
+      COALESCE(t.provided, 0) AS trainings_provided,
+      COALESCE(t.expired, 0) AS trainings_expired,
+      COALESCE(t.missing, 0) AS trainings_missing,
+      COALESCE(d.total_duties, 0) AS total_duties,
+      COALESCE(d.pending_approval, 0) AS duties_pending,
+      COALESCE(d.approved, 0) AS duties_approved,
+      COALESCE(d.active_duties, 0) AS duties_active,
+      COALESCE(d.rejected, 0) AS duties_rejected
+    FROM ${tbl('study')} st
+    LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
+    LEFT JOIN training t ON st.study_key = t.study_key
+    LEFT JOIN duties d ON st.study_key = d.study_key
+    WHERE st.is_active = 1 AND st._fivetran_deleted = false
+    ORDER BY t.missing DESC NULLS LAST`
+  },
+
+  // ── 22. Visit Todos (overdue/outstanding per study) ──
+  visitTodos: {
+    query: () => `SELECT
+      CAST(vt.study_key AS STRING) AS study_key,
+      ${STUDY_NAME_SQL} AS study_name,
+      vt.name AS todo_name,
+      COALESCE(vt.details, '') AS details,
+      CASE vt.status WHEN 0 THEN 'Deleted' WHEN 1 THEN 'Completed' WHEN 2 THEN 'Available' WHEN 3 THEN 'Immediate' WHEN 4 THEN 'Overdue' ELSE CAST(vt.status AS STRING) END AS status,
+      FORMAT_DATETIME('%Y-%m-%d', vt.due_date) AS due_date,
+      FORMAT_DATETIME('%Y-%m-%d', vt.date_created) AS date_created,
+      FORMAT_DATETIME('%Y-%m-%d', vt.date_completed) AS date_completed,
+      CONCAT(COALESCE(cu.first_name, ''), ' ', COALESCE(cu.last_name, '')) AS created_by,
+      CONCAT(COALESCE(comp_u.first_name, ''), ' ', COALESCE(comp_u.last_name, '')) AS completed_by,
+      CAST(vt.subject_key AS STRING) AS subject_key,
+      COALESCE(sv.name, '') AS visit_name
+    FROM ${tbl('subject_visit_todo')} vt
+    JOIN ${tbl('study')} st ON vt.study_key = st.study_key
+    LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
+    LEFT JOIN ${tbl('study_visit')} sv ON vt.study_visit_key = sv.study_visit_key
+    LEFT JOIN ${tbl('user')} cu ON vt.created_by_user_key = cu.user_key
+    LEFT JOIN ${tbl('user')} comp_u ON vt.completed_by_user_key = comp_u.user_key
+    WHERE vt._fivetran_deleted = false AND st.is_active = 1
+      AND vt.status IN (2, 3, 4)
+    ORDER BY CASE vt.status WHEN 4 THEN 0 WHEN 3 THEN 1 ELSE 2 END, vt.due_date ASC`
+  },
+
+  // ── 23. Recruiting Pipeline Detail (per-patient per-study status) ──
+  recruiting: {
+    query: () => `SELECT
+      CAST(srp.study_key AS STRING) AS study_key,
+      ${STUDY_NAME_SQL} AS study_name,
+      CAST(srp.patient_key AS STRING) AS patient_key,
+      REGEXP_REPLACE(TRIM(CONCAT(COALESCE(p.first_name, ''), ' ', COALESCE(p.last_name, ''))), r'\\s+', ' ') AS patient_name,
+      CASE srp.status
+        WHEN 0 THEN 'Prospect' WHEN 1 THEN 'Contacting' WHEN 10 THEN 'Interested'
+        WHEN 20 THEN 'Screening' WHEN 30 THEN 'Success' WHEN 40 THEN 'Screen Fail'
+        WHEN 45 THEN 'In Another Study' WHEN 50 THEN 'Not Eligible'
+        WHEN 55 THEN 'Not Applicable' WHEN 60 THEN 'Not Interested'
+        WHEN 65 THEN 'Give Up' WHEN 70 THEN 'Bad Contact Info'
+        WHEN 75 THEN 'Do Not Solicit' WHEN 80 THEN 'Do Not Enroll'
+        WHEN 85 THEN 'Deceased' ELSE CAST(srp.status AS STRING) END AS recruiting_status,
+      CASE
+        WHEN srp.status IN (0, 1, 10) THEN 'In Play'
+        WHEN srp.status = 50 THEN 'Not Eligible'
+        WHEN srp.status = 65 THEN 'Give Up'
+        WHEN srp.status IN (30) THEN 'Success'
+        WHEN srp.status IN (45, 55, 60) THEN 'Other'
+        ELSE 'Closed' END AS status_group,
+      COALESCE(srp.total_solicitation_calls, 0) AS calls,
+      COALESCE(srp.total_solicitation_texts, 0) AS texts,
+      COALESCE(srp.total_solicitation_emails, 0) AS emails,
+      CASE WHEN srp.needs_followup = 1 THEN 'Yes' ELSE 'No' END AS needs_followup,
+      FORMAT_DATETIME('%Y-%m-%d', srp.callback_date) AS callback_date,
+      FORMAT_DATETIME('%Y-%m-%d', srp.status_date) AS status_changed,
+      CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) AS recruiter,
+      COALESCE(prs.name, '') AS referral_source
+    FROM ${tbl('study_recruiting_patient')} srp
+    JOIN ${tbl('study')} st ON srp.study_key = st.study_key
+    LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
+    LEFT JOIN ${tbl('patient')} p ON srp.patient_key = p.patient_key
+    LEFT JOIN ${tbl('user')} u ON srp.user_key = u.user_key
+    LEFT JOIN ${tbl('patient_referral_source')} prs ON srp.referral_source_key = prs.patient_referral_source_key
+    WHERE st.is_active = 1 AND srp._fivetran_deleted = false
+    ORDER BY srp.status_date DESC`
   },
 };
 
