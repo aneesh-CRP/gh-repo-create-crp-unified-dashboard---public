@@ -15,12 +15,93 @@
 
 const { BigQuery } = require('@google-cloud/bigquery');
 const functions = require('@google-cloud/functions-framework');
+const https = require('https');
 
 const PROJECT = 'crio-468120';
 const DATASET = 'crio_data';
-const T = `\`${PROJECT}.${DATASET}.`;
+function tbl(name) { return '`' + PROJECT + '.' + DATASET + '.' + name + '`'; }
 
-const bq = new BigQuery({ projectId: PROJECT });
+// Use user credentials (refresh token) to access Fivetran-managed authorized views
+// The default service account can't read through authorized views — only the user who
+// set up Fivetran has access. We use the clasp OAuth refresh token to get access tokens.
+const OAUTH = {
+  clientId: process.env.OAUTH_CLIENT_ID || '',
+  clientSecret: process.env.OAUTH_CLIENT_SECRET || '',
+  refreshToken: process.env.OAUTH_REFRESH_TOKEN || '',
+};
+
+let _cachedToken = null;
+let _tokenExpiry = 0;
+
+async function getAccessToken() {
+  if (_cachedToken && Date.now() < _tokenExpiry - 60000) return _cachedToken;
+  const params = new URLSearchParams({
+    client_id: OAUTH.clientId, client_secret: OAUTH.clientSecret,
+    refresh_token: OAUTH.refreshToken, grant_type: 'refresh_token'
+  });
+  return new Promise((resolve, reject) => {
+    const req = https.request('https://oauth2.googleapis.com/token', {
+      method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    }, res => {
+      let d = ''; res.on('data', c => d += c);
+      res.on('end', () => {
+        try {
+          const j = JSON.parse(d);
+          _cachedToken = j.access_token;
+          _tokenExpiry = Date.now() + (j.expires_in || 3600) * 1000;
+          resolve(_cachedToken);
+        } catch (e) { reject(new Error('Token refresh failed: ' + d)); }
+      });
+    });
+    req.on('error', reject);
+    req.write(params.toString());
+    req.end();
+  });
+}
+
+// Create BQ client — uses user token if OAuth env vars are set, otherwise default SA
+function getBqClient() {
+  if (OAUTH.refreshToken) {
+    return { userAuth: true };
+  }
+  return { client: new BigQuery({ projectId: PROJECT }) };
+}
+
+async function runQuery(sql) {
+  if (OAUTH.refreshToken) {
+    // Use REST API with user token
+    const token = await getAccessToken();
+    const body = JSON.stringify({ query: sql, useLegacySql: false, maxResults: 50000 });
+    return new Promise((resolve, reject) => {
+      const req = https.request(`https://bigquery.googleapis.com/bigquery/v2/projects/${PROJECT}/queries`, {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
+      }, res => {
+        let d = ''; res.on('data', c => d += c);
+        res.on('end', () => {
+          try {
+            const j = JSON.parse(d);
+            if (j.error) { reject(new Error(j.error.message)); return; }
+            const schema = (j.schema?.fields || []).map(f => f.name);
+            const rows = (j.rows || []).map(r => {
+              const obj = {};
+              r.f.forEach((c, i) => { obj[schema[i]] = c.v || ''; });
+              return obj;
+            });
+            resolve(rows);
+          } catch (e) { reject(new Error('BQ parse failed: ' + d.slice(0, 200))); }
+        });
+      });
+      req.on('error', reject);
+      req.write(body);
+      req.end();
+    });
+  }
+  // Fallback: use default SA
+  const bq = new BigQuery({ projectId: PROJECT });
+  const [rows] = await bq.query({ query: sql, location: 'US' });
+  return rows;
+}
 
 // ═══════════════════════════════════════════════════════════
 // QUERY REGISTRY — add new feeds here
@@ -75,13 +156,13 @@ const FEEDS = {
       CAST(ca.calendar_appointment_key AS STRING) AS calendar_appointment_key,
       CASE ca.type WHEN 0 THEN 'Regular Visit' WHEN 1 THEN 'Ad Hoc Visit' WHEN 2 THEN 'General Appointment' WHEN 3 THEN 'Block' ELSE '' END AS appointment_type,
       FORMAT_DATETIME('%Y-%m-%d', CURRENT_DATETIME()) AS snapshot_date
-    FROM ${T}calendar_appointment\` ca
-    LEFT JOIN ${T}subject\` sub ON ca.subject_key = sub.subject_key
-    LEFT JOIN ${T}study\` st ON ca.study_key = st.study_key
-    LEFT JOIN ${T}sponsor\` spon ON st.sponsor_key = spon.sponsor_key
-    LEFT JOIN ${T}site\` si ON ca.site_key = si.site_key
-    LEFT JOIN ${T}study_visit\` sv ON ca.study_visit_key = sv.study_visit_key
-    LEFT JOIN ${T}user\` coord ON ca.creator_key = coord.user_key
+    FROM ${tbl('calendar_appointment')} ca
+    LEFT JOIN ${tbl('subject')} sub ON ca.subject_key = sub.subject_key
+    LEFT JOIN ${tbl('study')} st ON ca.study_key = st.study_key
+    LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
+    LEFT JOIN ${tbl('site')} si ON ca.site_key = si.site_key
+    LEFT JOIN ${tbl('study_visit')} sv ON ca.study_visit_key = sv.study_visit_key
+    LEFT JOIN ${tbl('user')} coord ON ca.creator_key = coord.user_key
     WHERE ca.subject_key IS NOT NULL AND st.is_active = 1
       AND ca.start >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 7 DAY)
       AND ca.start <= DATETIME_ADD(CURRENT_DATETIME(), INTERVAL 365 DAY)
@@ -120,16 +201,16 @@ const FEEDS = {
       'cancelled' AS appointment_status,
       CONCAT(COALESCE(inv.first_name, ''), ' ', COALESCE(inv.last_name, '')) AS investigator,
       FORMAT_DATETIME('%Y-%m-%d', CURRENT_DATETIME()) AS snapshot_date
-    FROM ${T}appointment_audit_log\` aal
-    LEFT JOIN ${T}study\` st ON aal.study_key = st.study_key
-    LEFT JOIN ${T}sponsor\` spon ON st.sponsor_key = spon.sponsor_key
-    LEFT JOIN ${T}site\` si ON aal.site_key = si.site_key
-    LEFT JOIN ${T}subject\` sub ON aal.subject_key = sub.subject_key
-    LEFT JOIN ${T}study_visit\` sv ON aal.study_visit_key = sv.study_visit_key
-    LEFT JOIN ${T}user\` coord ON aal.calendar_appointment_key IS NOT NULL
-      AND coord.user_key = (SELECT ca2.creator_key FROM ${T}calendar_appointment\` ca2 WHERE ca2.calendar_appointment_key = aal.calendar_appointment_key LIMIT 1)
-    LEFT JOIN ${T}user\` by_user ON aal.by_user_key = by_user.user_key
-    LEFT JOIN ${T}user\` inv ON aal.by_user_key = inv.user_key
+    FROM ${tbl('appointment_audit_log')} aal
+    LEFT JOIN ${tbl('study')} st ON aal.study_key = st.study_key
+    LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
+    LEFT JOIN ${tbl('site')} si ON aal.site_key = si.site_key
+    LEFT JOIN ${tbl('subject')} sub ON aal.subject_key = sub.subject_key
+    LEFT JOIN ${tbl('study_visit')} sv ON aal.study_visit_key = sv.study_visit_key
+    LEFT JOIN ${tbl('calendar_appointment')} ca ON aal.calendar_appointment_key = ca.calendar_appointment_key
+    LEFT JOIN ${tbl('user')} coord ON ca.creator_key = coord.user_key
+    LEFT JOIN ${tbl('user')} by_user ON aal.by_user_key = by_user.user_key
+    LEFT JOIN ${tbl('user')} inv ON aal.by_user_key = inv.user_key
     WHERE aal.change_type = 4
       AND aal.date_created >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 90 DAY)
       AND st.is_active = 1
@@ -146,7 +227,7 @@ const FEEDS = {
       COALESCE(sd.investigator_name, '') AS investigator,
       COALESCE(st.indications, sd.primary_indication, '') AS indication,
       COALESCE(sd.specialty, '') AS specialty,
-      (SELECT COUNT(*) FROM ${T}subject\` sub WHERE sub.study_key = st.study_key AND sub._fivetran_deleted = false) AS subject_count,
+      (SELECT COUNT(*) FROM ${tbl('subject')} sub WHERE sub.study_key = st.study_key AND sub._fivetran_deleted = false) AS subject_count,
       COALESCE(CAST(st.target_enrollment AS STRING), '') AS target_enrollment,
       COALESCE(spon.name, '') AS sponsor,
       ${PHASE_SQL} AS phase,
@@ -160,12 +241,12 @@ const FEEDS = {
       COALESCE(CAST(sf.total_revenue AS STRING), '0') AS total_revenue,
       COALESCE(CAST(sf.total_randomized AS STRING), '0') AS revenue_subjects,
       FORMAT_DATETIME('%Y-%m-%d', CURRENT_DATETIME()) AS snapshot_date
-    FROM ${T}study\` st
-    LEFT JOIN ${T}sponsor\` spon ON st.sponsor_key = spon.sponsor_key
-    LEFT JOIN ${T}site\` si ON st.site_key = si.site_key
-    LEFT JOIN ${T}clinical_trial\` ct ON st.clinical_trial_key = ct.clinical_trial_key
-    LEFT JOIN ${T}study_details\` sd ON st.study_key = sd.study_key
-    LEFT JOIN ${T}study_finance\` sf ON st.study_key = sf.study_key
+    FROM ${tbl('study')} st
+    LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
+    LEFT JOIN ${tbl('site')} si ON st.site_key = si.site_key
+    LEFT JOIN ${tbl('clinical_trial')} ct ON st.clinical_trial_key = ct.clinical_trial_key
+    LEFT JOIN ${tbl('study_details')} sd ON st.study_key = sd.study_key
+    LEFT JOIN ${tbl('study_finance')} sf ON st.study_key = sf.study_key
     WHERE st._fivetran_deleted = false AND st.is_active = 1
     ORDER BY st.study_key`
   },
@@ -177,8 +258,8 @@ const FEEDS = {
       CAST(sub.study_key AS STRING) AS study_key,
       COALESCE(st.protocol_number, '') AS protocol_number,
       ${SUBJECT_STATUS_SQL} AS status
-    FROM ${T}subject\` sub
-    JOIN ${T}study\` st ON sub.study_key = st.study_key
+    FROM ${tbl('subject')} sub
+    JOIN ${tbl('study')} st ON sub.study_key = st.study_key
     WHERE sub._fivetran_deleted = false AND st.is_active = 1
     ORDER BY sub.study_key, sub.subject_key`
   },
@@ -204,10 +285,10 @@ const FEEDS = {
       COALESCE(FORMAT_DATE('%Y-%m-%d', DATE_SUB(DATE(sd.investigator_meeting_date), INTERVAL 1 DAY)), '') AS investigator_meeting,
       COALESCE(FORMAT_DATE('%Y-%m-%d', DATE_SUB(DATE(sd.presite_selection_date), INTERVAL 1 DAY)), '') AS presite_selection,
       FORMAT_DATETIME('%Y-%m-%d', CURRENT_DATETIME()) AS snapshot_date
-    FROM ${T}study\` st
-    LEFT JOIN ${T}study_details\` sd ON st.study_key = sd.study_key
-    LEFT JOIN ${T}sponsor\` spon ON st.sponsor_key = spon.sponsor_key
-    LEFT JOIN ${T}clinical_trial\` ct ON st.clinical_trial_key = ct.clinical_trial_key
+    FROM ${tbl('study')} st
+    LEFT JOIN ${tbl('study_details')} sd ON st.study_key = sd.study_key
+    LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
+    LEFT JOIN ${tbl('clinical_trial')} ct ON st.clinical_trial_key = ct.clinical_trial_key
     WHERE st._fivetran_deleted = false AND st.is_active = 1
     ORDER BY st.study_key`,
     headers: {
@@ -245,16 +326,16 @@ const FEEDS = {
       CASE aal.change_type WHEN 0 THEN 'User Added' WHEN 1 THEN 'Created' WHEN 2 THEN 'Rescheduled' WHEN 3 THEN 'Modified' WHEN 4 THEN 'Cancelled' WHEN 5 THEN 'Restored' ELSE CAST(aal.change_type AS STRING) END AS change_type,
       CASE aal.cancel_type WHEN 1 THEN 'No Show' WHEN 2 THEN 'Site Cancelled' WHEN 3 THEN 'Patient Cancelled' ELSE '' END AS cancel_type,
       COALESCE(REGEXP_REPLACE(aal.cancel_reason, r'[\\x00-\\x1f]', ' '), '') AS cancel_reason
-    FROM ${T}appointment_audit_log\` aal
-    LEFT JOIN ${T}study\` st ON aal.study_key = st.study_key
-    LEFT JOIN ${T}sponsor\` spon ON st.sponsor_key = spon.sponsor_key
-    LEFT JOIN ${T}site\` si ON aal.site_key = si.site_key
-    LEFT JOIN ${T}subject\` sub ON aal.subject_key = sub.subject_key
-    LEFT JOIN ${T}study_visit\` sv ON aal.study_visit_key = sv.study_visit_key
-    LEFT JOIN ${T}user\` mod_u ON aal.by_user_key = mod_u.user_key
-    LEFT JOIN ${T}user\` by_u ON aal.by_user_key = by_u.user_key
-    LEFT JOIN ${T}calendar_appointment\` ca ON aal.calendar_appointment_key = ca.calendar_appointment_key
-    LEFT JOIN ${T}user\` coord ON ca.creator_key = coord.user_key
+    FROM ${tbl('appointment_audit_log')} aal
+    LEFT JOIN ${tbl('study')} st ON aal.study_key = st.study_key
+    LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
+    LEFT JOIN ${tbl('site')} si ON aal.site_key = si.site_key
+    LEFT JOIN ${tbl('subject')} sub ON aal.subject_key = sub.subject_key
+    LEFT JOIN ${tbl('study_visit')} sv ON aal.study_visit_key = sv.study_visit_key
+    LEFT JOIN ${tbl('user')} mod_u ON aal.by_user_key = mod_u.user_key
+    LEFT JOIN ${tbl('user')} by_u ON aal.by_user_key = by_u.user_key
+    LEFT JOIN ${tbl('calendar_appointment')} ca ON aal.calendar_appointment_key = ca.calendar_appointment_key
+    LEFT JOIN ${tbl('user')} coord ON ca.creator_key = coord.user_key
     WHERE aal.date_created >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 90 DAY) AND st.is_active = 1
     ORDER BY aal.date_created DESC`,
     headers: {
@@ -288,8 +369,8 @@ const FEEDS = {
       COALESCE(FORMAT_DATETIME('%Y-%m-%d', p.last_interaction_date), '') AS last_interaction_date,
       CAST(COALESCE(p.rating, 0) AS STRING) AS rating,
       FORMAT_DATETIME('%Y-%m-%d', CURRENT_DATETIME()) AS snapshot_date
-    FROM ${T}patient\` p
-    LEFT JOIN ${T}site\` si ON p.site_key = si.site_key
+    FROM ${tbl('patient')} p
+    LEFT JOIN ${tbl('site')} si ON p.site_key = si.site_key
     WHERE p._fivetran_deleted = false AND p.status != 3
     ORDER BY p.last_name, p.first_name`,
     headers: {
@@ -318,9 +399,9 @@ const FEEDS = {
       COUNTIF(f.is_eligible = true) AS eligible,
       COUNTIF(f.is_scheduled_v1 = true) AS scheduled_v1,
       COUNTIF(f.is_not_show = true) AS no_show
-    FROM ${T}fact_patient_funnel\` f
-    JOIN ${T}study\` st ON f.study_key = st.study_key
-    LEFT JOIN ${T}sponsor\` spon ON st.sponsor_key = spon.sponsor_key
+    FROM ${tbl('fact_patient_funnel')} f
+    JOIN ${tbl('study')} st ON f.study_key = st.study_key
+    LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
     WHERE st.is_active = 1
     GROUP BY f.study_key, study_name
     HAVING total_patients > 0
@@ -342,9 +423,9 @@ const FEEDS = {
       COUNTIF(sub.status = 3) AS no_show_v1,
       COUNTIF(sub.status = 1) AS interested,
       COUNTIF(sub.status = 2) AS prequalified
-    FROM ${T}subject\` sub
-    JOIN ${T}study\` st ON sub.study_key = st.study_key
-    LEFT JOIN ${T}sponsor\` spon ON st.sponsor_key = spon.sponsor_key
+    FROM ${tbl('subject')} sub
+    JOIN ${tbl('study')} st ON sub.study_key = st.study_key
+    LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
     WHERE sub._fivetran_deleted = false AND st.is_active = 1
     GROUP BY sub.study_key, study_name
     HAVING total_subjects > 0
@@ -374,9 +455,9 @@ const FEEDS = {
       sf.total_revenue_paid,
       sf.total_cost_paid,
       sf.total_external_amount
-    FROM ${T}study_finance\` sf
-    JOIN ${T}study\` st ON sf.study_key = st.study_key
-    LEFT JOIN ${T}sponsor\` spon ON st.sponsor_key = spon.sponsor_key
+    FROM ${tbl('study_finance')} sf
+    JOIN ${tbl('study')} st ON sf.study_key = st.study_key
+    LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
     WHERE st.is_active = 1
     ORDER BY sf.total_revenue DESC`
   },
@@ -392,14 +473,22 @@ const FEEDS = {
         COUNT(DISTINCT ca.study_key) AS studies,
         COUNTIF(ca.status = 0) AS cancelled,
         COUNTIF(ca.status = 1) AS active
-      FROM ${T}calendar_appointment\` ca
-      JOIN ${T}user\` u ON ca.creator_key = u.user_key
+      FROM ${tbl('calendar_appointment')} ca
+      JOIN ${tbl('user')} u ON ca.creator_key = u.user_key
       WHERE ca.start >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL ${days} DAY)
         AND ca.subject_key IS NOT NULL
       GROUP BY coordinator
       HAVING visits_managed > 0
       ORDER BY visits_managed DESC`;
     }
+  },
+
+  // ── TEST: minimal query to debug ──
+  test: {
+    query: () => `SELECT 'hello' AS msg, CURRENT_TIMESTAMP() AS ts`
+  },
+  test2: {
+    query: () => `SELECT COUNT(*) AS cnt FROM \`crio-468120.crio_data.study\``
   },
 
   // ── 12. Visit Compliance ──
@@ -414,8 +503,8 @@ const FEEDS = {
       FORMAT_DATETIME('%Y-%m-%d', sv.window_end_date) AS window_end,
       FORMAT_DATETIME('%Y-%m-%d', sv.subject_visit_appointment_end) AS visit_date,
       CAST(sv.subject_key AS STRING) AS subject_key
-    FROM ${T}fact_subject_visit\` sv
-    JOIN ${T}study\` st ON sv.study_key = st.study_key
+    FROM ${tbl('fact_subject_visit')} sv
+    JOIN ${tbl('study')} st ON sv.study_key = st.study_key
     WHERE sv.subject_visit_appointment_end >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 90 DAY)
       AND st.is_active = 1
     ORDER BY sv.subject_visit_appointment_end DESC`
@@ -455,7 +544,10 @@ functions.http('crpBqApi', async (req, res) => {
 
   try {
     const sql = typeof feedDef.query === 'function' ? feedDef.query(req.query) : feedDef.query;
-    const [rows] = await bq.query({ query: sql, location: 'US' });
+    // Debug: test with minimal query first if main returns 0
+    console.log(`Feed ${feed}: running query (${sql.length} chars), auth: ${OAUTH.refreshToken ? 'user-token' : 'service-account'}`);
+    const rows = await runQuery(sql);
+    console.log(`Feed ${feed}: ${rows.length} rows returned`);
 
     if (format === 'json') {
       res.json({ feed, rows: rows.length, data: rows, timestamp: new Date().toISOString() });
