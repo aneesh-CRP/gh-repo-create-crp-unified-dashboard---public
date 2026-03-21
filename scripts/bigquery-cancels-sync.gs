@@ -372,7 +372,7 @@ function _buildVisitsQuery() {
     // Scheduled Date
     'FORMAT_DATETIME(\'%Y-%m-%d\', ca.start) AS scheduled_date, ' +
     // Subject Full Name (first + middle + last, matching Looker format)
-    'TRIM(CONCAT(COALESCE(sub.first_name, \'\'), \' \', COALESCE(sub.middle_name, \'\'), \' \', COALESCE(sub.last_name, \'\'))) AS subject_full_name, ' +
+    'REGEXP_REPLACE(TRIM(CONCAT(COALESCE(sub.first_name, \'\'), \' \', COALESCE(sub.middle_name, \'\'), \' \', COALESCE(sub.last_name, \'\'))), r\'\\s+\', \' \') AS subject_full_name, ' +
     'ca.subject_key AS subject_key_back_end, ' +
     // Full Name = coordinator (creator of the appointment)
     'CONCAT(COALESCE(coord.first_name, \'\'), \' \', COALESCE(coord.last_name, \'\')) AS full_name, ' +
@@ -478,7 +478,7 @@ function _buildStudiesQuery() {
     '(SELECT COUNT(*) FROM ' + t + 'subject` sub WHERE sub.study_key = st.study_key AND sub._fivetran_deleted = false) AS subject_count, ' +
     'COALESCE(CAST(st.target_enrollment AS STRING), \'\') AS target_enrollment, ' +
     'COALESCE(spon.name, \'\') AS sponsor, ' +
-    'CASE ct.phase WHEN 1 THEN \'Phase 1\' WHEN 2 THEN \'Phase 2\' WHEN 3 THEN \'Phase 3\' WHEN 4 THEN \'Phase 4\' ELSE \'\' END AS phase, ' +
+    'CASE ct.phase WHEN 1 THEN \'Phase I\' WHEN 2 THEN \'Phase II\' WHEN 3 THEN \'Phase III\' WHEN 4 THEN \'Phase IV\' ELSE \'\' END AS phase, ' +
     'FORMAT_DATETIME(\'%Y-%m-%d\', st.date_created) AS date_created, ' +
     'FORMAT_DATETIME(\'%Y-%m-%d\', st.last_updated) AS last_updated, ' +
     'COALESCE(FORMAT_DATE(\'%Y-%m-%d\', DATE_SUB(DATE(sd.enrollment_start_date), INTERVAL 1 DAY)), \'\') AS start_date, ' +
@@ -564,7 +564,7 @@ function _buildStudyStatusQuery() {
     'CASE WHEN COALESCE(st.nickname, \'\') != \'\' THEN st.nickname ' +
     '  WHEN spon.name IS NOT NULL AND COALESCE(st.protocol_number, \'\') != \'\' THEN CONCAT(spon.name, \' - \', st.protocol_number) ' +
     '  WHEN COALESCE(st.protocol_number, \'\') != \'\' THEN st.protocol_number ELSE \'\' END AS study_name, ' +
-    'CASE ct.phase WHEN 1 THEN \'Phase 1\' WHEN 2 THEN \'Phase 2\' WHEN 3 THEN \'Phase 3\' WHEN 4 THEN \'Phase 4\' ELSE \'\' END AS phase, ' +
+    'CASE ct.phase WHEN 1 THEN \'Phase I\' WHEN 2 THEN \'Phase II\' WHEN 3 THEN \'Phase III\' WHEN 4 THEN \'Phase IV\' ELSE \'\' END AS phase, ' +
     'CASE st.status WHEN 0 THEN \'Pre-Site Qualification\' WHEN 1 THEN \'Site Qualification\' WHEN 2 THEN \'Start Up\' WHEN 3 THEN \'Enrolling\' WHEN 4 THEN \'Maintenance\' WHEN 5 THEN \'Closeout\' WHEN 6 THEN \'Closed\' ELSE \'\' END AS status, ' +
     // CRIO stores dates as next-day midnight UTC (e.g. Sept 19 ET → Sept 20 00:00 UTC)
     // Subtract 1 day to get the actual local date matching Looker/CRIO UI
@@ -623,7 +623,7 @@ function _buildAuditLogQuery() {
     '  WHEN spon.name IS NOT NULL AND COALESCE(st.protocol_number, \'\') != \'\' THEN CONCAT(spon.name, \' - \', st.protocol_number) ' +
     '  WHEN COALESCE(st.protocol_number, \'\') != \'\' THEN st.protocol_number ELSE \'\' END AS study_name, ' +
     'CAST(aal.subject_key AS STRING) AS subject_key, ' +
-    'TRIM(CONCAT(COALESCE(sub.first_name, \'\'), \' \', COALESCE(sub.middle_name, \'\'), \' \', COALESCE(sub.last_name, \'\'))) AS subject_full_name, ' +
+    'REGEXP_REPLACE(TRIM(CONCAT(COALESCE(sub.first_name, \'\'), \' \', COALESCE(sub.middle_name, \'\'), \' \', COALESCE(sub.last_name, \'\'))), r\'\\s+\', \' \') AS subject_full_name, ' +
     'CAST(aal.calendar_appointment_key AS STRING) AS calendar_appointment_key, ' +
     'COALESCE(sv.name, \'\') AS visit_name, ' +
     'FORMAT_DATETIME(\'%Y-%m-%d %H:%M:%S\', aal.date_created) AS date_changed, ' +
@@ -677,7 +677,7 @@ function _buildPatientDBQuery() {
   var t = '`' + project + '.' + ds + '.';
 
   return 'SELECT ' +
-    'TRIM(CONCAT(COALESCE(p.first_name, \'\'), \' \', COALESCE(p.middle_name, \'\'), \' \', COALESCE(p.last_name, \'\'))) AS patient_full_name, ' +
+    'REGEXP_REPLACE(TRIM(CONCAT(COALESCE(p.first_name, \'\'), \' \', COALESCE(p.middle_name, \'\'), \' \', COALESCE(p.last_name, \'\'))), r\'\\s+\', \' \') AS patient_full_name, ' +
     'CASE p.status WHEN 0 THEN \'Available\' WHEN 1 THEN \'Not Available\' WHEN 2 THEN \'Active\' WHEN 3 THEN \'Do Not Contact\' ELSE \'Available\' END AS patient_status, ' +
     'COALESCE(p.email, \'\') AS email, ' +
     'COALESCE(p.mobile_phone, \'\') AS mobile_phone, ' +
