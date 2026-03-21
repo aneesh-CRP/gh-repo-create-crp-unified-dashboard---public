@@ -635,7 +635,7 @@ function _buildAuditLogQuery() {
     'CONCAT(COALESCE(by_u.first_name, \'\'), \' \', COALESCE(by_u.last_name, \'\')) AS affected_user, ' +
     'CONCAT(COALESCE(coord.first_name, \'\'), \' \', COALESCE(coord.last_name, \'\')) AS appointment_for, ' +
     'CASE aal.appointment_type WHEN 0 THEN \'Regular Visit\' WHEN 1 THEN \'Ad Hoc Visit\' WHEN 2 THEN \'General Appointment\' WHEN 3 THEN \'Block\' ELSE \'\' END AS appointment_type, ' +
-    'CASE aal.change_type WHEN 1 THEN \'Created\' WHEN 2 THEN \'Rescheduled\' WHEN 3 THEN \'Modified\' WHEN 4 THEN \'Cancelled\' WHEN 5 THEN \'Restored\' ELSE CAST(aal.change_type AS STRING) END AS change_type, ' +
+    'CASE aal.change_type WHEN 0 THEN \'User Added\' WHEN 1 THEN \'Created\' WHEN 2 THEN \'Rescheduled\' WHEN 3 THEN \'Modified\' WHEN 4 THEN \'Cancelled\' WHEN 5 THEN \'Restored\' ELSE CAST(aal.change_type AS STRING) END AS change_type, ' +
     'CASE aal.cancel_type WHEN 1 THEN \'No Show\' WHEN 2 THEN \'Site Cancelled\' WHEN 3 THEN \'Patient Cancelled\' ELSE \'\' END AS cancel_type, ' +
     'COALESCE(REGEXP_REPLACE(aal.cancel_reason, r\'[\\x00-\\x1f]\', \' \'), \'\') AS cancel_reason ' +
     'FROM ' + t + 'appointment_audit_log` aal ' +
