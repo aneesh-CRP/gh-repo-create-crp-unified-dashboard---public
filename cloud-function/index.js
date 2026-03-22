@@ -1689,10 +1689,127 @@ async function fetchMedRecords() {
 }
 
 // ── Register ClickUp feeds ──
+// ── Monitoring Visit Tracker (list 901408668193) ──
+async function fetchMonitoringVisits() {
+  const tasks = await fetchAllClickUpTasks('901408668193');
+  return tasks.map(t => {
+    const f = parseCustomFields(t.custom_fields);
+    return {
+      name: t.name || '', status: (t.status||{}).status || '',
+      study: f['Study'] || '', monitor: f['Monitor Name '] || f['Monitor Name'] || '',
+      visit_date: f['Monitoring Visit Date '] || f['Monitoring Visit Date'] || '',
+      visit_type: f['Type of Visit'] || '',
+      observations: f['Number of Open Observations '] || f['Number of Open Observations'] || '0',
+      observation_category: f['Observation Category '] || f['Observation Category'] || '',
+      observation_date: f['Date Observation Occured '] || f['Date Observation Occured'] || '',
+      next_steps: f['Next Steps/Corrective Action Taken '] || f['Next Steps/Corrective Action Taken'] || '',
+      notes: f['Notes'] || '',
+      url: t.url || '',
+    };
+  });
+}
+
+// ── Document Expiries (list 901409831522) ──
+async function fetchDocExpiries() {
+  const tasks = await fetchAllClickUpTasks('901409831522');
+  return tasks.map(t => {
+    const f = parseCustomFields(t.custom_fields);
+    return {
+      name: t.name || '', status: (t.status||{}).status || '',
+      license_expiry: f['License Expiry'] || '',
+      cv_expiry: f['CV Expiry'] || '',
+      gcp_expiry: f['GCP Expiry'] || '',
+      cssrs_expiry: f['C-SSRS Expiry'] || '',
+      iata_expiry: f['IATA Expiry'] || '',
+      url: t.url || '',
+    };
+  });
+}
+
+// ── IRB Expirations (list 901409833229) ──
+async function fetchIRBExpirations() {
+  const tasks = await fetchAllClickUpTasks('901409833229');
+  return tasks.map(t => {
+    const f = parseCustomFields(t.custom_fields);
+    return {
+      study: t.name || '', status: (t.status||{}).status || '',
+      irb_expiration: f['IRB Expiration Date'] || '',
+      url: t.url || '',
+    };
+  });
+}
+
+// ── Study Master List (list 901407640932) ──
+async function fetchStudyMasterList() {
+  const tasks = await fetchAllClickUpTasks('901407640932');
+  return tasks.map(t => {
+    const f = parseCustomFields(t.custom_fields);
+    return {
+      study: t.name || '', status: (t.status||{}).status || '',
+      sponsor: f['Sponsor'] || '', cro: f['CRO'] || '',
+      pi: f['PI'] || '', sub_i: f['Sub-I'] || '',
+      primary_coordinator: f['Primary Coordinator'] || '',
+      backup_coordinator: f['Back-Up Coordinator'] || '',
+      phone_screener: f['Phone Screener Completed?'] || '',
+      crio_esource: f['CRIO eSource Build'] || '',
+      site: f['Study Site'] || '', site_number: f['Site Number'] || '',
+      therapeutic_area: f['Therapeutic Area'] || '',
+      url: t.url || '',
+    };
+  });
+}
+
+// ── Provider Trackers (all physician tracker lists) ──
+const PROVIDER_TRACKER_LISTS = [
+  { id: '901413202462', name: 'Dr. Modarressi' },
+  { id: '901414013590', name: 'Center For Primary Care Medicine' },
+  { id: '901413613360', name: 'Dr. Savita Singh' },
+  { id: '901414585282', name: 'Dr. Richard Mandel' },
+  { id: '901414585292', name: 'Prohealth Associates' },
+  { id: '901414585307', name: 'Parkwood' },
+  { id: '901414585313', name: 'SkinSmart Dermatology' },
+  { id: '901414585319', name: 'Princeton Dermatology' },
+  { id: '901414585325', name: 'Aura Derm' },
+  { id: '901413613356', name: 'Connolly Dermatology' },
+];
+async function fetchProviderTrackers() {
+  const allRows = [];
+  for (const list of PROVIDER_TRACKER_LISTS) {
+    const tasks = await fetchAllClickUpTasks(list.id);
+    tasks.forEach(t => {
+      const f = parseCustomFields(t.custom_fields);
+      const statusRaw = ((t.status||{}).status||'').toLowerCase();
+      const stage = PIPELINE_MAP[statusRaw] || statusRaw;
+      const isClosed = CLOSED_STAGES.has(stage) || (t.status||{}).type === 'closed';
+      allRows.push({
+        name: t.name || '', provider: list.name,
+        status: (t.status||{}).status || '', stage,
+        study: f['Study'] || '', phone: f['Phone #'] || f['Phone'] || '',
+        dob: f['Patient DOB'] || f['DOB'] || '',
+        next_appointment: f['Next Appointment Date'] || '',
+        crio_link: f['CRIO Link'] || '',
+        interested: f['Interest shown by the Participant?'] === 'true' ? 'Yes' : '',
+        pre_screening_required: f['Pre-screening required?'] || '',
+        medical_record_uploaded: f['Patient Medical Record Uploaded?'] || '',
+        is_active: !isClosed, url: t.url || '',
+        date_created: t.date_created ? new Date(parseInt(t.date_created)).toISOString().split('T')[0] : '',
+        date_updated: t.date_updated ? new Date(parseInt(t.date_updated)).toISOString().split('T')[0] : '',
+        days_since_update: t.date_updated ? Math.floor((Date.now() - parseInt(t.date_updated)) / 86400000) : 999,
+      });
+    });
+  }
+  return allRows;
+}
+
 const CLICKUP_FEEDS = {
   referrals: fetchReferrals,
   campaigns: fetchCampaigns,
   medRecords: fetchMedRecords,
+  monitoringVisits: fetchMonitoringVisits,
+  docExpiries: fetchDocExpiries,
+  irbExpirations: fetchIRBExpirations,
+  studyMasterList: fetchStudyMasterList,
+  providerTrackers: fetchProviderTrackers,
 };
 
 // ═══════════════════════════════════════════════════════════
