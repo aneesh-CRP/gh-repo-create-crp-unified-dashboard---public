@@ -3668,7 +3668,17 @@ function updateFinanceOverviewKPIs() {
   _s('fin-kpi-ap-ar', '$' + Math.round(apAR).toLocaleString());
   _s('fin-kpi-ap-ar-sub', AGING_AP ? AGING_AP.length + ' studies' : '');
   _s('fin-kpi-rev12m', revTotal >= 1000000 ? '$' + (revTotal/1000000).toFixed(2) + 'M' : '$' + Math.round(revTotal/1000) + 'K');
-  _s('fin-kpi-rev12m-sub', 'All sources');
+  // Show GAAP upfront/holdback breakdown if available
+  var gaapSrc = window._gaapStudyData || [];
+  if (gaapSrc.length > 0) {
+    var gaapUpfront = gaapSrc.reduce(function(s,r){return s+(r.total_upfront||0);},0);
+    var gaapHoldback = gaapSrc.reduce(function(s,r){return s+(r.total_holdback||0);},0);
+    var gaapInvoiced = gaapSrc.reduce(function(s,r){return s+(r.invoiced||0);},0);
+    var gaapUninvoiced = gaapSrc.reduce(function(s,r){return s+(r.uninvoiced||0);},0);
+    _s('fin-kpi-rev12m-sub', 'GAAP \u00b7 Upfront $' + Math.round(gaapUpfront/1000) + 'K \u00b7 Holdback $' + Math.round(gaapHoldback/1000) + 'K');
+  } else {
+    _s('fin-kpi-rev12m-sub', 'All sources');
+  }
 
   // Open receivables
   _s('fin-kpi-unpaid-inv', '$' + Math.round(unpaidInvTotal).toLocaleString());
@@ -3676,7 +3686,20 @@ function updateFinanceOverviewKPIs() {
   _s('fin-kpi-unpaid-ap', '$' + Math.round(unpaidApTotal).toLocaleString());
   _s('fin-kpi-unpaid-ap-sub', UNPAID_AP ? UNPAID_AP.length + ' studies' : '');
   _s('fin-kpi-uninvoiced', '$' + Math.round(uninvoicedTotal).toLocaleString());
-  _s('fin-kpi-uninvoiced-sub', UNINVOICED ? UNINVOICED.length + ' studies' : '');
+  if (gaapSrc.length > 0) {
+    var gaapUninv = gaapSrc.reduce(function(s,r){return s+(r.uninvoiced||0);},0);
+    _s('fin-kpi-uninvoiced', '$' + Math.round(gaapUninv).toLocaleString());
+    _s('fin-kpi-uninvoiced-sub', 'GAAP \u00b7 ' + gaapSrc.filter(function(r){return r.uninvoiced>0;}).length + ' studies');
+  } else {
+    _s('fin-kpi-uninvoiced-sub', UNINVOICED ? UNINVOICED.length + ' studies' : '');
+  }
+
+  // Data source indicator
+  var finSrcEl = document.getElementById('fin-data-source');
+  if (finSrcEl) {
+    var src = gaapSrc.length > 0 ? 'GAAP Live' : (window._financeLastFetch ? 'BQ' : 'Defaults');
+    finSrcEl.textContent = src + (window._financeLastFetch ? ' \u00b7 ' + window._financeLastFetch : '');
+  }
 }
 
 // ═══ UNIFIED TAB SWITCHER (wraps perf switchView + finance gating) ═══
@@ -6748,10 +6771,21 @@ async function fetchFinanceBQ() {
     // ── GAAP Revenue: live from CRIO GAAP tables (replaces hardcoded defaults) ──
     if (gaapRevRows.length > 0) {
       var gaapRev12m = {};
-      var gaapTopAR = [];
-      gaapRevRows.forEach(function(r) {
-        var code = (r.protocol_number || '').trim();
-        if (code) gaapRev12m[code] = Math.round(num(r.revenue_12m));
+      window._gaapStudyData = gaapRevRows.map(function(r) {
+        return {
+          study: (r.study_name || '').trim(),
+          protocol: (r.protocol_number || '').trim(),
+          total_revenue: num(r.total_revenue),
+          total_upfront: num(r.total_upfront),
+          total_holdback: num(r.total_holdback),
+          invoiced: num(r.invoiced),
+          uninvoiced: num(r.uninvoiced),
+          total_autopay: num(r.total_autopay),
+          revenue_12m: num(r.revenue_12m),
+        };
+      });
+      window._gaapStudyData.forEach(function(r) {
+        if (r.protocol) gaapRev12m[r.protocol] = Math.round(r.revenue_12m);
       });
       STUDY_REVENUE_12M = gaapRev12m;
       _log('CRP GAAP: Study revenue loaded — ' + Object.keys(gaapRev12m).length + ' studies');
@@ -15275,6 +15309,7 @@ if (typeof window !== 'undefined') {
 
   <!-- ALERTS -->
   <div id="alertsBox"></div>
+  <div style="text-align:right;padding:2px 12px;font-size:9px;color:#94a3b8"><span id="fin-data-source">Loading...</span></div>
 
   <!-- ── HERO: 3 biggest numbers at a glance ── -->
   <div class="hero-row">

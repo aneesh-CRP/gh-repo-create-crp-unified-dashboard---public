@@ -1,0 +1,2739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CRP · Unified Intelligence Dashboard</title>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="dns-prefetch" href="https://docs.google.com">
+<link rel="preconnect" href="https://docs.google.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<!-- BUILD:CSS_START -->
+<style>
+
+:root {
+  /* ═══ CRP Brand Colors ═══ */
+  --navy:   #072061;
+  --blue:   #1843ad;
+  --cyan:   #a2dceb;
+  --orange: #ff9933;
+
+  /* ═══ Brand Aliases (backwards compat) ═══ */
+  --accent: var(--navy);
+  --blue-bg: #e8eeff;
+  --blue-border: var(--blue);
+  --purple: var(--blue);          /* legacy alias */
+  --purple-light: #e8eeff;
+  --purple-border: var(--blue);
+
+  /* ═══ Surfaces & Layout ═══ */
+  --bg: #f0f4fa;
+  --surface: #ffffff;
+  --surface2: #edf2f8;
+  --border: #c8d6e8;
+  --border2: #b0c4d8;
+  --text: var(--navy);
+  --muted: #4a6080;
+  --light: #7a90b0;
+
+  /* ═══ Semantic Colors ═══ */
+  --green: #059669;
+  --green-bg: #ecfdf5;
+  --green-border: #a7f3d0;
+
+  --red: #dc2626;
+  --red-bg: #fef2f2;
+  --red-border: #fecaca;
+
+  --yellow: #d97706;
+  --yellow-bg: #fffbeb;
+  --yellow-border: #fde68a;
+  --yellow-light: #fff3e0;
+
+  --violet: #7c3aed;
+  --violet-bg: #f5f3ff;
+  --violet-border: #ddd6fe;
+
+  /* ═══ Orange (brand) vs Yellow (semantic) ═══ */
+  --orange-light: #fff3e0;
+  --orange-border: #ffc57a;
+}
+
+/* ═══ Dark Theme ═══ */
+[data-theme="dark"] {
+  --navy: #a8b8d8;
+  --blue: #5b8def;
+  --cyan: #2a6a7a;
+  --orange: #ff9933;
+  --accent: var(--navy);
+  --blue-bg: #1a2744;
+  --blue-border: #5b8def;
+  --purple: var(--blue);
+  --purple-light: #1a2744;
+  --purple-border: var(--blue);
+  --bg: #0f1724;
+  --surface: #1a2332;
+  --surface2: #1e2a3a;
+  --border: #2d3f56;
+  --border2: #3a4f66;
+  --text: #d8e2f0;
+  --muted: #8ea4c0;
+  --light: #6882a0;
+  --green: #34d399;
+  --green-bg: #0a2620;
+  --green-border: #166534;
+  --red: #f87171;
+  --red-bg: #2a1515;
+  --red-border: #7f1d1d;
+  --yellow: #fbbf24;
+  --yellow-bg: #2a2210;
+  --yellow-border: #92400e;
+  --yellow-light: #2a2210;
+  --violet: #a78bfa;
+  --violet-bg: #1e1536;
+  --violet-border: #4c1d95;
+  --orange-light: #2a2010;
+  --orange-border: #c67a20;
+}
+[data-theme="dark"] body,
+[data-theme="dark"] .nav {
+  background: var(--bg);
+  color: var(--text);
+}
+/* ── Core Layout ── */
+[data-theme="dark"] .nav { border-bottom-color: var(--border); }
+[data-theme="dark"] .card { background: var(--surface); border-color: var(--border); }
+[data-theme="dark"] .nav-tab.active { background: var(--blue-bg); color: var(--text); }
+[data-theme="dark"] .nav-tab:hover { background: var(--surface2); }
+[data-theme="dark"] table th { background: var(--surface2); color: var(--text); }
+[data-theme="dark"] table td { border-color: var(--border); }
+[data-theme="dark"] .data-badge { background: var(--surface2); color: var(--muted); }
+[data-theme="dark"] input, [data-theme="dark"] select { background: var(--surface2); color: var(--text); border-color: var(--border); }
+[data-theme="dark"] #data-health-strip { background: var(--surface); border-color: var(--border); color: var(--muted); }
+[data-theme="dark"] .dh-chip { background: var(--surface2); color: var(--muted); }
+[data-theme="dark"] .time-banner { background: var(--surface); }
+[data-theme="dark"] .detail-panel, [data-theme="dark"] #detail-panel { background: var(--surface); color: var(--text); }
+[data-theme="dark"] .modal-box { background: var(--surface); color: var(--text); }
+
+/* ── Panels, Heroes, Groups ── */
+[data-theme="dark"] .hero-cell,
+[data-theme="dark"] .kpi,
+[data-theme="dark"] .group-panel,
+[data-theme="dark"] .panel { background: var(--surface); border-color: var(--border); }
+[data-theme="dark"] .group-title { color: var(--text); border-color: var(--border); }
+[data-theme="dark"] .panel-head { color: var(--text); border-color: var(--border); }
+[data-theme="dark"] .hero-label,
+[data-theme="dark"] .gk-label { color: var(--muted); }
+[data-theme="dark"] .hero-sub,
+[data-theme="dark"] .gk-sub { color: var(--light); }
+[data-theme="dark"] .hero-cell:hover { border-color: var(--blue); box-shadow: 0 4px 16px rgba(91,141,239,0.15); }
+[data-theme="dark"] .kpi.click:hover { border-color: var(--blue); box-shadow: 0 4px 16px rgba(91,141,239,0.15); }
+[data-theme="dark"] .forecast-cell { border-color: var(--border); }
+[data-theme="dark"] .forecast-cell .fl { color: var(--muted); }
+[data-theme="dark"] .forecast-cell .fv { color: var(--text); }
+[data-theme="dark"] .forecast-cell .fs { color: var(--light); }
+
+/* ── Modals & Overlays ── */
+[data-theme="dark"] #detail-panel-body { background: var(--surface); }
+[data-theme="dark"] .detail-table th { background: var(--surface2); color: var(--muted); border-color: var(--border); }
+[data-theme="dark"] .detail-table td { border-color: var(--border); }
+[data-theme="dark"] .detail-table tr:hover td { background: var(--surface2); }
+[data-theme="dark"] .modal-hdr { background: var(--surface2); border-color: var(--border); }
+[data-theme="dark"] .modal-hdr h2 { color: var(--text); }
+[data-theme="dark"] .mclose { color: var(--muted); }
+[data-theme="dark"] .mclose:hover { background: var(--surface); }
+[data-theme="dark"] .modal-bdy { background: var(--surface); }
+[data-theme="dark"] #detail-modal { background: rgba(0,0,0,.6); }
+[data-theme="dark"] .modal-backdrop { background: rgba(0,0,0,.6); }
+[data-theme="dark"] #authModal > div { background: var(--surface) !important; color: var(--text); }
+
+/* ── Buttons & Filters ── */
+[data-theme="dark"] .fbtn { background: var(--surface2); color: var(--muted); border-color: var(--border); }
+[data-theme="dark"] .fbtn.active { background: var(--blue); color: #fff; border-color: var(--blue); }
+[data-theme="dark"] .export-btn { background: var(--surface2); color: var(--muted); border-color: var(--border); }
+[data-theme="dark"] .export-btn:hover { background: var(--surface); color: var(--text); }
+[data-theme="dark"] .refresh-btn { background: var(--surface2); color: var(--text); border-color: var(--border); }
+[data-theme="dark"] .notes-btn { background: var(--surface2); color: var(--muted); border-color: var(--border); }
+[data-theme="dark"] .sort-sel { background: var(--surface2); color: var(--text); border-color: var(--border); }
+
+/* ── Tables (class-based and inline bg) ── */
+[data-theme="dark"] .tbl tr:hover { background: var(--surface2); }
+[data-theme="dark"] .tbl td { border-color: var(--border); }
+[data-theme="dark"] .fin-table th { background: var(--surface2); color: var(--muted); }
+[data-theme="dark"] .fin-table td { border-color: var(--border); }
+[data-theme="dark"] .sortable th:hover { background: var(--surface2); }
+
+/* ── Inline backgrounds override (JS-rendered content) ── */
+[data-theme="dark"] [style*="background:#f8fafc"],
+[data-theme="dark"] [style*="background:#F7FAFC"],
+[data-theme="dark"] [style*="background: #f8fafc"],
+[data-theme="dark"] [style*="background: #F7FAFC"] { background: var(--surface2) !important; }
+[data-theme="dark"] [style*="background:#fff"],
+[data-theme="dark"] [style*="background:white"],
+[data-theme="dark"] [style*="background: #fff"],
+[data-theme="dark"] [style*="background: white"] { background: var(--surface) !important; }
+[data-theme="dark"] [style*="background:#fffbeb"],
+[data-theme="dark"] [style*="background:#fff7ed"] { background: var(--yellow-bg) !important; }
+[data-theme="dark"] [style*="background:#fef2f2"] { background: var(--red-bg) !important; }
+[data-theme="dark"] [style*="background:#ecfdf5"] { background: var(--green-bg) !important; }
+[data-theme="dark"] [style*="background:#f5f3ff"] { background: var(--violet-bg) !important; }
+[data-theme="dark"] [style*="background:#DBEAFE"],
+[data-theme="dark"] [style*="background:#dbeafe"] { background: var(--blue-bg) !important; }
+[data-theme="dark"] [style*="border-bottom:2px solid #e2e8f0"],
+[data-theme="dark"] [style*="border-bottom:1px solid #e2e8f0"],
+[data-theme="dark"] [style*="border-bottom:1px solid #E2E8F0"],
+[data-theme="dark"] [style*="border:1px solid #e2e8f0"],
+[data-theme="dark"] [style*="border:1px solid #E2E8F0"],
+[data-theme="dark"] [style*="border:1px solid #E5E7EB"] { border-color: var(--border) !important; }
+[data-theme="dark"] [style*="color:#718096"],
+[data-theme="dark"] [style*="color:#64748b"],
+[data-theme="dark"] [style*="color:#475569"],
+[data-theme="dark"] [style*="color:#4A5568"] { color: var(--muted) !important; }
+[data-theme="dark"] [style*="color:#2D3748"],
+[data-theme="dark"] [style*="color:#1a202c"],
+[data-theme="dark"] [style*="color:#2d3748"] { color: var(--text) !important; }
+[data-theme="dark"] [style*="color:#A0AEC0"] { color: var(--light) !important; }
+
+/* ── Alert bars ── */
+[data-theme="dark"] .alert-warn { background: var(--yellow-bg); border-color: var(--yellow); color: var(--yellow); }
+[data-theme="dark"] .alert-crit { background: var(--red-bg); border-color: var(--red); color: var(--red); }
+[data-theme="dark"] #fallback-banner { background: var(--red-bg) !important; border-color: var(--red-border) !important; color: var(--red) !important; }
+
+/* ── Pills ── */
+[data-theme="dark"] .pill-new { background: var(--blue-bg); color: var(--blue); }
+[data-theme="dark"] .pill-contacted { background: var(--yellow-bg); color: var(--yellow); }
+[data-theme="dark"] .pill-escalated { background: var(--orange-light); color: var(--orange); }
+[data-theme="dark"] .pill-disputed { background: var(--red-bg); color: var(--red); }
+[data-theme="dark"] .pill-resolved { background: var(--green-bg); color: var(--green); }
+
+/* ── Nav mobile dropdown in dark mode ── */
+[data-theme="dark"] .nav-tabs-wrapper { background: var(--surface); border-color: var(--border); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+[data-theme="dark"] .nav-tabs-wrapper .nav-tab:hover { background: var(--surface2); }
+[data-theme="dark"] .nav-hamburger { color: var(--text); }
+
+/* ── Search results dropdown ── */
+[data-theme="dark"] #search-results { background: var(--surface) !important; border-color: var(--border) !important; }
+[data-theme="dark"] #search-results > div:hover { background: var(--surface2); }
+
+/* ── Coord workload expand panels ── */
+[data-theme="dark"] .coord-day-detail { background: var(--surface2) !important; border-color: var(--border) !important; }
+
+/* ── Study cards ── */
+[data-theme="dark"] .study-card { background: var(--surface); border-color: var(--border); }
+[data-theme="dark"] .study-card:hover { box-shadow: 0 6px 20px rgba(91,141,239,0.15); }
+[data-theme="dark"] .study-link { color: var(--blue); }
+
+/* ── Chart containers ── */
+[data-theme="dark"] .chart-wrap { background: var(--surface); }
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'IBM Plex Sans', sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* ── SETUP OVERLAY ─────────────────────────── */
+#setup-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  background: rgba(15,23,42,0.85);
+  display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(4px);
+}
+.setup-modal {
+  background: var(--surface);
+  border-radius: 16px;
+  max-width: 720px; width: 90%;
+  max-height: 90vh; overflow-y: auto;
+  padding: 36px;
+  box-shadow: 0 25px 50px rgba(0,0,0,0.3);
+}
+.setup-modal h2 {
+  font-size: 22px; font-weight: 700; margin-bottom: 6px; color: var(--text);
+}
+.setup-modal .tagline { color: var(--muted); margin-bottom: 24px; font-size: 14px; }
+.step-list { display: flex; flex-direction: column; gap: 16px; margin-bottom: 24px; }
+.setup-step {
+  display: flex; gap: 16px; align-items: flex-start;
+  padding: 16px; background: var(--surface2); border-radius: 10px;
+  border-left: 4px solid var(--accent);
+}
+.setup-step.green-step { border-color: var(--green); }
+.setup-step.yellow-step { border-color: var(--yellow); }
+.step-num {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: var(--accent); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 13px; flex-shrink: 0;
+}
+.step-num.green { background: var(--green); }
+.step-num.yellow { background: var(--yellow); }
+.step-content h4 { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+.step-content p { font-size: 13px; color: var(--muted); line-height: 1.6; }
+.step-content code {
+  background: #f1f5f9; border: 1px solid var(--border);
+  padding: 2px 6px; border-radius: 4px;
+  font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: var(--blue);
+}
+.setup-url-box {
+  background: #0f172a; color: #7dd3fc;
+  font-family: 'IBM Plex Mono', monospace; font-size: 12px;
+  padding: 12px 14px; border-radius: 8px; margin-top: 8px;
+  word-break: break-all; line-height: 1.7;
+}
+.setup-note {
+  background: var(--yellow-bg); border: 1px solid var(--yellow-border);
+  padding: 12px 14px; border-radius: 8px; font-size: 12px; color: #78350f;
+  margin-top: 12px;
+}
+.setup-input-row { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
+.setup-input {
+  flex: 1; min-width: 200px;
+  padding: 9px 12px; border: 1px solid var(--border2);
+  border-radius: 8px; font-size: 13px; font-family: inherit;
+  background: var(--surface);
+}
+.setup-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(14,165,233,0.15); }
+.btn {
+  padding: 9px 18px; border-radius: 8px; border: none;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: #0284c7; }
+.btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+.btn-secondary:hover { background: var(--border); }
+.btn-green { background: var(--green); color: #fff; }
+.btn-green:hover { background: #047857; }
+.setup-footer {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.skip-link { font-size: 12px; color: var(--muted); cursor: pointer; text-decoration: underline; }
+
+/* ── NAV ───────────────────────────────────── */
+.nav {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 16px;
+  display: flex; align-items: center; gap: 5px;
+  min-height: 50px; height: auto;
+  position: sticky; top: 0; z-index: 100;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+.nav-brand {
+  display: flex; align-items: center; gap: 8px; margin-right: 4px;
+}
+.nav-logo { width:32px; height:32px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.nav-title { font-size: 14px; font-weight: 700; color: var(--text); }
+.nav-sub { font-size: 11px; color: var(--muted); }
+.nav-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.nav-tab {
+  padding: 5px 10px; border-radius: 6px; font-size: 12px; font-weight: 500;
+  cursor: pointer; color: var(--muted); transition: all 0.15s;
+  border: 1px solid transparent; white-space: nowrap;
+}
+.nav-tab.active { background: #e8eeff; color: #072061; border-color: #1843ad; font-weight: 700; }
+.nav-tab:hover:not(.active) { background: var(--surface2); color: var(--text); }
+.refresh-btn {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border-radius: 6px;
+  background: var(--green-bg); color: var(--green);
+  border: 1px solid var(--green-border); font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: all 0.15s;
+}
+.refresh-btn:hover { background: var(--green); color: #fff; }
+.connect-btn {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border-radius: 6px;
+  background: var(--accent); color: #fff;
+  border: none; font-size: 12px; font-weight: 600;
+  cursor: pointer;
+}
+.data-badge {
+  font-size: 11px; color: var(--muted);
+  background: var(--surface2); padding: 4px 10px;
+  border-radius: 20px; border: 1px solid var(--border);
+}
+
+/* ── LAYOUT ────────────────────────────────── */
+.main { max-width: 1480px; margin: 0 auto; padding: 20px 24px; }
+
+/* ── TAB VIEWS ─────────────────────────────── */
+.view { display: none; }
+.view.active { display: block; content-visibility: auto; contain-intrinsic-size: auto 2000px; }
+
+/* ── TIME BANNER ──────────────────────────── */
+.time-banner {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 14px 20px;
+  display: flex; align-items: center; gap: 0;
+  margin-bottom: 20px; overflow: hidden; position: relative;
+}
+.tb-section {
+  flex: 1; text-align: center; padding: 0 16px;
+  position: relative;
+}
+.tb-section + .tb-section::before {
+  content: ''; position: absolute; left: 0; top: 10%; height: 80%;
+  width: 1px; background: var(--border);
+}
+.tb-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 3px; }
+.tb-value { font-size: 22px; font-weight: 700; color: var(--text); }
+.tb-value.red { color: var(--red); }
+.tb-value.green { color: var(--green); }
+.tb-value.blue { color: var(--blue); }
+.tb-sub { font-size: 11px; color: var(--muted); margin-top: 1px; }
+.tb-divider {
+  width: 60px; text-align: center; font-size: 11px; font-weight: 600;
+  color: var(--light); flex-shrink: 0;
+}
+
+/* ── GRID LAYOUTS ─────────────────────────── */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.grid-65 { display: grid; grid-template-columns: 3fr 2fr; gap: 16px; margin-bottom: 16px; }
+.grid-56 { display: grid; grid-template-columns: 2fr 3fr; gap: 16px; margin-bottom: 16px; }
+.mb16 { margin-bottom: 16px; }
+.span2 { grid-column: span 2; }
+
+/* ── CARD ──────────────────────────────────── */
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 18px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  contain: layout style;
+}
+.card-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 14px;
+}
+.card-title { font-size: 13px; font-weight: 700; color: var(--text); text-transform: uppercase; letter-spacing: 0.3px; }
+.card-meta { font-size: 11px; color: var(--muted); }
+
+/* ── BADGES ───────────────────────────────── */
+.badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 600;
+}
+.badge-red { background: var(--red-bg); color: var(--red); border: 1px solid var(--red-border); }
+.badge-green { background: var(--green-bg); color: var(--green); border: 1px solid var(--green-border); }
+.badge-yellow { background: var(--yellow-bg); color: var(--yellow); border: 1px solid var(--yellow-border); }
+.badge-blue { background: var(--blue-bg); color: var(--blue); border: 1px solid var(--blue-border); }
+.badge-purple { background: var(--violet-bg); color: var(--purple); border: 1px solid var(--violet-border); }
+.badge-gray { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
+
+/* ── CHARTS ───────────────────────────────── */
+.chart-wrap { position: relative; }
+.h200 { height: 200px; }
+.h220 { height: 220px; }
+.h260 { height: 260px; }
+.h300 { height: 300px; }
+
+/* ── RISK MATRIX ──────────────────────────── */
+.risk-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.risk-table th {
+  text-align: left; padding: 7px 10px;
+  color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--border); font-weight: 600;
+}
+.risk-table td { padding: 8px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+.risk-table tr:last-child td { border-bottom: none; }
+.risk-table tr:hover td { background: #f8fafc; }
+.risk-tag {
+  display: inline-block; padding: 2px 8px; border-radius: 4px;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.5px;
+}
+.risk-critical { background: var(--red-bg); color: var(--red); }
+.risk-high { background: var(--yellow-bg); color: var(--yellow); }
+.risk-medium { background: #fff7ed; color: #c2410c; }
+.risk-low { background: var(--green-bg); color: var(--green); }
+.risk-bar-wrap { width: 60px; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; display: inline-block; vertical-align: middle; margin-right: 6px; }
+.risk-bar { height: 100%; border-radius: 3px; }
+
+/* ── HORIZON VIEW ─────────────────────────── */
+.horizon-grid {
+  display: grid; grid-template-columns: repeat(8, 1fr);
+  gap: 3px; margin-bottom: 8px;
+}
+.horizon-week {
+  padding: 6px 4px; border-radius: 6px; text-align: center;
+  font-size: 10px; cursor: pointer; transition: transform 0.1s;
+  border: 1px solid transparent;
+}
+.horizon-week:hover { transform: translateY(-2px); }
+.horizon-week .hw-date { color: var(--muted); margin-bottom: 3px; }
+.horizon-week .hw-count { font-size: 14px; font-weight: 700; }
+.horizon-week .hw-type { font-size: 9px; }
+.hw-past { background: #fef2f2; border-color: #fecaca; }
+.hw-past .hw-count { color: var(--red); }
+.hw-future { background: #eff6ff; border-color: #bfdbfe; }
+.hw-future .hw-count { color: var(--blue); }
+.hw-today { background: var(--green-bg); border-color: var(--green-border); }
+.hw-today .hw-count { color: var(--green); }
+.horizon-legend { display: flex; gap: 16px; font-size: 11px; color: var(--muted); }
+.hleg { display: flex; align-items: center; gap: 5px; }
+.hleg-dot { width: 10px; height: 10px; border-radius: 2px; }
+
+/* ── INSIGHTS ─────────────────────────────── */
+.insight-list { display: flex; flex-direction: column; gap: 10px; min-height: 40px; }
+.insight-item {
+  display: flex; gap: 12px; padding: 12px 14px;
+  border-radius: 8px; font-size: 12px; line-height: 1.6;
+  border-left: 3px solid var(--accent);
+  background: var(--surface2);
+}
+.insight-item.danger { background: var(--red-bg); border-color: var(--red); }
+.insight-item.warning { background: var(--yellow-bg); border-color: var(--yellow); }
+.insight-item.positive { background: var(--green-bg); border-color: var(--green); }
+.insight-item.info { background: var(--blue-bg); border-color: var(--blue); }
+.insight-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+.insight-title { font-weight: 700; color: var(--text); margin-bottom: 2px; font-size: 13px; }
+.insight-body { color: var(--muted); }
+.insight-tag { margin-top: 4px; }
+
+/* ── NEXT STEPS ───────────────────────────── */
+.steps-list { display: flex; flex-direction: column; gap: 10px; }
+.step-item {
+  display: flex; gap: 12px; padding: 12px 14px;
+  background: var(--surface2); border-radius: 8px;
+  border: 1px solid var(--border);
+}
+.step-num-box {
+  width: 28px; height: 28px; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 12px; flex-shrink: 0; color: #fff;
+}
+.step-title { font-weight: 600; font-size: 13px; margin-bottom: 3px; }
+.step-desc { font-size: 12px; color: var(--muted); line-height: 1.5; }
+.step-due { font-size: 11px; font-weight: 600; margin-top: 5px; }
+
+/* ── UPCOMING TABLE ───────────────────────── */
+.data-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.data-table th {
+  text-align: left; padding: 8px 10px;
+  background: #f8fafc; color: var(--muted);
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px;
+  border-bottom: 2px solid var(--border); border-top: 1px solid var(--border);
+  font-weight: 600; position: sticky; top: 0; z-index: 1;
+}
+.data-table td { padding: 8px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+.data-table tr:hover td { background: #f8fafc; }
+.scroll-wrap { max-height: 340px; overflow-y: auto; border-radius: 0 0 8px 8px; }
+.scroll-wrap::-webkit-scrollbar { width: 5px; }
+.scroll-wrap::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+/* ── COORDINATOR BARS ─────────────────────── */
+.coord-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 0; border-bottom: 1px solid #f1f5f9;
+}
+.coord-row:last-child { border-bottom: none; }
+.coord-avatar {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--blue); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; flex-shrink: 0;
+}
+.coord-name { flex: 1; font-size: 12px; font-weight: 500; }
+.coord-track { width: 80px; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+.coord-fill { height: 100%; border-radius: 3px; background: var(--blue); }
+.coord-count { font-size: 12px; font-weight: 600; color: var(--text); width: 24px; text-align: right; }
+
+/* ── REASON DONUT LEGEND ──────────────────── */
+.legend-list { display: flex; flex-direction: column; gap: 6px; }
+.legend-row { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.legend-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+.legend-label { flex: 1; color: var(--muted); }
+.legend-val { font-weight: 600; color: var(--text); }
+
+/* ── STUDY CARDS ──────────────────────────── */
+.study-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.study-card { transition:box-shadow .15s,transform .1s;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 14px;
+  border-top: 3px solid var(--accent);
+}
+.study-card.risk-critical { border-top-color: var(--red); }
+.study-card.risk-high { border-top-color: var(--yellow); }
+.study-card.risk-low { border-top-color: var(--green); }
+.study-card-name { font-size: 12px; font-weight: 600; margin-bottom: 8px; line-height: 1.4; }
+.study-card-stats { display: flex; gap: 10px; }
+.sc-stat { flex: 1; text-align: center; }
+.sc-num { font-size: 20px; font-weight: 700; }
+.sc-lbl { font-size: 10px; color: var(--muted); }
+
+/* ── TREND INDICATOR ──────────────────────── */
+.trend-up { color: var(--red); }
+.trend-down { color: var(--green); }
+.trend-flat { color: var(--muted); }
+
+/* ── SECTION TITLE ────────────────────────── */
+.section-title {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 1.2px; color: var(--muted);
+  margin: 20px 0 10px;
+  display: flex; align-items: center; gap: 8px;
+}
+.section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+/* ── FILTER BAR ───────────────────────────── */
+.filter-bar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 8px; margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.filter-label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+.filter-btn {
+  padding: 5px 12px; border-radius: 6px; font-size: 12px;
+  cursor: pointer; border: 1px solid var(--border);
+  background: var(--surface); color: var(--muted); transition: all 0.15s;
+}
+.filter-btn.active { background: var(--blue); color: #fff; border-color: var(--blue); }
+.filter-btn:hover:not(.active) { border-color: var(--blue); color: var(--blue); }
+
+/* ── CONNECT GUIDE ────────────────────────── */
+.guide-card {
+  background: #0f172a; border-radius: 12px;
+  padding: 28px; color: #e2e8f0; margin-bottom: 20px;
+}
+.guide-card h3 { font-size: 18px; font-weight: 700; color: #fff; margin-bottom: 6px; }
+.guide-card p { font-size: 13px; color: #94a3b8; margin-bottom: 20px; }
+.guide-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+.guide-step {
+  background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px; padding: 14px;
+}
+.guide-step-num { font-size: 10px; font-weight: 700; color: #7dd3fc; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px; }
+.guide-step h4 { font-size: 13px; font-weight: 600; color: #fff; margin-bottom: 5px; }
+.guide-step p { font-size: 12px; color: #94a3b8; line-height: 1.5; }
+.code-snippet {
+  background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1);
+  padding: 10px 12px; border-radius: 6px; font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px; color: #7dd3fc; margin-top: 8px; word-break: break-all; line-height: 1.7;
+}
+.connect-form {
+  display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap;
+}
+.connect-input {
+  flex: 1; min-width: 280px; padding: 10px 14px;
+  border-radius: 8px; border: 1px solid rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.08); color: #fff; font-size: 13px; font-family: inherit;
+}
+.connect-input::placeholder { color: #475569; }
+.connect-input:focus { outline: none; border-color: #7dd3fc; }
+
+/* ── STATUS RING ──────────────────────────── */
+.status-ring {
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 16px;
+}
+.sr-item { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); }
+.sr-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+/* ── EMPTY STATE ──────────────────────────── */
+.empty { text-align: center; padding: 30px; color: var(--light); font-size: 13px; }
+
+/* ── LOADING ──────────────────────────────── */
+.loading {
+  display: flex; align-items: center; justify-content: center;
+  gap: 8px; padding: 20px; color: var(--muted); font-size: 13px;
+}
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── FADE IN ──────────────────────────────── */
+.fade-in { animation: fadeIn 0.4s ease both; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; } }
+
+/* ── RESPONSIVE ───────────────────────────── */
+@media (max-width: 1100px) {
+  .grid-4 { grid-template-columns: 1fr 1fr; }
+  .grid-65, .grid-56 { grid-template-columns: 1fr; }
+}
+@media (max-width: 800px) {
+  .grid-2, .grid-3 { grid-template-columns: 1fr; }
+}
+
+/* Sortable tables */
+.sortable th { cursor:pointer; user-select:none; white-space:nowrap; }
+.sortable th:hover { background:var(--surface2, #f1f5f9); }
+.sortable th::after { content:' ⇅'; opacity:0.35; font-size:10px; }
+.sortable th.sort-asc::after  { content:' ↑'; opacity:1; color:var(--blue); }
+.sortable th.sort-desc::after { content:' ↓'; opacity:1; color:var(--blue); }
+
+
+/* ── Detail Modal ── */
+#detail-modal {
+  display:none; position:fixed; inset:0; z-index:9000;
+  background:rgba(7,32,97,.45); backdrop-filter:blur(3px);
+  align-items:flex-start; justify-content:center; padding:40px 16px;
+  overflow-y:auto;
+}
+#detail-modal.open { display:flex; }
+#detail-panel {
+  background:var(--surface); border-radius:14px; width:100%; max-width:780px;
+  box-shadow:0 24px 60px rgba(0,0,0,.22); overflow:hidden;
+  animation: slideUp .18s ease both;
+}
+@keyframes slideUp { from{transform:translateY(18px);opacity:0} to{transform:translateY(0);opacity:1} }
+#detail-panel { will-change: transform, opacity; }
+#detail-panel-header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:16px 20px; border-bottom:1px solid var(--border);
+  background:linear-gradient(135deg,#072061 0%,#1843ad 100%);
+  color:#fff;
+}
+#detail-panel-title { font-size:15px; font-weight:700; }
+#detail-panel-sub   { font-size:11px; opacity:.75; margin-top:2px; }
+#detail-close-btn   {
+  width:38px; height:38px; border-radius:50%; background:rgba(255,255,255,.2);
+  border:none; color:#fff; font-size:20px; cursor:pointer; line-height:1;
+  display:flex; align-items:center; justify-content:center; flex-shrink:0;
+}
+#detail-close-btn:hover { background:rgba(255,255,255,.35); }
+#detail-panel-body  { padding:20px; max-height:72vh; overflow-y:auto; }
+.detail-table { width:100%; border-collapse:collapse; font-size:12px; }
+.detail-table th {
+  text-align:left; padding:7px 10px; font-size:11px; font-weight:700;
+  color:var(--muted); border-bottom:2px solid var(--border); background:var(--surface2, #f8fafc);
+  cursor:pointer; user-select:none; white-space:nowrap;
+}
+.detail-table th:hover { background:var(--surface2, #f1f5f9); color:var(--blue); }
+.detail-table th::after { content:" ⇅"; opacity:.3; font-size:10px; }
+.detail-table th.sort-asc::after  { content:" ↑"; opacity:1; color:var(--blue); }
+.detail-table th.sort-desc::after { content:" ↓"; opacity:1; color:var(--blue); }
+.detail-table td { padding:8px 10px; border-bottom:1px solid var(--border); vertical-align:middle; }
+.detail-table tr:last-child td { border-bottom:none; }
+.detail-table tr:hover td { background:var(--surface2, #f8fafc); }
+.kpi-clickable {
+  cursor:pointer; text-decoration:underline; text-decoration-style:dotted;
+  text-underline-offset:3px; transition:opacity .15s;
+}
+.kpi-clickable:hover { opacity:.75; }
+.modal-badge { font-size:10px; font-weight:700; padding:2px 7px; border-radius:4px; }
+
+.study-card:hover{box-shadow:0 6px 20px rgba(7,32,97,.12);transform:translateY(-1px);}
+
+    .hero-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:20px}
+    .hero-cell{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;text-align:center;cursor:pointer;transition:all 0.2s}
+    .hero-cell:hover{border-color:var(--blue);box-shadow:0 4px 16px rgba(45,90,135,0.1);transform:translateY(-1px)}
+    .hero-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted)}
+    .hero-val{font-size:32px;font-weight:800;letter-spacing:-1px;margin:6px 0 4px}
+    .hero-sub{font-size:11px;color:var(--light)}
+    .group-panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:20px}
+    .group-title{font-size:13px;font-weight:700;color:var(--text);padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+    .gt-icon{width:8px;height:8px;border-radius:50%;display:inline-block}
+    .group-body{padding:20px}
+    .group-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+    .gkpi{text-align:center;cursor:pointer;padding:12px;border-radius:8px;transition:background 0.2s}
+    .gkpi:hover{background:var(--surface2)}
+    .gk-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted)}
+    .gk-val{font-size:24px;font-weight:800;margin:4px 0}
+    .gk-sub{font-size:10px;color:var(--light)}
+    .charts-row{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px}
+    @media(max-width:900px){.charts-row{grid-template-columns:1fr}}
+    .two-col{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px}
+    @media(max-width:900px){.two-col{grid-template-columns:1fr}}
+    .panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:20px}
+    .panel-head{padding:14px 20px;border-bottom:1px solid var(--border);font-size:13px;font-weight:700;color:var(--text)}
+    .panel-body{padding:0}
+    .tbl{width:100%;border-collapse:collapse;font-size:12px}
+    .tbl th{background:var(--surface2);padding:10px 14px;text-align:left;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;font-size:10px;border-bottom:2px solid var(--border);white-space:nowrap;position:sticky;top:0;z-index:1}
+    .tbl td{padding:10px 14px;border-bottom:1px solid var(--border)}
+    .tbl tr:hover{background:var(--surface2)}
+    .tbl .r{text-align:right;white-space:nowrap}
+    .study-link{color:var(--blue);text-decoration:none;font-weight:500}
+    .study-link:hover{text-decoration:underline}
+    .forecast-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:0}
+    .forecast-cell{padding:20px;text-align:center;border-right:1px solid var(--border)}
+    .forecast-cell:last-child{border-right:none}
+    .forecast-cell .fl{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px}
+    .forecast-cell .fv{font-size:22px;font-weight:800;color:var(--text)}
+    .forecast-cell .fs{font-size:10px;color:var(--light);margin-top:2px}
+    .chart-wrap{padding:20px}
+    .pill{display:inline-block;padding:5px 10px;border-radius:12px;font-size:10px;font-weight:700;text-transform:uppercase;cursor:pointer}
+    .pill-new{background:var(--blue-bg);color:var(--blue)}
+    .pill-contacted{background:var(--yellow-bg);color:var(--yellow)}
+    .pill-escalated{background:var(--orange-light);color:var(--orange)}
+    .pill-disputed{background:var(--red-bg);color:var(--red)}
+    .pill-resolved{background:var(--green-bg);color:var(--green)}
+    .kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:20px}
+    .kpi{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 20px;position:relative;overflow:hidden}
+    .kpi.click{cursor:pointer}
+    .kpi.click:hover{border-color:var(--blue);box-shadow:0 4px 16px rgba(45,90,135,0.1);transform:translateY(-1px)}
+    .kpi-stripe{position:absolute;left:0;top:0;bottom:0;width:4px;border-radius:10px 0 0 10px}
+    .kpi .label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted);margin-bottom:6px}
+    .kpi .value{font-size:26px;font-weight:800;letter-spacing:-0.5px}
+    .kpi .sub{font-size:11px;color:var(--light);margin-top:4px}
+    .modal-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;padding:20px}
+    .modal-backdrop.active{display:flex}
+    .modal-box{background:var(--surface);border-radius:12px;max-width:900px;width:100%;max-height:85vh;overflow:hidden;display:flex;flex-direction:column}
+    .modal-hdr{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:var(--surface2)}
+    .modal-hdr h2{font-size:15px;font-weight:700;color:var(--text)}
+    .mclose{background:none;border:none;font-size:22px;cursor:pointer;color:var(--muted);padding:4px 8px;border-radius:4px}
+    .mclose:hover{background:var(--surface2)}
+    .modal-bdy{overflow-y:auto;padding:20px;max-height:72vh}
+    .alert-bar{padding:10px 16px;border-radius:8px;font-size:12px;font-weight:500;display:flex;align-items:center;gap:8px;margin-bottom:12px}
+    .alert-warn{background:var(--yellow-bg);border:1px solid var(--yellow);color:var(--yellow)}
+    .alert-crit{background:var(--red-bg);border:1px solid var(--red);color:var(--red)}
+    .section-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);margin:28px 0 14px}
+    .coll-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px}
+    .filter-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;align-items:center}
+    .fbtn{padding:6px 14px;border-radius:16px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer}
+    .fbtn.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+    .sort-sel{padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:11px;background:var(--surface);color:var(--muted)}
+    .notes-btn{padding:3px 8px;background:var(--surface2);color:var(--muted);border:1px solid var(--border);border-radius:4px;font-size:10px;cursor:pointer}
+    /* Risk/badge styles defined earlier in main CSS */
+
+    /* ═══ Clickable KPI Enhancement ═══ */
+    .kpi-clickable, .clickable { cursor: pointer; }
+    .kpi-clickable:hover { transform: scale(1.03); transition: transform 0.15s ease; }
+    .hero-cell[onclick]:hover, .hero-val[onclick]:hover { opacity: 0.85; transition: opacity 0.15s; }
+    tr.clickable:hover td { background: var(--surface2, #f0f4fa); }
+    .alert-bar[onclick]:hover { filter: brightness(0.95); }
+    .drill-hint { font-size: 10px; color: var(--muted); margin-top: 2px; }
+    .drill-hint::before { content: '↗ '; }
+
+
+    /* ═══ Touch targets (44px min for accessibility) ═══ */
+    @media (pointer: coarse) {
+      .fbtn, .export-btn, .notes-btn, .pill { min-height: 44px; min-width: 44px; display: inline-flex; align-items: center; justify-content: center; }
+      .nav-tab { min-height: 44px; display: inline-flex; align-items: center; }
+      .refresh-btn, #theme-toggle-btn, #phi-toggle-btn { min-height: 44px; }
+      .tbl td, .fin-table td { padding: 10px 8px; }
+      .kpi { padding: 20px; }
+    }
+
+    /* ═══ Tablet ═══ */
+    @media (max-width: 900px) {
+      .time-banner { flex-wrap: wrap; gap: 8px; padding: 12px; }
+      .tb-section { flex: 0 0 auto; min-width: 80px; padding: 4px 10px; }
+      .tb-section + .tb-section::before { display: none; }
+      .tb-divider { display: none; }
+      .tb-value { font-size: 18px; }
+      .group-kpis { grid-template-columns: repeat(2, 1fr); }
+      .hero-row { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+      .hero-val { font-size: 24px; }
+      .kpi-row { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+      .filter-bar { gap: 6px; }
+    }
+
+    /* ═══ Mobile ═══ */
+    @media (max-width: 600px) {
+      .main { padding: 10px 8px; }
+      .card { padding: 12px; border-radius: 8px; }
+      .card-title { font-size: 10px; }
+      .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; gap: 10px; }
+      .grid-65, .grid-56 { grid-template-columns: 1fr; gap: 10px; }
+      .time-banner { flex-wrap: wrap; gap: 4px; padding: 10px; border-radius: 8px; }
+      .tb-section { flex: 0 0 calc(33% - 4px); min-width: 70px; padding: 4px 6px; }
+      .tb-section + .tb-section::before { display: none; }
+      .tb-divider { display: none; }
+      .tb-label { font-size: 8px; letter-spacing: 0.5px; }
+      .tb-value { font-size: 16px; }
+      .tb-sub { font-size: 9px; }
+      .hero-row { grid-template-columns: 1fr 1fr; gap: 8px; }
+      .hero-cell { padding: 12px 8px; }
+      .hero-val { font-size: 20px; }
+      .hero-label { font-size: 9px; }
+      .hero-sub { font-size: 9px; }
+      .group-kpis { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+      .gk-val { font-size: 18px; }
+      .gk-label { font-size: 8px; }
+      .charts-row { grid-template-columns: 1fr; gap: 12px; }
+      .two-col { grid-template-columns: 1fr; gap: 12px; }
+      .tbl, .fin-table, .detail-table { font-size: 11px; }
+      .tbl th, .fin-table th { font-size: 10px; padding: 6px 4px; }
+      .tbl td, .fin-table td { padding: 6px 4px; }
+      .modal-box { max-width: 98vw; padding: 12px; border-radius: 10px; }
+      #detail-panel { border-radius: 10px; }
+      #detail-panel-body { padding: 12px; }
+      #detail-modal { padding: 16px 6px; }
+      .group-body { padding: 12px; }
+      .group-title { font-size: 12px; padding: 10px 14px; }
+      .panel-head { padding: 10px 14px; font-size: 12px; }
+      .kpi-row { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+      .kpi .value { font-size: 20px; }
+      .kpi .label { font-size: 10px; }
+      .filter-bar { gap: 4px; }
+      .fbtn { padding: 6px 10px; font-size: 10px; }
+      .coll-summary { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+      .section-label { font-size: 10px; margin: 20px 0 10px; }
+    }
+
+    /* ═══ Mobile Small ═══ */
+    @media (max-width: 400px) {
+      .main { padding: 6px 4px; }
+      .card { padding: 10px; }
+      .tb-section { flex: 0 0 calc(50% - 4px); }
+      .hero-row { grid-template-columns: 1fr; }
+      .group-kpis { grid-template-columns: 1fr; }
+      .kpi-row { grid-template-columns: 1fr; }
+      .nav-brand { gap: 4px; }
+      .nav-title { font-size: 12px; }
+      .nav-sub { display: none; }
+      .coll-summary { grid-template-columns: 1fr; }
+    }
+
+    /* ═══ Horizontal scroll for wide tables on mobile ═══ */
+    @media (max-width: 800px) {
+      .tbl-wrap, .card:has(> table), .card:has(.tbl), .card:has(.fin-table),
+      .group-body:has(> table), .panel-body:has(> table) {
+        overflow-x: auto; -webkit-overflow-scrolling: touch;
+      }
+      .tbl, .fin-table { min-width: 500px; }
+      /* Scroll fade hint on right edge */
+      .card:has(.tbl)::after, .group-body:has(> table)::after, .panel-body:has(> table)::after {
+        content: ''; position: absolute; right: 0; top: 0; bottom: 0; width: 24px;
+        background: linear-gradient(to right, transparent, var(--surface));
+        pointer-events: none; z-index: 1; opacity: 0.7;
+      }
+      .card:has(.tbl), .group-body:has(> table), .panel-body:has(> table) { position: relative; }
+    }
+
+    /* ═══ Mobile Navigation ═══ */
+    .nav-tabs-wrapper {
+      display: contents;
+    }
+    .nav-hamburger {
+      display: none; background: none; border: none; font-size: 22px; cursor: pointer;
+      padding: 4px 8px; color: var(--text); line-height: 1;
+    }
+    @media (max-width: 800px) {
+      .nav-hamburger { display: inline-block; }
+      .nav-tabs-wrapper { display: none; flex-direction: column; position: absolute; top: 50px; left: 0; right: 0;
+        background: var(--surface); border-bottom: 2px solid var(--border); z-index: 999; padding: 8px 0; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+      .nav-tabs-wrapper.open { display: flex; }
+      .nav-tabs-wrapper .nav-tab { display: block; width: 100%; text-align: left; padding: 10px 24px; border-radius: 0; }
+      .nav-tabs-wrapper .nav-tab:hover { background: var(--surface2); }
+      .nav-tabs-wrapper > span[style*="width:1px"] { display: none; }
+      .nav-right { flex-wrap: wrap; gap: 6px; margin-left: 0 !important; justify-content: flex-end; flex: 1; }
+      .nav-right .data-badge { font-size: 10px; }
+      .nav { flex-wrap: wrap; gap: 4px; }
+      #search-container { width: 100%; order: 10; }
+      #search-container input { width: 100%; }
+    }
+
+    /* ═══ Export Buttons ═══ */
+    .export-bar { display: flex; gap: 6px; margin-bottom: 8px; justify-content: flex-end; }
+    .export-btn {
+      padding: 4px 10px; border: 1px solid var(--border); border-radius: 6px;
+      font-size: 11px; font-weight: 600; cursor: pointer; background: var(--surface);
+      color: var(--muted); transition: all 0.2s;
+    }
+    .export-btn:hover { background: var(--surface2); color: var(--text); }
+    @media print { .export-bar { display: none !important; } }
+
+    /* ═══ Toast Notifications ═══ */
+    #toast-container {
+      position: fixed; bottom: 24px; right: 24px; z-index: 10000;
+      display: flex; flex-direction: column; gap: 8px; pointer-events: none;
+    }
+    .toast {
+      pointer-events: auto;
+      padding: 12px 20px; border-radius: 8px; font-size: 13px; font-weight: 500;
+      color: #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      transform: translateX(120%); opacity: 0;
+      transition: transform 0.3s ease, opacity 0.3s ease;
+      max-width: 400px; line-height: 1.4;
+    }
+    .toast.show { transform: translateX(0); opacity: 1; }
+    .toast.hide { transform: translateX(120%); opacity: 0; }
+    .toast-info { background: var(--blue); }
+    .toast-success { background: var(--green); }
+    .toast-warning { background: var(--yellow); }
+    .toast-error { background: var(--red); }
+
+    /* ═══ Print Styles ═══ */
+    @media print {
+      .nav, .refresh-btn, #detail-modal, #modalBg, #authModal,
+      #toast-container, #data-health-strip, #phi-toggle-btn,
+      .filter-btn, .sched-filter, button { display: none !important; }
+      .main { padding: 0; }
+      .card { break-inside: avoid; box-shadow: none; border: 1px solid #ddd; margin-bottom: 12px; }
+      .view:not(.active) { display: none !important; }
+      .view.active { display: block !important; }
+      body { background: #fff; }
+      .grid-2, .grid-3, .grid-4 { display: block; }
+      .grid-2 > *, .grid-3 > *, .grid-4 > * { break-inside: avoid; margin-bottom: 12px; }
+      table { page-break-inside: auto; }
+      tr { page-break-inside: avoid; }
+      @page { margin: 1.5cm; }
+      #print-header { display: block !important; text-align: center; font-size: 14px; font-weight: 700; margin-bottom: 12px; color: #072061; }
+    }
+    #print-header { display: none; }
+
+    /* ═══ Responsive: Forecast Grid ═══ */
+    @media (max-width: 768px) {
+      .forecast-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 500px) {
+      .forecast-grid { grid-template-columns: 1fr; }
+    }
+
+    /* ═══ Responsive: Table min-width, chart heights, nav tabs ═══ */
+    @media (max-width: 600px) {
+      .tbl, .fin-table, .detail-table { min-width: 360px; }
+      .h220 { height: 150px; }
+      .h200 { height: 130px; }
+      .h180 { height: 110px; }
+      .nav-tab { padding: 8px 10px; font-size: 11px; }
+    }
+
+    /* ═══ Responsive: KPI banner at 500px ═══ */
+    @media (max-width: 500px) {
+      .tb-section { flex: 0 0 calc(50% - 4px); }
+      .tb-value { font-size: 15px; }
+      .tb-label { font-size: 7px; }
+    }
+</style>
+<!-- BUILD:CSS_END -->
+</head>
+<body>
+
+<!-- ── Detail Modal ── -->
+<div id="detail-modal" onclick="if(event.target===this)closeModal()">
+  <div id="detail-panel">
+    <div id="detail-panel-header">
+      <div>
+        <div id="detail-panel-title">Details</div>
+        <div id="detail-panel-sub"></div>
+      </div>
+      <button id="detail-close-btn" onclick="closeModal()" aria-label="Close detail panel">✕</button>
+    </div>
+    <div id="detail-panel-body"></div>
+  </div>
+</div>
+
+
+
+<!-- setup overlay removed - URLs baked in -->
+<div id="setup-overlay" style="display:none;"></div>
+
+<!-- ═══════════════════════════════════════
+     NAV
+════════════════════════════════════════ -->
+<nav class="nav" role="navigation" aria-label="Dashboard navigation">
+  <div class="nav-brand">
+    <div class="nav-logo" style="background:transparent;padding:0;width:40px;height:40px;display:flex;align-items:center;justify-content:center;"><svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 1920 1920">
+  <defs>
+    <style>
+      .cls-1 {
+        fill: #f93;
+      }
+
+      .cls-2 {
+        fill: #072061;
+      }
+
+      .cls-3 {
+        fill: #1843ad;
+      }
+
+      .cls-4 {
+        fill: #a2dceb;
+      }
+    </style>
+  </defs>
+  <path class="cls-3" d="m971.99,1338.54c-6.74-6.74-17.62-6.74-24.36,0l-236.2,236.72c-79.66,79.66-198.36,96.07-294.61,50.28l134.27-134.27.02.02,38.07-38.07-11.41-11.41c-.32-.38-.58-.79-.94-1.15l-97.45-97.28c-.06-.06-.14-.1-.2-.16l-12.28-12.28-38.07,38.07.02.02-135.22,135.22c-5.18-10.19-9.5-20.91-12.79-31.97-29.37-97.63-3.63-196.12,63.93-263.68l126.61-126.61,109.25-109.25c6.91-6.91,6.91-18.14,0-25.05l-109.72-109.72-35.59,35.6-86.22,86.22-86.57,86.57-40.09,40.09c-84.15,84.32-126.31,194.91-126.31,305.49s42.16,221.17,126.48,305.49c168.64,168.64,442.17,168.64,610.81,0l248.82-248.65-110.24-110.24Z"/>
+  <g>
+    <g>
+      <circle class="cls-3" cx="654.4" cy="1265.45" r="110.07" transform="translate(-703.14 833.37) rotate(-45)"/>
+      <circle class="cls-1" cx="1265.39" cy="1265.45" r="110.07" transform="translate(-524.19 1265.41) rotate(-45)"/>
+      <g>
+        <path class="cls-4" d="m1697.36,833.48c166.74-166.74,168.64-435.95,5.88-604.94-167.95-174.52-452.36-170.37-623.6.86l-241.73,241.73,109.72,109.72c6.91,6.91,17.97,6.91,24.88,0l230.85-230.85c80.35-80.35,201.82-101.43,299.96-55.64l-172.9,173.08,122.48,121.85,172.76-172.76c45.79,96.24,29.03,215.12-50.45,294.78l-236.2,236.2c-3.97,6.39-6.22,18.14.69,24.88l109.72,109.72,247.95-248.65Z"/>
+        <circle class="cls-4" cx="1265.39" cy="654.46" r="110.07"/>
+      </g>
+      <circle class="cls-2" cx="654.4" cy="654.46" r="110.07"/>
+    </g>
+    <g>
+      <path class="cls-2" d="m470.9,837.97l-35.59,35.6-86.22,86.22-126.48-126.4c-84.32-84.32-126.48-194.91-126.48-305.49s42.16-221,126.66-305.32c168.64-168.64,442.17-168.64,610.81,0l126.48,126.48,4.31-4.33c67.35-67.53,176.72-67.61,244.16-.17h0s-126.48,126.66-126.48,126.66l-109.72,109.72c-6.74,6.91-17.97,6.91-24.88,0l-236.2-236.2c-79.48-79.66-198.19-96.07-294.43-50.45l172.27,172.27-122.16,122.16-173.14-173.14c-5.36,10.37-9.68,21.08-12.96,32.14-29.37,97.63-3.63,195.94,63.93,263.51l126.14,126.74Z"/>
+      <path class="cls-1" d="m1086.38,1697.08c168.64,168.64,442.17,168.64,610.81,0,84.49-84.32,126.66-194.73,126.66-305.32,0-110.59-42.16-221.17-126.48-305.49l-248.82-248.65-109.38,109.38c-6.91,6.91-6.91,17.97,0,24.88l236.03,236.55c67.56,67.56,93.31,165.88,63.93,263.51-3.28,11.06-7.6,21.77-12.96,32.14l-173.14-173.14-122.16,122.16,172.27,172.27c-96.24,45.62-214.95,29.2-294.43-50.46l-236.2-236.2c-6.91-6.91-18.14-6.91-24.88,0l-109.72,109.72-126.48,126.66h0c67.44,67.44,176.81,67.37,244.16-.17l4.31-4.33,126.48,126.48Z"/>
+    </g>
+  </g>
+</svg></div>
+    <div class="nav-title" style="color:#072061;font-weight:700;font-size:14px;white-space:nowrap;">CRP <span style="color:#ff9933;">Intelligence</span></div>
+  </div>
+  <button class="nav-hamburger" onclick="document.getElementById('nav-tabs-wrap').classList.toggle('open')" aria-label="Toggle navigation">☰</button>
+  <div id="nav-tabs-wrap" class="nav-tabs-wrapper">
+    <span class="nav-tab active" onclick="switchTab('overview', this)" role="tab" aria-selected="true">Overview</span>
+    <span class="nav-tab" onclick="switchTab('studies', this)" role="tab">Studies</span>
+    <span class="nav-tab" onclick="switchTab('schedule', this)" role="tab">Schedule</span>
+    <span class="nav-tab" onclick="switchTab('referrals', this)" role="tab">Referrals</span>
+    <span class="nav-tab" onclick="switchTab('admin', this)" role="tab">🔒 Admin</span>
+    <span style="width:1px;background:#CBD5E0;margin:8px 3px"></span>
+    <span class="nav-tab fin-tab" onclick="switchTab('fin-overview',this)" role="tab">🔒 Finance</span>
+    <span class="nav-tab fin-tab" onclick="switchTab('fin-collections',this)">🔒 Collections</span>
+    <span class="nav-tab fin-tab" onclick="switchTab('fin-aging',this)">🔒 Aging AR</span>
+    <span class="nav-tab fin-tab" onclick="switchTab('fin-revenue',this)">🔒 Billing</span>
+    <span class="nav-tab fin-tab" onclick="switchTab('fin-qb',this)">🔒 CRIO vs QB</span>
+    <span style="width:1px;background:#CBD5E0;margin:8px 3px"></span>
+    <span class="nav-tab fin-tab" onclick="switchTab('insights',this)" role="tab">🔒 Insights</span>
+  </div>
+  <div class="nav-right" style="margin-left:auto;">
+    <div id="search-container" style="position:relative;">
+      <input type="text" id="global-search" placeholder="Search..." autocomplete="off" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:11px;width:130px;background:var(--surface);color:var(--text);">
+      <div id="search-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:6px;margin-top:4px;max-height:300px;overflow-y:auto;z-index:1000;box-shadow:0 4px 12px rgba(0,0,0,0.15);font-size:12px;"></div>
+    </div>
+    <span class="data-badge" id="data-source-badge" style="display:none;"></span>
+    <span class="data-badge" id="last-refresh-badge">Loading live data...</span>
+    <button id="theme-toggle-btn" onclick="toggleDarkMode()" title="Toggle dark mode" style="padding:4px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;font-size:13px;cursor:pointer;line-height:1;">🌙</button>
+    <button id="phi-toggle-btn" onclick="togglePHIMask()" title="Click to reveal patient names" style="padding:4px 10px;background:#059669;color:white;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;letter-spacing:0.3px;">&#x1f512; PHI Masked</button>
+    <button id="dh-toggle-btn" onclick="toggleHealthStrip()" title="Data health status" style="padding:4px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;color:var(--muted);display:none;" aria-label="Toggle data health">⏳ Health</button>
+    <button class="refresh-btn" id="refresh-btn" onclick="manualRefresh()">&#x21bb; Refresh</button>
+  </div>
+</nav>
+<div id="fallback-banner" style="display:none;background:#fef2f2;border-bottom:2px solid #fecaca;padding:6px 16px;font-size:12px;color:#991b1b;text-align:center;font-weight:600;">⚠ Showing sample data — live data unavailable. <button onclick="manualRefresh()" style="background:#dc2626;color:white;border:none;border-radius:4px;padding:2px 10px;font-size:11px;cursor:pointer;margin-left:8px;">Retry</button></div>
+
+<!-- Data Health Strip — shows data source status + freshness (hidden by default, toggled by Health button) -->
+<div id="data-health-strip" style="display:none;background:#F7FAFC;border-bottom:1px solid #E2E8F0;padding:6px 24px;font-size:11px;font-family:inherit;color:#718096;align-items:center;gap:12px;flex-wrap:wrap;">
+  <span style="font-weight:700;color:#4A5568;letter-spacing:0.3px;">DATA HEALTH</span>
+  <span id="dh-crio" class="dh-chip">⏳ CRIO</span>
+  <span id="dh-finance" class="dh-chip">⏳ Finance</span>
+  <span id="dh-audit" class="dh-chip">⏳ Audit Log</span>
+  <span id="dh-patientdb" class="dh-chip">⏳ Patient DB</span>
+  <span id="dh-fbcrm" class="dh-chip">⏳ FB CRM</span>
+  <span id="dh-metaads" class="dh-chip">⏳ Meta Ads</span>
+  <span id="dh-referrals" class="dh-chip">⏳ Referrals</span>
+  <span id="dh-campaigns" class="dh-chip">⏳ Campaigns</span>
+  <span id="dh-medrec" class="dh-chip">⏳ Med Records</span>
+  <span id="dh-crio-api" class="dh-chip">⏳ CRIO Studies</span>
+  <span id="dh-crio-subjects" class="dh-chip">⏳ CRIO Subjects</span>
+  <span id="dh-bq-cancels" class="dh-chip" style="display:none">⏳ BQ Cancels</span>
+  <span style="margin-left:auto;font-size:10px;color:#A0AEC0;" id="dh-freshness"></span>
+</div>
+<style>
+.dh-chip { padding:2px 8px; border-radius:4px; font-weight:600; font-size:10px; letter-spacing:0.3px; background:var(--surface2); color:var(--muted); transition: all 0.3s; }
+.dh-chip.ok { background:#F0FDF4; color:#065F46; }
+.dh-chip.warn { background:#FFFBEB; color:#92400E; }
+.dh-chip.fail { background:#FEF2F2; color:#991B1B; }
+</style>
+
+<!-- Toast Notification Container -->
+<div id="toast-container"></div>
+
+<!-- Print Header (visible only when printing) -->
+<div id="print-header">CRP Intelligence Dashboard</div>
+
+<!-- ═══════════════════════════════════════
+     MAIN
+════════════════════════════════════════ -->
+<div class="main">
+
+<!-- ══ VIEW: OVERVIEW ══════════════════════ -->
+<div id="view-overview" class="view active">
+
+  <!-- Time Banner -->
+  <div class="time-banner fade-in">
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showCancels(null,'True Cancellations')" title="Click to see true cancellations">
+      <div class="tb-label">📅 Past 2 Months</div>
+      <div class="tb-value red" id="kpi-cancels">0</div>
+      <div class="tb-sub" id="kpi-cancel-range">True cancellations</div>
+      <div style="display:flex;gap:8px;justify-content:center;margin-top:4px;flex-wrap:wrap" id="kpi-cancel-split">
+        <span style="cursor:pointer;font-size:11px;color:#64748b" onclick="event.stopPropagation();showSplitPopup('noShows','No Shows')" title="No Shows"><strong id="kpi-noshow" style="color:#f59e0b">0</strong> no-shows</span>
+        <span style="cursor:pointer;font-size:11px;color:#64748b" onclick="event.stopPropagation();showSplitPopup('withdrawals','Patient Withdrew')" title="Patient Withdrew"><strong id="kpi-withdrew" style="color:#8b5cf6">0</strong> withdrew</span>
+        <span style="cursor:pointer;font-size:11px;color:#64748b" onclick="event.stopPropagation();showSplitPopup('screenFails','Screen Fails / DNQ')" title="Screen Fails"><strong id="kpi-screenfail" style="color:#6366f1">0</strong> SF</span>
+        <span style="cursor:pointer;font-size:11px;color:#64748b" onclick="event.stopPropagation();showSplitPopup('discontinued','Discontinued')" title="Discontinued"><strong id="kpi-discontinued" style="color:#64748b">0</strong> disc.</span>
+      </div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showRescheduled()" title="Click to see rescheduled visits">
+      <div class="tb-label">🔄 Rescheduled</div>
+      <div class="tb-value" style="color:#f59e0b" id="kpi-rescheduled">0</div>
+      <div class="tb-sub">Cancelled but rebooked</div>
+    </div>
+    <div class="tb-divider" id="kpi-today-divider">TODAY</div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showUpcoming(r=>{ const d=_parseDate(r.date_iso||''); if(!d) return false; const now=new Date(); now.setHours(0,0,0,0); return (d-now)/86400000<=14; },'Next 14 Days')" title="Click to see next 14 days">
+      <div class="tb-label">⚡ Next 14 Days</div>
+      <div class="tb-value blue" id="kpi-next14">78</div>
+      <div class="tb-sub">Scheduled visits (CRIO)</div>
+    </div>
+    <div class="tb-divider">→</div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showUpcoming(null,'All Upcoming Visits')" title="Click to see all upcoming visits">
+      <div class="tb-label">📆 Next 2 Months</div>
+      <div class="tb-value green" id="kpi-upcoming">75</div>
+      <div class="tb-sub" id="kpi-upcoming-range">Scheduled visits</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showRiskFlags('At-Risk Patients')" title="Click to see at-risk patients">
+      <div class="tb-label">⚠ At-Risk Studies</div>
+      <div class="tb-value" style="color:var(--purple);" id="kpi-risk">2</div>
+      <div class="tb-sub">High cancel : upcoming ratio</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showUpcoming(null,'All Upcoming Visits')" title="Click to see active studies">
+      <div class="tb-label">🏥 Active Studies</div>
+      <div class="tb-value" id="kpi-studies">26</div>
+      <div class="tb-sub">Across 2 sites</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="switchTab('referrals',document.querySelector('.nav-tab[onclick*=referrals]'))" title="Click to see marketing intelligence">
+      <div class="tb-label">📈 Marketing</div>
+      <div class="tb-value blue" id="kpi-marketing-leads">—</div>
+      <div class="tb-sub" id="kpi-marketing-sub">Meta leads (30d)</div>
+    </div>
+  </div>
+
+  <!-- Row 1: 8-Week Horizon -->
+  <div class="card mb16 fade-in">
+    <div class="card-header">
+      <span class="card-title">📊 8-Week Activity Horizon</span>
+      <div style="display:flex; gap:10px; align-items:center;">
+        <span class="badge badge-red">← Past 2 months</span>
+        <span style="font-size:11px; color:var(--muted)">TODAY</span>
+        <span class="badge badge-blue">Next 2 months →</span>
+      </div>
+    </div>
+    <div class="horizon-grid" id="horizon-grid"></div>
+    <div class="horizon-legend">
+      <div class="hleg"><div class="hleg-dot" style="background:var(--red-bg); border: 1px solid var(--red-border);"></div> Cancellations (past)</div>
+      <div class="hleg"><div class="hleg-dot" style="background:var(--blue-bg); border: 1px solid var(--blue-border);"></div> Upcoming visits (future)</div>
+      <div class="hleg"><div class="hleg-dot" style="background:var(--green-bg); border: 1px solid var(--green-border);"></div> This week</div>
+    </div>
+  </div>
+
+  <!-- Recruitment Pipeline KPIs (cross-source) -->
+  <div class="time-banner fade-in" style="margin-bottom:16px;background:linear-gradient(135deg,#f0f4fa 0%,#e8eeff 100%);" id="recruitment-kpi-banner">
+    <div class="tb-section">
+      <div class="tb-label">📥 Active Referrals</div>
+      <div class="tb-value blue" id="ov-kpi-refs" style="cursor:pointer" onclick="switchTab('referrals',document.querySelector('.nav-tab[onclick*=referrals]'))">—</div>
+      <div class="tb-sub">In referral pipeline</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showSitePatients()" title="Click to see patients by site">
+      <div class="tb-label">🏥 Site Active Patients</div>
+      <div class="tb-value" style="color:#8b5cf6" id="ov-kpi-sites">—</div>
+      <div class="tb-sub">PHL + PNJ combined</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showFBLeads()" title="Click to see Facebook leads">
+      <div class="tb-label">📱 FB Leads (30d)</div>
+      <div class="tb-value" style="color:#3b82f6" id="ov-kpi-fb">—</div>
+      <div class="tb-sub">New Meta/Facebook leads</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showReferralDetailModal(r=>CRP_CONFIG.CLICKUP.STAGE_GROUPS.ENROLLED.has(r.stage),'Enrolled Referrals','Conversion breakdown')" title="Click to see enrolled referrals">
+      <div class="tb-label">🎯 Lead→Enrolled</div>
+      <div class="tb-value" style="color:#059669" id="ov-kpi-conv">—</div>
+      <div class="tb-sub">Referral conversion rate</div>
+    </div>
+  </div>
+
+  <!-- Enrollment Pipeline KPIs (CRIO-sourced) -->
+  <div class="time-banner fade-in" style="margin-bottom:16px;background:linear-gradient(135deg,#f0fdf4 0%,#e8eeff 100%);display:none;" id="enrollment-kpi-banner">
+    <div class="tb-section">
+      <div class="tb-label">📊 Enrolled / Target</div>
+      <div class="tb-value" style="color:#059669" id="ov-kpi-enrolled">—</div>
+      <div class="tb-sub" id="ov-kpi-enrolled-sub">Across enrolling studies</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section">
+      <div class="tb-label">🔬 In Screening</div>
+      <div class="tb-value" style="color:#d97706" id="ov-kpi-screening">—</div>
+      <div class="tb-sub">Ready for V1 scheduling</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section">
+      <div class="tb-label">🔄 V1 No-Shows</div>
+      <div class="tb-value" style="color:#dc2626" id="ov-kpi-winback">—</div>
+      <div class="tb-sub">Win-back opportunities</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section">
+      <div class="tb-label">📋 Pre-Qualified</div>
+      <div class="tb-value" style="color:#3b82f6" id="ov-kpi-prequalified">—</div>
+      <div class="tb-sub">Awaiting outreach</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section">
+      <div class="tb-label">📉 Screen Fail Rate</div>
+      <div class="tb-value" id="ov-kpi-sfrate">—</div>
+      <div class="tb-sub" id="ov-kpi-sfrate-sub">Across all studies</div>
+    </div>
+  </div>
+
+  <!-- Row 2: Cancel by Study + Reason Breakdown -->
+  <div class="grid-65 fade-in">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Cancellations by Study (Last 2 Months)</span>
+        <span class="badge badge-gray">Top 10</span>
+      </div>
+      <div id="cancel-study-bars"></div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Cancellation Root Causes</span>
+        <span class="badge badge-yellow">Why visits are missed</span>
+      </div>
+      <div class="chart-wrap" style="height:170px">
+        <canvas id="reasonChart"></canvas>
+      </div>
+      <div class="legend-list" style="margin-top:12px;" id="reason-legend"></div>
+    </div>
+  </div>
+
+  <!-- Row 4: Site Split -->
+  <div class="card mb16 fade-in">
+    <div class="card-header">
+      <span class="card-title">Site Comparison · PHL vs PNJ</span>
+      <span class="badge badge-gray">Cancellations vs. upcoming by site</span>
+    </div>
+    <div class="chart-wrap h200">
+      <canvas id="siteChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Key Insights -->
+  <div class="section-title">Key Insights</div>
+  <div class="grid-2 fade-in">
+    <div class="card">
+      <div class="card-header"><span class="card-title">⚠ Flags Requiring Action</span></div>
+      <div class="insight-list" id="perf-insight-flags"></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">✅ Positive Indicators</span></div>
+      <div class="insight-list" id="perf-insight-positive"></div>
+    </div>
+  </div>
+
+</div><!-- /view-overview -->
+
+
+<!-- ══ VIEW: STUDY RISK ══════════════════════ -->
+<div id="view-studies" class="view">
+
+  <!-- Header + filters -->
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;flex-wrap:wrap;gap:8px;">
+    <div><span class="card-title" style="font-size:16px;">All Studies</span> <span id="studies-count-badge" style="font-size:12px;font-weight:500;color:var(--muted);margin-left:6px"></span></div>
+  </div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;position:relative;z-index:10;" id="studies-filter-bar">
+      <button data-filter="all" class="sched-filter active" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid #1843ad;background:#e8eeff;color:#1843ad;cursor:pointer">All</button>
+      <button data-filter="critical" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Critical</button>
+      <button data-filter="high" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">High Risk</button>
+      <button data-filter="enrolling" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Enrolling</button>
+      <button data-filter="maintenance" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Maintenance</button>
+      <button data-filter="startup" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Startup</button>
+      <button data-filter="preclosed" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Pre-Closed</button>
+      <button data-filter="goal_met" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Goal Met</button>
+      <button data-filter="behind" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Behind Goal</button>
+      <button data-filter="phl" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">PHL</button>
+      <button data-filter="pnj" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">PNJ</button>
+  </div>
+
+  <!-- Studies table -->
+  <div class="card fade-in">
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;" id="merged-study-table">
+        <thead>
+          <tr style="background:var(--surface2);border-bottom:2px solid var(--border);">
+            <th style="padding:10px 12px;text-align:left;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;" onclick="sortMergedTable(this,0)">Study ↕</th>
+            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;" onclick="sortMergedTable(this,1)">Risk ↕</th>
+            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;" onclick="sortMergedTable(this,2)">Cancels ↕</th>
+            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;" onclick="sortMergedTable(this,3)">Upcoming ↕</th>
+            <th style="padding:10px 8px;text-align:left;font-weight:700;color:var(--text);white-space:nowrap;">Enrollment</th>
+            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;" onclick="sortMergedTable(this,5)">Screened ↕</th>
+            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;" onclick="sortMergedTable(this,6)">In Screen ↕</th>
+            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;" onclick="sortMergedTable(this,7)">SF Rate ↕</th>
+            <th style="padding:10px 8px;text-align:left;font-weight:700;color:var(--text);white-space:nowrap;">Coordinator</th>
+            <th style="padding:10px 8px;text-align:left;font-weight:700;color:var(--text);white-space:nowrap;">PI</th>
+            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Site</th>
+            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Enroll Start</th>
+            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Enroll End</th>
+            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Referrals</th>
+            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">FB Leads</th>
+            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Total Leads</th>
+          </tr>
+        </thead>
+        <tbody id="merged-study-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Study Startup Milestones — removed (data now in All Studies enroll start/end columns) -->
+
+  <!-- Enrollment Velocity Forecast — removed -->
+
+  <!-- Subject Retention — removed (metrics merged into All Studies table columns) -->
+
+  <!-- CRIO Recruitment Intelligence (moved from Actions) -->
+  <div class="card fade-in" style="margin-top:16px;margin-bottom:16px;">
+    <div class="card-header">
+      <span class="card-title">CRIO Recruitment Intelligence</span>
+      <span class="badge badge-blue" id="crio-studies-badge">Loading...</span>
+    </div>
+    <div id="crio-studies-container" style="padding:12px;">
+      <div style="text-align:center;padding:20px;color:var(--muted);font-size:12px;">Loading CRIO study data...</div>
+    </div>
+  </div>
+
+</div><!-- /view-studies -->
+
+
+<!-- ══ VIEW: SCHEDULE ══════════════════════ -->
+<div id="view-schedule" class="view">
+
+  <!-- KPI Row -->
+  <div class="time-banner fade-in" style="margin-bottom:16px;">
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showUpcoming(null,'All Upcoming Visits')" title="Click to see all upcoming visits">
+      <div class="tb-label">📆 Total Upcoming</div>
+      <div class="tb-value green" id="sched-kpi-total">71</div>
+      <div class="tb-sub">Active scheduled visits</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showUpcoming(r=>!r.site.includes('Penn'),'Philadelphia Visits')" title="Click to see Philadelphia visits">
+      <div class="tb-label">🏙 Philadelphia</div>
+      <div class="tb-value blue" id="sched-kpi-philly">52</div>
+      <div class="tb-sub">76% of scheduled visits</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showUpcoming(r=>r.site.includes('Penn'),'Pennington Visits')" title="Click to see Pennington visits">
+      <div class="tb-label">🌿 Pennington</div>
+      <div class="tb-value" style="color:var(--green)" id="sched-kpi-penn">19</div>
+      <div class="tb-sub">24% of scheduled visits</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" id="sched-kpi-month1-section" onclick="showUpcoming(r=>r.date_iso&&r.date_iso.startsWith(window._schedMonth1Prefix||''),'This Month Visits')" title="Click to see this month's visits">
+      <div class="tb-label" id="sched-kpi-month1-label">📅 Month</div>
+      <div class="tb-value" style="color:var(--purple)" id="sched-kpi-march">0</div>
+      <div class="tb-sub">Visits this month</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" id="sched-kpi-month2-section" onclick="showUpcoming(r=>r.date_iso&&r.date_iso.startsWith(window._schedMonth2Prefix||''),'Next Month Visits')" title="Click to see next month's visits">
+      <div class="tb-label" id="sched-kpi-month2-label">📅 Month</div>
+      <div class="tb-value" style="color:var(--yellow)" id="sched-kpi-april">0</div>
+      <div class="tb-sub">Visits next month</div>
+    </div>
+  </div>
+
+  <!-- Full visit table — moved up under KPIs for quick access -->
+  <div class="card fade-in">
+    <div class="card-header" style="flex-wrap:wrap;gap:8px;">
+      <span class="card-title">📆 All Upcoming Visits</span>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+        <span class="badge badge-green" id="sched-count">— visits</span>
+        <span class="badge" id="sched-confirm-count" style="background:#059669;color:#fff;font-size:10px;padding:2px 8px;border-radius:10px;">0/0 confirmed</span>
+        <button class="filter-btn active" onclick="schedFilter(this,'all')"  style="font-size:11px;padding:3px 8px;">All</button>
+        <button class="filter-btn"        onclick="schedFilter(this,'14')"   style="font-size:11px;padding:3px 8px;">14 days</button>
+        <button class="filter-btn"        onclick="schedFilter(this,'30')"   style="font-size:11px;padding:3px 8px;">30 days</button>
+        <button class="filter-btn"        onclick="schedFilter(this,'phl')"  style="font-size:11px;padding:3px 8px;">PHL only</button>
+        <button class="filter-btn"        onclick="schedFilter(this,'pnj')"  style="font-size:11px;padding:3px 8px;">PNJ only</button>
+      </div>
+    </div>
+    <div style="max-height:600px;overflow-y:auto;border-radius:0 0 8px 8px;">
+      <table class="data-table sortable" id="vis-table">
+        <thead>
+          <tr><th style="width:80px;font-size:10px">Confirm</th><th onclick="sortTable(this)">Date</th><th onclick="sortTable(this)">Study</th><th onclick="sortTable(this)">Visit</th><th onclick="sortTable(this)">Patient</th><th onclick="sortTable(this)">Status</th><th onclick="sortTable(this)">Coordinator</th><th onclick="sortTable(this)">Investigator</th><th onclick="sortTable(this)">Site</th></tr>
+        </thead>
+        <tbody id="upcoming-tbody">
+<tr><td colspan="9" style="text-align:center;padding:24px;color:#94a3b8;font-size:12px">Loading schedule from CRIO...</td></tr>
+<!-- Dynamic rows built by buildScheduleTable() from live CRIO data -->
+</tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- BQ: Visit Compliance -->
+  <div class="card fade-in" style="margin-bottom:16px;">
+    <div class="card-header">
+      <span class="card-title">Visit Compliance (90 days)</span>
+      <span class="badge badge-blue" id="compliance-badge">Loading...</span>
+    </div>
+    <div id="compliance-container" style="padding:12px;">
+      <div style="text-align:center;padding:20px;color:var(--muted);font-size:12px;">Loading...</div>
+    </div>
+  </div>
+
+  <!-- At-Risk Patients (moved from Actions) — most urgent, at top -->
+  <div class="section-title" style="margin-bottom:10px;">🚨 At-Risk Patients — Immediate Action Required</div>
+
+  <!-- KPI banner -->
+  <div class="time-banner fade-in" style="margin-bottom:16px;">
+    <div class="tb-section">
+      <div class="tb-label">⚠️ At-Risk Patients</div>
+      <div class="tb-value red kpi-clickable" id="risk-kpi-count" onclick="showRiskFlags('At-Risk Patients')">2</div>
+      <div class="tb-sub">Cancelled 2× with upcoming visit</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showRiskFlags('Urgent — Next Visit Within 14 Days')" title="Click to see urgent risk patients">
+      <div class="tb-label">📞 Call This Week</div>
+      <div class="tb-value yellow" id="risk-kpi-urgent">2</div>
+      <div class="tb-sub">Next visit within 14 days</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showRiskStudies()" title="Click to see affected studies">
+      <div class="tb-label">🏥 Studies Affected</div>
+      <div class="tb-value blue" id="risk-kpi-studies">2</div>
+      <div class="tb-sub">Unique studies with risk flags</div>
+    </div>
+  </div>
+
+  <!-- Risk flag cards -->
+  <div class="card fade-in" style="margin-bottom:16px;">
+    <div class="card-header">
+      <span class="card-title">⚠️ Patients with 2+ Cancellations Who Have Upcoming Visits</span>
+      <span class="badge badge-red">Call before their next visit</span>
+    </div>
+    <div id="risk-flag-cards" style="padding:12px 16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px;"></div>
+  </div>
+
+  <!-- Medical Records Follow-Up — removed (data captured in All Studies) -->
+  <!-- Investigator Approval Tracker — removed (not functioning) -->
+  </div>
+
+  <!-- Study breakdown + coord workload -->
+  <div class="grid-2 mb16 fade-in">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Upcoming by Study</span>
+        <span class="badge badge-blue" id="sched-study-count">17 studies</span>
+      </div>
+      <div id="upcoming-study-bars" style="padding:12px 16px;max-height:320px;overflow-y:auto;"></div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Coordinator Workload</span>
+      </div>
+      <div id="coordBalanceContainer" style="padding:12px 16px;">
+        <p style="color:#94a3b8;font-size:12px">Loading workload data...</p>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Investigator Workload</span>
+      </div>
+      <div id="invCapacityContainer" style="padding:12px 16px;">
+        <p style="color:#94a3b8;font-size:12px">Loading investigator data...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- BQ: Coordinator Productivity Leaderboard -->
+  <div class="card mb16 fade-in">
+    <div class="card-header">
+      <span class="card-title">Coordinator Productivity (30 days)</span>
+      <span class="badge badge-blue" id="coord-prod-badge">Loading...</span>
+    </div>
+    <div id="coord-prod-container" style="padding:12px;">
+      <div style="text-align:center;padding:20px;color:var(--muted);font-size:12px;">Loading...</div>
+    </div>
+  </div>
+
+  <!-- Recruiter Performance (data-driven) -->
+  <div class="card mb16 fade-in">
+    <div class="card-header">
+      <span class="card-title">Recruiter Performance</span>
+      <span class="badge badge-gray" id="recruiter-perf-badge">Loading...</span>
+    </div>
+    <div id="recruiterPerfContainer" style="padding:0 16px 4px;">
+      <p style="color:#94a3b8;font-size:12px">Loading recruiter data...</p>
+    </div>
+  </div>
+
+  <!-- ── COORDINATOR DAILY GOALS ── -->
+  <div class="section-title" style="margin-top:24px">Coordinator Visit Tracker</div>
+  <div class="card fade-in">
+    <div style="padding:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div style="font-size:14px;font-weight:700;color:var(--navy)">Coordinator Visit Snapshot</div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <button onclick="exportCoordHistory()" title="Export coordinator history as JSON" style="background:none;border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:11px;color:var(--muted);cursor:pointer">&#x2B07; Export</button>
+          <div style="font-size:11px;color:var(--muted)" id="coord-week-label">This Week</div>
+        </div>
+      </div>
+      <div id="coordGoalsGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px"></div>
+      <div style="margin-top:16px">
+        <div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">Monthly Snapshot — <span id="coord-month-label">March 2026</span></div>
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:12px" id="coordMonthTable">
+            <thead><tr style="background:var(--surface2);border-bottom:2px solid var(--border)">
+              <th style="padding:8px 12px;text-align:left;font-weight:700">Coordinator</th>
+              <th style="padding:8px 8px;text-align:center;font-weight:700">Visits</th>
+              <th style="padding:8px 8px;text-align:center;font-weight:700">Avg/Day</th>
+              <th style="padding:8px 8px;text-align:center;font-weight:700">Volume</th>
+              <th style="padding:8px 8px;text-align:center;font-weight:700">Period</th>
+            </tr></thead>
+            <tbody id="coordMonthBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Coordinator Cancel Rate Trend -->
+  <div class="card fade-in" style="margin-bottom:16px">
+    <div class="card-header">
+      <span class="card-title">Coordinator Cancel Rate Over Time</span>
+      <span class="badge badge-blue" style="font-size:10px">% of their visits that cancelled</span>
+    </div>
+    <div class="chart-wrap h220">
+      <canvas id="trendsCoordChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Prioritized Action Plan (moved from Actions) -->
+  <div class="section-title" style="margin-top:16px;">📋 Prioritized Action Plan</div>
+  <div class="grid-2">
+    <div>
+      <div class="steps-list" id="action-steps"></div>
+    </div>
+    <div>
+      <div class="card mb16">
+        <div class="card-header"><span class="card-title">🚫 Studies Needing Attention</span></div>
+        <div id="dormant-list"></div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /view-schedule -->
+
+
+
+<!-- ══ VIEW: REFERRALS ══════════════════════ -->
+<div id="view-referrals" class="view">
+
+  <!-- ClickUp API Key Setup (shown if no key stored) -->
+  <!-- Legacy ClickUp setup (hidden — data now comes from Google Sheets CSV) -->
+  <div id="referral-setup" style="display:none;">
+    <div class="card fade-in" style="max-width:600px;margin:40px auto;">
+      <div class="card-header"><span class="card-title">🔗 Connect ClickUp</span></div>
+      <div style="padding:20px;">
+        <p style="font-size:13px;color:var(--muted);margin-bottom:16px;">Referral data is now loaded automatically from Google Sheets.</p>
+        <input type="password" id="clickup-token-input" placeholder="pk_..." style="display:none;">
+      </div>
+    </div>
+  </div>
+
+  <!-- Referral Dashboard -->
+  <div id="referral-dashboard" style="display:none;">
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <span class="card-title">📊 Referral Pipeline</span>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <span class="data-badge" id="ref-status-badge" style="font-size:10px;">Loading...</span>
+        <button onclick="refreshReferrals()" style="padding:4px 12px;background:#e8eeff;color:#1843ad;border:1px solid #1843ad;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">↻ Refresh</button>
+      </div>
+    </div>
+
+    <!-- Pipeline KPI Banner -->
+    <div class="time-banner fade-in" style="margin-bottom:16px;">
+      <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showReferralDetailModal(r=>r.stage==='New Lead','New Leads','Pending outreach + to contact')" title="Click to see new leads">
+        <div class="tb-label">📥 New Leads</div>
+        <div class="tb-value blue" id="ref-kpi-leads">—</div>
+        <div class="tb-sub">Pending outreach + to contact</div>
+      </div>
+      <div class="tb-divider"></div>
+      <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showReferralDetailModal(r=>r.stage==='Contacted','In Contact','Interested + actively engaged')" title="Click to see contacted referrals">
+        <div class="tb-label">📞 In Contact</div>
+        <div class="tb-value yellow" id="ref-kpi-contact">—</div>
+        <div class="tb-sub">Interested + actively engaged</div>
+      </div>
+      <div class="tb-divider"></div>
+      <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showReferralDetailModal(r=>CRP_CONFIG.CLICKUP.STAGE_GROUPS.SCREENING.has(r.stage),'Screening Referrals','Pre-screening + screening')" title="Click to see screening referrals">
+        <div class="tb-label">🩺 Screening</div>
+        <div class="tb-value green" id="ref-kpi-screening">—</div>
+        <div class="tb-sub">Pre-screening + screening</div>
+      </div>
+      <div class="tb-divider"></div>
+      <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showReferralDetailModal(r=>CRP_CONFIG.CLICKUP.STAGE_GROUPS.ENROLLED.has(r.stage),'Enrolled Referrals','Randomized + completed')" title="Click to see enrolled referrals">
+        <div class="tb-label">✅ Enrolled</div>
+        <div class="tb-value" style="color:#059669" id="ref-kpi-enrolled">—</div>
+        <div class="tb-sub">Randomized + completed</div>
+      </div>
+      <div class="tb-divider"></div>
+      <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showReferralDetailModal(r=>!r.is_closed,'All Active Referrals','Full pipeline breakdown')" title="Click to see conversion details">
+        <div class="tb-label">📊 Conversion</div>
+        <div class="tb-value" style="color:#7C3AED" id="ref-kpi-conversion">—</div>
+        <div class="tb-sub">Lead → Enrolled rate</div>
+      </div>
+    </div>
+
+    <!-- Pipeline Funnel + Source Breakdown -->
+    <div class="grid-2" style="margin-bottom:16px;">
+      <div class="card fade-in">
+        <div class="card-header">
+          <span class="card-title">Pipeline Funnel</span>
+          <span class="badge badge-blue" id="ref-total-badge">—</span>
+        </div>
+        <div style="padding:12px 16px;" id="ref-funnel-chart">
+          <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Loading pipeline...</div>
+        </div>
+      </div>
+      <div class="card fade-in">
+        <div class="card-header">
+          <span class="card-title">Referral Source Breakdown</span>
+        </div>
+        <div style="padding:12px 16px;" id="ref-source-chart">
+          <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Loading sources...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pipeline by Study + Stale Leads -->
+    <div class="grid-2" style="margin-bottom:16px;">
+      <div class="card fade-in">
+        <div class="card-header">
+          <span class="card-title">Pipeline by Study</span>
+        </div>
+        <div style="padding:0;" id="ref-study-table">
+          <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Loading...</div>
+        </div>
+      </div>
+      <div class="card fade-in">
+        <div class="card-header">
+          <span class="card-title">⚠️ Stale Leads</span>
+          <span class="badge badge-yellow" id="ref-stale-badge">—</span>
+        </div>
+        <div style="padding:12px 16px;" id="ref-stale-list">
+          <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Loading...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tracker Detail Cards -->
+    <div class="card fade-in" style="margin-bottom:16px;">
+      <div class="card-header">
+        <span class="card-title">📇 Physician Tracker Detail</span>
+      </div>
+      <div style="padding:0;" id="ref-tracker-detail">
+        <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Loading tracker data...</div>
+      </div>
+    </div>
+
+    <!-- Central Campaigns — Unified Metrics + Cross-Reference -->
+    <div class="card fade-in" style="margin-bottom:16px;">
+      <div class="card-header">
+        <span class="card-title">📣 Central Campaigns — Metrics &amp; Conversion Tracking</span>
+        <span class="badge badge-blue" id="ref-camp-badge">Loading...</span>
+      </div>
+      <div style="padding:0;" id="ref-campaigns-table">
+        <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Loading campaigns...</div>
+      </div>
+    </div>
+
+
+    <!-- Vendor Analytics -->
+    <div class="card fade-in" style="margin-bottom:16px;">
+      <div class="card-header">
+        <span class="card-title">Vendor Performance Comparison</span>
+        <span class="badge badge-blue" id="vendor-analytics-badge" style="display:none">0</span>
+        <button onclick="exportTableById('vendor-analytics-container','vendor-analytics')" style="font-size:10px;padding:3px 8px;border-radius:4px;border:1px solid #e2e8f0;background:white;cursor:pointer;margin-left:auto;">Export CSV</button>
+      </div>
+      <div id="vendor-analytics-container" style="padding:12px;">
+        <div style="text-align:center;padding:20px;color:var(--muted);font-size:12px;">Loading vendor data...</div>
+      </div>
+    </div>
+
+    <!-- Contact Sequence Funnel -->
+    <div class="card fade-in" style="margin-bottom:16px;">
+      <div class="card-header">
+        <span class="card-title">Contact Sequence Effectiveness</span>
+      </div>
+      <div id="contact-sequence-container" style="padding:12px;">
+        <div style="text-align:center;padding:20px;color:var(--muted);font-size:12px;">Loading contact data...</div>
+      </div>
+    </div>
+
+    <!-- Referral-to-Enrollment Funnel -->
+    <div class="card fade-in" style="margin-bottom:16px;">
+      <div class="card-header">
+        <span class="card-title">Referral-to-Enrollment Conversion by Source</span>
+        <span class="badge badge-purple" id="ref-conversion-badge" style="display:none">0</span>
+        <button onclick="exportTableById('ref-conversion-container','referral-conversion')" style="font-size:10px;padding:3px 8px;border-radius:4px;border:1px solid #e2e8f0;background:white;cursor:pointer;margin-left:auto;">Export CSV</button>
+      </div>
+      <div id="ref-conversion-container" style="padding:12px;">
+        <div style="text-align:center;padding:20px;color:var(--muted);font-size:12px;">Loading conversion data...</div>
+      </div>
+    </div>
+
+    <!-- ═══ Marketing Intelligence (Meta Ads API) ═══ -->
+    <div class="section-title" style="margin-top:16px;">📈 Marketing Intelligence</div>
+
+    <!-- Campaign Health Alerts -->
+    <div class="card fade-in" style="margin-bottom:16px;">
+      <div class="card-header">
+        <span class="card-title">⚠️ Campaign Health Alerts</span>
+        <span class="badge badge-yellow" id="meta-alerts-badge">Checking...</span>
+      </div>
+      <div id="meta-alerts-container" style="padding:12px 16px;">
+        <div style="text-align:center;padding:12px;color:var(--muted);font-size:13px;">Loading campaign data...</div>
+      </div>
+    </div>
+
+    <!-- Full-Funnel Tracker (no dollar amounts) -->
+    <div class="card fade-in" style="margin-bottom:16px;">
+      <div class="card-header">
+        <span class="card-title">🎯 Campaign Funnel — Lead to Enrollment</span>
+        <span class="badge badge-purple" id="meta-funnel-badge">—</span>
+      </div>
+      <div style="padding:0;" id="meta-funnel-container">
+        <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Building funnel data...</div>
+      </div>
+    </div>
+
+    <!-- Campaign Performance with Sparklines -->
+    <div class="card fade-in" style="margin-bottom:16px;">
+      <div class="card-header">
+        <span class="card-title">📈 Campaign Performance &amp; Trends</span>
+        <span class="badge badge-blue" id="meta-ads-badge">Loading...</span>
+      </div>
+      <div style="padding:0;" id="meta-ads-container">
+        <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Fetching Meta campaign data...</div>
+      </div>
+    </div>
+
+    <!-- Campaign ↔ Study Alignment -->
+    <div class="card fade-in" style="margin-bottom:16px;">
+      <div class="card-header">
+        <span class="card-title">🔗 Campaign ↔ Study Alignment</span>
+        <span class="badge badge-blue" id="meta-alignment-badge">—</span>
+      </div>
+      <div id="meta-alignment-container" style="padding:12px 16px;">
+        <div style="text-align:center;padding:12px;color:var(--muted);font-size:13px;">Loading alignment data...</div>
+      </div>
+    </div>
+
+    <!-- Facebook CRM -->
+    <!-- Patient Pipeline by Site -->
+    <div class="card fade-in" style="margin-bottom:16px;">
+      <div class="card-header">
+        <span class="card-title">🏥 Patient Pipeline by Office</span>
+        <span class="badge badge-blue" id="pipeline-site-badge">Loading...</span>
+      </div>
+      <div id="pipeline-site-content" style="padding:16px;">
+        <div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">Loading patient pipeline data...</div>
+      </div>
+    </div>
+
+    <div class="card fade-in" style="margin-bottom:16px;">
+      <div class="card-header">
+        <span class="card-title">📘 Facebook / Meta Lead Referrals</span>
+        <span class="badge badge-blue" id="ref-fb-badge">Loading...</span>
+      </div>
+      <div style="padding:0;" id="ref-fb-table">
+        <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Fetching Facebook CRM sheet...</div>
+      </div>
+    </div>
+
+    <!-- BQ: Patient Conversion Funnel -->
+    <div class="card fade-in" style="margin-bottom:16px;">
+      <div class="card-header">
+        <span class="card-title">Patient Conversion Funnel</span>
+        <span class="badge badge-blue" id="ref-funnel-badge">Loading...</span>
+      </div>
+      <div id="ref-funnel-container" style="padding:12px;">
+        <div style="text-align:center;padding:20px;color:var(--muted);font-size:12px;">Loading funnel data...</div>
+      </div>
+    </div>
+
+  </div><!-- /referral-dashboard -->
+
+  <!-- Contact Quality Alerts (moved from Actions) -->
+  <div class="section-title" style="margin-top:16px;">📇 Contact Quality Alerts</div>
+
+  <div class="time-banner fade-in" style="margin-bottom:16px;">
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showContactAlerts('red')" title="Click to see red flag patients">
+      <div class="tb-label">🔴 Red Flags</div>
+      <div class="tb-value red" id="cq-kpi-red">0</div>
+      <div class="tb-sub">Do Not Solicit / Enroll / Deceased</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showContactAlerts('yellow')" title="Click to see yellow flag patients">
+      <div class="tb-label">🟡 Yellow Flags</div>
+      <div class="tb-value yellow" id="cq-kpi-yellow">0</div>
+      <div class="tb-sub">Bad contact info or missing email/phone</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showContactAlerts('clean')" title="Click to see clean contact patients">
+      <div class="tb-label">✅ Clean</div>
+      <div class="tb-value green" id="cq-kpi-clean">0</div>
+      <div class="tb-sub">Active patients with good contact data</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showPatientDB()" title="Click to see patient database summary">
+      <div class="tb-label">📇 Patient DB</div>
+      <div class="tb-value blue" id="cq-kpi-db-total">—</div>
+      <div class="tb-sub" id="cq-kpi-db-sub">Loading...</div>
+    </div>
+  </div>
+
+  <div class="card fade-in" style="margin-bottom:16px;">
+    <div class="card-header">
+      <span class="card-title">📇 Patient Contact Cross-Reference</span>
+      <span class="badge badge-blue" id="cq-badge">Checking patient database...</span>
+    </div>
+    <div id="contact-alert-cards" style="padding:12px 16px;">
+      <div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">⏳ Fetching CRIO patient database...</div>
+    </div>
+  </div>
+
+</div><!-- /view-referrals -->
+
+
+<!-- ══ VIEW: CONNECT ══════════════════════ -->
+<div id="view-admin" class="view">
+
+  <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;" id="admin-filter-bar">
+    <button onclick="switchAdmin('trends',this)" class="sched-filter active" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid #1843ad;background:#e8eeff;color:#1843ad;cursor:pointer">📈 Trends</button>
+    <button onclick="switchAdmin('connect',this)" class="sched-filter" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">⚙ Connect & Setup</button>
+    <button onclick="switchAdmin('auditlog',this)" class="sched-filter" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">📋 Audit Log</button>
+    <button onclick="switchAdmin('email',this)" class="sched-filter" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">📧 Daily Email</button>
+  </div>
+
+  <!-- Audit Log Panel -->
+  <div id="admin-auditlog" style="display:none;">
+    <div class="card fade-in">
+      <div class="card-header">
+        <span class="card-title">📋 Dashboard Audit Log</span>
+        <span class="badge badge-gray" id="audit-log-count">0 entries</span>
+      </div>
+      <div style="max-height:500px;overflow-y:auto;">
+        <table class="tbl" style="width:100%">
+          <thead><tr><th>Timestamp</th><th>Action</th><th>Details</th></tr></thead>
+          <tbody id="audit-log-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div id="admin-email" style="display:none;">
+    <div class="card fade-in" style="margin-bottom:16px;">
+      <div class="card-header">
+        <span class="card-title">📧 Daily Email Reports</span>
+      </div>
+      <div style="padding:16px;">
+        <p style="font-size:12px;color:var(--muted);margin:0 0 16px;">Generate actionable daily emails with CRIO links. Copy to clipboard and paste into your email client.</p>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;">
+          <button class="btn btn-blue" onclick="generateDailyEmail('ops')" style="font-size:12px;">📋 Operations Email (No Financials)</button>
+          <button class="btn btn-green" onclick="generateDailyEmail('finance')" style="font-size:12px;">💰 Full Report (With Financials)</button>
+        </div>
+      </div>
+    </div>
+    <div id="email-preview" style="display:none;">
+      <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center;">
+        <button class="btn btn-blue" onclick="copyEmailToClipboard()" style="font-size:11px;">📋 Copy to Clipboard</button>
+        <span id="email-copy-status" style="font-size:11px;color:var(--green);display:none;">Copied!</span>
+      </div>
+      <div class="card" style="padding:20px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:1.6;max-height:600px;overflow-y:auto;" id="email-body"></div>
+    </div>
+  </div>
+
+  <div id="admin-trends">
+
+
+  <!-- Header banner -->
+  <div class="time-banner fade-in" style="margin-bottom:16px;">
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showTrendsSummary()" title="Click to see trends summary">
+      <div class="tb-label">📅 Data Snapshots</div>
+      <div class="tb-value blue" id="trends-snapshot-count">—</div>
+      <div class="tb-sub">Weeks of data</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showCancels(null,'All Recent Cancellations')" title="Click to see cancel rate details">
+      <div class="tb-label">📉 Cancel Rate Trend</div>
+      <div class="tb-value" id="trends-rate-dir" style="color:var(--green)">—</div>
+      <div class="tb-sub" id="trends-rate-sub">vs. 4 weeks ago</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showCancels(null,'All Cancellations — Weekly Average')" title="Click to see cancellation details">
+      <div class="tb-label">📊 Avg Weekly Cancels</div>
+      <div class="tb-value red" id="trends-avg-cancel">—</div>
+      <div class="tb-sub">Rolling 4-week average</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showUpcoming(null,'All Upcoming Visits — Weekly Average')" title="Click to see upcoming visit details">
+      <div class="tb-label">📆 Avg Weekly Upcoming</div>
+      <div class="tb-value green" id="trends-avg-upcoming">—</div>
+      <div class="tb-sub">Rolling 4-week average</div>
+    </div>
+  </div>
+
+  <!-- Time range toggle -->
+  <div style="display:flex;gap:6px;margin-bottom:12px;" id="trends-range-bar">
+    <button class="sched-filter active" onclick="setTrendsRange(14,this)" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid #1843ad;background:#e8eeff;color:#1843ad;cursor:pointer">2 Weeks</button>
+    <button class="sched-filter" onclick="setTrendsRange(30,this)" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">1 Month</button>
+    <button class="sched-filter" onclick="setTrendsRange(61,this)" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">2 Months</button>
+  </div>
+
+  <!-- No data message (shown before live data loads) -->
+  <div id="trends-no-data-msg" class="card fade-in" style="text-align:center;padding:40px 24px;">
+    <div style="font-size:36px;margin-bottom:12px;">📈</div>
+    <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px;">Loading trends data...</div>
+    <div style="font-size:13px;color:var(--muted);max-width:500px;margin:0 auto 20px;">
+      Trends will appear automatically once live data loads from Google Sheets.
+      Charts show weekly cancel rates, visit volumes, coordinator performance, and study breakdowns.
+    </div>
+  </div>
+
+  <!-- Charts — hidden until longitudinal data available -->
+  <div id="trends-charts" style="display:none;">
+
+    <!-- Cancel volume (bars) + cancel rate (line) — dual axis -->
+    <div class="grid-2 mb16 fade-in">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">📉 Cancellations & Rate</span>
+          <span class="badge badge-gray">Bars = volume · Line = rate %</span>
+        </div>
+        <div class="chart-wrap h220">
+          <canvas id="trendsCancelDualChart"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Upcoming Visits per Week</span>
+        </div>
+        <div class="chart-wrap h220">
+          <canvas id="trendsUpcomingVolChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Study-level trends -->
+    <div class="card mb16 fade-in">
+      <div class="card-header">
+        <span class="card-title">📋 Study Cancel Rate Trends</span>
+        <span class="badge badge-gray">Top 6 studies by volume</span>
+      </div>
+      <div class="chart-wrap h220">
+        <canvas id="trendsStudyChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Master sheet connection panel -->
+    <div class="card fade-in">
+      <div class="card-header">
+        <span class="card-title">🔗 Master Sheet Connection</span>
+      </div>
+      <div style="padding:16px;display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
+        <div style="flex:1;min-width:200px;">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Master — Upcoming Visits (CSV URL)</div>
+          <input id="master-url1" value="https://docs.google.com/spreadsheets/d/e/2PACX-1vRUXJxTDsr5IRByMfuLF0P3hVq_QuEw6M1MPNDwd1CaV2UZ9tnFflUwsmUKAd3xeX3_esn0c4YlrV0q/pub?gid=0&single=true&output=csv" class="setup-input" style="width:100%;box-sizing:border-box;" placeholder="Paste CSV URL of Master - Upcoming sheet...">
+        </div>
+        <div style="flex:1;min-width:200px;">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px;">Master — Cancellations (CSV URL)</div>
+          <input id="master-url2" value="https://docs.google.com/spreadsheets/d/e/2PACX-1vRUXJxTDsr5IRByMfuLF0P3hVq_QuEw6M1MPNDwd1CaV2UZ9tnFflUwsmUKAd3xeX3_esn0c4YlrV0q/pub?gid=1487298034&single=true&output=csv" class="setup-input" style="width:100%;box-sizing:border-box;" placeholder="Paste CSV URL of Master - Cancellations sheet...">
+        </div>
+        <button class="btn btn-green" onclick="loadLongitudinalData()" style="white-space:nowrap;">Load Trends Data</button>
+      </div>
+      <div id="trends-load-status" style="padding:0 16px 12px;font-size:12px;color:var(--muted);"></div>
+    </div>
+
+  </div>
+
+
+  </div>
+
+  <div id="admin-connect" style="display:none;">
+
+
+  <div class="guide-card">
+    <h3>🔗 Connect to Google Sheets for Daily Auto-Refresh</h3>
+    <p>Your CTMS generates reports that land in a Google Drive folder as Google Sheets. Follow this guide to connect them to this dashboard so it refreshes automatically every morning.</p>
+    <div class="guide-steps">
+      <div class="guide-step">
+        <div class="guide-step-num">Step 1</div>
+        <h4>Open Your Report in Google Sheets</h4>
+        <p>Go to your Looker Reports folder in Google Drive and open the latest "Upcoming Scheduled Appointments" sheet.</p>
+      </div>
+      <div class="guide-step">
+        <div class="guide-step-num">Step 2</div>
+        <h4>Publish to the Web as CSV</h4>
+        <p>Go to <strong>File → Share → Publish to web</strong>. Select the correct sheet tab. Choose <strong>CSV format</strong>. Click Publish. Copy the URL.</p>
+        <div class="code-snippet">File → Share → Publish to web<br>→ Select sheet tab<br>→ Format: .csv<br>→ Publish → Copy URL</div>
+      </div>
+      <div class="guide-step">
+        <div class="guide-step-num">Step 3</div>
+        <h4>Repeat for No-Show Report</h4>
+        <p>Do the same for the "No Show and Canceled Visits" sheet. You'll get two URLs total.</p>
+      </div>
+      <div class="guide-step">
+        <div class="guide-step-num">Step 4</div>
+        <h4>Set Up Daily Auto-Refresh</h4>
+        <p>In your Sheet: <strong>Extensions → Apps Script</strong>. Add a time-driven trigger to run daily at 6am. This forces a re-pull from your CTMS every morning.</p>
+        <div class="code-snippet">Extensions → Apps Script<br>→ Triggers (clock icon)<br>→ Add Trigger<br>→ Time-driven · Day timer · 6am</div>
+      </div>
+    </div>
+    <div class="connect-form">
+      <input class="connect-input" id="url1-connect" value="https://docs.google.com/spreadsheets/d/e/2PACX-1vRUXJxTDsr5IRByMfuLF0P3hVq_QuEw6M1MPNDwd1CaV2UZ9tnFflUwsmUKAd3xeX3_esn0c4YlrV0q/pub?gid=0&single=true&output=csv" placeholder="📋 Upcoming Appointments — Published CSV URL">
+      <input class="connect-input" id="url2-connect" value="https://docs.google.com/spreadsheets/d/e/2PACX-1vRUXJxTDsr5IRByMfuLF0P3hVq_QuEw6M1MPNDwd1CaV2UZ9tnFflUwsmUKAd3xeX3_esn0c4YlrV0q/pub?gid=1487298034&single=true&output=csv" placeholder="🚫 No-Show & Canceled — Published CSV URL">
+      <button class="btn btn-primary" style="padding: 10px 20px;" onclick="connectFromGuide()">🔗 Connect Now</button>
+    </div>
+  </div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-header"><span class="card-title">How Auto-Refresh Works</span></div>
+      <div class="insight-list">
+        <div class="insight-item info">
+          <span class="insight-icon">📅</span>
+          <div>
+            <div class="insight-title">Daily at 6am: CTMS → Google Sheets</div>
+            <div class="insight-body">Your Apps Script trigger re-pulls the latest data from your CTMS into the Google Sheet. New appointments and cancellations from the previous day will appear.</div>
+          </div>
+        </div>
+        <div class="insight-item info">
+          <span class="insight-icon">🌐</span>
+          <div>
+            <div class="insight-title">When You Open This Dashboard: Sheets → Dashboard</div>
+            <div class="insight-body">Every time you open this HTML file in your browser, it fetches the latest CSV from Google Sheets automatically. No manual steps needed.</div>
+          </div>
+        </div>
+        <div class="insight-item positive">
+          <span class="insight-icon">✅</span>
+          <div>
+            <div class="insight-title">Zero Maintenance Once Connected</div>
+            <div class="insight-body">After the initial setup (~10 minutes), the entire pipeline is automatic. Open the dashboard each morning and you'll see yesterday's data already loaded.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">Troubleshooting</span></div>
+      <div class="insight-list">
+        <div class="insight-item warning">
+          <span class="insight-icon">⚠️</span>
+          <div>
+            <div class="insight-title">"Failed to load data" error</div>
+            <div class="insight-body">Make sure you used <strong>File → Share → Publish to web</strong> (not just "Share link"). The sheet must be publicly published for the CSV URL to work.</div>
+          </div>
+        </div>
+        <div class="insight-item warning">
+          <span class="insight-icon">⚠️</span>
+          <div>
+            <div class="insight-title">Data looks outdated</div>
+</div><!-- /view-connect -->
+
+
+</div>
+</div>
+</div>
+</div>
+
+  </div>
+
+</div>
+
+</div>
+
+<input type="hidden" id="url1-input" value="https://docs.google.com/spreadsheets/d/e/2PACX-1vRUXJxTDsr5IRByMfuLF0P3hVq_QuEw6M1MPNDwd1CaV2UZ9tnFflUwsmUKAd3xeX3_esn0c4YlrV0q/pub?gid=0&single=true&output=csv">
+<input type="hidden" id="url2-input" value="https://docs.google.com/spreadsheets/d/e/2PACX-1vRUXJxTDsr5IRByMfuLF0P3hVq_QuEw6M1MPNDwd1CaV2UZ9tnFflUwsmUKAd3xeX3_esn0c4YlrV0q/pub?gid=1487298034&single=true&output=csv">
+
+<!-- BUILD:JS_START -->
+<script>
+(function() {
+  var NUM_CHUNKS = 4;
+  var loadedChunks = new Array(NUM_CHUNKS);
+  var loadedCount = 0;
+  var hadError = false;
+
+  console.log('[AppScript] Loading dashboard JS in ' + NUM_CHUNKS + ' chunks...');
+
+  function onAllLoaded() {
+    var fullJS = loadedChunks.join('\n');
+    console.log('[AppScript] All chunks loaded, total: ' + fullJS.length + ' chars. Executing...');
+    try {
+      var scriptEl = document.createElement('script');
+      scriptEl.textContent = fullJS;
+      document.body.appendChild(scriptEl);
+      console.log('[AppScript] Dashboard JS executed successfully');
+    } catch (e) {
+      console.error('[AppScript] Error executing JS:', e);
+      document.body.innerHTML = '<div style="padding:40px;color:red;font-size:18px">'
+        + 'Error loading dashboard: ' + e.message + '</div>';
+    }
+  }
+
+  function loadChunk(index) {
+    google.script.run
+      .withSuccessHandler(function(content) {
+        if (hadError) return;
+        loadedChunks[index] = content;
+        loadedCount++;
+        console.log('[AppScript] Chunk ' + index + '/' + NUM_CHUNKS + ' loaded (' + (content ? content.length : 0) + ' chars)');
+        if (loadedCount === NUM_CHUNKS) {
+          onAllLoaded();
+        }
+      })
+      .withFailureHandler(function(err) {
+        hadError = true;
+        console.error('[AppScript] Failed to load chunk ' + index + ':', err);
+        document.body.innerHTML = '<div style="padding:40px;color:red;font-size:18px">'
+          + 'Failed to load dashboard JS chunk ' + index + ': ' + (err.message || err) + '</div>';
+      })
+      .getDashboardJSChunk(index);
+  }
+
+  // Load all chunks in parallel
+  for (var i = 0; i < NUM_CHUNKS; i++) {
+    loadChunk(i);
+  }
+})();
+</script>
+<!-- BUILD:JS_END -->
+
+
+<!-- ═════ Finance Overview View (Lines 2824-2939) ═════ -->
+<div id="view-fin-overview" class="view">
+
+  <!-- ALERTS -->
+  <div id="alertsBox"></div>
+  <div style="text-align:right;padding:2px 12px;font-size:9px;color:#94a3b8"><span id="fin-data-source">Loading...</span></div>
+
+  <!-- ── HERO: 3 biggest numbers at a glance ── -->
+  <div class="hero-row">
+    <div class="hero-cell" onclick="showTotalARModal()">
+      <div class="hero-label">Total Open AR</div>
+      <div class="hero-val" style="color:#8B5CF6" id="fin-hero-ar">--</div><div class="drill-hint">Click for study breakdown</div>
+      <div class="hero-sub" id="fin-hero-ar-sub">Loading...</div>
+    </div>
+    <div class="hero-cell" onclick="showPaymentsModal()">
+      <div class="hero-label">Payments Collected</div>
+      <div class="hero-val" style="color:#10B981" id="fin-hero-payments">--</div><div class="drill-hint">Click for monthly detail</div>
+      <div class="hero-sub" id="fin-hero-payments-sub">Loading...</div>
+    </div>
+    <div class="hero-cell" onclick="showForecastModal()">
+      <div class="hero-label">90-Day Forecast</div>
+      <div class="hero-val" style="color:#2d5a87" id="heroForecast">--</div>
+      <div class="hero-sub">Based on aging bucket collection rates</div>
+    </div>
+  </div>
+
+  <!-- ── TWO-COLUMN: AR Breakdown + Open Receivables ── -->
+  <div class="two-col">
+
+    <!-- LEFT: Accounts Receivable -->
+    <div class="group-panel">
+      <div class="group-title"><span class="gt-icon" style="background:#3B82F6"></span> Accounts Receivable</div>
+      <div class="group-body">
+        <div class="group-kpis">
+          <div class="gkpi" onclick="showInvAgingModal()">
+            <div class="gk-label">Invoice AR</div>
+            <div class="gk-val" style="color:#3B82F6" id="fin-kpi-inv-ar">--</div>
+            <div class="gk-sub" id="fin-kpi-inv-ar-sub">Loading...</div>
+          </div>
+          <div class="gkpi" onclick="showApAgingModal()">
+            <div class="gk-label">Autopay AR</div>
+            <div class="gk-val" style="color:#14B8A6" id="fin-kpi-ap-ar">--</div>
+            <div class="gk-sub" id="fin-kpi-ap-ar-sub">Loading...</div>
+          </div>
+          <div class="gkpi" onclick="showRev12mModal()">
+            <div class="gk-label">12-Month Revenue</div>
+            <div class="gk-val" style="color:#06B6D4" id="fin-kpi-rev12m">--</div>
+            <div class="gk-sub" id="fin-kpi-rev12m-sub">Loading...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Open Receivables -->
+    <div class="group-panel">
+      <div class="group-title"><span class="gt-icon" style="background:#EF4444"></span> Open Receivables</div>
+      <div class="group-body">
+        <div class="group-kpis">
+          <div class="gkpi" onclick="showUnpaidInvModal()">
+            <div class="gk-label">Unpaid Invoices</div>
+            <div class="gk-val" style="color:#EF4444" id="fin-kpi-unpaid-inv">--</div>
+            <div class="gk-sub" id="fin-kpi-unpaid-inv-sub">Loading...</div>
+          </div>
+          <div class="gkpi" onclick="showUnpaidAPModal()">
+            <div class="gk-label">Unpaid Autopay</div>
+            <div class="gk-val" style="color:#F59E0B" id="fin-kpi-unpaid-ap">--</div>
+            <div class="gk-sub" id="fin-kpi-unpaid-ap-sub">Loading...</div>
+          </div>
+          <div class="gkpi" onclick="showUninvoicedModal()">
+            <div class="gk-label">Uninvoiced</div>
+            <div class="gk-val" style="color:#EC4899" id="fin-kpi-uninvoiced">--</div>
+            <div class="gk-sub" id="fin-kpi-uninvoiced-sub">Loading...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── FORECAST BREAKDOWN ── -->
+  <div class="group-panel" style="cursor:pointer" onclick="showForecastModal()">
+    <div class="group-title"><span class="gt-icon" style="background:#2d5a87"></span> 90-Day Cash Forecast &mdash; Collection Probability Model</div>
+    <div class="forecast-grid" id="forecastGrid">
+      <div class="forecast-cell"><div class="fl">Next 30 Days</div><div class="fv" id="fc30">--</div><div class="fs">Current bucket &times; 88%</div></div>
+      <div class="forecast-cell"><div class="fl">30&ndash;60 Days</div><div class="fv" id="fc60">--</div><div class="fs">30-60d bucket &times; 78%</div></div>
+      <div class="forecast-cell"><div class="fl">60&ndash;90 Days</div><div class="fv" id="fc90">--</div><div class="fs">61-90d bucket &times; 62%</div></div>
+    </div>
+  </div>
+
+  <!-- ── MARKETING ROI (Meta Ads — spend visible only in Finance) ── -->
+  <div class="group-panel" id="fin-marketing-roi" style="display:none;">
+    <div class="group-title"><span class="gt-icon" style="background:#3b82f6"></span> Marketing ROI &mdash; Meta Ads (Last 30 Days)</div>
+    <div id="fin-meta-ads-kpi" style="display:flex;gap:16px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid #f1f5f9;"></div>
+    <div id="fin-meta-ads-table" style="overflow-x:auto;"></div>
+  </div>
+
+  <!-- ── CHARTS: Compact overview linking to detail tab ── -->
+  <div class="charts-row">
+    <div class="panel" style="cursor:pointer" onclick="switchTab('fin-revenue',document.querySelector('.nav-tab[onclick*=fin-revenue]'))">
+      <div class="panel-head">Revenue Trend <span style="font-size:10px;color:var(--muted);font-weight:400">→ click for detail</span></div>
+      <div class="chart-wrap"><svg id="revChart" viewBox="0 0 1000 310" style="width:100%;height:200px"></svg></div>
+    </div>
+    <div class="panel" style="cursor:pointer" onclick="switchTab('fin-revenue',document.querySelector('.nav-tab[onclick*=fin-revenue]'))">
+      <div class="panel-head">Payments Collected <span style="font-size:10px;color:var(--muted);font-weight:400">→ click for detail</span></div>
+      <div class="chart-wrap"><svg id="payChartOverview" viewBox="0 0 1000 310" style="width:100%;height:200px"></svg></div>
+    </div>
+  </div>
+
+  <!-- ── TOP STUDIES TABLE ── -->
+  <div class="group-panel">
+    <div class="group-title"><span class="gt-icon" style="background:#8B5CF6"></span> Top 15 Studies by Accounts Receivable</div>
+    <div class="panel-body" style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>Study</th><th class="r">Invoice AR</th><th class="r">Autopay AR</th><th class="r">Total AR</th><th class="r">Collected</th><th class="r">% Collected</th></tr></thead>
+        <tbody id="arStudiesBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ COLLECTIONS ═══════════ -->
+
+<!-- ═════ Finance Collections View (Lines 2940-2966) ═════ -->
+<div id="view-fin-collections" class="view">
+  <div class="section-label">Collection Status Summary</div>
+  <div class="coll-summary" id="collSummary"></div>
+
+  <div class="filter-bar">
+    <span style="font-size:11px;font-weight:600;color:#718096;margin-right:4px">Filter:</span>
+    <div id="statusFilters"></div>
+    <span style="margin-left:auto;font-size:11px;font-weight:600;color:#718096">Sort:</span>
+    <select class="sort-sel" onchange="collSort=this.value;renderCollections()">
+      <option value="days">Days Overdue</option>
+      <option value="amount">Amount</option>
+      <option value="status">Status</option>
+    </select>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><span>All Unpaid Invoices (42)</span></div>
+    <div class="panel-body" style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>Study</th><th>Invoice</th><th class="r">Days</th><th class="r">Amount</th><th>Status</th><th>Notes</th></tr></thead>
+        <tbody id="collBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ AGING AR ═══════════ -->
+
+<!-- ═════ Finance Aging View (Lines 2967-2992) ═════ -->
+<div id="view-fin-aging" class="view">
+  <div class="section-label">Aging Buckets (Invoice + Autopay Combined)</div>
+  <div class="kpi-row" id="agingKPIs"></div>
+
+  <div class="section-label">Invoice AR Aging Detail</div>
+  <div class="panel">
+    <div class="panel-body" style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>Study</th><th class="r">Current</th><th class="r">30-60d</th><th class="r">61-90d</th><th class="r">91-120d</th><th class="r">121-150d</th><th class="r">&gt;150d</th><th class="r">Total</th></tr></thead>
+        <tbody id="invAgingBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section-label">Autopay AR Aging Detail</div>
+  <div class="panel">
+    <div class="panel-body" style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>Study</th><th class="r">Current</th><th class="r">30-60d</th><th class="r">61-90d</th><th class="r">91-120d</th><th class="r">121-150d</th><th class="r">&gt;150d</th><th class="r">Total</th></tr></thead>
+        <tbody id="apAgingBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ REVENUE ═══════════ -->
+
+<!-- ═════ Finance Revenue View (Lines 2993-3063) ═════ -->
+<div id="view-fin-revenue" class="view">
+
+  <!-- Revenue KPIs -->
+  <div class="kpi-row" id="revKpiRow">
+    <div class="kpi kpi-clickable" style="cursor:pointer" onclick="showRevTotalPopup()"><div class="kpi-stripe" style="background:#8B5CF6"></div><div class="label">Total Revenue (12M)</div><div class="value" id="rev-total" style="color:#8B5CF6">--</div><div class="sub" id="rev-total-sub"></div></div>
+    <div class="kpi kpi-clickable" style="cursor:pointer" onclick="showRevMonthlyPopup()"><div class="kpi-stripe" style="background:#14B8A6"></div><div class="label">Avg Monthly Revenue</div><div class="value" id="rev-avg" style="color:#14B8A6">--</div><div class="sub" id="rev-avg-sub"></div></div>
+    <div class="kpi kpi-clickable" style="cursor:pointer" onclick="showRevPerStudyPopup()"><div class="kpi-stripe" style="background:#F59E0B"></div><div class="label">Revenue per Study</div><div class="value" id="rev-per-study" style="color:#F59E0B">--</div><div class="sub" id="rev-per-study-sub"></div></div>
+    <div class="kpi kpi-clickable" style="cursor:pointer" onclick="showRevByTypePopup()"><div class="kpi-stripe" style="background:#60A5FA"></div><div class="label">Top Revenue Source</div><div class="value" id="rev-top-type" style="color:#60A5FA;font-size:20px">--</div><div class="sub" id="rev-top-type-sub"></div></div>
+  </div>
+
+  <!-- Revenue Trend (Last 12 Months) -->
+  <div class="section-label">Revenue Trend &mdash; Last 12 Months</div>
+  <div class="panel">
+    <div class="chart-wrap"><svg id="revChartDetail" viewBox="0 0 1000 310" style="width:100%;height:280px"></svg></div>
+    <div style="display:flex;gap:16px;justify-content:center;padding:0 16px 14px;font-size:10px;color:#718096">
+      <span><span style="display:inline-block;width:8px;height:8px;background:#60A5FA;border-radius:2px;margin-right:3px"></span>Autopay</span>
+      <span><span style="display:inline-block;width:8px;height:8px;background:#FBBF24;border-radius:2px;margin-right:3px"></span>Invoicables</span>
+    </div>
+  </div>
+
+  <!-- Revenue Breakdown: Type + Payment Type side by side -->
+  <div class="charts-row">
+    <div class="panel">
+      <div class="panel-head">Revenue by Type</div>
+      <div style="display:flex;align-items:center;padding:16px">
+        <svg id="revTypeDonut" viewBox="0 0 200 200" style="width:180px;height:180px;flex-shrink:0"></svg>
+        <div id="revTypeLegend" style="margin-left:20px;font-size:13px;line-height:2"></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">Revenue by Payment Method</div>
+      <div id="revPayTypeChart" style="padding:20px"></div>
+    </div>
+  </div>
+
+  <!-- Monthly Payments Collected -->
+  <div class="section-label">Monthly Payments Collected</div>
+  <div class="panel">
+    <div class="chart-wrap"><svg id="payChart" viewBox="0 0 1000 300" style="width:100%;height:280px"></svg></div>
+  </div>
+
+  <!-- Top Revenue Items -->
+  <div class="section-label">Revenue by Category</div>
+  <div class="panel">
+    <div class="panel-body" style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>Category</th><th class="r">Total Revenue</th><th class="r">Items</th><th class="r">Avg per Item</th></tr></thead>
+        <tbody id="revItemsBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 12-Month Revenue by Study (enhanced) -->
+  <div class="section-label">Revenue by Study (Last 12 Months)</div>
+  <div class="panel">
+    <div class="panel-body" style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>Study</th><th class="r">Revenue (12M)</th></tr></thead>
+        <tbody id="revByStudyBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ═══════════ ACCRUALS (merged into Billing) ═══════════ -->
+  <!-- Accruals KPI row removed — same data shown in Finance Overview Open Receivables -->
+  <div class="section-label" style="margin-top:24px">Open Accruals Detail</div>
+
+  <!-- Uninvoiced by Category + Unpaid AP by Type side by side -->
+  <div class="charts-row">
+    <div class="panel">
+      <div class="panel-head">Uninvoiced Revenue by Category</div>
+      <div style="display:flex;align-items:center;padding:16px">
+        <svg id="uninvCatDonut" viewBox="0 0 200 200" style="width:180px;height:180px;flex-shrink:0"></svg>
+        <div id="uninvCatLegend" style="margin-left:20px;font-size:13px;line-height:2"></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">Unpaid Autopay by Revenue Type</div>
+      <div id="unpaidApTypeChart" style="padding:20px"></div>
+    </div>
+  </div>
+
+  <!-- Unpaid Autopay Aging Distribution -->
+  <div class="section-label">Unpaid Autopay &mdash; Aging Distribution</div>
+  <div class="panel">
+    <div id="unpaidApAgingChart" style="padding:20px"></div>
+  </div>
+
+  <!-- Uninvoiced Detail Table -->
+  <div class="section-label" id="uninvDetailLabel">Uninvoiced Revenue by Study</div>
+  <div class="panel">
+    <div class="panel-body" style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>Study</th><th>Item</th><th>Category</th><th class="r">Amount</th></tr></thead>
+        <tbody id="uninvDetailBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Uninvoiced summary removed — detail table above shows same data with more columns -->
+</div>
+
+<!-- ═══════════ CRIO vs QUICKBOOKS ═══════════ -->
+<div id="view-fin-qb" class="view">
+
+  <div class="section-label">CRIO vs QuickBooks — Financial Reconciliation</div>
+
+  <div class="kpi-row" id="qbKpiRow">
+    <div class="kpi">
+      <div class="kpi-stripe" style="background:#10B981"></div>
+      <div class="label">CRIO Billed</div>
+      <div class="value" id="qb-kpi1" style="color:#10B981">--</div>
+      <div class="sub" id="qb-kpi1-sub"></div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-stripe" style="background:#8B5CF6"></div>
+      <div class="label">QB Total Income</div>
+      <div class="value" id="qb-kpi2" style="color:#8B5CF6">--</div>
+      <div class="sub" id="qb-kpi2-sub"></div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-stripe" style="background:#3B82F6"></div>
+      <div class="label">Alignment</div>
+      <div class="value" id="qb-kpi3" style="color:#3B82F6">--</div>
+      <div class="sub" id="qb-kpi3-sub"></div>
+    </div>
+  </div>
+
+  <!-- Alignment gauge -->
+  <div class="panel" style="margin-bottom:16px;">
+    <div class="panel-body" style="padding:10px 16px;" id="qbAlignGauge">
+      <div style="font-size:11px;color:var(--muted);text-align:center">Loading alignment data…</div>
+    </div>
+  </div>
+
+  <!-- Charts row -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+    <div class="panel">
+      <div class="panel-body" style="padding:12px;">
+        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:8px;">Revenue by Study — CRIO vs QB (Top 15)</div>
+        <canvas id="qbStudyBarChart" height="260"></canvas>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-body" style="padding:12px;">
+        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:8px;">Monthly QB Revenue Trend</div>
+        <canvas id="qbMonthlyTrendChart" height="260"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-label">Study Revenue Comparison — CRIO Billed vs QB P&amp;L</div>
+  <div class="panel">
+    <div class="panel-body" style="overflow-x:auto;max-height:500px;overflow-y:auto">
+      <table class="tbl" id="qbReconTable">
+        <thead><tr>
+          <th>Study / Sponsor</th>
+          <th class="r">CRIO Billed<div style="font-size:9px;font-weight:400;color:var(--muted)">Collected + AR</div></th>
+          <th class="r" style="color:var(--muted)">12M Est.</th>
+          <th class="r">QB P&amp;L Rev<div style="font-size:9px;font-weight:400;color:var(--muted)">Jan 2025+</div></th>
+          <th class="r">Diff</th>
+          <th class="r">Match</th>
+          <th class="r">Months</th>
+          <th>Status</th>
+        </tr></thead>
+        <tbody id="qbReconBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section-label">QB-Only Income — Not Tracked in CRIO</div>
+  <div class="panel">
+    <div class="panel-body" style="overflow-x:auto;max-height:300px;overflow-y:auto">
+      <table class="tbl">
+        <thead><tr>
+          <th>QB Account</th>
+          <th class="r">Revenue</th>
+        </tr></thead>
+        <tbody id="qbOnlyBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section-label">QuickBooks Invoice Line Items (latest 200)</div>
+  <div class="panel">
+    <div class="panel-body" style="overflow-x:auto;max-height:400px;overflow-y:auto">
+      <table class="tbl">
+        <thead><tr>
+          <th>Invoice #</th>
+          <th>Date</th>
+          <th>Customer</th>
+          <th>Item</th>
+          <th>Description</th>
+          <th class="r">Qty</th>
+          <th class="r">Rate</th>
+          <th class="r">Amount</th>
+          <th>Class</th>
+        </tr></thead>
+        <tbody id="qbInvLinesBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- AR Aging -->
+  <div class="section-label">Accounts Receivable — Aging Summary</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+    <div class="panel">
+      <div class="panel-body" style="padding:12px;">
+        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:8px;">AR Aging by Bucket</div>
+        <canvas id="qbAgingBarChart" height="220"></canvas>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-body" style="padding:12px;" id="qbAgingSummary">
+        <div style="color:var(--muted);font-size:11px;">Loading aging data…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Payment Trend -->
+  <div class="section-label">Payment Trend</div>
+  <div class="panel" style="margin-bottom:16px;">
+    <div class="panel-body" style="padding:12px;">
+      <canvas id="qbPaymentTrendChart" height="200"></canvas>
+    </div>
+  </div>
+
+  <div class="section-label">Staff Hours by Study (QB Time Activity)</div>
+  <div class="panel">
+    <div class="panel-body" style="overflow-x:auto;max-height:400px;overflow-y:auto">
+      <table class="tbl">
+        <thead><tr>
+          <th>Study/Customer</th>
+          <th class="r">Total Hours</th>
+          <th class="r">Billable Hours</th>
+          <th class="r">Est. Amount</th>
+          <th class="r">Entries</th>
+        </tr></thead>
+        <tbody id="qbTimeBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+</div><!-- /main -->
+
+
+
+
+<!-- ═══════════ INSIGHTS ═══════════ -->
+
+<!-- ═════ Insights View (Lines 3064-3147) ═════ -->
+<div id="view-insights" class="view">
+  <div class="section-label" style="margin-top:0">Cross-Dashboard Intelligence</div>
+
+  <!-- Hero KPIs -->
+  <div class="hero-row" style="margin-bottom:20px">
+    <div class="hero-cell">
+      <div class="hero-label">Studies Tracked</div>
+      <div class="hero-val kpi-clickable" style="color:#2d5a87;cursor:pointer" id="ins-studies" onclick="showFinModal('All Tracked Studies',FIN_MERGED_STUDIES.map(r=>'<tr><td>'+slink(r.study)+'</td><td><span class=\'badge\'>'+r.status+'</span></td><td class=\'r\'>'+r.enrolled+'</td></tr>').join(''),true)">--</div>
+      <div class="hero-sub">Across operations & finance</div>
+    </div>
+    <div class="hero-cell">
+      <div class="hero-label">Est. Revenue at Risk</div>
+      <div class="hero-val" style="color:#EF4444" id="ins-rev-risk">--</div>
+      <div class="hero-sub">From aging AR &amp; cancellations</div>
+    </div>
+    <div class="hero-cell">
+      <div class="hero-label">Collection Efficiency</div>
+      <div class="hero-val" style="color:#10B981" id="ins-collect-eff">--</div>
+      <div class="hero-sub">Collected vs. total billed</div>
+    </div>
+    <div class="hero-cell">
+      <div class="hero-label">Cancel Rate</div>
+      <div class="hero-val" style="color:#F59E0B" id="ins-cancel-rate">--</div>
+      <div class="hero-sub">Overall patient retention</div>
+    </div>
+  </div>
+
+  <!-- Revenue Impact of Cancellations -->
+  <div class="group-panel" style="margin-bottom:18px">
+    <div class="group-title"><span class="gt-icon" style="background:#F59E0B"></span> Revenue Impact of Cancellations</div>
+    <div class="panel-body" id="ins-cancel-revenue" style="padding:12px">
+      <div style="color:#718096;font-size:13px;padding:12px">Loading...</div>
+    </div>
+  </div>
+
+  <!-- Cancellation Root Cause Playbook -->
+  <div class="group-panel" style="margin-bottom:18px">
+    <div class="group-title"><span class="gt-icon" style="background:#7C3AED"></span> Cancellation Root Cause Playbook</div>
+    <div class="panel-body" id="ins-cancel-playbook" style="padding:16px">
+      <div style="color:#718096;font-size:13px">Loading playbook...</div>
+    </div>
+  </div>
+
+  <!-- Financial Risk Matrix (cross-referenced with operational data) -->
+  <div class="group-panel" style="margin-bottom:18px">
+    <div class="group-title"><span class="gt-icon" style="background:#EF4444"></span> Financial Risk Matrix</div>
+    <div class="panel-body" style="overflow-x:auto;padding:0">
+      <table class="tbl" id="insightRiskTable">
+        <thead><tr><th>Study</th><th>Status</th><th class="r">Cancels</th><th class="r">Upcoming</th><th class="r">Total AR</th><th class="r">Collection %</th><th>Risk</th></tr></thead>
+        <tbody id="insightRiskBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 90-Day Cash Flow Forecast -->
+  <div class="group-panel" style="margin-bottom:18px">
+    <div class="group-title"><span class="gt-icon" style="background:#10B981"></span> 90-Day Cash Flow Projection</div>
+    <div class="panel-body" id="ins-forecast" style="padding:16px">
+      <div style="color:#718096;font-size:13px">Loading forecast...</div>
+    </div>
+  </div>
+
+  <!-- What To Do Next — Actionable Recommendations -->
+  <div class="group-panel" style="margin-bottom:18px">
+    <div class="group-title"><span class="gt-icon" style="background:#1843ad"></span> What To Do Next</div>
+    <div class="panel-body" id="ins-next-steps" style="padding:16px">
+      <div style="color:#718096;font-size:13px">Loading recommendations...</div>
+    </div>
+  </div>
+
+</div>
+</div><!-- /main -->
+
+<!-- MODAL -->
+
+
+
+<div class="modal-backdrop" id="modalBg" onclick="closeFinModal()">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div class="modal-hdr">
+      <h2 id="mTitle">Title</h2>
+      <button class="mclose" onclick="closeFinModal()" aria-label="Close modal">&#215;</button>
+    </div>
+    <div class="modal-bdy" id="mBody"></div>
+  </div>
+</div>
+
+
+
+
+<!-- PASSWORD MODAL -->
+<div id="authModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9998;align-items:center;justify-content:center">
+  <div style="background:white;border-radius:12px;padding:32px;max-width:400px;width:90%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.2)">
+    <div style="font-size:32px;margin-bottom:12px">🔒</div>
+    <h3 style="font-size:18px;font-weight:700;color:#1a202c;margin-bottom:8px">Finance Access</h3>
+    <p style="font-size:13px;color:#718096;margin-bottom:20px">Enter PIN to access this section</p>
+    <input type="password" id="authPinInput" placeholder="Enter PIN" style="width:100%;padding:12px;border:2px solid #E2E8F0;border-radius:8px;font-size:16px;text-align:center;letter-spacing:8px;margin-bottom:8px" onkeypress="if(event.key==='Enter')verifyPin()">
+    <div id="authError" style="color:#EF4444;font-size:12px;margin-bottom:12px;display:none">Incorrect PIN. Try again.</div>
+    <button onclick="verifyPin()" style="width:100%;padding:12px;background:linear-gradient(135deg,#1e3a5f,#2d5a87);color:white;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer">Unlock</button>
+    <button onclick="closeAuthModal()" style="margin-top:8px;background:none;border:none;color:#718096;font-size:12px;cursor:pointer">Cancel</button>
+
+  </div>
+</div>
+
+<!-- Apps Script iframe auto-resize: when served via HtmlService, the outer
+     iframe defaults to a tiny height. This detects the Apps Script environment
+     and continuously resizes the iframe to match the document height. -->
+<script>
+(function() {
+  if (typeof google !== 'undefined' && google.script && google.script.host) {
+    function resizeFrame() {
+      var h = document.documentElement.scrollHeight || document.body.scrollHeight;
+      google.script.host.setHeight(h + 40);
+    }
+    // Resize on load, after data renders, and on window resize
+    window.addEventListener('load', function() { setTimeout(resizeFrame, 500); });
+    window.addEventListener('resize', resizeFrame);
+    setInterval(resizeFrame, 2000);
+  }
+})();
+</script>
+</body>
+</html>
