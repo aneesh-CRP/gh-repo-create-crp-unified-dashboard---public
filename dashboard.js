@@ -11302,13 +11302,24 @@ function renderMetaAlignment() {
 
 // ── 5. Overview Marketing KPI ──
 function updateOverviewMarketingKPI() {
-  if (!META_ADS_DATA || META_ADS_DATA.length === 0) return;
-  var totalLeads = META_ADS_DATA.reduce(function(s, c) { return s + c.leads; }, 0);
-  var active = META_ADS_CAMPAIGNS.filter(function(c) { return c.status === 'ACTIVE'; }).length;
+  var metaLeads = 0, activeCampaigns = 0;
+  if (META_ADS_DATA && META_ADS_DATA.length > 0) {
+    metaLeads = META_ADS_DATA.reduce(function(s, c) { return s + c.leads; }, 0);
+    activeCampaigns = (META_ADS_CAMPAIGNS||[]).filter(function(c) { return c.status === 'ACTIVE'; }).length;
+  }
+  var campaignCount = (typeof CAMPAIGN_DATA !== 'undefined' && CAMPAIGN_DATA) ? CAMPAIGN_DATA.length : 0;
+  var activeRefs = (typeof REFERRAL_DATA !== 'undefined' && REFERRAL_DATA) ? REFERRAL_DATA.filter(function(r) { return !r.is_closed; }).length : 0;
+  var totalActive = metaLeads + activeRefs;
   var kpiVal = document.getElementById('kpi-marketing-leads');
   var kpiSub = document.getElementById('kpi-marketing-sub');
-  if (kpiVal) kpiVal.textContent = totalLeads.toLocaleString();
-  if (kpiSub) kpiSub.textContent = active + ' active campaigns (30d)';
+  if (kpiVal) kpiVal.textContent = totalActive > 0 ? totalActive.toLocaleString() : '—';
+  if (kpiSub) kpiSub.textContent = totalActive > 0 ? 'Active pipeline (all sources)' : 'Loading...';
+  var metaEl = document.getElementById('kpi-meta-count');
+  var campEl = document.getElementById('kpi-campaign-count');
+  var provEl = document.getElementById('kpi-provider-count');
+  if (metaEl) metaEl.textContent = metaLeads || '—';
+  if (campEl) campEl.textContent = campaignCount || '—';
+  if (provEl) provEl.textContent = activeRefs || '—';
 }
 
 // (Speed-to-Contact + Recruiter Attribution removed — noisy without shared lead IDs)

@@ -1133,22 +1133,28 @@ body {
 
   <!-- Time Banner -->
   <div class="time-banner fade-in">
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showCancels(null,'True Cancellations')" title="Click to see true cancellations">
-      <div class="tb-label">📅 Past 2 Months</div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showCancels(null,'Cancellations')" title="Click to see cancellations">
+      <div class="tb-label">❌ Cancels</div>
       <div class="tb-value red" id="kpi-cancels">0</div>
-      <div class="tb-sub" id="kpi-cancel-range">True cancellations</div>
-      <div style="display:flex;gap:8px;justify-content:center;margin-top:4px;flex-wrap:wrap" id="kpi-cancel-split">
-        <span style="cursor:pointer;font-size:11px;color:#64748b" onclick="event.stopPropagation();showSplitPopup('noShows','No Shows')" title="No Shows"><strong id="kpi-noshow" style="color:#f59e0b">0</strong> no-shows</span>
-        <span style="cursor:pointer;font-size:11px;color:#64748b" onclick="event.stopPropagation();showSplitPopup('withdrawals','Patient Withdrew')" title="Patient Withdrew"><strong id="kpi-withdrew" style="color:#8b5cf6">0</strong> withdrew</span>
-        <span style="cursor:pointer;font-size:11px;color:#64748b" onclick="event.stopPropagation();showSplitPopup('screenFails','Screen Fails / DNQ')" title="Screen Fails"><strong id="kpi-screenfail" style="color:#6366f1">0</strong> SF</span>
-        <span style="cursor:pointer;font-size:11px;color:#64748b" onclick="event.stopPropagation();showSplitPopup('discontinued','Discontinued')" title="Discontinued"><strong id="kpi-discontinued" style="color:#64748b">0</strong> disc.</span>
-      </div>
+      <div class="tb-sub" id="kpi-cancel-range">Site + patient cancels</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showSplitPopup('withdrawals','Patient Withdrew')" title="Click to see withdrawals">
+      <div class="tb-label">🚪 Withdrew</div>
+      <div class="tb-value" style="color:#8b5cf6" id="kpi-withdrew">0</div>
+      <div class="tb-sub">Patient withdrawals</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showSplitPopup('screenFails','Screen Fails / DNQ')" title="Click to see screen fails">
+      <div class="tb-label">📉 Screen Fail</div>
+      <div class="tb-value" style="color:#6366f1" id="kpi-screenfail">0</div>
+      <div class="tb-sub" id="kpi-sf-sub">DNQ + SF</div>
     </div>
     <div class="tb-divider"></div>
     <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showRescheduled()" title="Click to see rescheduled visits">
       <div class="tb-label">🔄 Rescheduled</div>
       <div class="tb-value" style="color:#f59e0b" id="kpi-rescheduled">0</div>
-      <div class="tb-sub">Cancelled but rebooked</div>
+      <div class="tb-sub">Not counted in cancels</div>
     </div>
     <div class="tb-divider" id="kpi-today-divider">TODAY</div>
     <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showUpcoming(r=>{ const d=_parseDate(r.date_iso||''); if(!d) return false; const now=new Date(); now.setHours(0,0,0,0); return (d-now)/86400000<=14; },'Next 14 Days')" title="Click to see next 14 days">
@@ -1176,9 +1182,14 @@ body {
     </div>
     <div class="tb-divider"></div>
     <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="switchTab('referrals',document.querySelector('.nav-tab[onclick*=referrals]'))" title="Click to see marketing intelligence">
-      <div class="tb-label">📈 Marketing</div>
+      <div class="tb-label">📈 Active Leads</div>
       <div class="tb-value blue" id="kpi-marketing-leads">—</div>
-      <div class="tb-sub" id="kpi-marketing-sub">Meta leads (30d)</div>
+      <div class="tb-sub" id="kpi-marketing-sub">Loading...</div>
+      <div style="display:flex;gap:8px;justify-content:center;margin-top:4px;flex-wrap:wrap">
+        <span style="font-size:10px;color:#64748b">📱 <strong id="kpi-meta-count">—</strong> Meta</span>
+        <span style="font-size:10px;color:#64748b">📋 <strong id="kpi-campaign-count">—</strong> campaigns</span>
+        <span style="font-size:10px;color:#64748b">🏥 <strong id="kpi-provider-count">—</strong> providers</span>
+      </div>
     </div>
   </div>
 
