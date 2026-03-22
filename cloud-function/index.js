@@ -1215,6 +1215,8 @@ const FEEDS = {
       CASE WHEN sd.has_draft = 1 THEN 'Yes' ELSE 'No' END AS has_draft,
       sd.file_size,
       COALESCE(sd.custom_name, '') AS custom_name,
+      COALESCE(sd.external_id, '') AS doc_external_id,
+      COALESCE(sd.cloud_document_id, '') AS cloud_doc_id,
       COALESCE(si.name, '') AS site_name
     FROM ${tbl('subject_document')} sd
     JOIN ${tbl('study')} st ON sd.study_key = st.study_key
