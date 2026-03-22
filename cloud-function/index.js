@@ -1711,8 +1711,29 @@ functions.http('crpBqApi', async (req, res) => {
   res.set('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
 
+  // Cache-Control: allow CDN/browser caching for 5 minutes
+  res.set('Cache-Control', 'public, max-age=300');
+
   const feed = req.query.feed;
   const format = req.query.format || 'csv';
+
+  // ── Batch endpoint: ?feed=batch&feeds=visits,cancels,studies ──
+  if (feed === 'batch') {
+    const feedNames = (req.query.feeds || '').split(',').filter(Boolean);
+    if (!feedNames.length) { res.status(400).json({ error: 'Provide feeds=name1,name2,...' }); return; }
+    const results = {};
+    await Promise.all(feedNames.map(async (name) => {
+      const def = FEEDS[name];
+      if (!def) { results[name] = { error: 'unknown feed' }; return; }
+      try {
+        const sql = typeof def.query === 'function' ? def.query(req.query) : def.query;
+        const rows = await runQuery(sql);
+        results[name] = { rows: rows.length, data: rows };
+      } catch (err) { results[name] = { error: err.message }; }
+    }));
+    res.json({ batch: true, feeds: feedNames.length, results, timestamp: new Date().toISOString() });
+    return;
+  }
 
   // List available feeds
   if (!feed) {

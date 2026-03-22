@@ -6002,17 +6002,15 @@ function fetchActionRequiredData() {
   var base = CRP_CONFIG.CF_BASE;
   var _s = function(id, val) { var e = document.getElementById(id); if (e) e.textContent = val; };
 
-  // Fetch all 4 feeds in parallel
-  Promise.all([
-    fetchCSV(base + '?feed=comments&format=csv').catch(function() { return []; }),
-    fetchCSV(base + '?feed=documentSummary&format=csv').catch(function() { return []; }),
-    fetchCSV(base + '?feed=visitTodos&format=csv').catch(function() { return []; }),
-    fetchCSV(base + '?feed=regulatory&format=csv').catch(function() { return []; }),
-  ]).then(function(results) {
-    var comments = results[0] || [];
-    var docSummary = results[1] || [];
-    var todos = results[2] || [];
-    var regulatory = results[3] || [];
+  // Batch fetch all 4 feeds in one request (reduces HTTP overhead)
+  fetch(base + '?feed=batch&feeds=comments,documentSummary,visitTodos,regulatory&format=json')
+  .then(function(r) { return r.json(); })
+  .then(function(batch) {
+    var results = batch.results || {};
+    var comments = (results.comments || {}).data || [];
+    var docSummary = (results.documentSummary || {}).data || [];
+    var todos = (results.visitTodos || {}).data || [];
+    var regulatory = (results.regulatory || {}).data || [];
 
     // Open Queries
     window._actionQueries = comments;
@@ -6749,17 +6747,22 @@ async function fetchFinanceBQ() {
   _log('CRP Finance BQ: Fetching from Cloud Function...');
 
   try {
-    var [invRows, pmtRows, sfRows, mrevRows, stipRows, gaapRevRows, gaapMonthRows, gaapArRows, forecastRows] = await Promise.all([
+    // Batch GAAP feeds (1 request instead of 4) + core finance feeds (5 requests)
+    var gaapBatchP = fetch(base + '?feed=batch&feeds=gaapStudyRevenue,gaapMonthly,gaapAging,enrollmentForecast&format=json')
+      .then(function(r) { return r.json(); }).catch(function() { return { results: {} }; });
+    var [invRows, pmtRows, sfRows, mrevRows, stipRows, gaapBatch] = await Promise.all([
       fetchCSV(base + '?feed=agingInvoices&format=csv'),
       fetchCSV(base + '?feed=payments&format=csv'),
       fetchCSV(base + '?feed=studyFinance&format=csv'),
       fetchCSV(base + '?feed=monthlyRevenue&format=csv'),
       fetchCSV(base + '?feed=stipends&format=csv'),
-      fetchCSV(base + '?feed=gaapStudyRevenue&format=csv').catch(function() { return []; }),
-      fetchCSV(base + '?feed=gaapMonthly&format=csv').catch(function() { return []; }),
-      fetchCSV(base + '?feed=gaapAging&format=csv').catch(function() { return []; }),
-      fetchCSV(base + '?feed=enrollmentForecast&format=csv').catch(function() { return []; }),
+      gaapBatchP,
     ]);
+    var gaapResults = gaapBatch.results || {};
+    var gaapRevRows = (gaapResults.gaapStudyRevenue || {}).data || [];
+    var gaapMonthRows = (gaapResults.gaapMonthly || {}).data || [];
+    var gaapArRows = (gaapResults.gaapAging || {}).data || [];
+    var forecastRows = (gaapResults.enrollmentForecast || {}).data || [];
 
     if (invRows.length === 0 && sfRows.length === 0) {
       _log('CRP Finance BQ: empty — falling back to Sheets');
