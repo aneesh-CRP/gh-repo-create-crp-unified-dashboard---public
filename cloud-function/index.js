@@ -503,7 +503,7 @@ const FEEDS = {
     ORDER BY enrolled DESC`
   },
 
-  // ── 10. Revenue Analytics (financial performance per study) ──
+  // ── 10. Revenue Analytics — DEPRECATED: use gaapStudyRevenue (feed 24) instead ──
   revenue: {
     query: () => `SELECT
       CAST(sf.study_key AS STRING) AS study_key,
@@ -602,7 +602,7 @@ const FEEDS = {
     ORDER BY i.amount_unpaid DESC`
   },
 
-  // ── 14. Payments received ──
+  // ── 14. Payments — DEPRECATED: use gaapPayments (feed 40) instead ──
   payments: {
     query: () => `SELECT
       p.payment_number, CAST(p.payment_key AS STRING) AS payment_key,
@@ -650,7 +650,7 @@ const FEEDS = {
     }
   },
 
-  // ── 16. Monthly revenue summary ──
+  // ── 16. Monthly revenue — DEPRECATED: use gaapMonthly (feed 25) instead ──
   monthlyRevenue: {
     query: () => `SELECT
       FORMAT_DATE('%Y-%m', DATE(ri.service_date)) AS month,
@@ -733,7 +733,7 @@ const FEEDS = {
     ORDER BY sf.total_revenue DESC`
   },
 
-  // ── 19. Revenue per Subject ──
+  // ── 19. Revenue per Subject — DEPRECATED: derivable from gaapStudyRevenue (feed 24) ──
   revenuePerSubject: {
     query: () => `SELECT CAST(sf.study_key AS STRING) AS study_key,
       ${STUDY_NAME_SQL} AS study_name,
