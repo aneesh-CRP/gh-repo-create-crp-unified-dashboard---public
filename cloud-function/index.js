@@ -695,8 +695,8 @@ const FEEDS = {
   // ── 18. Study finance summary (enhanced) ──
   studyFinance: {
     query: () => `WITH
-      inv_stats AS (SELECT study_key, COUNT(*) AS inv_count, SUM(amount) AS inv_total, SUM(amount_unpaid) AS inv_unpaid,
-        COUNTIF(status = 1) AS inv_unpaid, COUNTIF(status = 2) AS inv_paid, COUNTIF(status = 3) AS inv_partial FROM ${tbl('invoice')} GROUP BY study_key),
+      inv_stats AS (SELECT study_key, COUNT(*) AS inv_count, SUM(amount) AS inv_total, SUM(amount_unpaid) AS inv_unpaid_amount,
+        COUNTIF(status = 1) AS inv_unpaid_count, COUNTIF(status = 2) AS inv_paid, COUNTIF(status = 3) AS inv_partial FROM ${tbl('invoice')} GROUP BY study_key),
       pmt_stats AS (SELECT study_key, COUNT(*) AS pmt_count, SUM(amount) AS pmt_total FROM ${tbl('payment')} GROUP BY study_key),
       stip_stats AS (SELECT study_key, COUNT(*) AS stip_count, SUM(amount) AS stip_total, COUNTIF(is_paid=1) AS stip_paid FROM ${tbl('subject_payment')} WHERE is_active = 1 GROUP BY study_key)
     SELECT
@@ -719,8 +719,8 @@ const FEEDS = {
       CAST(sf.patient_stipend AS FLOAT64) AS stipend_per_patient,
       COALESCE(inv.inv_count, 0) AS invoice_count,
       COALESCE(CAST(inv.inv_total AS FLOAT64), 0) AS invoice_total,
-      COALESCE(CAST(inv.inv_unpaid AS FLOAT64), 0) AS invoice_unpaid,
-      COALESCE(inv.inv_unpaid, 0) AS invoices_unpaid,
+      COALESCE(CAST(inv.inv_unpaid_amount AS FLOAT64), 0) AS invoice_unpaid,
+      COALESCE(inv.inv_unpaid_count, 0) AS invoices_unpaid,
       COALESCE(inv.inv_partial, 0) AS invoices_partial,
       COALESCE(inv.inv_paid, 0) AS invoices_paid,
       COALESCE(pmt.pmt_count, 0) AS payment_count,
