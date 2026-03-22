@@ -255,6 +255,8 @@ const FEEDS = {
     WHERE aal.change_type = 4
       AND aal.date_created >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 90 DAY)
       AND st.is_active = 1 AND st.site_key NOT IN (5547)
+      ${STUDY_FILTER_SQL}
+      AND LOWER(COALESCE(st.protocol_number, '')) != 'j2a-mc-gzps'
     ORDER BY aal.date_created DESC`,
     headers: {
       subject_full_name: 'Subject Full Name', study_name: 'Study Name', study_key: 'Study Key',
