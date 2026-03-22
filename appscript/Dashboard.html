@@ -1133,63 +1133,58 @@ body {
 
   <!-- Time Banner -->
   <div class="time-banner fade-in">
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showCancels(null,'Cancellations')" title="Click to see cancellations">
-      <div class="tb-label">❌ Cancels</div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showCancels(null,'Cancellations')">
+      <div class="tb-label">Cancels</div>
       <div class="tb-value red" id="kpi-cancels">0</div>
-      <div class="tb-sub" id="kpi-cancel-range">Site + patient cancels</div>
+      <div class="tb-sub" id="kpi-cancel-range"></div>
     </div>
     <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showSplitPopup('withdrawals','Patient Withdrew')" title="Click to see withdrawals">
-      <div class="tb-label">🚪 Withdrew</div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showSplitPopup('noShows','No Shows')">
+      <div class="tb-label">No Shows</div>
+      <div class="tb-value" style="color:#f59e0b" id="kpi-noshow">0</div>
+      <div class="tb-sub">Missed visits</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showSplitPopup('withdrawals','Withdrawals')">
+      <div class="tb-label">Withdrew</div>
       <div class="tb-value" style="color:#8b5cf6" id="kpi-withdrew">0</div>
-      <div class="tb-sub">Patient withdrawals</div>
+      <div class="tb-sub">Patient withdrew</div>
     </div>
     <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showSplitPopup('screenFails','Screen Fails / DNQ')" title="Click to see screen fails">
-      <div class="tb-label">📉 Screen Fail</div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showSplitPopup('screenFails','Screen Fails')">
+      <div class="tb-label">Screen Fail</div>
       <div class="tb-value" style="color:#6366f1" id="kpi-screenfail">0</div>
-      <div class="tb-sub" id="kpi-sf-sub">DNQ + SF</div>
+      <div class="tb-sub">DNQ + SF</div>
     </div>
     <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showRescheduled()" title="Click to see rescheduled visits">
-      <div class="tb-label">🔄 Rescheduled</div>
-      <div class="tb-value" style="color:#f59e0b" id="kpi-rescheduled">0</div>
-      <div class="tb-sub">Not counted in cancels</div>
-    </div>
-    <div class="tb-divider" id="kpi-today-divider">TODAY</div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showUpcoming(r=>{ const d=_parseDate(r.date_iso||''); if(!d) return false; const now=new Date(); now.setHours(0,0,0,0); return (d-now)/86400000<=14; },'Next 14 Days')" title="Click to see next 14 days">
-      <div class="tb-label">⚡ Next 14 Days</div>
-      <div class="tb-value blue" id="kpi-next14">78</div>
-      <div class="tb-sub">Scheduled visits (CRIO)</div>
-    </div>
-    <div class="tb-divider">→</div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showUpcoming(null,'All Upcoming Visits')" title="Click to see all upcoming visits">
-      <div class="tb-label">📆 Next 2 Months</div>
-      <div class="tb-value green" id="kpi-upcoming">75</div>
-      <div class="tb-sub" id="kpi-upcoming-range">Scheduled visits</div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showRescheduled()">
+      <div class="tb-label">Rescheduled</div>
+      <div class="tb-value" style="color:#059669" id="kpi-rescheduled">0</div>
+      <div class="tb-sub">Rebooked</div>
     </div>
     <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showRiskFlags('At-Risk Patients')" title="Click to see at-risk patients">
-      <div class="tb-label">⚠ At-Risk Studies</div>
-      <div class="tb-value" style="color:var(--purple);" id="kpi-risk">2</div>
-      <div class="tb-sub">High cancel : upcoming ratio</div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showUpcoming(r=>{ const d=_parseDate(r.date_iso||''); if(!d) return false; const now=new Date(); now.setHours(0,0,0,0); return (d-now)/86400000<=14; },'Next 14 Days')">
+      <div class="tb-label">Next 14 Days</div>
+      <div class="tb-value blue" id="kpi-next14">0</div>
+      <div class="tb-sub">Upcoming visits</div>
     </div>
     <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showUpcoming(null,'All Upcoming Visits')" title="Click to see active studies">
-      <div class="tb-label">🏥 Active Studies</div>
-      <div class="tb-value" id="kpi-studies">26</div>
-      <div class="tb-sub">Across 2 sites</div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showUpcoming(null,'All Upcoming Visits')">
+      <div class="tb-label">All Upcoming</div>
+      <div class="tb-value green" id="kpi-upcoming">0</div>
+      <div class="tb-sub" id="kpi-upcoming-range"></div>
     </div>
     <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="switchTab('referrals',document.querySelector('.nav-tab[onclick*=referrals]'))" title="Click to see marketing intelligence">
-      <div class="tb-label">📈 Active Leads</div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showRiskFlags('At-Risk Studies')">
+      <div class="tb-label">At-Risk</div>
+      <div class="tb-value" style="color:#dc2626" id="kpi-risk">0</div>
+      <div class="tb-sub">Enrolling only</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="switchTab('referrals',document.querySelector('.nav-tab[onclick*=referrals]'))">
+      <div class="tb-label">Active Leads</div>
       <div class="tb-value blue" id="kpi-marketing-leads">—</div>
-      <div class="tb-sub" id="kpi-marketing-sub">Loading...</div>
-      <div style="display:flex;gap:8px;justify-content:center;margin-top:4px;flex-wrap:wrap">
-        <span style="font-size:10px;color:#64748b">📱 <strong id="kpi-meta-count">—</strong> Meta</span>
-        <span style="font-size:10px;color:#64748b">📋 <strong id="kpi-campaign-count">—</strong> campaigns</span>
-        <span style="font-size:10px;color:#64748b">🏥 <strong id="kpi-provider-count">—</strong> providers</span>
-      </div>
+      <div class="tb-sub" id="kpi-marketing-sub"></div>
     </div>
   </div>
 
@@ -1207,56 +1202,42 @@ body {
   </div>
 
   <!-- Recruitment Pipeline KPIs (cross-source) -->
-  <div class="time-banner fade-in" style="margin-bottom:16px;background:linear-gradient(135deg,#f0f4fa 0%,#e8eeff 100%);" id="recruitment-kpi-banner">
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="switchTab('referrals',document.querySelector('.nav-tab[onclick*=referrals]'))" title="Click to view Referrals tab">
-      <div class="tb-label">📥 Stale Leads</div>
+  <!-- ── RECRUITMENT + ACTION REQUIRED — single unified row ── -->
+  <div class="time-banner fade-in" style="margin-bottom:16px;" id="recruitment-kpi-banner">
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="switchTab('referrals',document.querySelector('.nav-tab[onclick*=referrals]'))">
+      <div class="tb-label">Stale Leads</div>
       <div class="tb-value" style="color:#f59e0b" id="ov-kpi-refs">—</div>
-      <div class="tb-sub">Inactive >30d — need follow-up</div>
+      <div class="tb-sub">Inactive >30d</div>
     </div>
     <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showSitePatients()" title="Click to see patients by site">
-      <div class="tb-label">🏥 Site Active Patients</div>
-      <div class="tb-value" style="color:#8b5cf6" id="ov-kpi-sites">—</div>
-      <div class="tb-sub">PHL + PNJ combined</div>
-    </div>
-    <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showFBLeads()" title="Click to see Facebook leads">
-      <div class="tb-label">📱 FB Leads (30d)</div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showFBLeads()">
+      <div class="tb-label">FB Leads</div>
       <div class="tb-value" style="color:#3b82f6" id="ov-kpi-fb">—</div>
-      <div class="tb-sub">New Meta/Facebook leads</div>
+      <div class="tb-sub">30-day</div>
     </div>
     <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showReferralDetailModal(r=>CRP_CONFIG.CLICKUP.STAGE_GROUPS.ENROLLED.has(r.stage),'Enrolled Referrals','Conversion breakdown')" title="Click to see enrolled referrals">
-      <div class="tb-label">🎯 Lead→Enrolled</div>
-      <div class="tb-value" style="color:#059669" id="ov-kpi-conv">—</div>
-      <div class="tb-sub">Referral conversion rate</div>
-    </div>
-  </div>
-
-  <!-- ── ACTION REQUIRED: 4 chips showing what needs attention today ── -->
-  <div class="time-banner fade-in" style="margin-bottom:16px;background:linear-gradient(135deg,#fef2f2 0%,#fffbeb 50%,#f0fdf4 100%);" id="action-required-banner">
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showActionModal('queries')" title="Click for open query details">
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showActionModal('queries')">
       <div class="tb-label">Open Queries</div>
       <div class="tb-value" style="color:#dc2626" id="ar-queries">—</div>
-      <div class="tb-sub" id="ar-queries-sub">Loading...</div>
+      <div class="tb-sub" id="ar-queries-sub"></div>
     </div>
     <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showActionModal('docs')" title="Click for unsigned document details">
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showActionModal('docs')">
       <div class="tb-label">Unsigned Docs</div>
       <div class="tb-value" style="color:#d97706" id="ar-docs">—</div>
-      <div class="tb-sub" id="ar-docs-sub">Loading...</div>
+      <div class="tb-sub" id="ar-docs-sub"></div>
     </div>
     <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showActionModal('todos')" title="Click for overdue todo details">
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showActionModal('todos')">
       <div class="tb-label">Overdue Todos</div>
       <div class="tb-value" style="color:#f59e0b" id="ar-todos">—</div>
-      <div class="tb-sub" id="ar-todos-sub">Loading...</div>
+      <div class="tb-sub" id="ar-todos-sub"></div>
     </div>
     <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showActionModal('training')" title="Click for training gap details">
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showActionModal('training')">
       <div class="tb-label">Training Gaps</div>
       <div class="tb-value" style="color:#7c3aed" id="ar-training">—</div>
-      <div class="tb-sub" id="ar-training-sub">Loading...</div>
+      <div class="tb-sub" id="ar-training-sub"></div>
     </div>
   </div>
 
