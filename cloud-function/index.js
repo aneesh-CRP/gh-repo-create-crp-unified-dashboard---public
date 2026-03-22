@@ -161,10 +161,7 @@ const FEEDS = {
       FORMAT_DATETIME('%Y-%m-%d', ca.start) AS scheduled_date,
       ${SUBJECT_NAME_SQL} AS subject_full_name,
       CAST(ca.subject_key AS STRING) AS subject_key_back_end,
-      COALESCE(
-        NULLIF(TRIM(CONCAT(COALESCE(svs_coord.first_name, ''), ' ', COALESCE(svs_coord.last_name, ''))), ''),
-        TRIM(CONCAT(COALESCE(coord.first_name, ''), ' ', COALESCE(coord.last_name, '')))
-      ) AS full_name,
+      COALESCE(sc.name, '') AS full_name,
       CASE ca.status WHEN 0 THEN 'Cancelled' ELSE 'Active' END AS appointment_status,
       COALESCE(sv.name, '') AS visit_name,
       ${SUBJECT_STATUS_SQL} AS subject_status,
@@ -172,18 +169,12 @@ const FEEDS = {
       CASE WHEN ca.status = 0 THEN FORMAT_DATETIME('%Y-%m-%d', ca.cancel_date) ELSE '' END AS cancel_date,
       CASE WHEN ca.status = 0 THEN COALESCE(REGEXP_REPLACE(ca.cancel_reason, r'[\\x00-\\x1f]', ' '), '') ELSE '' END AS cancel_reason,
       CASE WHEN ca.status = 0 THEN CASE ca.cancel_type WHEN 1 THEN 'No Show' WHEN 2 THEN 'Site Cancelled' WHEN 3 THEN 'Patient Cancelled' ELSE '' END ELSE '' END AS appointment_cancellation_type,
-      COALESCE(
-        NULLIF(TRIM(CONCAT(COALESCE(svs_coord.first_name, ''), ' ', COALESCE(svs_coord.last_name, ''))), ''),
-        TRIM(CONCAT(COALESCE(coord.first_name, ''), ' ', COALESCE(coord.last_name, '')))
-      ) AS staff_full_name,
+      COALESCE(sc.name, '') AS staff_full_name,
       COALESCE(si.name, '') AS site_name,
       COALESCE(sub.mobile_phone, '') AS mobile_phone,
       CAST(ca.calendar_appointment_key AS STRING) AS calendar_appointment_key,
       CASE ca.type WHEN 0 THEN 'Regular Visit' WHEN 1 THEN 'Ad Hoc Visit' WHEN 2 THEN 'General Appointment' WHEN 3 THEN 'Block' ELSE '' END AS appointment_type,
-      COALESCE(
-        NULLIF(TRIM(CONCAT(COALESCE(svs_inv.first_name, ''), ' ', COALESCE(svs_inv.last_name, ''))), ''),
-        pi.name, ''
-      ) AS investigator,
+      COALESCE(sp.name, '') AS investigator,
       FORMAT_DATETIME('%Y-%m-%d', CURRENT_DATETIME()) AS snapshot_date
     FROM ${tbl('calendar_appointment')} ca
     LEFT JOIN ${tbl('subject')} sub ON ca.subject_key = sub.subject_key
@@ -191,13 +182,14 @@ const FEEDS = {
     LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
     LEFT JOIN ${tbl('site')} si ON ca.site_key = si.site_key
     LEFT JOIN ${tbl('study_visit')} sv ON ca.study_visit_key = sv.study_visit_key
-    LEFT JOIN ${tbl('user')} coord ON ca.creator_key = coord.user_key
-    LEFT JOIN ${tbl('subject_visit_stats')} svs ON ca.subject_visit_key = svs.subject_visit_key
-    LEFT JOIN ${tbl('user')} svs_coord ON svs.coordinator_user_key = svs_coord.user_key
-    LEFT JOIN ${tbl('user')} svs_inv ON svs.investigator_user_key = svs_inv.user_key
     LEFT JOIN (SELECT su.study_key, CONCAT(u.first_name, ' ', u.last_name) AS name
       FROM ${tbl('study_user')} su JOIN ${tbl('user')} u ON su.user_key = u.user_key
-      WHERE su.role = 1 AND su.is_role_leader = 1 AND su._fivetran_deleted = false) pi ON ca.study_key = pi.study_key
+      WHERE su.role = 2 AND su._fivetran_deleted = false
+      QUALIFY ROW_NUMBER() OVER (PARTITION BY su.study_key ORDER BY su.date_created DESC) = 1) sc ON ca.study_key = sc.study_key
+    LEFT JOIN (SELECT su.study_key, CONCAT(u.first_name, ' ', u.last_name) AS name
+      FROM ${tbl('study_user')} su JOIN ${tbl('user')} u ON su.user_key = u.user_key
+      WHERE su.role = 1 AND su._fivetran_deleted = false
+      QUALIFY ROW_NUMBER() OVER (PARTITION BY su.study_key ORDER BY su.date_created DESC) = 1) sp ON ca.study_key = sp.study_key
     WHERE ca.subject_key IS NOT NULL AND st.is_active = 1 AND st.site_key NOT IN (5547)
       AND ca.start >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 7 DAY)
       AND ca.start <= DATETIME_ADD(CURRENT_DATETIME(), INTERVAL 365 DAY)
@@ -227,11 +219,7 @@ const FEEDS = {
       FORMAT_DATETIME('%Y-%m-%d', aal.date_created) AS cancel_date,
       FORMAT_DATETIME('%Y-%m-%d', COALESCE(aal.old_start, aal.date_created)) AS scheduled_date,
       CAST(aal.subject_key AS STRING) AS subject_key_back_end,
-      COALESCE(
-        NULLIF(TRIM(CONCAT(COALESCE(svs_coord.first_name, ''), ' ', COALESCE(svs_coord.last_name, ''))), ''),
-        NULLIF(TRIM(CONCAT(COALESCE(coord.first_name, ''), ' ', COALESCE(coord.last_name, ''))), ''),
-        TRIM(CONCAT(COALESCE(by_user.first_name, ''), ' ', COALESCE(by_user.last_name, '')))
-      ) AS staff_full_name,
+      COALESCE(sc.name, '') AS staff_full_name,
       COALESCE(aal.cancel_reason, '') AS cancel_reason,
       CASE aal.cancel_type WHEN 1 THEN 'No Show' WHEN 2 THEN 'Site Cancelled' WHEN 3 THEN 'Patient Cancelled' ELSE '' END AS appointment_cancellation_type,
       ${SUBJECT_STATUS_SQL} AS subject_status,
@@ -239,26 +227,23 @@ const FEEDS = {
       CASE aal.appointment_type WHEN 0 THEN 'Regular Visit' WHEN 1 THEN 'Ad Hoc Visit' WHEN 2 THEN 'General Appointment' WHEN 3 THEN 'Block' ELSE '' END AS appointment_type,
       'cancelled' AS appointment_status,
       CAST(aal.calendar_appointment_key AS STRING) AS calendar_appointment_key,
-      COALESCE(
-        NULLIF(TRIM(CONCAT(COALESCE(svs_inv.first_name, ''), ' ', COALESCE(svs_inv.last_name, ''))), ''),
-        pi.name, ''
-      ) AS investigator,
+      COALESCE(sp.name, '') AS investigator,
       FORMAT_DATETIME('%Y-%m-%d', CURRENT_DATETIME()) AS snapshot_date
     FROM ${tbl('appointment_audit_log')} aal
     LEFT JOIN ${tbl('study')} st ON aal.study_key = st.study_key
-    LEFT JOIN (SELECT su.study_key, CONCAT(u.first_name, ' ', u.last_name) AS name
-      FROM ${tbl('study_user')} su JOIN ${tbl('user')} u ON su.user_key = u.user_key
-      WHERE su.role = 1 AND su.is_role_leader = 1 AND su._fivetran_deleted = false) pi ON aal.study_key = pi.study_key
     LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
     LEFT JOIN ${tbl('site')} si ON aal.site_key = si.site_key
     LEFT JOIN ${tbl('subject')} sub ON aal.subject_key = sub.subject_key
     LEFT JOIN ${tbl('study_visit')} sv ON aal.study_visit_key = sv.study_visit_key
     LEFT JOIN ${tbl('calendar_appointment')} ca ON aal.calendar_appointment_key = ca.calendar_appointment_key
-    LEFT JOIN ${tbl('user')} coord ON ca.creator_key = coord.user_key
-    LEFT JOIN ${tbl('user')} by_user ON aal.by_user_key = by_user.user_key
-    LEFT JOIN ${tbl('subject_visit_stats')} svs ON ca.subject_visit_key = svs.subject_visit_key
-    LEFT JOIN ${tbl('user')} svs_coord ON svs.coordinator_user_key = svs_coord.user_key
-    LEFT JOIN ${tbl('user')} svs_inv ON svs.investigator_user_key = svs_inv.user_key
+    LEFT JOIN (SELECT su.study_key, CONCAT(u.first_name, ' ', u.last_name) AS name
+      FROM ${tbl('study_user')} su JOIN ${tbl('user')} u ON su.user_key = u.user_key
+      WHERE su.role = 2 AND su._fivetran_deleted = false
+      QUALIFY ROW_NUMBER() OVER (PARTITION BY su.study_key ORDER BY su.date_created DESC) = 1) sc ON aal.study_key = sc.study_key
+    LEFT JOIN (SELECT su.study_key, CONCAT(u.first_name, ' ', u.last_name) AS name
+      FROM ${tbl('study_user')} su JOIN ${tbl('user')} u ON su.user_key = u.user_key
+      WHERE su.role = 1 AND su._fivetran_deleted = false
+      QUALIFY ROW_NUMBER() OVER (PARTITION BY su.study_key ORDER BY su.date_created DESC) = 1) sp ON aal.study_key = sp.study_key
     WHERE aal.change_type = 4
       AND aal.date_created >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 90 DAY)
       AND st.is_active = 1 AND st.site_key NOT IN (5547)
