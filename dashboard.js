@@ -3870,6 +3870,111 @@ function toggleCoordDayDetail(coordName, date, el) {
   detailDiv.dataset.activeDate = date;
 }
 
+// ═══ ACTION REQUIRED BANNER — fetches pending items from BQ feeds ═══
+var _actionDataLoaded = false;
+function fetchActionRequiredData() {
+  if (_actionDataLoaded || !CRP_CONFIG.USE_CLOUD_FUNCTION || !CRP_CONFIG.CF_BASE) return;
+  _actionDataLoaded = true;
+  var base = CRP_CONFIG.CF_BASE;
+  var _s = function(id, val) { var e = document.getElementById(id); if (e) e.textContent = val; };
+
+  // Fetch all 4 feeds in parallel
+  Promise.all([
+    fetchCSV(base + '?feed=comments&format=csv').catch(function() { return []; }),
+    fetchCSV(base + '?feed=documentSummary&format=csv').catch(function() { return []; }),
+    fetchCSV(base + '?feed=visitTodos&format=csv').catch(function() { return []; }),
+    fetchCSV(base + '?feed=regulatory&format=csv').catch(function() { return []; }),
+  ]).then(function(results) {
+    var comments = results[0] || [];
+    var docSummary = results[1] || [];
+    var todos = results[2] || [];
+    var regulatory = results[3] || [];
+
+    // Open Queries
+    window._actionQueries = comments;
+    _s('ar-queries', comments.length);
+    var oldestDays = comments.length > 0 ? Math.max.apply(null, comments.map(function(r) { return parseInt(r.days_outstanding) || 0; })) : 0;
+    _s('ar-queries-sub', comments.length > 0 ? 'Oldest: ' + oldestDays + 'd' : 'None pending');
+
+    // Unsigned Docs
+    var unsignedTotal = docSummary.reduce(function(s, r) { return s + (parseInt(r.active) || 0) + (parseInt(r.assigned) || 0) + (parseInt(r.incoming) || 0); }, 0);
+    var unsignedStudies = docSummary.filter(function(r) { return (parseInt(r.active) || 0) + (parseInt(r.assigned) || 0) + (parseInt(r.incoming) || 0) > 0; }).length;
+    window._actionDocs = docSummary;
+    _s('ar-docs', unsignedTotal);
+    _s('ar-docs-sub', unsignedStudies > 0 ? unsignedStudies + ' studies' : 'All signed');
+
+    // Overdue Todos
+    var overdue = todos.filter(function(r) { return r.status === 'Overdue'; });
+    var immediate = todos.filter(function(r) { return r.status === 'Immediate'; });
+    window._actionTodos = todos;
+    _s('ar-todos', overdue.length);
+    _s('ar-todos-sub', immediate.length > 0 ? '+' + immediate.length + ' immediate' : overdue.length > 0 ? 'Need action' : 'All clear');
+
+    // Training Gaps
+    var missingTotal = regulatory.reduce(function(s, r) { return s + (parseInt(r.trainings_missing) || 0); }, 0);
+    var gapStudies = regulatory.filter(function(r) { return (parseInt(r.trainings_missing) || 0) > 0; }).length;
+    window._actionTraining = regulatory;
+    _s('ar-training', missingTotal);
+    _s('ar-training-sub', gapStudies > 0 ? gapStudies + ' studies' : 'All compliant');
+
+    _log('Action Required: queries=' + comments.length + ', unsignedDocs=' + unsignedTotal + ', overdueTodos=' + overdue.length + ', trainingGaps=' + missingTotal);
+  }).catch(function(e) {
+    console.warn('Action Required fetch failed:', e);
+  });
+}
+
+function showActionModal(type) {
+  var title, body;
+  if (type === 'queries') {
+    var rows = window._actionQueries || [];
+    title = 'Open Queries (' + rows.length + ')';
+    body = '<table class="detail-table"><thead><tr><th>Study</th><th>Type</th><th>Message</th><th>Created By</th><th>Date</th><th>Days</th></tr></thead><tbody>' +
+      rows.slice(0, 100).map(function(r) {
+        return '<tr><td style="font-size:11px">' + escapeHTML(r.study_name||'') + '</td><td>' + escapeHTML(r.comment_type||'') + '</td>' +
+          '<td style="font-size:11px;max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHTML(r.message||'') + '">' + escapeHTML((r.message||'').substring(0,80)) + '</td>' +
+          '<td style="font-size:11px">' + escapeHTML(r.created_by||'') + '</td><td style="white-space:nowrap">' + escapeHTML(r.date_created||'') + '</td>' +
+          '<td style="font-weight:700;color:' + (parseInt(r.days_outstanding)>90?'#dc2626':parseInt(r.days_outstanding)>30?'#d97706':'#059669') + '">' + (r.days_outstanding||'') + '</td></tr>';
+      }).join('') + '</tbody></table>';
+  } else if (type === 'docs') {
+    var rows = window._actionDocs || [];
+    title = 'Document Completion by Study';
+    body = '<table class="detail-table"><thead><tr><th>Study</th><th>Total</th><th>Signed</th><th>Active</th><th>Assigned</th><th>Incoming</th><th>Completion</th></tr></thead><tbody>' +
+      rows.filter(function(r) { return (parseInt(r.active)||0) + (parseInt(r.assigned)||0) + (parseInt(r.incoming)||0) > 0; }).map(function(r) {
+        var pct = parseFloat(r.completion_pct) || 0;
+        return '<tr><td style="font-size:11px">' + escapeHTML(r.study_name||'') + '</td><td class="r">' + (r.total_documents||0) + '</td>' +
+          '<td class="r">' + (r.signed||0) + '</td><td class="r" style="color:#d97706;font-weight:700">' + (r.active||0) + '</td>' +
+          '<td class="r" style="color:#dc2626;font-weight:700">' + (r.assigned||0) + '</td><td class="r">' + (r.incoming||0) + '</td>' +
+          '<td class="r"><span style="color:' + (pct>=95?'#059669':pct>=80?'#d97706':'#dc2626') + ';font-weight:700">' + pct + '%</span></td></tr>';
+      }).join('') + '</tbody></table>';
+  } else if (type === 'todos') {
+    var rows = window._actionTodos || [];
+    title = 'Visit Todos (' + rows.length + ')';
+    body = '<table class="detail-table"><thead><tr><th>Study</th><th>Todo</th><th>Status</th><th>Due</th><th>Created By</th><th>Visit</th></tr></thead><tbody>' +
+      rows.slice(0, 100).map(function(r) {
+        var isOverdue = r.status === 'Overdue';
+        return '<tr style="' + (isOverdue?'background:#fef2f2':'') + '"><td style="font-size:11px">' + escapeHTML(r.study_name||'') + '</td>' +
+          '<td style="font-size:11px">' + escapeHTML(r.todo_name||'') + '</td>' +
+          '<td><span style="font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px;background:' + (isOverdue?'#fef2f2':'#fffbeb') + ';color:' + (isOverdue?'#dc2626':'#d97706') + '">' + escapeHTML(r.status||'') + '</span></td>' +
+          '<td style="white-space:nowrap;color:' + (isOverdue?'#dc2626':'') + '">' + escapeHTML(r.due_date||'') + '</td>' +
+          '<td style="font-size:11px">' + escapeHTML(r.created_by||'') + '</td>' +
+          '<td style="font-size:11px">' + escapeHTML(r.visit_name||'') + '</td></tr>';
+      }).join('') + '</tbody></table>';
+  } else if (type === 'training') {
+    var rows = (window._actionTraining || []).filter(function(r) { return (parseInt(r.trainings_missing)||0) > 0 || (parseInt(r.duties_pending)||0) > 0; });
+    title = 'Regulatory Compliance Gaps';
+    body = '<table class="detail-table"><thead><tr><th>Study</th><th>Missing Trainings</th><th>Pending Duties</th><th>Expired</th><th>Total Trainings</th><th>Active Duties</th></tr></thead><tbody>' +
+      rows.map(function(r) {
+        return '<tr><td style="font-size:11px">' + escapeHTML(r.study_name||'') + '</td>' +
+          '<td class="r" style="color:#dc2626;font-weight:700">' + (r.trainings_missing||0) + '</td>' +
+          '<td class="r" style="color:#d97706;font-weight:700">' + (r.duties_pending||0) + '</td>' +
+          '<td class="r">' + (r.trainings_expired||0) + '</td>' +
+          '<td class="r">' + (r.total_trainings||0) + '</td>' +
+          '<td class="r">' + (r.duties_active||0) + '</td></tr>';
+      }).join('') + '</tbody></table>';
+  }
+  openModal(title, '', body || '<div style="padding:20px;color:#94a3b8">No data available</div>');
+}
+
 function buildInsights() {
   const flags    = DATA.riskFlags || [];
   const cancels  = DATA.cancelByStudy || [];
@@ -13024,6 +13129,8 @@ async function _crpInit() {
 
     // ── Phase 3: Supplemental data (Patient DB + Facebook CRM — lowest priority) ──
     _log('CRP: Phase 3 — loading supplemental data...');
+    // Action Required banner — fetch pending items for Overview
+    if (typeof fetchActionRequiredData === 'function') fetchActionRequiredData();
     fetchPatientDB().then(ok => {
       if (ok) {
         _log('CRP: Patient DB cross-reference complete');
