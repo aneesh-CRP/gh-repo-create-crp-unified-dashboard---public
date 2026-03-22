@@ -132,6 +132,16 @@ const STUDY_NAME_SQL = `CASE
 
 const SUBJECT_NAME_SQL = `REGEXP_REPLACE(TRIM(CONCAT(COALESCE(sub.first_name, ''), ' ', COALESCE(sub.middle_name, ''), ' ', COALESCE(sub.last_name, ''))), r'\\s+', ' ')`;
 
+// Reusable filter: exclude test/config/event studies from all feeds
+const STUDY_FILTER_SQL = `AND LOWER(CONCAT(COALESCE(st.nickname, ''), ' ', COALESCE(st.protocol_number, ''))) NOT LIKE '%test%'
+      AND LOWER(CONCAT(COALESCE(st.nickname, ''), ' ', COALESCE(st.protocol_number, ''))) NOT LIKE '%demo%'
+      AND LOWER(CONCAT(COALESCE(st.nickname, ''), ' ', COALESCE(st.protocol_number, ''))) NOT LIKE '%sandbox%'
+      AND LOWER(CONCAT(COALESCE(st.nickname, ''), ' ', COALESCE(st.protocol_number, ''))) NOT LIKE '%config study%'
+      AND LOWER(CONCAT(COALESCE(st.nickname, ''), ' ', COALESCE(st.protocol_number, ''))) NOT LIKE '%covid_flu_rsv%'
+      AND LOWER(COALESCE(st.protocol_number, '')) NOT IN ('event')
+      AND LOWER(CONCAT(COALESCE(st.nickname, ''), ' ', COALESCE(st.protocol_number, ''))) NOT LIKE '%pre-screen%'
+      AND st.status != 0`;
+
 const SUBJECT_STATUS_SQL = `CASE sub.status
   WHEN -2 THEN 'Not Interested' WHEN -1 THEN 'Not Eligible'
   WHEN 1 THEN 'Interested' WHEN 2 THEN 'Prequalified'
@@ -193,9 +203,7 @@ const FEEDS = {
     WHERE ca.subject_key IS NOT NULL AND st.is_active = 1 AND st.site_key NOT IN (5547)
       AND ca.start >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 7 DAY)
       AND ca.start <= DATETIME_ADD(CURRENT_DATETIME(), INTERVAL 365 DAY)
-      AND LOWER(COALESCE(st.nickname, st.protocol_number, '')) NOT LIKE '%test%'
-      AND LOWER(COALESCE(st.nickname, st.protocol_number, '')) NOT LIKE '%demo%'
-      AND LOWER(COALESCE(st.nickname, st.protocol_number, '')) NOT LIKE '%sandbox%'
+      ${STUDY_FILTER_SQL}
     ORDER BY ca.start ASC`,
     headers: {
       study_name: 'Study Name', study_key: 'Study Key', scheduled_date: 'Scheduled Date',
@@ -307,6 +315,7 @@ const FEEDS = {
     LEFT JOIN sub_counts sc ON st.study_key = sc.study_key
     LEFT JOIN ${tbl('study_finance')} sf ON st.study_key = sf.study_key
     WHERE st._fivetran_deleted = false AND st.is_active = 1 AND st.site_key NOT IN (5547)
+      ${STUDY_FILTER_SQL}
     ORDER BY st.study_key`
   },
 
@@ -349,6 +358,7 @@ const FEEDS = {
     LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
     LEFT JOIN ${tbl('clinical_trial')} ct ON st.clinical_trial_key = ct.clinical_trial_key
     WHERE st._fivetran_deleted = false AND st.is_active = 1 AND st.site_key NOT IN (5547)
+      ${STUDY_FILTER_SQL}
     ORDER BY st.study_key`,
     headers: {
       study_key: 'Study Key (Back End)', study_name: 'Study Name', phase: 'Phase',
