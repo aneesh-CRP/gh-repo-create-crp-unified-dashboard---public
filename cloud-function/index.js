@@ -843,6 +843,7 @@ const FEEDS = {
       CONCAT(COALESCE(cu.first_name, ''), ' ', COALESCE(cu.last_name, '')) AS created_by,
       CONCAT(COALESCE(comp_u.first_name, ''), ' ', COALESCE(comp_u.last_name, '')) AS completed_by,
       CAST(vt.subject_key AS STRING) AS subject_key,
+      COALESCE(NULLIF(TRIM(CONCAT(COALESCE(sub.first_name,''),' ',COALESCE(sub.last_name,''))), ''), CAST(vt.subject_key AS STRING)) AS subject_name,
       COALESCE(sv.name, '') AS visit_name
     FROM ${tbl('subject_visit_todo')} vt
     JOIN ${tbl('study')} st ON vt.study_key = st.study_key
@@ -850,6 +851,7 @@ const FEEDS = {
     LEFT JOIN ${tbl('study_visit')} sv ON vt.study_visit_key = sv.study_visit_key
     LEFT JOIN ${tbl('user')} cu ON vt.created_by_user_key = cu.user_key
     LEFT JOIN ${tbl('user')} comp_u ON vt.completed_by_user_key = comp_u.user_key
+    LEFT JOIN ${tbl('subject')} sub ON vt.subject_key = sub.subject_key
     WHERE vt._fivetran_deleted = false AND st.is_active = 1 AND st.site_key NOT IN (5547)
       AND vt.status IN (2, 3, 4)
     ORDER BY CASE vt.status WHEN 4 THEN 0 WHEN 3 THEN 1 ELSE 2 END, vt.due_date ASC`
@@ -1156,12 +1158,15 @@ const FEEDS = {
       CASE WHEN c.is_resolved = 1 THEN 'Resolved' ELSE 'Open' END AS status,
       c.message,
       CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) AS created_by,
+      COALESCE(NULLIF(TRIM(CONCAT(COALESCE(sub.first_name,''),' ',COALESCE(sub.last_name,''))), ''), CAST(c.subject_key AS STRING)) AS subject_name,
+      CAST(c.subject_key AS STRING) AS subject_key,
       FORMAT_DATETIME('%Y-%m-%d', c.date_created) AS date_created,
       DATE_DIFF(CURRENT_DATE(), DATE(c.date_created), DAY) AS days_outstanding
     FROM ${tbl('comment')} c
     JOIN ${tbl('study')} st ON c.study_key = st.study_key
     LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
     LEFT JOIN ${tbl('user')} u ON c.user_key = u.user_key
+    LEFT JOIN ${tbl('subject')} sub ON c.subject_key = sub.subject_key
     WHERE c._fivetran_deleted = false AND st.is_active = 1 AND st.site_key NOT IN (5547)
       AND c.is_resolved = 0
     ORDER BY c.date_created ASC`

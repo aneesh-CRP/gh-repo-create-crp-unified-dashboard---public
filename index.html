@@ -6053,7 +6053,7 @@ function showActionModal(type) {
         var studyUrl = _crioStudyUrl(r.study_key);
         var subUrl = _crioSubjectUrl(r.study_key, r.subject_key);
         return '<tr><td style="font-size:11px">' + _crioLink(r.study_name||'', studyUrl) + '</td>' +
-          '<td style="font-size:11px">' + (r.subject_key ? _crioLink(r.subject_key, subUrl) : '—') + '</td>' +
+          '<td style="font-size:11px">' + (r.subject_key ? _crioLink(r.subject_name||r.subject_key, subUrl) : '—') + '</td>' +
           '<td>' + escapeHTML(r.comment_type||'') + '</td>' +
           '<td style="font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHTML(r.message||'') + '">' + escapeHTML((r.message||'').substring(0,60)) + '</td>' +
           '<td style="font-size:11px">' + escapeHTML(r.created_by||'') + '</td>' +
@@ -6080,7 +6080,7 @@ function showActionModal(type) {
         var studyUrl = _crioStudyUrl(r.study_key);
         var subUrl = _crioSubjectUrl(r.study_key, r.subject_key);
         return '<tr style="' + (isOverdue?'background:#fef2f2':'') + '"><td style="font-size:11px">' + _crioLink(r.study_name||'', studyUrl) + '</td>' +
-          '<td style="font-size:11px">' + (r.subject_key ? _crioLink(r.subject_key, subUrl) : '—') + '</td>' +
+          '<td style="font-size:11px">' + (r.subject_key ? _crioLink(r.subject_name||r.subject_key, subUrl) : '—') + '</td>' +
           '<td style="font-size:11px">' + escapeHTML(r.todo_name||'') + '</td>' +
           '<td><span style="font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px;background:' + (isOverdue?'#fef2f2':'#fffbeb') + ';color:' + (isOverdue?'#dc2626':'#d97706') + '">' + escapeHTML(r.status||'') + '</span></td>' +
           '<td style="white-space:nowrap;color:' + (isOverdue?'#dc2626':'') + '">' + escapeHTML(r.due_date||'') + '</td>' +
