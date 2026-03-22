@@ -198,7 +198,7 @@ const FEEDS = {
     LEFT JOIN (SELECT su.study_key, CONCAT(u.first_name, ' ', u.last_name) AS name
       FROM ${tbl('study_user')} su JOIN ${tbl('user')} u ON su.user_key = u.user_key
       WHERE su.role = 1 AND su.is_role_leader = 1 AND su._fivetran_deleted = false) pi ON ca.study_key = pi.study_key
-    WHERE ca.subject_key IS NOT NULL AND st.is_active = 1
+    WHERE ca.subject_key IS NOT NULL AND st.is_active = 1 AND st.site_key NOT IN (5547)
       AND ca.start >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 7 DAY)
       AND ca.start <= DATETIME_ADD(CURRENT_DATETIME(), INTERVAL 365 DAY)
       AND LOWER(COALESCE(st.nickname, st.protocol_number, '')) NOT LIKE '%test%'
@@ -261,7 +261,7 @@ const FEEDS = {
     LEFT JOIN ${tbl('user')} svs_inv ON svs.investigator_user_key = svs_inv.user_key
     WHERE aal.change_type = 4
       AND aal.date_created >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 90 DAY)
-      AND st.is_active = 1
+      AND st.is_active = 1 AND st.site_key NOT IN (5547)
     ORDER BY aal.date_created DESC`,
     headers: {
       subject_full_name: 'Subject Full Name', study_name: 'Study Name', study_key: 'Study Key',
@@ -321,7 +321,7 @@ const FEEDS = {
     LEFT JOIN pi_leaders pi ON st.study_key = pi.study_key
     LEFT JOIN sub_counts sc ON st.study_key = sc.study_key
     LEFT JOIN ${tbl('study_finance')} sf ON st.study_key = sf.study_key
-    WHERE st._fivetran_deleted = false AND st.is_active = 1
+    WHERE st._fivetran_deleted = false AND st.is_active = 1 AND st.site_key NOT IN (5547)
     ORDER BY st.study_key`
   },
 
@@ -334,7 +334,7 @@ const FEEDS = {
       ${SUBJECT_STATUS_SQL} AS status
     FROM ${tbl('subject')} sub
     JOIN ${tbl('study')} st ON sub.study_key = st.study_key
-    WHERE sub._fivetran_deleted = false AND st.is_active = 1
+    WHERE sub._fivetran_deleted = false AND st.is_active = 1 AND st.site_key NOT IN (5547)
     ORDER BY sub.study_key, sub.subject_key`
   },
 
@@ -363,7 +363,7 @@ const FEEDS = {
     LEFT JOIN ${tbl('study_details')} sd ON st.study_key = sd.study_key
     LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
     LEFT JOIN ${tbl('clinical_trial')} ct ON st.clinical_trial_key = ct.clinical_trial_key
-    WHERE st._fivetran_deleted = false AND st.is_active = 1
+    WHERE st._fivetran_deleted = false AND st.is_active = 1 AND st.site_key NOT IN (5547)
     ORDER BY st.study_key`,
     headers: {
       study_key: 'Study Key (Back End)', study_name: 'Study Name', phase: 'Phase',
@@ -410,7 +410,7 @@ const FEEDS = {
     LEFT JOIN ${tbl('user')} by_u ON aal.by_user_key = by_u.user_key
     LEFT JOIN ${tbl('calendar_appointment')} ca ON aal.calendar_appointment_key = ca.calendar_appointment_key
     LEFT JOIN ${tbl('user')} coord ON ca.creator_key = coord.user_key
-    WHERE aal.date_created >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 90 DAY) AND st.is_active = 1
+    WHERE aal.date_created >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 90 DAY) AND st.is_active = 1 AND st.site_key NOT IN (5547)
     ORDER BY aal.date_created DESC`,
     headers: {
       site_name: 'Site Name', study_key: 'Study Key (Back End)', study_name: 'Study Name',
@@ -502,7 +502,7 @@ const FEEDS = {
     FROM ${tbl('subject')} sub
     JOIN ${tbl('study')} st ON sub.study_key = st.study_key
     LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
-    WHERE sub._fivetran_deleted = false AND st.is_active = 1
+    WHERE sub._fivetran_deleted = false AND st.is_active = 1 AND st.site_key NOT IN (5547)
     GROUP BY sub.study_key, study_name
     HAVING total_subjects > 0
     ORDER BY enrolled DESC`
@@ -577,7 +577,7 @@ const FEEDS = {
     JOIN ${tbl('study')} st ON sv.study_key = st.study_key
     LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
     WHERE sv.subject_visit_appointment_end >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 90 DAY)
-      AND st.is_active = 1
+      AND st.is_active = 1 AND st.site_key NOT IN (5547)
     ORDER BY sv.subject_visit_appointment_end DESC`
   },
 
@@ -754,7 +754,7 @@ const FEEDS = {
     FROM ${tbl('study_finance')} sf
     JOIN ${tbl('study')} st ON sf.study_key = st.study_key
     LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
-    WHERE sf.total_revenue > 0 AND st.is_active = 1
+    WHERE sf.total_revenue > 0 AND st.is_active = 1 AND st.site_key NOT IN (5547)
     ORDER BY rev_per_subject DESC`
   },
 
@@ -853,7 +853,7 @@ const FEEDS = {
     LEFT JOIN ${tbl('study_visit')} sv ON vt.study_visit_key = sv.study_visit_key
     LEFT JOIN ${tbl('user')} cu ON vt.created_by_user_key = cu.user_key
     LEFT JOIN ${tbl('user')} comp_u ON vt.completed_by_user_key = comp_u.user_key
-    WHERE vt._fivetran_deleted = false AND st.is_active = 1
+    WHERE vt._fivetran_deleted = false AND st.is_active = 1 AND st.site_key NOT IN (5547)
       AND vt.status IN (2, 3, 4)
     ORDER BY CASE vt.status WHEN 4 THEN 0 WHEN 3 THEN 1 ELSE 2 END, vt.due_date ASC`
   },
@@ -1165,7 +1165,7 @@ const FEEDS = {
     JOIN ${tbl('study')} st ON c.study_key = st.study_key
     LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
     LEFT JOIN ${tbl('user')} u ON c.user_key = u.user_key
-    WHERE c._fivetran_deleted = false AND st.is_active = 1
+    WHERE c._fivetran_deleted = false AND st.is_active = 1 AND st.site_key NOT IN (5547)
       AND c.is_resolved = 0
     ORDER BY c.date_created ASC`
   },
@@ -1225,7 +1225,7 @@ const FEEDS = {
     LEFT JOIN ${tbl('user')} owner ON sd.owner_user_key = owner.user_key
     LEFT JOIN ${tbl('user')} assigned ON sd.assigned_user_key = assigned.user_key
     LEFT JOIN ${tbl('user')} signer ON sd.signed_by_user_key = signer.user_key
-    WHERE sd._fivetran_deleted = false AND st.is_active = 1
+    WHERE sd._fivetran_deleted = false AND st.is_active = 1 AND st.site_key NOT IN (5547)
       AND sd.status NOT IN (-1)
     ORDER BY sd.date_created DESC`
   },
@@ -1286,7 +1286,7 @@ const FEEDS = {
       LEFT JOIN ${tbl('study_visit')} sv ON svi.study_visit_key = sv.study_visit_key
       WHERE q.date_completed >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL ${days} DAY)
         AND q.answer IS NOT NULL AND q.answer != ''
-        AND st.is_active = 1
+        AND st.is_active = 1 AND st.site_key NOT IN (5547)
         AND q.first_name IS NOT NULL
       GROUP BY q.study_key, study_name, q.subject_visit_key, visit_name, q.subject_key, answered_by
       ORDER BY questions_answered DESC`;
@@ -1515,7 +1515,7 @@ const FEEDS = {
     FROM ${tbl('subject_document')} sd
     JOIN ${tbl('study')} st ON sd.study_key = st.study_key
     LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
-    WHERE sd._fivetran_deleted = false AND st.is_active = 1
+    WHERE sd._fivetran_deleted = false AND st.is_active = 1 AND st.site_key NOT IN (5547)
       AND sd.status != -1
     GROUP BY sd.study_key, study_name
     HAVING total_documents > 0
