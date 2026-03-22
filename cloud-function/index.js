@@ -1190,6 +1190,138 @@ const FEEDS = {
     WHERE st.is_active = 1
     ORDER BY ic.date_signed DESC`
   },
+
+  // ── 36. Source Document Status (per subject per visit) ──
+  sourceDocuments: {
+    query: () => `SELECT
+      CAST(sd.study_key AS STRING) AS study_key,
+      ${STUDY_NAME_SQL} AS study_name,
+      CAST(sd.subject_key AS STRING) AS subject_key,
+      ${SUBJECT_NAME_SQL} AS subject_name,
+      COALESCE(sv.name, '') AS visit_name,
+      COALESCE(dt.name, '') AS document_type,
+      COALESCE(dc.name, '') AS document_category,
+      CASE sd.status WHEN -1 THEN 'Deleted' WHEN 0 THEN 'Updated' WHEN 1 THEN 'Active' WHEN 2 THEN 'Incoming' WHEN 3 THEN 'Assigned' WHEN 4 THEN 'Rejected' WHEN 6 THEN 'Completed' WHEN 10 THEN 'Signed' ELSE CAST(sd.status AS STRING) END AS status,
+      FORMAT_DATETIME('%Y-%m-%d', sd.uploaded_date) AS uploaded_date,
+      FORMAT_DATETIME('%Y-%m-%d', sd.signed_date) AS signed_date,
+      FORMAT_DATETIME('%Y-%m-%d', sd.assigned_date) AS assigned_date,
+      FORMAT_DATETIME('%Y-%m-%d', sd.date_created) AS date_created,
+      CONCAT(COALESCE(owner.first_name, ''), ' ', COALESCE(owner.last_name, '')) AS owner,
+      CONCAT(COALESCE(assigned.first_name, ''), ' ', COALESCE(assigned.last_name, '')) AS assigned_to,
+      CONCAT(COALESCE(signer.first_name, ''), ' ', COALESCE(signer.last_name, '')) AS signed_by,
+      CASE WHEN sd.is_redacted = 1 THEN 'Yes' ELSE 'No' END AS redacted,
+      CASE WHEN sd.has_draft = 1 THEN 'Yes' ELSE 'No' END AS has_draft,
+      sd.file_size,
+      COALESCE(sd.custom_name, '') AS custom_name,
+      COALESCE(si.name, '') AS site_name
+    FROM ${tbl('subject_document')} sd
+    JOIN ${tbl('study')} st ON sd.study_key = st.study_key
+    LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
+    LEFT JOIN ${tbl('subject')} sub ON sd.subject_key = sub.subject_key
+    LEFT JOIN ${tbl('study_visit')} sv ON sd.study_visit_key = sv.study_visit_key
+    LEFT JOIN ${tbl('document_type')} dt ON sd.document_type_key = dt.document_type_key
+    LEFT JOIN ${tbl('document_category')} dc ON sd.document_category_key = dc.document_category_key
+    LEFT JOIN ${tbl('site')} si ON sd.site_key = si.site_key
+    LEFT JOIN ${tbl('user')} owner ON sd.owner_user_key = owner.user_key
+    LEFT JOIN ${tbl('user')} assigned ON sd.assigned_user_key = assigned.user_key
+    LEFT JOIN ${tbl('user')} signer ON sd.signed_by_user_key = signer.user_key
+    WHERE sd._fivetran_deleted = false AND st.is_active = 1
+      AND sd.status NOT IN (-1)
+    ORDER BY sd.date_created DESC`
+  },
+
+  // ── 37. Revenue per Procedure per Visit per Subject ──
+  visitProcedureRevenue: {
+    query: (params) => {
+      const days = parseInt(params.days) || 365;
+      return `SELECT
+        CAST(svpr.study_key AS STRING) AS study_key,
+        ${STUDY_NAME_SQL} AS study_name,
+        CAST(svpr.subject_key AS STRING) AS subject_key,
+        ${SUBJECT_NAME_SQL} AS subject_name,
+        COALESCE(sv.name, '') AS visit_name,
+        COALESCE(sp.name, '') AS procedure_name,
+        ROUND(CAST(svpr.revenue AS FLOAT64), 2) AS revenue,
+        ROUND(CAST(svpr.holdback AS FLOAT64), 2) AS holdback,
+        ROUND(CAST(svpr.receivable AS FLOAT64), 2) AS receivable,
+        CASE WHEN svpr.requires_invoice = 1 THEN 'Invoice' ELSE 'Autopay' END AS pay_type,
+        CASE WHEN svpr.is_screen_fail = 1 THEN 'Yes' ELSE 'No' END AS screen_fail,
+        CASE WHEN svpr.is_locked = 1 THEN 'Locked' ELSE 'Open' END AS lock_status,
+        FORMAT_DATETIME('%Y-%m-%d', svpr.date_completed) AS date_completed,
+        FORMAT_DATETIME('%Y-%m-%d', svpr.initial_date_completed) AS initial_date_completed,
+        COALESCE(si.name, '') AS site_name
+      FROM ${tbl('subject_visit_procedure_revenue')} svpr
+      JOIN ${tbl('study')} st ON svpr.study_key = st.study_key
+      LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
+      LEFT JOIN ${tbl('subject')} sub ON svpr.subject_key = sub.subject_key
+      LEFT JOIN ${tbl('subject_visit')} svi ON svpr.subject_visit_key = svi.subject_visit_key
+      LEFT JOIN ${tbl('study_visit')} sv ON svi.study_visit_key = sv.study_visit_key
+      LEFT JOIN ${tbl('study_procedure')} sp ON svpr.study_procedure_key = sp.study_procedure_key
+      LEFT JOIN ${tbl('site')} si ON svpr.site_key = si.site_key
+      WHERE st.is_active = 1 AND svpr.is_active = 1
+        AND svpr.date_completed >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL ${days} DAY)
+      ORDER BY svpr.date_completed DESC`;
+    }
+  },
+
+  // ── 38. eSource Completion — who answered the most questions per visit ──
+  esourceByUser: {
+    query: (params) => {
+      const days = parseInt(params.days) || 90;
+      return `SELECT
+        CAST(q.study_key AS STRING) AS study_key,
+        COALESCE(st.nickname, st.protocol_number, '') AS study_name,
+        CAST(q.subject_visit_key AS STRING) AS subject_visit_key,
+        COALESCE(sv.name, '') AS visit_name,
+        CAST(q.subject_key AS STRING) AS subject_key,
+        TRIM(CONCAT(COALESCE(q.first_name, ''), ' ', COALESCE(q.last_name, ''))) AS answered_by,
+        COUNT(*) AS questions_answered,
+        COUNT(DISTINCT q.study_procedure_key) AS procedures_touched,
+        MIN(FORMAT_DATETIME('%Y-%m-%d', q.date_completed)) AS first_answer,
+        MAX(FORMAT_DATETIME('%Y-%m-%d', q.date_completed)) AS last_answer,
+        COUNTIF(q.is_completed_outside_crio = 1) AS outside_crio
+      FROM ${tbl('fact_subject_visit_procedure_question')} q
+      JOIN ${tbl('study')} st ON q.study_key = st.study_key
+      LEFT JOIN ${tbl('subject_visit')} svi ON q.subject_visit_key = svi.subject_visit_key
+      LEFT JOIN ${tbl('study_visit')} sv ON svi.study_visit_key = sv.study_visit_key
+      WHERE q.date_completed >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL ${days} DAY)
+        AND q.answer IS NOT NULL AND q.answer != ''
+        AND st.is_active = 1
+        AND q.first_name IS NOT NULL
+      GROUP BY q.study_key, study_name, q.subject_visit_key, visit_name, q.subject_key, answered_by
+      ORDER BY questions_answered DESC`;
+    }
+  },
+
+  // ── 39. Document Completion Summary (aggregate per study) ──
+  documentSummary: {
+    query: () => `SELECT
+      CAST(sd.study_key AS STRING) AS study_key,
+      ${STUDY_NAME_SQL} AS study_name,
+      COUNT(*) AS total_documents,
+      COUNTIF(sd.status = 10) AS signed,
+      COUNTIF(sd.status = 6) AS completed,
+      COUNTIF(sd.status = 1) AS active,
+      COUNTIF(sd.status = 3) AS assigned,
+      COUNTIF(sd.status = 2) AS incoming,
+      COUNTIF(sd.status = 4) AS rejected,
+      COUNTIF(sd.status = 0) AS updated,
+      COUNTIF(sd.signed_date IS NOT NULL) AS has_signature,
+      COUNTIF(sd.uploaded_date IS NOT NULL) AS has_upload,
+      COUNTIF(sd.has_draft = 1) AS drafts,
+      COUNTIF(sd.is_redacted = 1) AS redacted,
+      COUNT(DISTINCT sd.subject_key) AS subjects_with_docs,
+      COUNT(DISTINCT sd.document_type_key) AS doc_types_used,
+      ROUND(SAFE_DIVIDE(COUNTIF(sd.status IN (6, 10)), COUNT(*)) * 100, 1) AS completion_pct
+    FROM ${tbl('subject_document')} sd
+    JOIN ${tbl('study')} st ON sd.study_key = st.study_key
+    LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
+    WHERE sd._fivetran_deleted = false AND st.is_active = 1
+      AND sd.status != -1
+    GROUP BY sd.study_key, study_name
+    HAVING total_documents > 0
+    ORDER BY total_documents DESC`
+  },
 };
 
 // ═══════════════════════════════════════════════════════════
