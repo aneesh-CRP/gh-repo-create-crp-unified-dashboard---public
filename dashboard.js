@@ -7716,7 +7716,7 @@ function renderAll() {
   var reschSub = reschEl ? reschEl.parentElement.querySelector('.tb-sub') : null;
   if (reschSub) {
     var pending = (DATA.pendingReschedules||[]).length;
-    reschSub.textContent = pending ? pending + ' still need new date' : 'Cancelled but rebooked';
+    reschSub.textContent = pending ? pending + ' pending' : 'Rebooked';
   }
   document.getElementById('kpi-upcoming').textContent = DATA.upcomingTotal || 0;
   document.getElementById('kpi-next14').textContent   = DATA.next14        || 0;
@@ -7733,11 +7733,9 @@ function renderAll() {
     var past = new Date(now); past.setMonth(past.getMonth() - 2);
     var future = new Date(now); future.setMonth(future.getMonth() + 2);
     var cancelRange = document.getElementById('kpi-cancel-range');
-    if (cancelRange) cancelRange.textContent = 'Clinical visit cancellations · ' + fmt(past) + ' – ' + fmt(now);
-    var todayDiv = document.getElementById('kpi-today-divider');
-    if (todayDiv) todayDiv.innerHTML = 'TODAY<br>' + fmt(now);
+    if (cancelRange) cancelRange.textContent = fmt(past) + ' – ' + fmt(now);
     var upRange = document.getElementById('kpi-upcoming-range');
-    if (upRange) upRange.textContent = 'Scheduled visits · through ' + fmt(future);
+    if (upRange) upRange.textContent = 'Through ' + fmt(future);
   })();
 
   safe(buildHorizon,         'buildHorizon');

@@ -460,28 +460,8 @@ body {
 .risk-bar { height: 100%; border-radius: 3px; }
 
 /* ── HORIZON VIEW ─────────────────────────── */
-.horizon-grid {
-  display: grid; grid-template-columns: repeat(8, 1fr);
-  gap: 3px; margin-bottom: 8px;
-}
-.horizon-week {
-  padding: 6px 4px; border-radius: 6px; text-align: center;
-  font-size: 10px; cursor: pointer; transition: transform 0.1s;
-  border: 1px solid transparent;
-}
-.horizon-week:hover { transform: translateY(-2px); }
-.horizon-week .hw-date { color: var(--muted); margin-bottom: 3px; }
-.horizon-week .hw-count { font-size: 14px; font-weight: 700; }
-.horizon-week .hw-type { font-size: 9px; }
-.hw-past { background: #fef2f2; border-color: #fecaca; }
-.hw-past .hw-count { color: var(--red); }
-.hw-future { background: #eff6ff; border-color: #bfdbfe; }
-.hw-future .hw-count { color: var(--blue); }
-.hw-today { background: var(--green-bg); border-color: var(--green-border); }
-.hw-today .hw-count { color: var(--green); }
-.horizon-legend { display: flex; gap: 16px; font-size: 11px; color: var(--muted); }
-.hleg { display: flex; align-items: center; gap: 5px; }
-.hleg-dot { width: 10px; height: 10px; border-radius: 2px; }
+/* horizon-grid old CSS removed — now uses time-banner + tb-section classes */
+/* old horizon CSS removed */
 
 /* ── INSIGHTS ─────────────────────────────── */
 .insight-list { display: flex; flex-direction: column; gap: 10px; min-height: 40px; }
@@ -9808,7 +9788,7 @@ function renderAll() {
   var reschSub = reschEl ? reschEl.parentElement.querySelector('.tb-sub') : null;
   if (reschSub) {
     var pending = (DATA.pendingReschedules||[]).length;
-    reschSub.textContent = pending ? pending + ' still need new date' : 'Cancelled but rebooked';
+    reschSub.textContent = pending ? pending + ' pending' : 'Rebooked';
   }
   document.getElementById('kpi-upcoming').textContent = DATA.upcomingTotal || 0;
   document.getElementById('kpi-next14').textContent   = DATA.next14        || 0;
@@ -9825,11 +9805,9 @@ function renderAll() {
     var past = new Date(now); past.setMonth(past.getMonth() - 2);
     var future = new Date(now); future.setMonth(future.getMonth() + 2);
     var cancelRange = document.getElementById('kpi-cancel-range');
-    if (cancelRange) cancelRange.textContent = 'Clinical visit cancellations · ' + fmt(past) + ' – ' + fmt(now);
-    var todayDiv = document.getElementById('kpi-today-divider');
-    if (todayDiv) todayDiv.innerHTML = 'TODAY<br>' + fmt(now);
+    if (cancelRange) cancelRange.textContent = fmt(past) + ' – ' + fmt(now);
     var upRange = document.getElementById('kpi-upcoming-range');
-    if (upRange) upRange.textContent = 'Scheduled visits · through ' + fmt(future);
+    if (upRange) upRange.textContent = 'Through ' + fmt(future);
   })();
 
   safe(buildHorizon,         'buildHorizon');
