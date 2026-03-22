@@ -4497,12 +4497,16 @@ async function fetchFinanceBQ() {
   _log('CRP Finance BQ: Fetching from Cloud Function...');
 
   try {
-    var [invRows, pmtRows, sfRows, mrevRows, stipRows] = await Promise.all([
+    var [invRows, pmtRows, sfRows, mrevRows, stipRows, gaapRevRows, gaapMonthRows, gaapArRows, forecastRows] = await Promise.all([
       fetchCSV(base + '?feed=agingInvoices&format=csv'),
       fetchCSV(base + '?feed=payments&format=csv'),
       fetchCSV(base + '?feed=studyFinance&format=csv'),
       fetchCSV(base + '?feed=monthlyRevenue&format=csv'),
       fetchCSV(base + '?feed=stipends&format=csv'),
+      fetchCSV(base + '?feed=gaapStudyRevenue&format=csv').catch(function() { return []; }),
+      fetchCSV(base + '?feed=gaapMonthly&format=csv').catch(function() { return []; }),
+      fetchCSV(base + '?feed=gaapAging&format=csv').catch(function() { return []; }),
+      fetchCSV(base + '?feed=enrollmentForecast&format=csv').catch(function() { return []; }),
     ]);
 
     if (invRows.length === 0 && sfRows.length === 0) {
@@ -4608,6 +4612,55 @@ async function fetchFinanceBQ() {
     if (heroAR) heroAR.textContent = '$' + Math.round(newTotalInvAR / 1000).toLocaleString() + 'K';
     var heroSub = heroAR ? heroAR.parentElement.querySelector('.hero-sub') : null;
     if (heroSub) heroSub.textContent = 'Invoice AR $' + Math.round(newTotalInvAR / 1000) + 'K · ' + newUnpaidInv.length + ' unpaid invoices';
+
+    // ── GAAP Revenue: live from CRIO GAAP tables (replaces hardcoded defaults) ──
+    if (gaapRevRows.length > 0) {
+      var gaapRev12m = {};
+      var gaapTopAR = [];
+      gaapRevRows.forEach(function(r) {
+        var code = (r.protocol_number || '').trim();
+        if (code) gaapRev12m[code] = Math.round(num(r.revenue_12m));
+      });
+      STUDY_REVENUE_12M = gaapRev12m;
+      _log('CRP GAAP: Study revenue loaded — ' + Object.keys(gaapRev12m).length + ' studies');
+    }
+    if (gaapArRows.length > 0) {
+      TOP_AR_STUDIES = gaapArRows.map(function(r) {
+        return {
+          study: (r.study_name || '').trim(),
+          invAR: Math.round(num(r.invoice_ar) * 100) / 100,
+          apAR: Math.round(num(r.autopay_ar) * 100) / 100,
+          total: Math.round(num(r.total_ar) * 100) / 100,
+          collected: Math.round(num(r.collected) * 100) / 100,
+        };
+      });
+      totalInvAR = TOP_AR_STUDIES.reduce(function(s, r) { return s + r.invAR; }, 0);
+      totalApAR = TOP_AR_STUDIES.reduce(function(s, r) { return s + r.apAR; }, 0);
+      _log('CRP GAAP: AR loaded — ' + TOP_AR_STUDIES.length + ' studies, $' + Math.round(totalInvAR + totalApAR).toLocaleString() + ' total AR');
+    }
+    if (gaapMonthRows.length > 0) {
+      var monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      MONTHLY_REVENUE = gaapMonthRows.map(function(r) {
+        var m = (r.month || '').trim();
+        var parts = m.split('-');
+        var mk = parts.length === 2 ? monthNames[parseInt(parts[1]) - 1] + " '" + parts[0].slice(2) : m;
+        return { month: mk, autopay: Math.round(num(r.autopay)), procedures: 0, invoicables: Math.round(num(r.invoiceable)) };
+      });
+      _log('CRP GAAP: Monthly revenue loaded — ' + MONTHLY_REVENUE.length + ' months');
+    }
+
+    // ── Enrollment Forecast (for velocity feature) ──
+    if (forecastRows.length > 0) {
+      window._enrollmentForecast = {};
+      forecastRows.forEach(function(r) {
+        var sk = (r.study_key || '').trim();
+        if (!window._enrollmentForecast[sk]) window._enrollmentForecast[sk] = { study_name: r.study_name, months: [] };
+        window._enrollmentForecast[sk].months.push({
+          month: r.month, target: parseInt(r.target) || 0, scheduled: parseInt(r.scheduled) || 0, actual: parseInt(r.actual) || 0
+        });
+      });
+      _log('CRP Forecast: Enrollment velocity loaded — ' + Object.keys(window._enrollmentForecast).length + ' studies');
+    }
 
     _log('CRP Finance BQ: loaded — ' + newAgingInv.length + ' aging studies, $' + newTotalInvAR.toLocaleString() + ' total AR, ' + newRevenue.length + ' months revenue');
     return true;
