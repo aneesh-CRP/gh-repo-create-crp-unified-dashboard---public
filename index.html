@@ -372,17 +372,22 @@ body {
 
 /* ── TIME BANNER ──────────────────────────── */
 .time-banner {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 10px; padding: 14px 20px;
-  display: flex; align-items: center; gap: 0;
-  margin-bottom: 20px; overflow: hidden; position: relative;
+  background: transparent; border: none;
+  border-radius: 0; padding: 0;
+  display: flex; align-items: stretch; gap: 8px;
+  margin-bottom: 12px; overflow: visible; position: relative;
+  flex-wrap: wrap;
 }
 .tb-section {
-  flex: 1; text-align: center; padding: 0 16px;
+  flex: 1; text-align: center; padding: 12px 10px;
   position: relative;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  margin: 4px 0;
 }
 .tb-section + .tb-section::before {
-  content: ''; position: absolute; left: 0; top: 10%; height: 80%;
+  display: none; content: ''; position: absolute; left: 0; top: 10%; height: 80%;
   width: 1px; background: var(--border);
 }
 .tb-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 3px; }
@@ -392,8 +397,7 @@ body {
 .tb-value.blue { color: var(--blue); }
 .tb-sub { font-size: 11px; color: var(--muted); margin-top: 1px; }
 .tb-divider {
-  width: 60px; text-align: center; font-size: 11px; font-weight: 600;
-  color: var(--light); flex-shrink: 0;
+  display: none;
 }
 
 /* ── GRID LAYOUTS ─────────────────────────── */
