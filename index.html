@@ -5653,6 +5653,32 @@ function renderRecruiterPerformance() {
     html += '</div></div>';
   });
   html += '</div>';
+
+  // ── Supplement with BQ recruiter outreach stats (calls/texts/emails) ──
+  if (window._recruiterStats && window._recruiterStats.length > 0) {
+    html += '<div style="margin-top:16px;padding-top:12px;border-top:2px solid #e2e8f0;">';
+    html += '<div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:8px;">Outreach Activity (30 days — from CRIO)</div>';
+    html += '<table style="width:100%;font-size:11px;border-collapse:collapse;"><thead><tr style="border-bottom:1px solid #e2e8f0;">';
+    html += '<th style="text-align:left;padding:4px 6px;color:#94a3b8;font-weight:600;">Recruiter</th>';
+    html += '<th style="text-align:right;padding:4px 6px;color:#94a3b8;font-weight:600;">Calls</th>';
+    html += '<th style="text-align:right;padding:4px 6px;color:#94a3b8;font-weight:600;">Texts</th>';
+    html += '<th style="text-align:right;padding:4px 6px;color:#94a3b8;font-weight:600;">Emails</th>';
+    html += '<th style="text-align:right;padding:4px 6px;color:#94a3b8;font-weight:600;">Interested</th>';
+    html += '<th style="text-align:right;padding:4px 6px;color:#94a3b8;font-weight:600;">Patients</th>';
+    html += '</tr></thead><tbody>';
+    window._recruiterStats.forEach(function(r) {
+      html += '<tr style="border-bottom:1px solid #f8fafc;">';
+      html += '<td style="padding:4px 6px;font-weight:600;">' + escapeHTML(r.recruiter || '') + '</td>';
+      html += '<td style="text-align:right;padding:4px 6px;">' + (r.phone_calls || 0) + '</td>';
+      html += '<td style="text-align:right;padding:4px 6px;">' + (r.texts || 0) + '</td>';
+      html += '<td style="text-align:right;padding:4px 6px;">' + (r.emails || 0) + '</td>';
+      html += '<td style="text-align:right;padding:4px 6px;color:#059669;font-weight:600;">' + (r.interested_responses || 0) + '</td>';
+      html += '<td style="text-align:right;padding:4px 6px;">' + (r.unique_patients || 0) + '</td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+
   el.innerHTML = html;
 }
 
@@ -6002,8 +6028,8 @@ function fetchActionRequiredData() {
   var base = CRP_CONFIG.CF_BASE;
   var _s = function(id, val) { var e = document.getElementById(id); if (e) e.textContent = val; };
 
-  // Batch fetch all 4 feeds in one request (reduces HTTP overhead)
-  fetch(base + '?feed=batch&feeds=comments,documentSummary,visitTodos,regulatory&format=json')
+  // Batch fetch all 5 feeds in one request (reduces HTTP overhead)
+  fetch(base + '?feed=batch&feeds=comments,documentSummary,visitTodos,regulatory,recruiterStats,demographics&format=json')
   .then(function(r) { return r.json(); })
   .then(function(batch) {
     var results = batch.results || {};
@@ -6011,6 +6037,22 @@ function fetchActionRequiredData() {
     var docSummary = (results.documentSummary || {}).data || [];
     var todos = (results.visitTodos || {}).data || [];
     var regulatory = (results.regulatory || {}).data || [];
+    window._recruiterStats = (results.recruiterStats || {}).data || [];
+
+    // Demographics — build diversity % per study
+    var demoRows = (results.demographics || {}).data || [];
+    window._studyDiversity = {};
+    demoRows.forEach(function(r) {
+      var sk = r.study_key;
+      if (!sk) return;
+      if (!window._studyDiversity[sk]) window._studyDiversity[sk] = { total: 0, diverse: 0, study_name: r.study_name || '' };
+      var race = (r.race || '').toLowerCase();
+      var count = parseInt(r.race_count) || 0;
+      window._studyDiversity[sk].total += count;
+      if (race && race !== 'white' && race !== 'caucasian' && race !== 'unknown' && race !== 'not reported') {
+        window._studyDiversity[sk].diverse += count;
+      }
+    });
 
     // Open Queries
     window._actionQueries = comments;
@@ -6039,7 +6081,9 @@ function fetchActionRequiredData() {
     _s('ar-training', missingTotal);
     _s('ar-training-sub', gapStudies > 0 ? gapStudies + ' studies' : 'All compliant');
 
-    _log('Action Required: queries=' + comments.length + ', unsignedDocs=' + unsignedTotal + ', overdueTodos=' + overdue.length + ', trainingGaps=' + missingTotal);
+    _log('Action Required: queries=' + comments.length + ', unsignedDocs=' + unsignedTotal + ', overdueTodos=' + overdue.length + ', trainingGaps=' + missingTotal + ', recruiters=' + window._recruiterStats.length);
+    // Re-render recruiter card with BQ outreach data
+    if (typeof renderRecruiterPerformance === 'function') try { renderRecruiterPerformance(); } catch(e2) {}
   }).catch(function(e) {
     console.warn('Action Required fetch failed:', e);
   });
@@ -14271,6 +14315,13 @@ function renderStudiesTable() {
     const statusBadge = _sb
       ? `<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;margin-left:5px;background:${_sbBg};color:${_sbFg}">${_sb}</span>` : '';
     const indicationTag = s.crio_indication ? `<div style="font-size:9px;color:#94a3b8;margin-top:1px">${escapeHTML(s.crio_indication)}${s.crio_end_date ? ' · End: '+escapeHTML(s.crio_end_date) : ''}</div>` : (s.crio_end_date ? `<div style="font-size:9px;color:#94a3b8;margin-top:1px">End: ${escapeHTML(s.crio_end_date)}</div>` : '');
+    // Diversity badge from demographics feed
+    const _divData = (window._studyDiversity || {})[s.crio_study_key || ''];
+    const diversityBadge = _divData && _divData.total > 0 ? (() => {
+      const pct = Math.round(_divData.diverse / _divData.total * 100);
+      const color = pct >= 40 ? '#059669' : pct >= 20 ? '#d97706' : '#dc2626';
+      return `<span style="font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px;margin-left:4px;background:${color}15;color:${color}" title="${_divData.diverse}/${_divData.total} diverse patients">${pct}% diverse</span>`;
+    })() : '';
 
     const isEnrolling = s.enroll_status === 'Enrolling';
 
@@ -14344,7 +14395,7 @@ function renderStudiesTable() {
     const sfColor = s.screen_fail_pct > 60 ? '#dc2626' : s.screen_fail_pct > 40 ? '#d97706' : 'var(--muted)';
 
     return `<tr style="border-bottom:1px solid var(--border);transition:background .1s" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
-      <td style="padding:10px 12px;min-width:160px">${studyCell}${statusBadge}${indicationTag}${alertTags}</td>
+      <td style="padding:10px 12px;min-width:160px">${studyCell}${statusBadge}${diversityBadge}${indicationTag}${alertTags}</td>
       <td style="padding:10px 8px;text-align:center">${riskScoreCell}</td>
       <td style="padding:10px 8px;text-align:center">${cancelsCell}</td>
       <td style="padding:10px 8px;text-align:center">${upcomingCell}</td>
