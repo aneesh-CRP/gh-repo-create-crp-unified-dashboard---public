@@ -1197,11 +1197,6 @@ body {
   <div class="card mb16 fade-in">
     <div class="card-header">
       <span class="card-title">📊 8-Week Activity Horizon</span>
-      <div style="display:flex; gap:10px; align-items:center;">
-        <span class="badge badge-red">← Past 2 months</span>
-        <span style="font-size:11px; color:var(--muted)">TODAY</span>
-        <span class="badge badge-blue">Next 2 months →</span>
-      </div>
     </div>
     <div class="horizon-grid" id="horizon-grid"></div>
     <div class="horizon-legend">
@@ -5014,34 +5009,43 @@ function injectVisitConfirmButtons() {
 function buildHorizon() {
   const grid = document.getElementById('horizon-grid');
   if (!grid || !DATA || !DATA.cancelWeekly || !DATA.upcomingWeekly) return;
-  const pastWeeks = DATA.cancelWeekly.slice(-4);
-  const futureWeeks = DATA.upcomingWeekly.slice(0, 4);
+  const cancelWeeks = DATA.cancelWeekly.slice(-4);
+  const upcomingWeeks = DATA.upcomingWeekly.slice(0, 4);
+
+  // Build a unified 8-week timeline — each week shows both cancels and upcoming
+  const allWeeks = [];
+  cancelWeeks.forEach(w => { allWeeks.push({ week: w.week, cancels: w.count, upcoming: 0, isPast: true }); });
+  upcomingWeeks.forEach(w => { allWeeks.push({ week: w.week, cancels: 0, upcoming: w.count, isPast: false }); });
+
+  // Find today's position
+  const now = new Date();
+  const todayWeekLabel = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (now.getDay() === 0 ? 6 : now.getDay() - 1))
+    .toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
   let html = '';
-
-  pastWeeks.forEach(w => {
-    html += `<div class="horizon-week hw-past" title="${w.count} cancellations week of ${w.week}" style="cursor:pointer" onclick="showHorizonDetail('cancel','${w.week}')">
-      <div class="hw-date">${w.week}</div>
-      <div class="hw-count">${w.count}</div>
-      <div class="hw-type" style="color:var(--red)">canceled</div>
-    </div>`;
-  });
-
-  const todayStr = new Date().toLocaleDateString('en-US',{month:'short',day:'numeric'});
-  html += `<div class="horizon-week hw-today">
-    <div class="hw-date" style="color:var(--green); font-weight:600">TODAY</div>
-    <div class="hw-count" style="font-size:11px; color:var(--green);">${todayStr}</div>
-    <div class="hw-type" style="color:var(--green);">★</div>
-  </div>`;
-
-  futureWeeks.forEach(w => {
-    html += `<div class="horizon-week hw-future" title="${w.count} visits scheduled week of ${w.week}" style="cursor:pointer" onclick="showHorizonDetail('upcoming','${w.week}')">
-      <div class="hw-date">${w.week}</div>
-      <div class="hw-count">${w.count}</div>
-      <div class="hw-type" style="color:#1843ad">visits</div>
-    </div>`;
+  allWeeks.forEach((w, i) => {
+    const isThisWeek = w.week === todayWeekLabel;
+    const border = isThisWeek ? 'border:2px solid #059669;' : '';
+    const bg = w.isPast ? 'background:#fef2f2;' : 'background:#eff6ff;';
+    const clickType = w.isPast ? 'cancel' : 'upcoming';
+    const clickCount = w.isPast ? w.cancels : w.upcoming;
+    html += `<div style="flex:1;min-width:90px;padding:10px 6px;border-radius:8px;text-align:center;cursor:pointer;${bg}${border}" title="${clickCount} ${w.isPast ? 'cancellations' : 'visits'} week of ${w.week}" onclick="showHorizonDetail('${clickType}','${w.week}')">
+      <div style="font-size:10px;font-weight:600;color:#94a3b8;margin-bottom:4px;">${w.week}${isThisWeek ? ' ★' : ''}</div>`;
+    if (w.isPast) {
+      html += `<div style="font-size:20px;font-weight:700;color:#dc2626;">${w.cancels}</div>
+        <div style="font-size:9px;color:#94a3b8;">cancels</div>`;
+    } else {
+      html += `<div style="font-size:20px;font-weight:700;color:#1843ad;">${w.upcoming}</div>
+        <div style="font-size:9px;color:#94a3b8;">visits</div>`;
+    }
+    html += `</div>`;
   });
 
   grid.innerHTML = html;
+  grid.style.display = 'flex';
+  grid.style.gap = '6px';
+  grid.style.flexWrap = 'nowrap';
+  grid.style.overflowX = 'auto';
 }
 
 function showHorizonDetail(type, weekLabel) {
