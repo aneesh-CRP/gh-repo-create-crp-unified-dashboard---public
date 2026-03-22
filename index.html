@@ -1364,6 +1364,17 @@ body {
     </div>
   </div>
 
+  <!-- Enrollment Velocity (forecast vs actual) -->
+  <div class="card fade-in" style="margin-top:16px;margin-bottom:16px;">
+    <div class="card-header">
+      <span class="card-title">Enrollment Velocity</span>
+      <span class="badge badge-blue" id="enroll-velocity-badge">Loading...</span>
+    </div>
+    <div id="enroll-velocity-container" style="padding:12px;">
+      <div style="text-align:center;padding:20px;color:var(--muted);font-size:12px;">Loading enrollment velocity data...</div>
+    </div>
+  </div>
+
 </div><!-- /view-studies -->
 
 
@@ -2879,6 +2890,8 @@ function showBucketModal(bk){
   showFinModal('AR: '+labels[bk],h);
 }
 function showStudyModal(s){
+  // Redirect to unified modal if available (shows all data in one place)
+  if (typeof showStudyUnifiedModal === 'function') { showStudyUnifiedModal(s.includes(' - ') ? s.split(' - ').pop().trim() : s); return; }
   const ar=TOP_AR_STUDIES.find(x=>x.study===s);const p=pid(s);const rev=p?STUDY_REVENUE_12M[p]||0:0;
   const ms=FIN_MERGED_STUDIES.find(x=>s.includes(x.study));const ui=UNINVOICED.find(x=>x.study===s);
   let h='<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">';
@@ -3634,9 +3647,10 @@ function updateFinanceOverviewKPIs() {
   var pmtMonths = MONTHLY_PAYMENTS ? MONTHLY_PAYMENTS.length : 0;
   var avgPmt = pmtMonths > 0 ? Math.round(pmtTotal / pmtMonths / 1000) : 0;
 
-  // Heroes
+  // Heroes — mark as live data vs defaults
+  var isLive = !!window._financeLastFetch;
   _s('fin-hero-ar', '$' + Math.round(totalAR/1000).toLocaleString() + 'K');
-  _s('fin-hero-ar-sub', 'Invoice $' + Math.round(invAR/1000) + 'K + Autopay $' + Math.round(apAR/1000) + 'K');
+  _s('fin-hero-ar-sub', (isLive ? '' : '⏳ ') + 'Invoice $' + Math.round(invAR/1000) + 'K + Autopay $' + Math.round(apAR/1000) + 'K');
   _s('fin-hero-payments', '$' + Math.round(pmtTotal).toLocaleString());
   _s('fin-hero-payments-sub', pmtMonths + ' months \u00b7 avg $' + avgPmt + 'K/mo');
 
@@ -9363,10 +9377,19 @@ function buildPatientPipelineBySite() {
 // ══════════════════════════════════════════════════════════════
 function buildRecruitmentKPIs() {
   var el = function(id) { return document.getElementById(id); };
-  // Active referrals (show 0 as a real value, only dash if data not loaded)
+  // Stale leads: active referrals inactive for 30+ days (need follow-up)
   var hasRefData = REFERRAL_DATA && REFERRAL_DATA.length > 0;
-  var activeRefs = hasRefData ? REFERRAL_DATA.filter(function(r){ return !r.is_closed; }).length : null;
-  if (el('ov-kpi-refs')) el('ov-kpi-refs').textContent = activeRefs !== null ? activeRefs : '--';
+  var staleCount = null;
+  if (hasRefData) {
+    var _now = Date.now();
+    staleCount = REFERRAL_DATA.filter(function(r) {
+      if (r.is_closed) return false;
+      var stage = (r.stage||'').toLowerCase();
+      if (stage !== 'new lead' && stage !== 'contacted' && stage !== 'in contact') return false;
+      return r.days_since_update > 30;
+    }).length;
+  }
+  if (el('ov-kpi-refs')) el('ov-kpi-refs').textContent = staleCount !== null ? staleCount : '--';
   // FB leads (30 days)
   var now = Date.now();
   var hasFBData = FB_CRM_DATA && FB_CRM_DATA.length > 0;
@@ -10465,11 +10488,75 @@ function showStudyUnifiedModal(studyName) {
     });
   }
 
+  /* 7 — Documents (from BQ feeds) */
+  var studyDocs = (window._actionDocs||[]).find(function(d){ return d.study_name && (d.study_name.includes(studyName) || studyName.includes(d.study_name.split(' - ').pop())); });
+  if (studyDocs && parseInt(studyDocs.total_documents) > 0) {
+    var pct = parseFloat(studyDocs.completion_pct) || 0;
+    var pctColor = pct >= 95 ? '#059669' : pct >= 80 ? '#d97706' : '#dc2626';
+    body += '<h4 style="' + sectionStyle + '">📄 Documents</h4>';
+    body += '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px;">';
+    body += '<div style="font-size:11px;"><strong>Total:</strong> ' + studyDocs.total_documents + '</div>';
+    body += '<div style="font-size:11px;"><strong style="color:#059669">Signed:</strong> ' + (studyDocs.signed||0) + '</div>';
+    body += '<div style="font-size:11px;"><strong style="color:#d97706">Active:</strong> ' + (studyDocs.active||0) + '</div>';
+    body += '<div style="font-size:11px;"><strong style="color:#dc2626">Assigned:</strong> ' + (studyDocs.assigned||0) + '</div>';
+    body += '<div style="font-size:11px;"><strong style="color:#7c3aed">Incoming:</strong> ' + (studyDocs.incoming||0) + '</div>';
+    body += '<div style="font-size:11px;"><strong>Subjects:</strong> ' + (studyDocs.subjects_with_docs||0) + '</div>';
+    body += '</div>';
+    body += '<div style="background:#f1f5f9;border-radius:6px;height:8px;margin-bottom:12px;overflow:hidden"><div style="background:' + pctColor + ';height:100%;width:' + Math.min(pct, 100) + '%;border-radius:6px;transition:width .3s"></div></div>';
+    body += '<div style="font-size:10px;color:' + pctColor + ';font-weight:700;margin-top:-8px;margin-bottom:10px;">' + pct + '% completion</div>';
+  }
+
+  /* 8 — Compliance (from BQ feeds) */
+  var studyReg = (window._actionTraining||[]).find(function(r){ return r.study_name && (r.study_name.includes(studyName) || studyName.includes(r.study_name.split(' - ').pop())); });
+  var studyTodos = (window._actionTodos||[]).filter(function(t){ return t.study_name && (t.study_name.includes(studyName) || studyName.includes(t.study_name.split(' - ').pop())); });
+  if ((studyReg && (parseInt(studyReg.trainings_missing)||0) + (parseInt(studyReg.duties_pending)||0) > 0) || studyTodos.length > 0) {
+    body += '<h4 style="' + sectionStyle + '">✅ Compliance</h4>';
+    if (studyReg) {
+      body += '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px;">';
+      if (parseInt(studyReg.trainings_missing) > 0) body += '<div style="font-size:11px;color:#dc2626;font-weight:700;">' + studyReg.trainings_missing + ' missing trainings</div>';
+      if (parseInt(studyReg.duties_pending) > 0) body += '<div style="font-size:11px;color:#d97706;font-weight:700;">' + studyReg.duties_pending + ' pending duties</div>';
+      if (parseInt(studyReg.trainings_expired) > 0) body += '<div style="font-size:11px;">' + studyReg.trainings_expired + ' expired</div>';
+      body += '<div style="font-size:11px;">' + (studyReg.duties_active||0) + ' active duties</div>';
+      body += '</div>';
+    }
+    if (studyTodos.length > 0) {
+      var overdueTodos = studyTodos.filter(function(t){ return t.status === 'Overdue'; });
+      body += '<div style="font-size:11px;margin-bottom:8px;">' + (overdueTodos.length > 0 ? '<span style="color:#dc2626;font-weight:700;">' + overdueTodos.length + ' overdue</span> · ' : '') + studyTodos.length + ' total todos</div>';
+      if (overdueTodos.length > 0) {
+        body += '<table class="detail-table" style="margin-bottom:12px;"><thead><tr><th>Todo</th><th>Due</th><th>Created By</th></tr></thead><tbody>';
+        overdueTodos.slice(0,5).forEach(function(t) {
+          body += '<tr style="background:#fef2f2"><td style="font-size:11px">' + escapeHTML(t.todo_name||'') + '</td>';
+          body += '<td style="font-size:11px;color:#dc2626;font-weight:600">' + escapeHTML(t.due_date||'') + '</td>';
+          body += '<td style="font-size:11px">' + escapeHTML(t.created_by||'') + '</td></tr>';
+        });
+        body += '</tbody></table>';
+      }
+    }
+  }
+
+  /* 9 — Finance (GAAP — locked) */
+  if (typeof isFinanceUnlocked === 'function' && isFinanceUnlocked()) {
+    var gaapStudy = (window._gaapStudyData||[]).find(function(g){ return g.study && (g.study.includes(studyName) || studyName.includes(g.protocol)); });
+    if (gaapStudy) {
+      body += '<h4 style="' + sectionStyle + '">💰 Finance (GAAP)</h4>';
+      body += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">';
+      body += '<div style="font-size:11px;"><strong>Total Revenue:</strong> $' + Math.round(gaapStudy.total_revenue).toLocaleString() + '</div>';
+      body += '<div style="font-size:11px;"><strong>12M Revenue:</strong> $' + Math.round(gaapStudy.revenue_12m).toLocaleString() + '</div>';
+      body += '<div style="font-size:11px;"><strong>Upfront:</strong> $' + Math.round(gaapStudy.total_upfront).toLocaleString() + '</div>';
+      body += '<div style="font-size:11px;"><strong>Holdback:</strong> $' + Math.round(gaapStudy.total_holdback).toLocaleString() + '</div>';
+      body += '<div style="font-size:11px;"><strong>Invoiced:</strong> $' + Math.round(gaapStudy.invoiced).toLocaleString() + '</div>';
+      body += '<div style="font-size:11px;"><strong>Uninvoiced:</strong> $' + Math.round(gaapStudy.uninvoiced).toLocaleString() + '</div>';
+      body += '<div style="font-size:11px;"><strong>Autopay:</strong> $' + Math.round(gaapStudy.total_autopay).toLocaleString() + '</div>';
+      body += '</div>';
+    }
+  }
+
   if (!body) body = '<p style="color:#94a3b8;padding:20px;text-align:center">No data available for this study across any source.</p>';
 
   var subtitle = '';
   if (riskEntry) subtitle += (riskEntry.enroll_status||'') + ' · ';
-  subtitle += upcoming.length + ' upcoming · ' + refs.length + ' referrals · ' + (medRec ? medRec.total : 0) + ' med records';
+  subtitle += upcoming.length + ' upcoming · ' + refs.length + ' referrals';
+  if (studyDocs) subtitle += ' · ' + studyDocs.total_documents + ' docs (' + (studyDocs.completion_pct||0) + '%)';
 
   openModal('🔬 ' + studyName, subtitle, body);
 }
