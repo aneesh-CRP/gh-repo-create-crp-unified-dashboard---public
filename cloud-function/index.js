@@ -1293,7 +1293,206 @@ const FEEDS = {
     }
   },
 
-  // ── 39. Document Completion Summary (aggregate per study) ──
+  // ── 39. GAAP Invoices (detailed invoice records with line items) ──
+  gaapInvoices: {
+    query: () => `SELECT
+      gi.invoice_number,
+      gi.invoice_id,
+      CAST(st.study_key AS STRING) AS study_key,
+      ${STUDY_NAME_SQL} AS study_name,
+      COALESCE(spon.name, '') AS sponsor,
+      CASE gi.status WHEN 0 THEN 'Draft' WHEN 1 THEN 'Unpaid' WHEN 2 THEN 'Paid' WHEN 3 THEN 'Partially Paid' ELSE CAST(gi.status AS STRING) END AS status,
+      FORMAT_DATETIME('%Y-%m-%d', gi.date_created) AS date_created,
+      FORMAT_DATETIME('%Y-%m-%d', gi.date_due) AS date_due,
+      FORMAT_DATETIME('%Y-%m-%d', gi.date_sent) AS date_sent,
+      COALESCE(gi.bill_to_company, '') AS bill_to,
+      COUNT(gii.invoice_item_id) AS line_items,
+      COALESCE(si.name, '') AS site_name
+    FROM ${tbl('gaap_invoice')} gi
+    JOIN ${tbl('study')} st ON gi.study_id = st.external_id
+    LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
+    LEFT JOIN ${tbl('gaap_invoice_item')} gii ON gi.invoice_id = gii.invoice_id AND gii.is_active = true
+    LEFT JOIN ${tbl('site')} si ON gi.site_id = st.external_id
+    WHERE st.is_active = 1
+    GROUP BY gi.invoice_number, gi.invoice_id, st.study_key, study_name, spon.name, gi.status, gi.date_created, gi.date_due, gi.date_sent, gi.bill_to_company, si.name
+    ORDER BY gi.date_created DESC`
+  },
+
+  // ── 40. GAAP Payments (payment records with reconciliation) ──
+  gaapPayments: {
+    query: () => `SELECT
+      gp.payment_number,
+      gp.payment_id,
+      CAST(st.study_key AS STRING) AS study_key,
+      ${STUDY_NAME_SQL} AS study_name,
+      COALESCE(spon.name, '') AS sponsor,
+      ROUND(CAST(gp.amount AS FLOAT64), 2) AS amount,
+      CASE gp.type WHEN 1 THEN 'Check' WHEN 2 THEN 'Direct Deposit' WHEN 3 THEN 'Credit/Debit' WHEN 4 THEN 'Credit Memo' WHEN 5 THEN 'Refund' ELSE CAST(gp.type AS STRING) END AS payment_type,
+      FORMAT_DATETIME('%Y-%m-%d', gp.date_received) AS date_received,
+      FORMAT_DATETIME('%Y-%m-%d', gp.date_issued) AS date_issued,
+      COALESCE(gp.comments, '') AS comments,
+      (SELECT COUNT(*) FROM ${tbl('gaap_reconciliation')} gr WHERE gr.payment_id = gp.payment_id) AS reconciled_items,
+      (SELECT ROUND(CAST(SUM(gr.amount) AS FLOAT64), 2) FROM ${tbl('gaap_reconciliation')} gr WHERE gr.payment_id = gp.payment_id) AS reconciled_amount
+    FROM ${tbl('gaap_payment')} gp
+    JOIN ${tbl('study')} st ON gp.study_id = st.external_id
+    LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
+    WHERE st.is_active = 1
+    ORDER BY gp.date_received DESC`
+  },
+
+  // ── 41. Study Procedure Revenue Config (revenue rules per procedure) ──
+  procedureRevenueConfig: {
+    query: () => `SELECT
+      CAST(spr.study_key AS STRING) AS study_key,
+      ${STUDY_NAME_SQL} AS study_name,
+      COALESCE(sp.name, '') AS procedure_name,
+      ROUND(CAST(spr.revenue_base AS FLOAT64), 2) AS revenue_base,
+      ROUND(CAST(spr.revenue_screen_fail AS FLOAT64), 2) AS revenue_screen_fail,
+      ROUND(CAST(spr.revenue_ad_hoc AS FLOAT64), 2) AS revenue_ad_hoc,
+      ROUND(CAST(spr.patient_stipend AS FLOAT64), 2) AS patient_stipend,
+      ROUND(CAST(spr.total_holdbacks AS FLOAT64), 2) AS total_holdbacks,
+      ROUND(CAST(spr.total_receivables AS FLOAT64), 2) AS total_receivable,
+      ROUND(CAST(spr.total_revenue AS FLOAT64), 2) AS total_revenue,
+      ROUND(CAST(spr.total_paid AS FLOAT64), 2) AS total_paid
+    FROM ${tbl('study_procedure_revenue')} spr
+    JOIN ${tbl('study')} st ON spr.study_key = st.study_key
+    LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
+    LEFT JOIN ${tbl('study_procedure')} sp ON spr.study_procedure_key = sp.study_procedure_key
+    WHERE st.is_active = 1
+    ORDER BY spr.total_revenue DESC`
+  },
+
+  // ── 42. Study Procedure Cost Config (cost rules per procedure) ──
+  procedureCostConfig: {
+    query: () => `SELECT
+      CAST(spc.study_key AS STRING) AS study_key,
+      ${STUDY_NAME_SQL} AS study_name,
+      COALESCE(sp.name, '') AS procedure_name,
+      ROUND(CAST(spc.cost_base AS FLOAT64), 2) AS cost_base,
+      ROUND(CAST(spc.cost_screen_fail AS FLOAT64), 2) AS cost_screen_fail,
+      ROUND(CAST(spc.cost_ad_hoc AS FLOAT64), 2) AS cost_ad_hoc,
+      ROUND(CAST(spc.total_costs AS FLOAT64), 2) AS total_costs,
+      ROUND(CAST(spc.total_costs_paid AS FLOAT64), 2) AS total_paid,
+      COALESCE(CONCAT(v.first_name, ' ', v.last_name), v.company_name, '') AS vendor
+    FROM ${tbl('study_procedure_cost')} spc
+    JOIN ${tbl('study')} st ON spc.study_key = st.study_key
+    LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
+    LEFT JOIN ${tbl('study_procedure')} sp ON spc.study_procedure_key = sp.study_procedure_key
+    LEFT JOIN ${tbl('vendor')} v ON spc.vendor_key = v.vendor_key
+    WHERE st.is_active = 1
+    ORDER BY spc.total_costs DESC`
+  },
+
+  // ── 43. Visit-Level Finance (revenue/cost per visit template) ──
+  visitFinance: {
+    query: () => `SELECT
+      CAST(svf.study_key AS STRING) AS study_key,
+      ${STUDY_NAME_SQL} AS study_name,
+      COALESCE(sv.name, '') AS visit_name,
+      ROUND(CAST(svf.revenue_base AS FLOAT64), 2) AS revenue_per_visit,
+      ROUND(CAST(svf.cost_base AS FLOAT64), 2) AS cost_per_visit,
+      ROUND(CAST(svf.patient_stipend AS FLOAT64), 2) AS patient_stipend,
+      ROUND(CAST(svf.revenue_screen_fail AS FLOAT64), 2) AS revenue_screen_fail,
+      ROUND(CAST(svf.cost_screen_fail AS FLOAT64), 2) AS cost_screen_fail,
+      ROUND(CAST(svf.total_revenue AS FLOAT64), 2) AS total_revenue,
+      ROUND(CAST(svf.total_paid AS FLOAT64), 2) AS total_paid,
+      ROUND(CAST(svf.total_holdbacks AS FLOAT64), 2) AS total_holdback,
+      ROUND(CAST(svf.total_costs AS FLOAT64), 2) AS total_cost
+    FROM ${tbl('study_visit_finance')} svf
+    JOIN ${tbl('study')} st ON svf.study_key = st.study_key
+    LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
+    LEFT JOIN ${tbl('study_visit')} sv ON svf.study_visit_key = sv.study_visit_key
+    WHERE st.is_active = 1
+    ORDER BY svf.total_revenue DESC`
+  },
+
+  // ── 44. Subject Visit Sign-Off (PI/QA approval tracking) ──
+  visitSignOff: {
+    query: () => `SELECT
+      CAST(so.study_key AS STRING) AS study_key,
+      ${STUDY_NAME_SQL} AS study_name,
+      CAST(so.subject_key AS STRING) AS subject_key,
+      ${SUBJECT_NAME_SQL} AS subject_name,
+      COALESCE(sv.name, '') AS visit_name,
+      CASE so.type WHEN 1 THEN 'PI Sign-Off' WHEN 2 THEN 'QA Sign-Off' ELSE CAST(so.type AS STRING) END AS sign_off_type,
+      CASE WHEN so.is_active = 1 THEN 'Active' ELSE 'Inactive' END AS status,
+      FORMAT_DATETIME('%Y-%m-%d', so.date_created) AS date_signed,
+      CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) AS signed_by,
+      COALESCE(si.name, '') AS site_name
+    FROM ${tbl('subject_visit_sign_off')} so
+    JOIN ${tbl('study')} st ON so.study_key = st.study_key
+    LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
+    LEFT JOIN ${tbl('subject')} sub ON so.subject_key = sub.subject_key
+    LEFT JOIN ${tbl('subject_visit')} svi ON so.subject_visit_key = svi.subject_visit_key
+    LEFT JOIN ${tbl('study_visit')} sv ON svi.study_visit_key = sv.study_visit_key
+    LEFT JOIN ${tbl('user')} u ON so.user_key = u.user_key
+    LEFT JOIN ${tbl('site')} si ON so.site_key = si.site_key
+    WHERE st.is_active = 1 AND so.is_active = 1
+    ORDER BY so.date_created DESC`
+  },
+
+  // ── 45. Subject Audit Trail (status changes with reasons) ──
+  subjectAudit: {
+    query: () => `SELECT
+      CAST(sal.study_key AS STRING) AS study_key,
+      ${STUDY_NAME_SQL} AS study_name,
+      CAST(sal.subject_key AS STRING) AS subject_key,
+      ${SUBJECT_NAME_SQL} AS subject_name,
+      CASE sal.old_status
+        WHEN -2 THEN 'Not Interested' WHEN -1 THEN 'Not Eligible'
+        WHEN 1 THEN 'Interested' WHEN 2 THEN 'Prequalified'
+        WHEN 3 THEN 'No Show/Cancelled V1' WHEN 4 THEN 'Scheduled V1'
+        WHEN 10 THEN 'Screening' WHEN 11 THEN 'Enrolled'
+        WHEN 12 THEN 'Screen Fail' WHEN 13 THEN 'Discontinued'
+        WHEN 20 THEN 'Completed' ELSE CAST(sal.old_status AS STRING) END AS old_status,
+      CASE sal.new_status
+        WHEN -2 THEN 'Not Interested' WHEN -1 THEN 'Not Eligible'
+        WHEN 1 THEN 'Interested' WHEN 2 THEN 'Prequalified'
+        WHEN 3 THEN 'No Show/Cancelled V1' WHEN 4 THEN 'Scheduled V1'
+        WHEN 10 THEN 'Screening' WHEN 11 THEN 'Enrolled'
+        WHEN 12 THEN 'Screen Fail' WHEN 13 THEN 'Discontinued'
+        WHEN 20 THEN 'Completed' ELSE CAST(sal.new_status AS STRING) END AS new_status,
+      FORMAT_DATETIME('%Y-%m-%d %H:%M', sal.as_of_date) AS transition_date,
+      COALESCE(sal.change_reason, '') AS reason,
+      COALESCE(sal.change_reason_comment, '') AS comment,
+      CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) AS changed_by,
+      COALESCE(si.name, '') AS site_name
+    FROM ${tbl('subject_status_audit_log')} sal
+    JOIN ${tbl('study')} st ON sal.study_key = st.study_key
+    LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
+    LEFT JOIN ${tbl('subject')} sub ON sal.subject_key = sub.subject_key
+    LEFT JOIN ${tbl('user')} u ON sal.user_key = u.user_key
+    LEFT JOIN ${tbl('site')} si ON sal.site_key = si.site_key
+    WHERE st.is_active = 1
+    ORDER BY sal.as_of_date DESC`
+  },
+
+  // ── 46. Stipend Payments (patient payments with card tracking) ──
+  stipendPayments: {
+    query: () => `SELECT
+      CAST(subp.study_key AS STRING) AS study_key,
+      ${STUDY_NAME_SQL} AS study_name,
+      CAST(subp.subject_key AS STRING) AS subject_key,
+      ${SUBJECT_NAME_SQL} AS subject_name,
+      ROUND(CAST(sp.amount AS FLOAT64), 2) AS amount,
+      FORMAT_DATETIME('%Y-%m-%d', sp.payment_date) AS payment_date,
+      CASE sp.status WHEN 1 THEN 'Paid' WHEN 0 THEN 'Pending' ELSE CAST(sp.status AS STRING) END AS status,
+      COALESCE(sa.current_balance, 0) AS card_balance,
+      COALESCE(sa.total_deposited, 0) AS total_deposited,
+      COALESCE(sa.total_paid, 0) AS total_paid_from_card,
+      COALESCE(si.name, '') AS site_name
+    FROM ${tbl('stipend_payment')} sp
+    JOIN ${tbl('subject_payment')} subp ON sp.stipend_payment_key = subp.stipend_payment_key
+    JOIN ${tbl('study')} st ON subp.study_key = st.study_key
+    LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
+    LEFT JOIN ${tbl('subject')} sub ON subp.subject_key = sub.subject_key
+    LEFT JOIN ${tbl('stipend_account')} sa ON sp.stipend_account_key = sa.stipend_account_key
+    LEFT JOIN ${tbl('site')} si ON sp.site_key = si.site_key
+    WHERE st.is_active = 1 AND sp._fivetran_deleted = false
+    ORDER BY sp.payment_date DESC`
+  },
+
+  // ── 47. Document Completion Summary (aggregate per study — was feed 39) ──
   documentSummary: {
     query: () => `SELECT
       CAST(sd.study_key AS STRING) AS study_key,
