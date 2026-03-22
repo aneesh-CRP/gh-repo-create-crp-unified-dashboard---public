@@ -1013,6 +1013,183 @@ const FEEDS = {
     FROM ${tbl('cache_reports_overview')} cro
     LEFT JOIN ${tbl('site')} si ON cro.site_key = si.site_key`
   },
+
+  // ═══════════════════════════════════════════════════════════
+  // TIER 1 EXPANSION — deep analytics from full 196-table schema
+  // ═══════════════════════════════════════════════════════════
+
+  // ── 29. Enrollment Velocity (status transitions with exact dates) ──
+  enrollmentVelocity: {
+    query: (params) => {
+      const days = parseInt(params.days) || 365;
+      return `SELECT
+        CAST(sal.study_key AS STRING) AS study_key,
+        ${STUDY_NAME_SQL} AS study_name,
+        FORMAT_DATE('%Y-%W', DATE(sal.as_of_date)) AS week,
+        FORMAT_DATE('%Y-%m', DATE(sal.as_of_date)) AS month,
+        COUNTIF(sal.new_status = 11) AS newly_enrolled,
+        COUNTIF(sal.new_status = 10) AS newly_screening,
+        COUNTIF(sal.new_status = 12) AS newly_screen_failed,
+        COUNTIF(sal.new_status = 13) AS newly_discontinued,
+        COUNTIF(sal.new_status = 20) AS newly_completed,
+        COUNTIF(sal.new_status = 4) AS newly_scheduled_v1,
+        COUNT(*) AS total_transitions
+      FROM ${tbl('fact_subject_status_audit_log')} sal
+      JOIN ${tbl('study')} st ON sal.study_key = st.study_key
+      LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
+      WHERE st.is_active = 1
+        AND sal.as_of_date >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL ${days} DAY)
+      GROUP BY sal.study_key, study_name, week, month
+      ORDER BY week DESC, newly_enrolled DESC`;
+    }
+  },
+
+  // ── 30. Recruiter Productivity (calls, texts, emails per user) ──
+  recruiterStats: {
+    query: (params) => {
+      const days = parseInt(params.days) || 30;
+      return `SELECT
+        CONCAT(u.first_name, ' ', u.last_name) AS recruiter,
+        COUNT(*) AS total_interactions,
+        COUNTIF(pi.action_type BETWEEN 100 AND 199) AS phone_calls,
+        COUNTIF(pi.action_type BETWEEN 200 AND 299) AS texts,
+        COUNTIF(pi.action_type BETWEEN 300 AND 399) AS emails,
+        COUNTIF(pi.action_type IN (180, 211, 311, 720)) AS interested_responses,
+        COUNTIF(pi.action_type IN (170, 210, 310)) AS declined_responses,
+        COUNTIF(pi.action_type IN (160, 161, 162)) AS no_answers,
+        SUM(COALESCE(pi.action_duration, 0)) AS total_duration_seconds,
+        COUNT(DISTINCT pi.patient_key) AS unique_patients,
+        COUNT(DISTINCT pi.study_key) AS studies
+      FROM ${tbl('patient_interaction')} pi
+      JOIN ${tbl('user')} u ON pi.user_key = u.user_key
+      WHERE pi.action_date >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL ${days} DAY)
+        AND pi.user_key IS NOT NULL
+      GROUP BY recruiter
+      HAVING total_interactions > 0
+      ORDER BY total_interactions DESC`;
+    }
+  },
+
+  // ── 31. Patient Demographics (race + ethnicity per study) ──
+  demographics: {
+    query: () => `WITH
+      race_data AS (
+        SELECT srp.study_key, dr.race, COUNT(DISTINCT dr.patient_key) AS cnt
+        FROM ${tbl('dim_race')} dr
+        JOIN ${tbl('study_recruiting_patient')} srp ON dr.patient_key = srp.patient_key
+        WHERE dr.race IS NOT NULL AND dr.race != ''
+        GROUP BY srp.study_key, dr.race
+      ),
+      eth_data AS (
+        SELECT srp.study_key, de.ethnicity, COUNT(DISTINCT de.patient_key) AS cnt
+        FROM ${tbl('dim_ethnicity')} de
+        JOIN ${tbl('study_recruiting_patient')} srp ON de.patient_key = srp.patient_key
+        WHERE de.ethnicity IS NOT NULL AND de.ethnicity != ''
+        GROUP BY srp.study_key, de.ethnicity
+      )
+    SELECT
+      CAST(st.study_key AS STRING) AS study_key,
+      ${STUDY_NAME_SQL} AS study_name,
+      COALESCE(r.race, '') AS race,
+      COALESCE(r.cnt, 0) AS race_count,
+      COALESCE(e.ethnicity, '') AS ethnicity,
+      COALESCE(e.cnt, 0) AS ethnicity_count
+    FROM ${tbl('study')} st
+    LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
+    LEFT JOIN race_data r ON st.study_key = r.study_key
+    LEFT JOIN eth_data e ON st.study_key = e.study_key
+    WHERE st.is_active = 1 AND (r.race IS NOT NULL OR e.ethnicity IS NOT NULL)
+    ORDER BY st.study_key, r.cnt DESC`
+  },
+
+  // ── 32. Web Form Funnel (ad → submission → patient) ──
+  webFormFunnel: {
+    query: () => `SELECT
+      CAST(wfs.web_form_key AS STRING) AS form_key,
+      COALESCE(wf.name, '') AS form_name,
+      ${STUDY_NAME_SQL} AS study_name,
+      COUNT(*) AS total_submissions,
+      COUNTIF(wfs.is_valid = 1) AS valid_submissions,
+      COUNTIF(wfs.is_new_patient = 1) AS new_patients,
+      COUNTIF(wfs.facebook_ad_id IS NOT NULL AND wfs.facebook_ad_id > 0) AS from_facebook,
+      COUNTIF(wfs.patient_key IS NOT NULL) AS linked_to_patient,
+      FORMAT_DATE('%Y-%m', DATE(MIN(wfs.date_created))) AS first_submission,
+      FORMAT_DATE('%Y-%m', DATE(MAX(wfs.date_created))) AS last_submission
+    FROM ${tbl('web_form_submission')} wfs
+    LEFT JOIN ${tbl('web_form')} wf ON wfs.web_form_key = wf.web_form_key
+    LEFT JOIN ${tbl('study')} st ON wf.study_key = st.study_key
+    LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
+    WHERE wfs.is_active = 1
+    GROUP BY wfs.web_form_key, wf.name, study_name
+    HAVING total_submissions > 0
+    ORDER BY total_submissions DESC`
+  },
+
+  // ── 33. Procedure-Level Revenue (revenue per procedure per study) ──
+  procedureRevenue: {
+    query: () => `SELECT
+      CAST(svpr.study_key AS STRING) AS study_key,
+      ${STUDY_NAME_SQL} AS study_name,
+      COALESCE(sp.name, '') AS procedure_name,
+      COUNT(*) AS completions,
+      ROUND(SUM(CAST(svpr.revenue AS FLOAT64)), 2) AS total_revenue,
+      ROUND(SUM(CAST(svpr.holdback AS FLOAT64)), 2) AS total_holdback,
+      ROUND(SUM(CAST(svpr.receivable AS FLOAT64)), 2) AS total_receivable,
+      COUNTIF(svpr.is_screen_fail = 1) AS screen_fail_count,
+      ROUND(AVG(CAST(svpr.revenue AS FLOAT64)), 2) AS avg_revenue_per_completion
+    FROM ${tbl('subject_visit_procedure_revenue')} svpr
+    JOIN ${tbl('study')} st ON svpr.study_key = st.study_key
+    LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
+    LEFT JOIN ${tbl('study_procedure')} sp ON svpr.study_procedure_key = sp.study_procedure_key
+    WHERE st.is_active = 1 AND svpr.is_active = 1
+    GROUP BY svpr.study_key, study_name, sp.name
+    HAVING total_revenue > 0
+    ORDER BY total_revenue DESC`
+  },
+
+  // ── 34. eSource Comments & Issues (outstanding queries) ──
+  comments: {
+    query: () => `SELECT
+      CAST(c.study_key AS STRING) AS study_key,
+      ${STUDY_NAME_SQL} AS study_name,
+      CAST(c.subject_key AS STRING) AS subject_key,
+      c.issue_number,
+      CASE c.type WHEN 1 THEN 'eSource' WHEN 2 THEN 'Subject Document' WHEN 3 THEN 'eReg' WHEN 4 THEN 'Subject Status' WHEN 5 THEN 'Subject Arm Change' WHEN 6 THEN 'Progress Note' ELSE 'Other' END AS comment_type,
+      CASE WHEN c.is_external = 1 THEN 'External' ELSE 'Internal' END AS visibility,
+      CASE WHEN c.is_resolved = 1 THEN 'Resolved' ELSE 'Open' END AS status,
+      c.message,
+      CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) AS created_by,
+      FORMAT_DATETIME('%Y-%m-%d', c.date_created) AS date_created,
+      DATE_DIFF(CURRENT_DATE(), DATE(c.date_created), DAY) AS days_outstanding
+    FROM ${tbl('comment')} c
+    JOIN ${tbl('study')} st ON c.study_key = st.study_key
+    LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
+    LEFT JOIN ${tbl('user')} u ON c.user_key = u.user_key
+    WHERE c._fivetran_deleted = false AND st.is_active = 1
+      AND c.is_resolved = 0
+    ORDER BY c.date_created ASC`
+  },
+
+  // ── 35. Informed Consent Tracking ──
+  consentTracking: {
+    query: () => `SELECT
+      CAST(ic.study_key AS STRING) AS study_key,
+      ${STUDY_NAME_SQL} AS study_name,
+      CAST(ic.subject_key AS STRING) AS subject_key,
+      ${SUBJECT_NAME_SQL} AS subject_name,
+      ic.version,
+      FORMAT_DATETIME('%Y-%m-%d', ic.date_signed) AS date_signed,
+      FORMAT_DATETIME('%Y-%m-%d', ic.version_date) AS version_date,
+      FORMAT_DATETIME('%Y-%m-%d', ic.approval_date) AS approval_date,
+      CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) AS signed_by
+    FROM ${tbl('informed_consent_audit_log')} ic
+    JOIN ${tbl('study')} st ON ic.study_key = st.study_key
+    LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
+    LEFT JOIN ${tbl('subject')} sub ON ic.subject_key = sub.subject_key
+    LEFT JOIN ${tbl('user')} u ON ic.user_key = u.user_key
+    WHERE st.is_active = 1
+    ORDER BY ic.date_signed DESC`
+  },
 };
 
 // ═══════════════════════════════════════════════════════════
