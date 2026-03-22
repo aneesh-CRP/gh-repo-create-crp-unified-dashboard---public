@@ -1188,18 +1188,8 @@ body {
     </div>
   </div>
 
-  <!-- Row 1: 8-Week Horizon -->
-  <div class="card mb16 fade-in">
-    <div class="card-header">
-      <span class="card-title">📊 8-Week Activity Horizon</span>
-    </div>
-    <div class="horizon-grid" id="horizon-grid"></div>
-    <div class="horizon-legend">
-      <div class="hleg"><div class="hleg-dot" style="background:var(--red-bg); border: 1px solid var(--red-border);"></div> Cancellations (past)</div>
-      <div class="hleg"><div class="hleg-dot" style="background:var(--blue-bg); border: 1px solid var(--blue-border);"></div> Upcoming visits (future)</div>
-      <div class="hleg"><div class="hleg-dot" style="background:var(--green-bg); border: 1px solid var(--green-border);"></div> This week</div>
-    </div>
-  </div>
+  <!-- Row 3: 8-Week Horizon (same block style as rows 1 and 2) -->
+  <div id="horizon-grid" class="time-banner fade-in" style="margin-bottom:16px;"></div>
 
   <!-- Recruitment Pipeline KPIs (cross-source) -->
   <!-- ── RECRUITMENT + ACTION REQUIRED — single unified row ── -->
@@ -1232,12 +1222,6 @@ body {
       <div class="tb-label">Overdue Todos</div>
       <div class="tb-value" style="color:#f59e0b" id="ar-todos">—</div>
       <div class="tb-sub" id="ar-todos-sub"></div>
-    </div>
-    <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showActionModal('training')">
-      <div class="tb-label">Training Gaps</div>
-      <div class="tb-value" style="color:#7c3aed" id="ar-training">—</div>
-      <div class="tb-sub" id="ar-training-sub"></div>
     </div>
   </div>
 
@@ -4993,40 +4977,26 @@ function buildHorizon() {
   const cancelWeeks = DATA.cancelWeekly.slice(-4);
   const upcomingWeeks = DATA.upcomingWeekly.slice(0, 4);
 
-  // Build a unified 8-week timeline — each week shows both cancels and upcoming
+  // Build unified 8-week timeline using same tb-section style as KPI strips
   const allWeeks = [];
-  cancelWeeks.forEach(w => { allWeeks.push({ week: w.week, cancels: w.count, upcoming: 0, isPast: true }); });
-  upcomingWeeks.forEach(w => { allWeeks.push({ week: w.week, cancels: 0, upcoming: w.count, isPast: false }); });
-
-  // Find today's position
-  const now = new Date();
-  const todayWeekLabel = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (now.getDay() === 0 ? 6 : now.getDay() - 1))
-    .toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  cancelWeeks.forEach(w => { allWeeks.push({ week: w.week, count: w.count, isPast: true }); });
+  upcomingWeeks.forEach(w => { allWeeks.push({ week: w.week, count: w.count, isPast: false }); });
 
   let html = '';
   allWeeks.forEach((w, i) => {
-    const isThisWeek = w.week === todayWeekLabel;
-    const border = isThisWeek ? 'border:2px solid #059669;' : '';
-    const bg = w.isPast ? 'background:#fef2f2;' : 'background:#eff6ff;';
     const clickType = w.isPast ? 'cancel' : 'upcoming';
-    const clickCount = w.isPast ? w.cancels : w.upcoming;
-    html += `<div style="flex:1;min-width:90px;padding:10px 6px;border-radius:8px;text-align:center;cursor:pointer;${bg}${border}" title="${clickCount} ${w.isPast ? 'cancellations' : 'visits'} week of ${w.week}" onclick="showHorizonDetail('${clickType}','${w.week}')">
-      <div style="font-size:10px;font-weight:600;color:#94a3b8;margin-bottom:4px;">${w.week}${isThisWeek ? ' ★' : ''}</div>`;
-    if (w.isPast) {
-      html += `<div style="font-size:20px;font-weight:700;color:#dc2626;">${w.cancels}</div>
-        <div style="font-size:9px;color:#94a3b8;">cancels</div>`;
-    } else {
-      html += `<div style="font-size:20px;font-weight:700;color:#1843ad;">${w.upcoming}</div>
-        <div style="font-size:9px;color:#94a3b8;">visits</div>`;
-    }
-    html += `</div>`;
+    const color = w.isPast ? '#dc2626' : '#1843ad';
+    const label = w.isPast ? 'cancels' : 'visits';
+    if (i > 0) html += '<div class="tb-divider"></div>';
+    html += `<div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showHorizonDetail('${clickType}','${w.week}')">
+      <div class="tb-label">${w.week}</div>
+      <div class="tb-value" style="color:${color}">${w.count}</div>
+      <div class="tb-sub">${label}</div>
+    </div>`;
   });
 
   grid.innerHTML = html;
-  grid.style.display = 'flex';
-  grid.style.gap = '6px';
-  grid.style.flexWrap = 'nowrap';
-  grid.style.overflowX = 'auto';
+  grid.className = 'time-banner';
 }
 
 function showHorizonDetail(type, weekLabel) {
@@ -6087,38 +6057,49 @@ function fetchActionRequiredData() {
 
 function showActionModal(type) {
   var title, body;
+  var _crioStudyUrl = function(sk) { return sk ? 'https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/' + sk + '/subjects' : ''; };
+  var _crioSubjectUrl = function(sk, subk) { return (sk && subk) ? 'https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/' + sk + '/subject/' + subk : ''; };
+  var _crioLink = function(text, url) { return url ? '<a href="' + escapeHTML(url) + '" target="_blank" style="color:#1843ad;text-decoration:underline;text-decoration-style:dotted">' + escapeHTML(text) + '</a>' : escapeHTML(text); };
+
   if (type === 'queries') {
     var rows = window._actionQueries || [];
     title = 'Open Queries (' + rows.length + ')';
-    body = '<table class="detail-table"><thead><tr><th>Study</th><th>Type</th><th>Message</th><th>Created By</th><th>Date</th><th>Days</th></tr></thead><tbody>' +
+    body = '<table class="detail-table"><thead><tr><th>Study</th><th>Subject</th><th>Type</th><th>Message</th><th>Created By</th><th>Days</th></tr></thead><tbody>' +
       rows.slice(0, 100).map(function(r) {
-        return '<tr><td style="font-size:11px">' + escapeHTML(r.study_name||'') + '</td><td>' + escapeHTML(r.comment_type||'') + '</td>' +
-          '<td style="font-size:11px;max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHTML(r.message||'') + '">' + escapeHTML((r.message||'').substring(0,80)) + '</td>' +
-          '<td style="font-size:11px">' + escapeHTML(r.created_by||'') + '</td><td style="white-space:nowrap">' + escapeHTML(r.date_created||'') + '</td>' +
-          '<td style="font-weight:700;color:' + (parseInt(r.days_outstanding)>90?'#dc2626':parseInt(r.days_outstanding)>30?'#d97706':'#059669') + '">' + (r.days_outstanding||'') + '</td></tr>';
+        var studyUrl = _crioStudyUrl(r.study_key);
+        var subUrl = _crioSubjectUrl(r.study_key, r.subject_key);
+        return '<tr><td style="font-size:11px">' + _crioLink(r.study_name||'', studyUrl) + '</td>' +
+          '<td style="font-size:11px">' + (r.subject_key ? _crioLink(r.subject_key, subUrl) : '—') + '</td>' +
+          '<td>' + escapeHTML(r.comment_type||'') + '</td>' +
+          '<td style="font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHTML(r.message||'') + '">' + escapeHTML((r.message||'').substring(0,60)) + '</td>' +
+          '<td style="font-size:11px">' + escapeHTML(r.created_by||'') + '</td>' +
+          '<td style="font-weight:700;color:' + (parseInt(r.days_outstanding)>90?'#dc2626':parseInt(r.days_outstanding)>30?'#d97706':'#059669') + '">' + (r.days_outstanding||'') + 'd</td></tr>';
       }).join('') + '</tbody></table>';
   } else if (type === 'docs') {
     var rows = window._actionDocs || [];
     title = 'Document Completion by Study';
-    body = '<table class="detail-table"><thead><tr><th>Study</th><th>Total</th><th>Signed</th><th>Active</th><th>Assigned</th><th>Incoming</th><th>Completion</th></tr></thead><tbody>' +
+    body = '<table class="detail-table"><thead><tr><th>Study</th><th>Total</th><th>Signed</th><th>Active</th><th>Assigned</th><th>Completion</th></tr></thead><tbody>' +
       rows.filter(function(r) { return (parseInt(r.active)||0) + (parseInt(r.assigned)||0) + (parseInt(r.incoming)||0) > 0; }).map(function(r) {
         var pct = parseFloat(r.completion_pct) || 0;
-        return '<tr><td style="font-size:11px">' + escapeHTML(r.study_name||'') + '</td><td class="r">' + (r.total_documents||0) + '</td>' +
+        var studyUrl = _crioStudyUrl(r.study_key);
+        return '<tr><td style="font-size:11px">' + _crioLink(r.study_name||'', studyUrl) + '</td><td class="r">' + (r.total_documents||0) + '</td>' +
           '<td class="r">' + (r.signed||0) + '</td><td class="r" style="color:#d97706;font-weight:700">' + (r.active||0) + '</td>' +
-          '<td class="r" style="color:#dc2626;font-weight:700">' + (r.assigned||0) + '</td><td class="r">' + (r.incoming||0) + '</td>' +
+          '<td class="r" style="color:#dc2626;font-weight:700">' + (r.assigned||0) + '</td>' +
           '<td class="r"><span style="color:' + (pct>=95?'#059669':pct>=80?'#d97706':'#dc2626') + ';font-weight:700">' + pct + '%</span></td></tr>';
       }).join('') + '</tbody></table>';
   } else if (type === 'todos') {
     var rows = window._actionTodos || [];
     title = 'Visit Todos (' + rows.length + ')';
-    body = '<table class="detail-table"><thead><tr><th>Study</th><th>Todo</th><th>Status</th><th>Due</th><th>Created By</th><th>Visit</th></tr></thead><tbody>' +
+    body = '<table class="detail-table"><thead><tr><th>Study</th><th>Subject</th><th>Todo</th><th>Status</th><th>Due</th><th>Visit</th></tr></thead><tbody>' +
       rows.slice(0, 100).map(function(r) {
         var isOverdue = r.status === 'Overdue';
-        return '<tr style="' + (isOverdue?'background:#fef2f2':'') + '"><td style="font-size:11px">' + escapeHTML(r.study_name||'') + '</td>' +
+        var studyUrl = _crioStudyUrl(r.study_key);
+        var subUrl = _crioSubjectUrl(r.study_key, r.subject_key);
+        return '<tr style="' + (isOverdue?'background:#fef2f2':'') + '"><td style="font-size:11px">' + _crioLink(r.study_name||'', studyUrl) + '</td>' +
+          '<td style="font-size:11px">' + (r.subject_key ? _crioLink(r.subject_key, subUrl) : '—') + '</td>' +
           '<td style="font-size:11px">' + escapeHTML(r.todo_name||'') + '</td>' +
           '<td><span style="font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px;background:' + (isOverdue?'#fef2f2':'#fffbeb') + ';color:' + (isOverdue?'#dc2626':'#d97706') + '">' + escapeHTML(r.status||'') + '</span></td>' +
           '<td style="white-space:nowrap;color:' + (isOverdue?'#dc2626':'') + '">' + escapeHTML(r.due_date||'') + '</td>' +
-          '<td style="font-size:11px">' + escapeHTML(r.created_by||'') + '</td>' +
           '<td style="font-size:11px">' + escapeHTML(r.visit_name||'') + '</td></tr>';
       }).join('') + '</tbody></table>';
   } else if (type === 'training') {

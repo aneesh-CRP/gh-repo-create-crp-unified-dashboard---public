@@ -1188,18 +1188,8 @@ body {
     </div>
   </div>
 
-  <!-- Row 1: 8-Week Horizon -->
-  <div class="card mb16 fade-in">
-    <div class="card-header">
-      <span class="card-title">📊 8-Week Activity Horizon</span>
-    </div>
-    <div class="horizon-grid" id="horizon-grid"></div>
-    <div class="horizon-legend">
-      <div class="hleg"><div class="hleg-dot" style="background:var(--red-bg); border: 1px solid var(--red-border);"></div> Cancellations (past)</div>
-      <div class="hleg"><div class="hleg-dot" style="background:var(--blue-bg); border: 1px solid var(--blue-border);"></div> Upcoming visits (future)</div>
-      <div class="hleg"><div class="hleg-dot" style="background:var(--green-bg); border: 1px solid var(--green-border);"></div> This week</div>
-    </div>
-  </div>
+  <!-- Row 3: 8-Week Horizon (same block style as rows 1 and 2) -->
+  <div id="horizon-grid" class="time-banner fade-in" style="margin-bottom:16px;"></div>
 
   <!-- Recruitment Pipeline KPIs (cross-source) -->
   <!-- ── RECRUITMENT + ACTION REQUIRED — single unified row ── -->
@@ -1232,12 +1222,6 @@ body {
       <div class="tb-label">Overdue Todos</div>
       <div class="tb-value" style="color:#f59e0b" id="ar-todos">—</div>
       <div class="tb-sub" id="ar-todos-sub"></div>
-    </div>
-    <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showActionModal('training')">
-      <div class="tb-label">Training Gaps</div>
-      <div class="tb-value" style="color:#7c3aed" id="ar-training">—</div>
-      <div class="tb-sub" id="ar-training-sub"></div>
     </div>
   </div>
 
