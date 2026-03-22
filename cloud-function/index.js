@@ -921,7 +921,7 @@ const FEEDS = {
       COUNT(DISTINCT rdp.revenue_data_point_id) AS line_items
     FROM ${tbl('gaap_revenue_data_point')} rdp
     JOIN ${tbl('gaap_revenue_group')} rg ON rdp.group_id = rg.group_id
-    JOIN ${tbl('study')} st ON rg.study_id = CAST(st.study_key AS STRING)
+    JOIN ${tbl('study')} st ON rg.study_id = st.external_id
     LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
     WHERE st.is_active = 1
     GROUP BY st.study_key, study_name, spon.name, st.protocol_number
@@ -966,7 +966,7 @@ const FEEDS = {
       ROUND(SUM(COALESCE(rec.paid, 0)), 2) AS collected
     FROM ${tbl('gaap_revenue_data_point')} rdp
     JOIN ${tbl('gaap_revenue_group')} rg ON rdp.group_id = rg.group_id
-    JOIN ${tbl('study')} st ON rg.study_id = CAST(st.study_key AS STRING)
+    JOIN ${tbl('study')} st ON rg.study_id = st.external_id
     LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
     LEFT JOIN reconciled rec ON rdp.revenue_data_point_id = rec.revenue_data_point_id
     WHERE rdp.amount > COALESCE(rec.paid, 0)
