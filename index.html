@@ -1488,29 +1488,6 @@ body {
     </div>
   </div>
 
-  <!-- Coordinator Cancel Rate Trend -->
-  <div class="card fade-in" style="margin-bottom:16px">
-    <div class="card-header">
-      <span class="card-title">Coordinator Cancel Rate Over Time</span>
-      <span class="badge badge-blue" style="font-size:10px">% of their visits that cancelled</span>
-    </div>
-    <div class="chart-wrap h220">
-      <canvas id="trendsCoordChart"></canvas>
-    </div>
-  </div>
-
-  <!-- Key Insights -->
-  <div class="grid-2 mb16 fade-in">
-    <div class="card">
-      <div class="card-header"><span class="card-title">Flags Requiring Action</span></div>
-      <div class="insight-list" id="perf-insight-flags"></div>
-    </div>
-    <div class="card">
-      <div class="card-header"><span class="card-title">Positive Indicators</span></div>
-      <div class="insight-list" id="perf-insight-positive"></div>
-    </div>
-  </div>
-
   <!-- Investigator + Recruiter side by side -->
   <div class="grid-2 mb16 fade-in">
     <div class="card">
@@ -1529,6 +1506,29 @@ body {
       <div id="recruiterPerfContainer" style="padding:0 16px 4px;">
         <p style="color:#94a3b8;font-size:12px">Loading recruiter data...</p>
       </div>
+    </div>
+  </div>
+
+  <!-- Coordinator Cancel Rate Trend -->
+  <div class="card fade-in" style="margin-bottom:16px">
+    <div class="card-header">
+      <span class="card-title">Coordinator Cancel Rate Over Time</span>
+      <span class="badge badge-blue" style="font-size:10px">5 core coordinators only</span>
+    </div>
+    <div class="chart-wrap h220">
+      <canvas id="trendsCoordChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Key Insights -->
+  <div class="grid-2 mb16 fade-in">
+    <div class="card">
+      <div class="card-header"><span class="card-title">Flags Requiring Action</span></div>
+      <div class="insight-list" id="perf-insight-flags"></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">Positive Indicators</span></div>
+      <div class="insight-list" id="perf-insight-positive"></div>
     </div>
   </div>
 
@@ -5660,58 +5660,60 @@ function renderRecruiterPerformance() {
   var el = document.getElementById('recruiterPerfContainer');
   var badge = document.getElementById('recruiter-perf-badge');
   if (!el) return;
-  var visits = DATA.allVisitDetail || [];
-  var cancels = DATA.allCancels || [];
-  if (visits.length === 0 && cancels.length === 0) return;
 
   // Recruiters = COORDINATORS minus SCHEDULE_COORDINATORS
   var schedSet = {};
-  (CRP_CONFIG.SCHEDULE_COORDINATORS || []).forEach(function(n){ schedSet[n] = true; });
-  var recruiters = (CRP_CONFIG.COORDINATORS || []).filter(function(n){ return !schedSet[n]; });
-  if (recruiters.length === 0) return;
-
-  // Nickname map for display
+  (CRP_CONFIG.SCHEDULE_COORDINATORS || []).forEach(function(n){ schedSet[n.toLowerCase()] = true; });
   var nicknames = { 'Gabrijela Ateljevic': 'Gaby', 'Ema Gunic': 'Ema', 'Ana Lambic': 'Ana', 'Vlado Draganic': 'Vlado', 'Jana Milankovic': 'Jana' };
 
-  var stats = recruiters.map(function(name) {
-    var rv = visits.filter(function(v){ return v.coord === name; });
-    var rc = cancels.filter(function(c){ return c.coord === name; });
-    var noShows = rc.filter(function(c){ return c.category === 'No Show'; }).length;
-    var screenFails = rc.filter(function(c){ return c.category === 'Screen Fail / DNQ'; }).length;
-    var undoc = rc.filter(function(c){ return !c.category || c.category === 'Uncategorized' || c.category === 'Other'; }).length;
-    var nsPct = rc.length > 0 ? Math.round(noShows / rc.length * 100) : 0;
-    return { name: name, nick: nicknames[name] || name.split(' ')[0], upcoming: rv.length, cancels: rc.length, noShows: noShows, nsPct: nsPct, screenFails: screenFails, undoc: undoc };
-  }).sort(function(a,b){ return b.upcoming - a.upcoming; });
+  // Use recruiterStats (patient_interaction) for outreach activity
+  var stats = [];
+  if (window._recruiterStats && window._recruiterStats.length > 0) {
+    window._recruiterStats.forEach(function(r) {
+      var rName = r.recruiter || '';
+      if (schedSet[rName.toLowerCase()]) return; // skip coordinators
+      stats.push({
+        name: rName, nick: nicknames[rName] || rName.split(' ')[0],
+        calls: parseInt(r.phone_calls)||0, texts: parseInt(r.texts)||0,
+        emails: parseInt(r.emails)||0, patients: parseInt(r.unique_patients)||0,
+        interested: parseInt(r.interested_responses)||0, total: parseInt(r.total_interactions)||0
+      });
+    });
+  }
+  if (stats.length === 0) {
+    el.innerHTML = '<div style="padding:16px;text-align:center;color:#94a3b8;font-size:12px;">Outreach data loads after initial render...</div>';
+    return;
+  }
+  stats.sort(function(a,b){ return b.total - a.total; });
 
-  if (badge) badge.textContent = stats.length + ' recruiters';
+  if (badge) badge.textContent = stats.length + ' recruiters (30d)';
 
-  var maxVal = Math.max.apply(null, stats.map(function(s){ return Math.max(s.upcoming, s.cancels); }).concat([1]));
-  var totalUpcoming = stats.reduce(function(s,r){ return s+r.upcoming; },0);
-  var totalCancels = stats.reduce(function(s,r){ return s+r.cancels; },0);
-  var totalNoShows = stats.reduce(function(s,r){ return s+r.noShows; },0);
-  var avgNsPct = totalCancels > 0 ? Math.round(totalNoShows / totalCancels * 100) : 0;
+  var maxTotal = stats[0].total || 1;
+  var totalInteractions = stats.reduce(function(s,r){ return s+r.total; },0);
+  var totalPatients = stats.reduce(function(s,r){ return s+r.patients; },0);
+  var totalInterested = stats.reduce(function(s,r){ return s+r.interested; },0);
+  var convPct = totalPatients > 0 ? Math.round(totalInterested / totalPatients * 100) : 0;
 
   var kpiStyleR = 'padding:8px;border-radius:8px;text-align:center;cursor:pointer;transition:box-shadow .15s;';
   var html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:14px;">';
-  html += '<div style="'+kpiStyleR+'background:#eff6ff;" onclick="showRecruiterKpiPopup(\'upcoming\')"><div style="font-size:18px;font-weight:800;color:#3b82f6;">'+totalUpcoming+'</div><div style="font-size:9px;color:#3b82f6;font-weight:600;">Upcoming</div></div>';
-  html += '<div style="'+kpiStyleR+'background:#fffbeb;" onclick="showRecruiterKpiPopup(\'cancels\')"><div style="font-size:18px;font-weight:800;color:#d97706;">'+totalCancels+'</div><div style="font-size:9px;color:#d97706;font-weight:600;">Cancels</div></div>';
-  html += '<div style="'+kpiStyleR+'background:'+(avgNsPct>20?'#fef2f2':'#f0fdf4')+';"><div style="font-size:18px;font-weight:800;color:'+(avgNsPct>20?'#dc2626':'#059669')+';">'+avgNsPct+'%</div><div style="font-size:9px;color:'+(avgNsPct>20?'#dc2626':'#059669')+';font-weight:600;">No-Show Rate</div></div>';
+  html += '<div style="'+kpiStyleR+'background:#eff6ff;"><div style="font-size:18px;font-weight:800;color:#3b82f6;">'+totalInteractions+'</div><div style="font-size:9px;color:#3b82f6;font-weight:600;">Interactions</div></div>';
+  html += '<div style="'+kpiStyleR+'background:#f5f3ff;"><div style="font-size:18px;font-weight:800;color:#7c3aed;">'+totalPatients+'</div><div style="font-size:9px;color:#7c3aed;font-weight:600;">Patients</div></div>';
+  html += '<div style="'+kpiStyleR+'background:'+(convPct>10?'#f0fdf4':'#fffbeb')+';"><div style="font-size:18px;font-weight:800;color:'+(convPct>10?'#059669':'#d97706')+';">'+convPct+'%</div><div style="font-size:9px;color:'+(convPct>10?'#059669':'#d97706')+';font-weight:600;">Interest Rate</div></div>';
   html += '</div>';
 
   html += '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:4px;">';
-  html += '<tr style="background:#f8fafc;"><th style="text-align:left;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Recruiter</th><th style="text-align:left;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Upcoming</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Cancels</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">No-Shows</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Screen Fails</th></tr>';
+  html += '<tr style="background:#f8fafc;"><th style="text-align:left;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Recruiter</th><th style="text-align:left;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Activity</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Calls</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Texts</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Patients</th></tr>';
   stats.forEach(function(s) {
-    var upPct = Math.round(s.upcoming / maxVal * 100);
-    var nsColor = s.nsPct > 30 ? '#dc2626' : s.nsPct > 15 ? '#f59e0b' : '#059669';
+    var barW = Math.round(s.total / maxTotal * 100);
     html += '<tr style="border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showCoordDetail(\'' + jsAttr(s.name) + '\')">';
     html += '<td style="padding:8px;"><div style="font-weight:700;color:#1e293b;">' + escapeHTML(s.nick) + '</div></td>';
     html += '<td style="padding:8px;"><div style="background:#e2e8f0;border-radius:5px;height:18px;overflow:hidden;position:relative;">';
-    html += '<div style="height:100%;width:'+upPct+'%;background:linear-gradient(90deg,#0369a1,#38bdf8);border-radius:5px;"></div>';
-    html += '<div style="position:absolute;left:8px;top:0;font-size:11px;font-weight:700;color:'+(upPct>30?'#fff':'#1e293b')+';line-height:18px;">'+s.upcoming+'</div>';
+    html += '<div style="height:100%;width:'+barW+'%;background:linear-gradient(90deg,#0369a1,#38bdf8);border-radius:5px;"></div>';
+    html += '<div style="position:absolute;left:8px;top:0;font-size:11px;font-weight:700;color:'+(barW>30?'#fff':'#1e293b')+';line-height:18px;">'+s.total+'</div>';
     html += '</div></td>';
-    html += '<td style="padding:8px;text-align:center;font-weight:600;color:#d97706;">'+s.cancels+'</td>';
-    html += '<td style="padding:8px;text-align:center;font-weight:700;color:'+nsColor+';">'+s.noShows+' <span style="font-size:10px;font-weight:600;">('+s.nsPct+'%)</span></td>';
-    html += '<td style="padding:8px;text-align:center;font-weight:600;color:#475569;">'+s.screenFails+'</td>';
+    html += '<td style="padding:8px;text-align:center;font-weight:600;color:#475569;">'+s.calls+'</td>';
+    html += '<td style="padding:8px;text-align:center;font-weight:600;color:#475569;">'+s.texts+'</td>';
+    html += '<td style="padding:8px;text-align:center;font-weight:600;color:#475569;">'+s.patients+'</td>';
     html += '</tr>';
   });
   html += '</table>';
@@ -5773,36 +5775,23 @@ function showInvKpiPopup(type) {
 }
 
 function showRecruiterKpiPopup(type) {
+  var stats = window._recruiterStats || [];
   var schedSet = {};
-  (CRP_CONFIG.SCHEDULE_COORDINATORS || []).forEach(function(n){ schedSet[n] = true; });
-  var recruiters = (CRP_CONFIG.COORDINATORS || []).filter(function(n){ return !schedSet[n]; });
+  (CRP_CONFIG.SCHEDULE_COORDINATORS || []).forEach(function(n){ schedSet[n.toLowerCase()] = true; });
   var nicknames = { 'Gabrijela Ateljevic': 'Gaby', 'Ema Gunic': 'Ema', 'Ana Lambic': 'Ana', 'Vlado Draganic': 'Vlado', 'Jana Milankovic': 'Jana' };
-  if (type === 'upcoming') {
-    var rows = recruiters.map(function(name) {
-      var v = (DATA.allVisitDetail||[]).filter(function(r){return r.coord===name;});
-      return {name:name, nick:nicknames[name]||name.split(' ')[0], visits:v.length};
-    }).sort(function(a,b){return b.visits-a.visits;});
-    var body = '<table class="detail-table"><thead><tr><th>Recruiter</th><th style="text-align:right">Upcoming Visits</th></tr></thead><tbody>';
-    rows.forEach(function(r){
-      body += '<tr onclick="showCoordDetail(\''+jsAttr(r.name)+'\')" style="cursor:pointer"><td style="font-weight:600">'+escapeHTML(r.nick)+'</td><td style="text-align:right;color:#3b82f6;font-weight:700">'+r.visits+'</td></tr>';
-    });
-    body += '</tbody></table>';
-    var total = rows.reduce(function(s,r){return s+r.visits;},0);
-    openModal('Recruiter Upcoming Visits', total+' total', body);
-  } else if (type === 'cancels') {
-    var rows2 = recruiters.map(function(name) {
-      var c = (DATA.allCancels||[]).filter(function(r){return r.coord===name;});
-      var noShows = c.filter(function(r){return r.category==='No Show';}).length;
-      return {name:name, nick:nicknames[name]||name.split(' ')[0], cancels:c.length, noShows:noShows};
-    }).sort(function(a,b){return b.cancels-a.cancels;});
-    var body2 = '<table class="detail-table"><thead><tr><th>Recruiter</th><th style="text-align:right">Cancels</th><th style="text-align:right">No-Shows</th></tr></thead><tbody>';
-    rows2.forEach(function(r){
-      body2 += '<tr onclick="showCoordDetail(\''+jsAttr(r.name)+'\')" style="cursor:pointer"><td style="font-weight:600">'+escapeHTML(r.nick)+'</td><td style="text-align:right;color:#d97706;font-weight:700">'+r.cancels+'</td><td style="text-align:right;color:#dc2626;font-weight:600">'+r.noShows+'</td></tr>';
-    });
-    body2 += '</tbody></table>';
-    var total2 = rows2.reduce(function(s,r){return s+r.cancels;},0);
-    openModal('Recruiter Cancellations', total2+' total', body2);
-  }
+  var rows = stats.filter(function(r){ return !schedSet[(r.recruiter||'').toLowerCase()]; }).map(function(r){
+    return { name:r.recruiter, nick:nicknames[r.recruiter]||r.recruiter.split(' ')[0],
+      calls:parseInt(r.phone_calls)||0, texts:parseInt(r.texts)||0, emails:parseInt(r.emails)||0,
+      patients:parseInt(r.unique_patients)||0, interested:parseInt(r.interested_responses)||0,
+      total:parseInt(r.total_interactions)||0 };
+  }).sort(function(a,b){return b.total-a.total;});
+  var body = '<table class="detail-table"><thead><tr><th>Recruiter</th><th style="text-align:right">Calls</th><th style="text-align:right">Texts</th><th style="text-align:right">Emails</th><th style="text-align:right">Patients</th><th style="text-align:right">Interested</th><th style="text-align:right">Total</th></tr></thead><tbody>';
+  rows.forEach(function(r){
+    body += '<tr><td style="font-weight:600">'+escapeHTML(r.nick)+'</td><td style="text-align:right">'+r.calls+'</td><td style="text-align:right">'+r.texts+'</td><td style="text-align:right">'+r.emails+'</td><td style="text-align:right;color:#7c3aed;font-weight:600">'+r.patients+'</td><td style="text-align:right;color:#059669;font-weight:600">'+r.interested+'</td><td style="text-align:right;font-weight:700">'+r.total+'</td></tr>';
+  });
+  body += '</tbody></table>';
+  var total = rows.reduce(function(s,r){return s+r.total;},0);
+  openModal('Recruiter Outreach Activity', total+' total interactions (last 30 days)', body);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -14038,10 +14027,14 @@ function setTrendsRange(days, btn) {
 function renderCoordTrendChart() {
   var trends = DATA.weeklyTrends || [];
   if (!trends.length) return;
+  // Only show SCHEDULE_COORDINATORS (5 core coordinators)
+  var schedCoords = CRP_CONFIG.SCHEDULE_COORDINATORS || CRP_CONFIG.COORDINATORS || [];
+  var schedSet = {};
+  schedCoords.forEach(function(n) { schedSet[n.toLowerCase()] = n; });
   var allCoords = new Set();
-  trends.forEach(function(t) { Object.keys(t.byCoord).forEach(function(c) { allCoords.add(c); }); });
-  var coordColors = ['#dc2626','#2563eb','#059669','#d97706','#7c3aed','#db2777','#0891b2','#65a30d'];
-  var topCoords = Array.from(allCoords).slice(0, 8);
+  trends.forEach(function(t) { Object.keys(t.byCoord).forEach(function(c) { if (schedSet[c.toLowerCase()]) allCoords.add(c); }); });
+  var coordColors = ['#dc2626','#2563eb','#059669','#d97706','#7c3aed'];
+  var topCoords = Array.from(allCoords).slice(0, 5);
   mkChart('trendsCoordChart', {
     type: 'line',
     data: {
