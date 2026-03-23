@@ -2431,7 +2431,23 @@ function buildRiskFlagCards() {
 function buildScheduleTable() {
   var tbody = document.getElementById('upcoming-tbody');
   if (!tbody) return;
-  var visits = (DATA && DATA.allVisitDetail) ? DATA.allVisitDetail : [];
+  var visits = (DATA && DATA.allVisitDetail) ? DATA.allVisitDetail.map(function(v){ v._prescreen = false; return v; }) : [];
+  // Merge pre-screening visits (display only, not in metrics)
+  if (window._prescrVisits && window._prescrVisits.length > 0) {
+    window._prescrVisits.forEach(function(r) {
+      visits.push({
+        name: r.subject_full_name || '', patient: r.subject_full_name || '',
+        date: (() => { var d = _parseDate(r.scheduled_date); return d ? d.toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '—'; })(),
+        date_iso: r.scheduled_date || '',
+        study: (r.study_name||'').split(' - ').pop().trim(),
+        study_url: '', visit: r.visit_name || '',
+        patient_url: '', status: r.subject_status || '',
+        coord: r.staff_full_name || '', investigator: r.investigator || '',
+        site: r.site_name || '', _prescreen: true
+      });
+    });
+    visits.sort(function(a,b) { return (a.date_iso||'').localeCompare(b.date_iso||''); });
+  }
   if (!visits.length) {
     _log('buildScheduleTable: no allVisitDetail data, keeping static rows');
     return;
@@ -2493,6 +2509,7 @@ function buildScheduleTable() {
     var studyHtml = v.study_url
       ? '<a href="' + v.study_url + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="text-decoration:none;color:var(--navy);font-weight:600">' + studyText + linkSvg + '</a>'
       : studyText;
+    if (v._prescreen) studyHtml += ' <span style="font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px;background:#dbeafe;color:#3b82f6;">Pre-Screen</span>';
     // Patient cell (PHI masked + escaped)
     var patRaw = v.patient||'—';
     var patText = esc(PHI_MASKED ? maskPHI(patRaw) : patRaw);
@@ -4069,8 +4086,8 @@ function fetchActionRequiredData() {
   var base = CRP_CONFIG.CF_BASE;
   var _s = function(id, val) { var e = document.getElementById(id); if (e) e.textContent = val; };
 
-  // Batch fetch all 5 feeds in one request (reduces HTTP overhead)
-  fetch(base + '?feed=batch&feeds=comments,documentSummary,visitTodos,regulatory,recruiterStats,demographics,eregPending&format=json')
+  // Batch fetch feeds in one request (reduces HTTP overhead)
+  fetch(base + '?feed=batch&feeds=comments,documentSummary,visitTodos,regulatory,recruiterStats,demographics,eregPending,prescrVisits&format=json')
   .then(function(r) { return r.json(); })
   .then(function(batch) {
     var results = batch.results || {};
@@ -4079,6 +4096,14 @@ function fetchActionRequiredData() {
     var todos = (results.visitTodos || {}).data || [];
     var regulatory = (results.regulatory || {}).data || [];
     window._recruiterStats = (results.recruiterStats || {}).data || [];
+
+    // Pre-screening visits (display only in schedule table, not in metrics)
+    var prescr = (results.prescrVisits || {}).data || [];
+    if (prescr.length > 0) {
+      window._prescrVisits = prescr.filter(function(r){ return r.appointment_status !== 'Cancelled'; });
+      _log('Pre-screening visits: ' + window._prescrVisits.length + ' upcoming');
+      safe(buildScheduleTable, 'buildScheduleTable-prescr');
+    }
 
     // Demographics — build diversity % per study
     var demoRows = (results.demographics || {}).data || [];

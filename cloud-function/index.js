@@ -424,6 +424,47 @@ const FEEDS = {
     }
   },
 
+  // ── Pre-screening visits (for Schedule tab only, excluded from metrics) ──
+  prescrVisits: {
+    query: () => `SELECT
+      ${STUDY_NAME_SQL} AS study_name,
+      CAST(ca.study_key AS STRING) AS study_key,
+      FORMAT_DATETIME('%Y-%m-%d', ca.start) AS scheduled_date,
+      ${SUBJECT_NAME_SQL} AS subject_full_name,
+      CAST(ca.subject_key AS STRING) AS subject_key_back_end,
+      CASE ca.status WHEN 0 THEN 'Cancelled' ELSE 'Active' END AS appointment_status,
+      COALESCE(sv.name, '') AS visit_name,
+      ${SUBJECT_STATUS_SQL} AS subject_status,
+      COALESCE(sc.name, '') AS staff_full_name,
+      COALESCE(si.name, '') AS site_name,
+      COALESCE(sp.name, '') AS investigator,
+      FORMAT_DATETIME('%Y-%m-%d', CURRENT_DATETIME()) AS snapshot_date
+    FROM ${tbl('calendar_appointment')} ca
+    LEFT JOIN ${tbl('subject')} sub ON ca.subject_key = sub.subject_key
+    LEFT JOIN ${tbl('study')} st ON ca.study_key = st.study_key
+    LEFT JOIN ${tbl('site')} si ON ca.site_key = si.site_key
+    LEFT JOIN ${tbl('study_visit')} sv ON ca.study_visit_key = sv.study_visit_key
+    LEFT JOIN (SELECT ua.calendar_appointment_key, CONCAT(u.first_name, ' ', u.last_name) AS name
+      FROM ${tbl('user_appointment')} ua
+      JOIN ${tbl('study_user')} su ON ua.user_key = su.user_key AND ua.study_key = su.study_key AND su.role = 2
+      JOIN ${tbl('user')} u ON ua.user_key = u.user_key
+      WHERE ua._fivetran_deleted = false AND su._fivetran_deleted = false
+      QUALIFY ROW_NUMBER() OVER (PARTITION BY ua.calendar_appointment_key ORDER BY ua.date_created DESC) = 1) sc ON ca.calendar_appointment_key = sc.calendar_appointment_key
+    LEFT JOIN (SELECT ua.calendar_appointment_key, CONCAT(u.first_name, ' ', u.last_name) AS name
+      FROM ${tbl('user_appointment')} ua
+      JOIN ${tbl('study_user')} su ON ua.user_key = su.user_key AND ua.study_key = su.study_key AND su.role = 1
+      JOIN ${tbl('user')} u ON ua.user_key = u.user_key
+      WHERE ua._fivetran_deleted = false AND su._fivetran_deleted = false
+      QUALIFY ROW_NUMBER() OVER (PARTITION BY ua.calendar_appointment_key ORDER BY ua.date_created DESC) = 1) sp ON ca.calendar_appointment_key = sp.calendar_appointment_key
+    WHERE ca.subject_key IS NOT NULL AND st.is_active = 1 AND st.site_key NOT IN (5547)
+      AND ca.status != 0
+      AND ca.start >= CURRENT_DATETIME()
+      AND ca.start <= DATETIME_ADD(CURRENT_DATETIME(), INTERVAL 365 DAY)
+      AND LOWER(CONCAT(COALESCE(st.nickname, ''), ' ', COALESCE(st.protocol_number, ''))) LIKE '%pre-screen%'
+      AND st.status != 0
+    ORDER BY ca.start ASC`
+  },
+
   // ── 7. Patient DB ──
   patientDB: {
     query: () => `SELECT
