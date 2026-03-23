@@ -1594,7 +1594,7 @@ function switchTab(name, el) {
   if (navWrap) navWrap.classList.remove('open');
 
   // Performance tabs → delegate to switchView (handles lazy building)
-  const PERF_TABS = ['overview','studies','schedule','referrals','admin'];
+  const PERF_TABS = ['overview','studies','schedule','referrals','medrec','admin'];
   if (PERF_TABS.includes(name)) {
     // Hide finance+insights views first
     document.querySelectorAll('[id^="view-fin-"], #view-insights').forEach(v => {
@@ -4375,6 +4375,9 @@ function switchView(name, el) {
   }
   if (name === 'referrals') {
     setTimeout(() => initReferrals(), 50);
+  }
+  if (name === 'medrec') {
+    setTimeout(() => renderMedRecTab(), 50);
   }
   if (name === 'trends' && typeof LONGITUDINAL !== 'undefined' && LONGITUDINAL) {
     setTimeout(() => renderTrendsCharts(), 50);
@@ -10817,6 +10820,121 @@ function showMedRecFilteredModal(filterKey) {
   openModal(title, patients.length + ' patients', html);
 }
 
+
+// ══════════════════════════════════════════════════════════════
+// MED RECORDS TAB (dedicated view)
+// ══════════════════════════════════════════════════════════════
+var _medRecTabFilter = 'all';
+
+function filterMedRec(filter, btn) {
+  _medRecTabFilter = filter;
+  document.querySelectorAll('#medrec-filter-bar .sched-filter').forEach(function(b) {
+    b.style.background = 'var(--surface)'; b.style.color = 'var(--muted)'; b.style.borderColor = 'var(--border)';
+  });
+  if (btn) { btn.style.background = '#e8eeff'; btn.style.color = '#1843ad'; btn.style.borderColor = '#1843ad'; }
+  renderMedRecTab();
+}
+
+function renderMedRecTab() {
+  if (!MED_RECORDS_DATA || MED_RECORDS_DATA.length === 0) return;
+  var data = MED_RECORDS_DATA;
+  var active = data.filter(function(r){ return r.is_active; });
+  var closed = data.filter(function(r){ return !r.is_active; });
+
+  // Apply filter
+  var filtered = data;
+  if (_medRecTabFilter === 'all') filtered = active;
+  else if (_medRecTabFilter === 'pending_release') filtered = data.filter(function(r){ return r.is_active && r.status === 'Pending Release'; });
+  else if (_medRecTabFilter === 'under_review') filtered = data.filter(function(r){ return r.is_active && r.status === 'Under Review'; });
+  else if (_medRecTabFilter === 'ready_sched') filtered = data.filter(function(r){ return r.is_active && r.status === 'Ready to Schedule'; });
+  else if (_medRecTabFilter === 'in_screening') filtered = data.filter(function(r){ return r.is_active && r.status === 'In Screening'; });
+  else if (_medRecTabFilter === 'enrolled') filtered = data.filter(function(r){ return r.status === 'Enrolled'; });
+  else if (_medRecTabFilter === 'pi_pending') filtered = data.filter(function(r){ return r.is_active && r.investigator_approval && r.investigator_approval.indexOf('Confirmed') === -1 && r.investigator_approval !== 'Not Applicable' && r.investigator_approval !== ''; });
+  else if (_medRecTabFilter === 'closed') filtered = closed;
+
+  // Badge
+  var badge = document.getElementById('medrec-count-badge');
+  if (badge) badge.textContent = filtered.length + ' of ' + data.length + ' patients';
+
+  // KPI strip
+  var kpiEl = document.getElementById('medrec-kpi-strip');
+  if (kpiEl) {
+    var pendRel = data.filter(function(r){ return r.is_active && r.status === 'Pending Release'; }).length;
+    var underRev = data.filter(function(r){ return r.is_active && r.status === 'Under Review'; }).length;
+    var readySch = data.filter(function(r){ return r.is_active && r.status === 'Ready to Schedule'; }).length;
+    var inScreen = data.filter(function(r){ return r.is_active && r.status === 'In Screening'; }).length;
+    var enrolled = data.filter(function(r){ return r.status === 'Enrolled'; }).length;
+    var recPend = data.filter(function(r){ return r.is_active && r.records_received === 'Pending'; }).length;
+    var piPend = data.filter(function(r){ return r.is_active && r.investigator_approval && r.investigator_approval.indexOf('Confirmed') === -1 && r.investigator_approval !== 'Not Applicable' && r.investigator_approval !== ''; }).length;
+    var stale = data.filter(function(r){ return r.is_active && r.days_since_update > 14; }).length;
+    kpiEl.innerHTML =
+      '<div class="tb-section kpi-clickable" onclick="filterMedRec(\'all\',null)"><div class="tb-label">Active</div><div class="tb-value blue">'+active.length+'</div></div>' +
+      '<div class="tb-section kpi-clickable" onclick="filterMedRec(\'pending_release\',null)"><div class="tb-label">Pending Release</div><div class="tb-value" style="color:#f59e0b">'+pendRel+'</div></div>' +
+      '<div class="tb-section kpi-clickable" onclick="filterMedRec(\'ready_sched\',null)"><div class="tb-label">Ready to Schedule</div><div class="tb-value green">'+readySch+'</div></div>' +
+      '<div class="tb-section kpi-clickable" onclick="filterMedRec(\'in_screening\',null)"><div class="tb-label">In Screening</div><div class="tb-value" style="color:#8b5cf6">'+inScreen+'</div></div>' +
+      '<div class="tb-section kpi-clickable" onclick="filterMedRec(\'enrolled\',null)"><div class="tb-label">Enrolled</div><div class="tb-value green">'+enrolled+'</div></div>' +
+      '<div class="tb-section kpi-clickable" onclick="filterMedRec(\'pi_pending\',null)"><div class="tb-label">PI Pending</div><div class="tb-value" style="color:#dc2626">'+piPend+'</div></div>' +
+      '<div class="tb-section"><div class="tb-label">Stale (14d+)</div><div class="tb-value" style="color:'+(stale>0?'#dc2626':'#059669')+'">'+stale+'</div></div>';
+  }
+
+  // Status colors
+  var SC = {'Enrolled':'#059669','In Screening':'#8b5cf6','Visit Scheduled':'#06b6d4','Ready to Schedule':'#f59e0b','Pending Release':'#94a3b8','Under Review':'#64748b','DNQ':'#dc2626','Screen Fail':'#dc2626','No Show':'#dc2626','Not Interested':'#94a3b8','Complete':'#059669'};
+  var RC = {'Received':'#059669','Pending':'#f59e0b','Not applicable':'#94a3b8','Unavailable':'#dc2626'};
+  var PC = {'Confirmed - (ready to schedule)':'#059669','Pending Submission':'#f59e0b','Under Review':'#8b5cf6','DNQ':'#dc2626','Not Applicable':'#94a3b8'};
+  function bdg(val, map) {
+    if (!val) return '<span style="color:#cbd5e1">—</span>';
+    var c = map[val] || '#64748b';
+    return '<span style="padding:2px 6px;border-radius:4px;font-size:9px;font-weight:600;background:'+c+'18;color:'+c+'">'+escapeHTML(val)+'</span>';
+  }
+
+  // Table rows
+  var tbody = document.getElementById('medrec-tbody');
+  if (!tbody) return;
+  filtered.sort(function(a,b){ return (a.days_since_update||999) < (b.days_since_update||999) ? 1 : -1; });
+  var html = '';
+  filtered.forEach(function(r) {
+    var staleColor = r.days_since_update > 14 ? '#dc2626' : r.days_since_update > 7 ? '#f59e0b' : '#64748b';
+    var patLink = r.crio_link || r.url || '#';
+    html += '<tr style="border-bottom:1px solid var(--border);">';
+    html += '<td style="padding:8px;"><a href="'+escapeHTML(patLink)+'" target="_blank" style="font-weight:600;color:#1e293b;text-decoration:none;">'+maskPHI(r.name)+'</a></td>';
+    html += '<td style="padding:8px;font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+escapeHTML(r.study||'')+'">'+escapeHTML(r.study||'—')+'</td>';
+    html += '<td style="padding:8px;text-align:center;">'+bdg(r.status, SC)+'</td>';
+    html += '<td style="padding:8px;text-align:center;">'+bdg(r.records_received, RC)+'</td>';
+    html += '<td style="padding:8px;text-align:center;">'+bdg(r.medical_release, {'Recieved':'#059669','Pending':'#f59e0b','Contact 1':'#3b82f6','Contact 2':'#8b5cf6','Contact 3':'#dc2626'})+'</td>';
+    html += '<td style="padding:8px;text-align:center;">'+bdg(r.investigator_approval, PC)+'</td>';
+    html += '<td style="padding:8px;text-align:center;font-size:11px;color:var(--muted);">'+escapeHTML(r.next_visit_date||r.next_appointment||'—')+'</td>';
+    html += '<td style="padding:8px;font-size:11px;">'+escapeHTML(r.assignee||'—')+'</td>';
+    html += '<td style="padding:8px;text-align:center;font-weight:600;color:'+staleColor+';">'+r.days_since_update+'d</td>';
+    html += '</tr>';
+  });
+  tbody.innerHTML = html;
+
+  // By-Study breakdown
+  var byStudyEl = document.getElementById('medrec-by-study');
+  if (byStudyEl) {
+    var byStudy = {};
+    data.forEach(function(r) {
+      var s = r.study || 'Unknown';
+      if (!byStudy[s]) byStudy[s] = { active: 0, closed: 0, total: 0 };
+      byStudy[s].total++;
+      if (r.is_active) byStudy[s].active++; else byStudy[s].closed++;
+    });
+    var studies = Object.entries(byStudy).sort(function(a,b){ return b[1].active - a[1].active; });
+    var maxActive = Math.max.apply(null, studies.map(function(s){ return s[1].active; }).concat([1]));
+    var sHtml = '';
+    studies.forEach(function(entry) {
+      var name = entry[0], s = entry[1];
+      var pct = Math.round(s.active / maxActive * 100);
+      sHtml += '<div style="display:grid;grid-template-columns:1fr 60px 60px;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showMedRecDetailModal(\''+jsAttr(name)+'\')">';
+      sHtml += '<div><div style="font-size:11px;font-weight:600;margin-bottom:3px;">'+escapeHTML(name)+'</div>';
+      sHtml += '<div style="height:5px;background:#e2e8f0;border-radius:3px;overflow:hidden;"><div style="width:'+pct+'%;height:100%;background:#8b5cf6;border-radius:3px;"></div></div></div>';
+      sHtml += '<div style="text-align:center;font-size:12px;font-weight:700;color:#8b5cf6;">'+s.active+'</div>';
+      sHtml += '<div style="text-align:center;font-size:11px;color:#94a3b8;">'+s.closed+' closed</div>';
+      sHtml += '</div>';
+    });
+    byStudyEl.innerHTML = sHtml;
+  }
+}
 
 // ══════════════════════════════════════════════════════════════
 // PATIENT TRACKER NJ (PENNINGTON)

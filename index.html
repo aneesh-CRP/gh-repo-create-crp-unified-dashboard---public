@@ -1053,6 +1053,7 @@ body {
     <span class="nav-tab" onclick="switchTab('studies', this)" role="tab">Studies</span>
     <span class="nav-tab" onclick="switchTab('schedule', this)" role="tab">Schedule</span>
     <span class="nav-tab" onclick="switchTab('referrals', this)" role="tab">Referrals</span>
+    <span class="nav-tab" onclick="switchTab('medrec', this)" role="tab">Med Records</span>
     <span class="nav-tab" onclick="switchTab('admin', this)" role="tab">🔒 Admin</span>
     <span style="width:1px;background:#CBD5E0;margin:8px 3px"></span>
     <span class="nav-tab fin-tab" onclick="switchTab('fin-overview',this)" role="tab">🔒 Finance</span>
@@ -1880,6 +1881,66 @@ body {
   </div>
 
 </div><!-- /view-referrals -->
+
+
+<!-- ══ VIEW: MED RECORDS ══════════════════════ -->
+<div id="view-medrec" class="view">
+
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;flex-wrap:wrap;gap:8px;">
+    <div>
+      <span class="card-title" style="font-size:16px;">Medical Records Status</span>
+      <span id="medrec-count-badge" style="font-size:12px;font-weight:500;color:var(--muted);margin-left:6px"></span>
+      <div style="font-size:10px;color:#94a3b8;margin-top:2px;">Screening patient records from ClickUp · medical release, PI approval, and records receipt tracking</div>
+    </div>
+  </div>
+
+  <!-- KPI Strip -->
+  <div class="time-banner fade-in" style="margin-bottom:16px;" id="medrec-kpi-strip"></div>
+
+  <!-- Filters -->
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;" id="medrec-filter-bar">
+    <button class="sched-filter active" onclick="filterMedRec('all',this)" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid #1843ad;background:#e8eeff;color:#1843ad;cursor:pointer">All Active</button>
+    <button class="sched-filter" onclick="filterMedRec('pending_release',this)" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Pending Release</button>
+    <button class="sched-filter" onclick="filterMedRec('under_review',this)" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Under Review</button>
+    <button class="sched-filter" onclick="filterMedRec('ready_sched',this)" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Ready to Schedule</button>
+    <button class="sched-filter" onclick="filterMedRec('in_screening',this)" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">In Screening</button>
+    <button class="sched-filter" onclick="filterMedRec('enrolled',this)" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Enrolled</button>
+    <button class="sched-filter" onclick="filterMedRec('pi_pending',this)" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">PI Pending</button>
+    <button class="sched-filter" onclick="filterMedRec('closed',this)" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Closed</button>
+  </div>
+
+  <!-- Main table -->
+  <div class="card fade-in">
+    <div style="overflow-x:auto;max-height:700px;overflow-y:auto;">
+      <table class="data-table sortable" id="medrec-table">
+        <thead>
+          <tr>
+            <th style="padding:10px 8px;text-align:left;font-weight:700;">Patient</th>
+            <th style="padding:10px 8px;text-align:left;font-weight:700;">Study</th>
+            <th style="padding:10px 8px;text-align:center;font-weight:700;">Status</th>
+            <th style="padding:10px 8px;text-align:center;font-weight:700;">Records</th>
+            <th style="padding:10px 8px;text-align:center;font-weight:700;">Med Release</th>
+            <th style="padding:10px 8px;text-align:center;font-weight:700;">PI Approval</th>
+            <th style="padding:10px 8px;text-align:center;font-weight:700;">Next Visit</th>
+            <th style="padding:10px 8px;text-align:left;font-weight:700;">Assignee</th>
+            <th style="padding:10px 8px;text-align:center;font-weight:700;">Updated</th>
+          </tr>
+        </thead>
+        <tbody id="medrec-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- By-Study breakdown -->
+  <div class="card fade-in" style="margin-top:16px;">
+    <div class="card-header">
+      <span class="card-title">Records by Study</span>
+    </div>
+    <div style="font-size:10px;color:#94a3b8;padding:0 16px;">Active vs closed patients per study · click to expand</div>
+    <div id="medrec-by-study" style="padding:12px 16px;"></div>
+  </div>
+
+</div><!-- /view-medrec -->
 
 
 <!-- ══ VIEW: CONNECT ══════════════════════ -->
@@ -3727,7 +3788,7 @@ function switchTab(name, el) {
   if (navWrap) navWrap.classList.remove('open');
 
   // Performance tabs → delegate to switchView (handles lazy building)
-  const PERF_TABS = ['overview','studies','schedule','referrals','admin'];
+  const PERF_TABS = ['overview','studies','schedule','referrals','medrec','admin'];
   if (PERF_TABS.includes(name)) {
     // Hide finance+insights views first
     document.querySelectorAll('[id^="view-fin-"], #view-insights').forEach(v => {
@@ -6508,6 +6569,9 @@ function switchView(name, el) {
   }
   if (name === 'referrals') {
     setTimeout(() => initReferrals(), 50);
+  }
+  if (name === 'medrec') {
+    setTimeout(() => renderMedRecTab(), 50);
   }
   if (name === 'trends' && typeof LONGITUDINAL !== 'undefined' && LONGITUDINAL) {
     setTimeout(() => renderTrendsCharts(), 50);
@@ -12950,6 +13014,121 @@ function showMedRecFilteredModal(filterKey) {
   openModal(title, patients.length + ' patients', html);
 }
 
+
+// ══════════════════════════════════════════════════════════════
+// MED RECORDS TAB (dedicated view)
+// ══════════════════════════════════════════════════════════════
+var _medRecTabFilter = 'all';
+
+function filterMedRec(filter, btn) {
+  _medRecTabFilter = filter;
+  document.querySelectorAll('#medrec-filter-bar .sched-filter').forEach(function(b) {
+    b.style.background = 'var(--surface)'; b.style.color = 'var(--muted)'; b.style.borderColor = 'var(--border)';
+  });
+  if (btn) { btn.style.background = '#e8eeff'; btn.style.color = '#1843ad'; btn.style.borderColor = '#1843ad'; }
+  renderMedRecTab();
+}
+
+function renderMedRecTab() {
+  if (!MED_RECORDS_DATA || MED_RECORDS_DATA.length === 0) return;
+  var data = MED_RECORDS_DATA;
+  var active = data.filter(function(r){ return r.is_active; });
+  var closed = data.filter(function(r){ return !r.is_active; });
+
+  // Apply filter
+  var filtered = data;
+  if (_medRecTabFilter === 'all') filtered = active;
+  else if (_medRecTabFilter === 'pending_release') filtered = data.filter(function(r){ return r.is_active && r.status === 'Pending Release'; });
+  else if (_medRecTabFilter === 'under_review') filtered = data.filter(function(r){ return r.is_active && r.status === 'Under Review'; });
+  else if (_medRecTabFilter === 'ready_sched') filtered = data.filter(function(r){ return r.is_active && r.status === 'Ready to Schedule'; });
+  else if (_medRecTabFilter === 'in_screening') filtered = data.filter(function(r){ return r.is_active && r.status === 'In Screening'; });
+  else if (_medRecTabFilter === 'enrolled') filtered = data.filter(function(r){ return r.status === 'Enrolled'; });
+  else if (_medRecTabFilter === 'pi_pending') filtered = data.filter(function(r){ return r.is_active && r.investigator_approval && r.investigator_approval.indexOf('Confirmed') === -1 && r.investigator_approval !== 'Not Applicable' && r.investigator_approval !== ''; });
+  else if (_medRecTabFilter === 'closed') filtered = closed;
+
+  // Badge
+  var badge = document.getElementById('medrec-count-badge');
+  if (badge) badge.textContent = filtered.length + ' of ' + data.length + ' patients';
+
+  // KPI strip
+  var kpiEl = document.getElementById('medrec-kpi-strip');
+  if (kpiEl) {
+    var pendRel = data.filter(function(r){ return r.is_active && r.status === 'Pending Release'; }).length;
+    var underRev = data.filter(function(r){ return r.is_active && r.status === 'Under Review'; }).length;
+    var readySch = data.filter(function(r){ return r.is_active && r.status === 'Ready to Schedule'; }).length;
+    var inScreen = data.filter(function(r){ return r.is_active && r.status === 'In Screening'; }).length;
+    var enrolled = data.filter(function(r){ return r.status === 'Enrolled'; }).length;
+    var recPend = data.filter(function(r){ return r.is_active && r.records_received === 'Pending'; }).length;
+    var piPend = data.filter(function(r){ return r.is_active && r.investigator_approval && r.investigator_approval.indexOf('Confirmed') === -1 && r.investigator_approval !== 'Not Applicable' && r.investigator_approval !== ''; }).length;
+    var stale = data.filter(function(r){ return r.is_active && r.days_since_update > 14; }).length;
+    kpiEl.innerHTML =
+      '<div class="tb-section kpi-clickable" onclick="filterMedRec(\'all\',null)"><div class="tb-label">Active</div><div class="tb-value blue">'+active.length+'</div></div>' +
+      '<div class="tb-section kpi-clickable" onclick="filterMedRec(\'pending_release\',null)"><div class="tb-label">Pending Release</div><div class="tb-value" style="color:#f59e0b">'+pendRel+'</div></div>' +
+      '<div class="tb-section kpi-clickable" onclick="filterMedRec(\'ready_sched\',null)"><div class="tb-label">Ready to Schedule</div><div class="tb-value green">'+readySch+'</div></div>' +
+      '<div class="tb-section kpi-clickable" onclick="filterMedRec(\'in_screening\',null)"><div class="tb-label">In Screening</div><div class="tb-value" style="color:#8b5cf6">'+inScreen+'</div></div>' +
+      '<div class="tb-section kpi-clickable" onclick="filterMedRec(\'enrolled\',null)"><div class="tb-label">Enrolled</div><div class="tb-value green">'+enrolled+'</div></div>' +
+      '<div class="tb-section kpi-clickable" onclick="filterMedRec(\'pi_pending\',null)"><div class="tb-label">PI Pending</div><div class="tb-value" style="color:#dc2626">'+piPend+'</div></div>' +
+      '<div class="tb-section"><div class="tb-label">Stale (14d+)</div><div class="tb-value" style="color:'+(stale>0?'#dc2626':'#059669')+'">'+stale+'</div></div>';
+  }
+
+  // Status colors
+  var SC = {'Enrolled':'#059669','In Screening':'#8b5cf6','Visit Scheduled':'#06b6d4','Ready to Schedule':'#f59e0b','Pending Release':'#94a3b8','Under Review':'#64748b','DNQ':'#dc2626','Screen Fail':'#dc2626','No Show':'#dc2626','Not Interested':'#94a3b8','Complete':'#059669'};
+  var RC = {'Received':'#059669','Pending':'#f59e0b','Not applicable':'#94a3b8','Unavailable':'#dc2626'};
+  var PC = {'Confirmed - (ready to schedule)':'#059669','Pending Submission':'#f59e0b','Under Review':'#8b5cf6','DNQ':'#dc2626','Not Applicable':'#94a3b8'};
+  function bdg(val, map) {
+    if (!val) return '<span style="color:#cbd5e1">—</span>';
+    var c = map[val] || '#64748b';
+    return '<span style="padding:2px 6px;border-radius:4px;font-size:9px;font-weight:600;background:'+c+'18;color:'+c+'">'+escapeHTML(val)+'</span>';
+  }
+
+  // Table rows
+  var tbody = document.getElementById('medrec-tbody');
+  if (!tbody) return;
+  filtered.sort(function(a,b){ return (a.days_since_update||999) < (b.days_since_update||999) ? 1 : -1; });
+  var html = '';
+  filtered.forEach(function(r) {
+    var staleColor = r.days_since_update > 14 ? '#dc2626' : r.days_since_update > 7 ? '#f59e0b' : '#64748b';
+    var patLink = r.crio_link || r.url || '#';
+    html += '<tr style="border-bottom:1px solid var(--border);">';
+    html += '<td style="padding:8px;"><a href="'+escapeHTML(patLink)+'" target="_blank" style="font-weight:600;color:#1e293b;text-decoration:none;">'+maskPHI(r.name)+'</a></td>';
+    html += '<td style="padding:8px;font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+escapeHTML(r.study||'')+'">'+escapeHTML(r.study||'—')+'</td>';
+    html += '<td style="padding:8px;text-align:center;">'+bdg(r.status, SC)+'</td>';
+    html += '<td style="padding:8px;text-align:center;">'+bdg(r.records_received, RC)+'</td>';
+    html += '<td style="padding:8px;text-align:center;">'+bdg(r.medical_release, {'Recieved':'#059669','Pending':'#f59e0b','Contact 1':'#3b82f6','Contact 2':'#8b5cf6','Contact 3':'#dc2626'})+'</td>';
+    html += '<td style="padding:8px;text-align:center;">'+bdg(r.investigator_approval, PC)+'</td>';
+    html += '<td style="padding:8px;text-align:center;font-size:11px;color:var(--muted);">'+escapeHTML(r.next_visit_date||r.next_appointment||'—')+'</td>';
+    html += '<td style="padding:8px;font-size:11px;">'+escapeHTML(r.assignee||'—')+'</td>';
+    html += '<td style="padding:8px;text-align:center;font-weight:600;color:'+staleColor+';">'+r.days_since_update+'d</td>';
+    html += '</tr>';
+  });
+  tbody.innerHTML = html;
+
+  // By-Study breakdown
+  var byStudyEl = document.getElementById('medrec-by-study');
+  if (byStudyEl) {
+    var byStudy = {};
+    data.forEach(function(r) {
+      var s = r.study || 'Unknown';
+      if (!byStudy[s]) byStudy[s] = { active: 0, closed: 0, total: 0 };
+      byStudy[s].total++;
+      if (r.is_active) byStudy[s].active++; else byStudy[s].closed++;
+    });
+    var studies = Object.entries(byStudy).sort(function(a,b){ return b[1].active - a[1].active; });
+    var maxActive = Math.max.apply(null, studies.map(function(s){ return s[1].active; }).concat([1]));
+    var sHtml = '';
+    studies.forEach(function(entry) {
+      var name = entry[0], s = entry[1];
+      var pct = Math.round(s.active / maxActive * 100);
+      sHtml += '<div style="display:grid;grid-template-columns:1fr 60px 60px;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showMedRecDetailModal(\''+jsAttr(name)+'\')">';
+      sHtml += '<div><div style="font-size:11px;font-weight:600;margin-bottom:3px;">'+escapeHTML(name)+'</div>';
+      sHtml += '<div style="height:5px;background:#e2e8f0;border-radius:3px;overflow:hidden;"><div style="width:'+pct+'%;height:100%;background:#8b5cf6;border-radius:3px;"></div></div></div>';
+      sHtml += '<div style="text-align:center;font-size:12px;font-weight:700;color:#8b5cf6;">'+s.active+'</div>';
+      sHtml += '<div style="text-align:center;font-size:11px;color:#94a3b8;">'+s.closed+' closed</div>';
+      sHtml += '</div>';
+    });
+    byStudyEl.innerHTML = sHtml;
+  }
+}
 
 // ══════════════════════════════════════════════════════════════
 // PATIENT TRACKER NJ (PENNINGTON)
