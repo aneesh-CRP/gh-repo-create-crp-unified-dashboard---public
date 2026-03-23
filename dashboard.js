@@ -3192,7 +3192,7 @@ function fetchCoordHistory() {
  */
 function exportCoordHistory() {
   var snapshot = loadCoordSnapshot();
-  var COORDS = CRP_CONFIG.COORDINATORS || [];
+  var COORDS = CRP_CONFIG.SCHEDULE_COORDINATORS || CRP_CONFIG.COORDINATORS || [];
   var today = localISO(new Date());
 
   // Merge: file history + localStorage snapshot + live data → combined
@@ -6550,7 +6550,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
   // ── coordinator daily goals (weekdays only) ──
   // Use upcomingAllSnapshots (all daily CRIO snapshots) so past visits are included.
   // The seenCoordVisits set deduplicates by coord+date+subjectId across snapshots.
-  const COORD_NAMES = CRP_CONFIG.COORDINATORS || [];
+  const COORD_NAMES = CRP_CONFIG.SCHEDULE_COORDINATORS || CRP_CONFIG.COORDINATORS || [];
   const COORD_LOWER = COORD_NAMES.map(c => c.toLowerCase());
   const coordGoals = { byDay: {}, byMonth: {}, byDayDetail: {} };
   const seenCoordVisits = new Set();
