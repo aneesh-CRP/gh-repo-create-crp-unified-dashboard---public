@@ -1216,34 +1216,35 @@ body {
     </div>
   </div>
 
-  <!-- Row 2: Cancel by Study + Reason Breakdown -->
+  <!-- Row 2: Study Breakdown (stacked) + Reasons -->
   <div class="grid-65 fade-in">
     <div class="card">
       <div class="card-header">
-        <span class="card-title">Cancellations by Study (Last 2 Months)</span>
-        <span class="badge badge-gray">Top 10</span>
+        <span class="card-title">Study Breakdown (Last 2 Months)</span>
+        <span class="badge badge-gray">Cancels · No Shows · SF · Withdrew</span>
       </div>
       <div id="cancel-study-bars"></div>
     </div>
     <div class="card">
       <div class="card-header">
-        <span class="card-title">Cancellation Root Causes</span>
-        <span class="badge badge-yellow">Why visits are missed</span>
+        <span class="card-title">Reasons by Category</span>
       </div>
-      <div class="chart-wrap" style="height:170px">
+      <div id="reason-breakdown"></div>
+      <div class="chart-wrap" style="height:150px;display:none">
         <canvas id="reasonChart"></canvas>
       </div>
-      <div class="legend-list" style="margin-top:12px;" id="reason-legend"></div>
+      <div class="legend-list" style="margin-top:8px;display:none" id="reason-legend"></div>
     </div>
   </div>
 
-  <!-- Row 4: Site Split -->
+  <!-- Row 4: Site Breakdown (stacked) -->
   <div class="card mb16 fade-in">
     <div class="card-header">
-      <span class="card-title">Site Comparison · PHL vs PNJ</span>
-      <span class="badge badge-gray">Cancellations vs. upcoming by site</span>
+      <span class="card-title">Site Breakdown · PHL vs PNJ</span>
+      <span class="badge badge-gray">All categories by site</span>
     </div>
-    <div class="chart-wrap h200">
+    <div id="site-stacked-bars"></div>
+    <div class="chart-wrap h200" style="display:none">
       <canvas id="siteChart"></canvas>
     </div>
   </div>

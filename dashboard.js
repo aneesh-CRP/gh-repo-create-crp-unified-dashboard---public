@@ -2991,26 +2991,135 @@ function showHorizonDetail(type, weekLabel) {
 
 function buildCancelStudyBars() {
   const el = document.getElementById('cancel-study-bars');
-  if (!el || !DATA.cancelByStudy || !DATA.cancelByStudy.length) return;
-  const max = DATA.cancelByStudy[0].count;
-  el.innerHTML = DATA.cancelByStudy.map(d => {
-    const label = d.study || d.name || d.full || '—';
-    const pct   = (d.count / max * 100).toFixed(0);
-    const color = d.count >= 30 ? '#dc2626' : d.count >= 15 ? '#d97706' : '#072061';
-    const linkIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-left:3px;opacity:0.45;vertical-align:middle;flex-shrink:0"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>`;
-    const esLabel = escapeHTML(label);
-    const labelHtml = d.study_url
-      ? `<a href="${escapeHTML(d.study_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="text-decoration:none;font-size:11px;color:var(--muted);">${esLabel}${linkIcon}</a>`
-      : esLabel;
-    return `<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #f1f5f9;cursor:pointer;"
-                 onclick="showCancels(r=>r.study==='${jsAttr(label)}','${esLabel} — Cancellations','${d.count} records')">
-      <span style="font-size:11px;color:var(--muted);width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esLabel}">${labelHtml}</span>
-      <div style="flex:1;height:8px;background:var(--border);border-radius:4px;overflow:hidden">
-        <div style="width:${pct}%;height:100%;background:${color};border-radius:4px;"></div>
-      </div>
-      <span style="font-size:12px;font-weight:700;color:${color};width:24px;text-align:right">${d.count}</span>
-    </div>`;
+  if (!el || !DATA) return;
+  var cancels = DATA.allCancels || [];
+  var noShows = DATA.noShows || [];
+  var screenFails = DATA.screenFails || [];
+  var withdrawals = DATA.withdrawals || [];
+
+  // Aggregate by study
+  var studies = {};
+  function addToStudy(rows, cat) {
+    rows.forEach(function(r) {
+      var s = r.study || '—';
+      if (!studies[s]) studies[s] = { study: s, cancels: 0, noShows: 0, screenFails: 0, withdrew: 0, total: 0, study_url: r.study_url || '' };
+      studies[s][cat]++;
+      studies[s].total++;
+    });
+  }
+  addToStudy(cancels, 'cancels');
+  addToStudy(noShows, 'noShows');
+  addToStudy(screenFails, 'screenFails');
+  addToStudy(withdrawals, 'withdrew');
+
+  var sorted = Object.values(studies).sort(function(a,b) { return b.total - a.total; }).slice(0, 12);
+  if (sorted.length === 0) { el.innerHTML = '<div style="padding:20px;color:#94a3b8;font-size:12px;text-align:center;">No data</div>'; return; }
+  var max = sorted[0].total || 1;
+  var colors = { cancels: '#dc2626', noShows: '#f59e0b', screenFails: '#6366f1', withdrew: '#8b5cf6' };
+
+  el.innerHTML = '<div style="display:flex;gap:6px;margin-bottom:8px;font-size:9px;color:#94a3b8;">' +
+    '<span><span style="display:inline-block;width:8px;height:8px;background:#dc2626;border-radius:2px;margin-right:3px;"></span>Cancels</span>' +
+    '<span><span style="display:inline-block;width:8px;height:8px;background:#f59e0b;border-radius:2px;margin-right:3px;"></span>No Shows</span>' +
+    '<span><span style="display:inline-block;width:8px;height:8px;background:#6366f1;border-radius:2px;margin-right:3px;"></span>Screen Fail</span>' +
+    '<span><span style="display:inline-block;width:8px;height:8px;background:#8b5cf6;border-radius:2px;margin-right:3px;"></span>Withdrew</span></div>' +
+    sorted.map(function(d) {
+    var totalPct = (d.total / max * 100);
+    var cW = d.total > 0 ? (d.cancels / d.total * totalPct) : 0;
+    var nW = d.total > 0 ? (d.noShows / d.total * totalPct) : 0;
+    var sW = d.total > 0 ? (d.screenFails / d.total * totalPct) : 0;
+    var wW = d.total > 0 ? (d.withdrew / d.total * totalPct) : 0;
+    return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f8fafc;cursor:pointer;" onclick="showStudyUnifiedModal(\'' + jsAttr(d.study) + '\')">' +
+      '<span style="font-size:10px;color:#64748b;width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + escapeHTML(d.study) + '">' + escapeHTML(d.study) + '</span>' +
+      '<div style="flex:1;height:12px;background:#f1f5f9;border-radius:4px;overflow:hidden;display:flex;">' +
+      (cW > 0 ? '<div style="width:' + cW.toFixed(1) + '%;background:#dc2626;height:100%;"></div>' : '') +
+      (nW > 0 ? '<div style="width:' + nW.toFixed(1) + '%;background:#f59e0b;height:100%;"></div>' : '') +
+      (sW > 0 ? '<div style="width:' + sW.toFixed(1) + '%;background:#6366f1;height:100%;"></div>' : '') +
+      (wW > 0 ? '<div style="width:' + wW.toFixed(1) + '%;background:#8b5cf6;height:100%;"></div>' : '') +
+      '</div>' +
+      '<span style="font-size:11px;font-weight:700;color:#1e293b;width:28px;text-align:right;">' + d.total + '</span></div>';
   }).join('');
+}
+
+function buildReasonBreakdown() {
+  var el = document.getElementById('reason-breakdown');
+  if (!el || !DATA) return;
+  var reasons = DATA.cancelReasons || [];
+  if (reasons.length === 0) { el.innerHTML = '<div style="padding:20px;color:#94a3b8;font-size:12px;text-align:center;">No data</div>'; return; }
+  var total = reasons.reduce(function(s, r) { return s + r.count; }, 0);
+  var catColors = { 'Patient Cancelled': '#dc2626', 'Site Cancelled': '#f59e0b', 'No Show': '#f97316', 'Screen Fail / DNQ': '#6366f1',
+    'Patient Withdrew': '#8b5cf6', 'Rescheduled': '#059669', 'Weather': '#0ea5e9', 'BMI / Labs': '#d946ef',
+    'Admin Error': '#64748b', 'Undocumented': '#94a3b8', 'Other': '#cbd5e1' };
+  el.innerHTML = reasons.map(function(r) {
+    var pct = total > 0 ? Math.round(r.count / total * 100) : 0;
+    var color = catColors[r.category] || '#94a3b8';
+    return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f8fafc;cursor:pointer;" onclick="showCancelsByReason(\'' + jsAttr(r.category) + '\')">' +
+      '<span style="display:inline-block;width:10px;height:10px;background:' + color + ';border-radius:2px;flex-shrink:0;"></span>' +
+      '<span style="font-size:11px;color:#475569;flex:1;">' + escapeHTML(r.category) + '</span>' +
+      '<span style="font-size:11px;font-weight:700;color:' + color + ';">' + r.count + '</span>' +
+      '<span style="font-size:10px;color:#94a3b8;width:30px;text-align:right;">' + pct + '%</span></div>';
+  }).join('');
+}
+
+function buildSiteStackedBars() {
+  var el = document.getElementById('site-stacked-bars');
+  if (!el || !DATA || !DATA.sites) return;
+  var cancels = DATA.allCancels || [];
+  var noShows = DATA.noShows || [];
+  var screenFails = DATA.screenFails || [];
+  var withdrawals = DATA.withdrawals || [];
+  var upcoming = DATA.allVisitDetail || [];
+
+  var sites = {};
+  function classify(rows, cat) {
+    rows.forEach(function(r) {
+      var site = (r.site || '').indexOf('Penn') !== -1 ? 'PNJ' : 'PHL';
+      if (!sites[site]) sites[site] = { cancels: 0, noShows: 0, screenFails: 0, withdrew: 0, upcoming: 0, total: 0 };
+      sites[site][cat]++;
+      sites[site].total++;
+    });
+  }
+  classify(cancels, 'cancels');
+  classify(noShows, 'noShows');
+  classify(screenFails, 'screenFails');
+  classify(withdrawals, 'withdrew');
+  upcoming.forEach(function(r) {
+    var site = (r.site || '').indexOf('Penn') !== -1 ? 'PNJ' : 'PHL';
+    if (!sites[site]) sites[site] = { cancels: 0, noShows: 0, screenFails: 0, withdrew: 0, upcoming: 0, total: 0 };
+    sites[site].upcoming++;
+  });
+
+  var html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:12px;">';
+  ['PHL', 'PNJ'].forEach(function(site) {
+    var s = sites[site] || { cancels: 0, noShows: 0, screenFails: 0, withdrew: 0, upcoming: 0, total: 0 };
+    var allEvents = s.cancels + s.noShows + s.screenFails + s.withdrew + s.upcoming;
+    if (allEvents === 0) allEvents = 1;
+    html += '<div style="text-align:center;">';
+    html += '<div style="font-size:14px;font-weight:700;color:' + (site === 'PHL' ? '#072061' : '#059669') + ';margin-bottom:8px;">' + site + '</div>';
+    html += '<div style="display:flex;height:16px;border-radius:4px;overflow:hidden;margin-bottom:8px;">';
+    if (s.upcoming) html += '<div style="width:' + (s.upcoming/allEvents*100).toFixed(1) + '%;background:#3b82f6;" title="' + s.upcoming + ' upcoming"></div>';
+    if (s.cancels) html += '<div style="width:' + (s.cancels/allEvents*100).toFixed(1) + '%;background:#dc2626;" title="' + s.cancels + ' cancels"></div>';
+    if (s.noShows) html += '<div style="width:' + (s.noShows/allEvents*100).toFixed(1) + '%;background:#f59e0b;" title="' + s.noShows + ' no shows"></div>';
+    if (s.screenFails) html += '<div style="width:' + (s.screenFails/allEvents*100).toFixed(1) + '%;background:#6366f1;" title="' + s.screenFails + ' SF"></div>';
+    if (s.withdrew) html += '<div style="width:' + (s.withdrew/allEvents*100).toFixed(1) + '%;background:#8b5cf6;" title="' + s.withdrew + ' withdrew"></div>';
+    html += '</div>';
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:10px;text-align:left;">';
+    html += '<div><span style="color:#3b82f6;font-weight:700;">' + s.upcoming + '</span> upcoming</div>';
+    html += '<div><span style="color:#dc2626;font-weight:700;">' + s.cancels + '</span> cancels</div>';
+    html += '<div><span style="color:#f59e0b;font-weight:700;">' + s.noShows + '</span> no shows</div>';
+    html += '<div><span style="color:#6366f1;font-weight:700;">' + s.screenFails + '</span> screen fail</div>';
+    html += '<div><span style="color:#8b5cf6;font-weight:700;">' + s.withdrew + '</span> withdrew</div>';
+    var cancelRate = (s.upcoming + s.cancels) > 0 ? Math.round(s.cancels / (s.upcoming + s.cancels) * 100) : 0;
+    html += '<div><span style="color:#475569;font-weight:700;">' + cancelRate + '%</span> cancel rate</div>';
+    html += '</div></div>';
+  });
+  html += '</div>';
+  html += '<div style="display:flex;gap:8px;justify-content:center;font-size:9px;color:#94a3b8;padding:4px 0;">' +
+    '<span><span style="display:inline-block;width:8px;height:8px;background:#3b82f6;border-radius:2px;margin-right:3px;"></span>Upcoming</span>' +
+    '<span><span style="display:inline-block;width:8px;height:8px;background:#dc2626;border-radius:2px;margin-right:3px;"></span>Cancels</span>' +
+    '<span><span style="display:inline-block;width:8px;height:8px;background:#f59e0b;border-radius:2px;margin-right:3px;"></span>No Shows</span>' +
+    '<span><span style="display:inline-block;width:8px;height:8px;background:#6366f1;border-radius:2px;margin-right:3px;"></span>Screen Fail</span>' +
+    '<span><span style="display:inline-block;width:8px;height:8px;background:#8b5cf6;border-radius:2px;margin-right:3px;"></span>Withdrew</span></div>';
+  el.innerHTML = html;
 }
 
 function showInvDetail(invName) {
@@ -7748,6 +7857,8 @@ function renderAll() {
   safe(buildReasonChart,     'buildReasonChart');
   safe(buildSiteChart,       'buildSiteChart');
   safe(buildCancelStudyBars, 'buildCancelStudyBars');
+  safe(buildReasonBreakdown, 'buildReasonBreakdown');
+  safe(buildSiteStackedBars, 'buildSiteStackedBars');
   safe(renderCoordinatorGoals, 'renderCoordinatorGoals');
   safe(renderCoordWorkloadBalance, 'renderCoordWorkloadBalance');
   safe(renderInvCapacity, 'renderInvCapacity');
