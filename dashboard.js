@@ -3465,40 +3465,31 @@ function renderCoordWorkloadBalance() {
   html += '<div style="padding:8px;background:'+(highCancel.length>0?'#fef2f2':'#f0fdf4')+';border-radius:8px;text-align:center;"><div style="font-size:18px;font-weight:800;color:'+(highCancel.length>0?'#dc2626':'#059669')+';">'+highCancel.length+'</div><div style="font-size:9px;color:'+(highCancel.length>0?'#dc2626':'#059669')+';font-weight:600;">High Cancel Rate</div></div>';
   html += '</div>';
 
-  // Workload bars
-  html += '<div style="display:grid;gap:6px;">';
+  // Workload table
+  html += '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:4px;">';
+  html += '<tr style="background:#f8fafc;"><th style="text-align:left;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Coordinator</th><th style="text-align:left;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Visits</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Site</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Cancel Rate</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Patients</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Studies</th></tr>';
   coordStats.forEach(function(c) {
     var pct = Math.round(c.visits / maxVisits * 100);
-    var devPct = avgVisits > 0 ? Math.round((c.visits - avgVisits) / avgVisits * 100) : 0;
-    var devColor = Math.abs(devPct) <= 15 ? '#059669' : Math.abs(devPct) <= 30 ? '#f59e0b' : '#dc2626';
     var crColor = c.cancelRate > 20 ? '#dc2626' : c.cancelRate > 10 ? '#f59e0b' : '#059669';
-    // Automated indicators
     var alerts = [];
-    if (c.visits < avgVisits * 0.5 && avgVisits > 0) alerts.push({text:'Low Activity', bg:'#fffbeb', color:'#d97706'});
     if (c.cancelRate > 25) alerts.push({text:'High Cancels', bg:'#fef2f2', color:'#dc2626'});
-    // Check for overloaded days (more than 8 visits in a single day)
-    var dayVisits = {};
-    DATA.allVisitDetail.filter(function(v){return v.coord===c.name;}).forEach(function(v){dayVisits[v.date_iso]=(dayVisits[v.date_iso]||0)+1;});
-    var maxDayVisits = Math.max.apply(null, Object.values(dayVisits).concat([0]));
-    if (maxDayVisits > 8) alerts.push({text:'Overloaded ('+maxDayVisits+'/day)', bg:'#fef2f2', color:'#dc2626'});
     if (c.visits > avgVisits * 1.5 && avgVisits > 0 && c.cancelRate < 10) alerts.push({text:'Top Performer', bg:'#f0fdf4', color:'#059669'});
-    var alertHtml = alerts.length > 0 ? ' ' + alerts.map(function(a){ return '<span style="font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px;background:'+a.bg+';color:'+a.color+';">'+a.text+'</span>'; }).join(' ') : '';
+    var alertHtml = alerts.length > 0 ? '<div style="margin-top:2px;">' + alerts.map(function(a){ return '<span style="font-size:9px;font-weight:600;padding:1px 5px;border-radius:3px;background:'+a.bg+';color:'+a.color+';">'+a.text+'</span>'; }).join(' ') + '</div>' : '';
+    var siteBadge = c.pnj > 0 && c.phl > 0 ? '<span style="color:#072061;font-weight:600;">PHL</span> / <span style="color:#059669;font-weight:600;">PNJ</span>' : c.pnj > 0 ? '<span style="padding:2px 6px;border-radius:4px;background:#05966920;color:#059669;font-weight:600;">PNJ</span>' : '<span style="padding:2px 6px;border-radius:4px;background:#07206120;color:#072061;font-weight:600;">PHL</span>';
 
-    var siteBadge = c.pnj > 0 && c.phl > 0 ? '<span style="font-size:8px;color:#072061;">'+c.phl+'</span>/<span style="font-size:8px;color:#059669;">'+c.pnj+'</span>' : c.pnj > 0 ? '<span style="font-size:8px;padding:1px 4px;border-radius:3px;background:#05966920;color:#059669;font-weight:600;">PNJ</span>' : '<span style="font-size:8px;padding:1px 4px;border-radius:3px;background:#07206120;color:#072061;font-weight:600;">PHL</span>';
-    html += '<div style="display:grid;grid-template-columns:110px 1fr 40px 50px 50px 40px;align-items:center;gap:5px;font-size:11px;cursor:pointer;" onclick="showCoordDetail(\''+jsAttr(c.name)+'\')">';
-    html += '<div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+c.name.split(' ')[0]+alertHtml+'</div>';
-    html += '<div style="background:#e2e8f0;border-radius:4px;height:14px;overflow:hidden;position:relative;">';
-    html += '<div style="height:100%;width:'+pct+'%;background:linear-gradient(90deg,#1843AD,#3b82f6);border-radius:4px;"></div>';
-    html += '<div style="position:absolute;left:'+Math.min(pct,50)+'%;top:0;transform:translateX(4px);font-size:9px;font-weight:700;color:'+(pct>30?'#fff':'#1e293b')+';line-height:14px;">'+c.visits+'</div>';
-    html += '</div>';
-    html += '<div style="text-align:center;">'+siteBadge+'</div>';
-    html += '<div style="text-align:center;font-size:10px;color:'+crColor+';font-weight:600;">'+c.cancelRate+'%</div>';
-    html += '<div style="text-align:center;font-size:10px;color:'+devColor+';font-weight:700;">'+(devPct>0?'+':'')+devPct+'%</div>';
-    html += '<div style="text-align:center;font-size:10px;color:#64748b;">'+c.patients+'p</div>';
-    html += '</div>';
+    html += '<tr style="border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showCoordDetail(\''+jsAttr(c.name)+'\')">';
+    html += '<td style="padding:8px;"><div style="font-weight:700;color:#1e293b;">'+escapeHTML(c.name.split(' ')[0])+'</div>'+alertHtml+'</td>';
+    html += '<td style="padding:8px;"><div style="display:flex;align-items:center;gap:8px;"><div style="flex:1;background:#e2e8f0;border-radius:5px;height:18px;overflow:hidden;position:relative;">';
+    html += '<div style="height:100%;width:'+pct+'%;background:linear-gradient(90deg,#1843AD,#3b82f6);border-radius:5px;"></div>';
+    html += '<div style="position:absolute;left:8px;top:0;font-size:11px;font-weight:700;color:'+(pct>30?'#fff':'#1e293b')+';line-height:18px;">'+c.visits+'</div>';
+    html += '</div></div></td>';
+    html += '<td style="padding:8px;text-align:center;font-size:11px;">'+siteBadge+'</td>';
+    html += '<td style="padding:8px;text-align:center;font-weight:700;color:'+crColor+';">'+c.cancelRate+'%</td>';
+    html += '<td style="padding:8px;text-align:center;font-weight:600;color:#475569;">'+c.patients+'</td>';
+    html += '<td style="padding:8px;text-align:center;font-weight:600;color:#475569;">'+c.studies+'</td>';
+    html += '</tr>';
   });
-  html += '</div>';
-  html += '<div style="margin-top:6px;font-size:9px;color:#94a3b8;text-align:right;">Upcoming visits · CR = cancel rate · Balance = deviation from average</div>';
+  html += '</table>';
 
   el.innerHTML = html;
 }
@@ -12870,16 +12861,21 @@ function renderCoordProductivity() {
   data.sort(function(a,b) { return b.total - a.total; });
   if (badge) badge.textContent = data.length + ' staff (30d)';
   var maxTotal = data[0].total || 1;
-  var html = '<div style="font-size:10px;color:#94a3b8;margin-bottom:6px;">eSource & outreach activity (last 30 days)</div>';
-  data.forEach(function(r, i) {
+  var html = '<div style="font-size:11px;color:#64748b;margin-bottom:8px;font-weight:600;">eSource & Outreach Activity (last 30 days)</div>';
+  html += '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
+  html += '<tr style="background:#f8fafc;"><th style="text-align:left;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Name</th><th style="text-align:left;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Activity</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Total</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Patients</th></tr>';
+  data.forEach(function(r) {
     var barW = Math.round(r.total / maxTotal * 100);
-    html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f1f5f9;">' +
-      '<div style="width:100px;font-weight:600;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHTML(r.name.split(' ')[0]) + '</div>' +
-      '<div style="flex:1;background:#e2e8f0;border-radius:4px;height:14px;position:relative;">' +
-      '<div style="width:' + barW + '%;background:linear-gradient(90deg,#3b82f6,#8b5cf6);height:100%;border-radius:4px;"></div>' +
-      '<span style="position:absolute;right:4px;top:0;font-size:9px;font-weight:700;color:' + (barW>40?'#fff':'#374151') + ';line-height:14px;">' + r.total + '</span></div>' +
-      '<div style="font-size:9px;color:#64748b;min-width:80px;text-align:right;">' + (r.calls ? r.calls+'c ' : '') + (r.texts ? r.texts+'t ' : '') + r.patients + 'p</div></div>';
+    html += '<tr style="border-bottom:1px solid #f1f5f9;">';
+    html += '<td style="padding:8px;font-weight:700;color:#1e293b;">' + escapeHTML(r.name.split(' ')[0]) + '</td>';
+    html += '<td style="padding:8px;"><div style="background:#e2e8f0;border-radius:5px;height:18px;position:relative;">';
+    html += '<div style="width:' + barW + '%;background:linear-gradient(90deg,#3b82f6,#8b5cf6);height:100%;border-radius:5px;"></div>';
+    html += '<span style="position:absolute;left:8px;top:0;font-size:11px;font-weight:700;color:' + (barW>40?'#fff':'#374151') + ';line-height:18px;">' + r.total + '</span></div></td>';
+    html += '<td style="padding:8px;text-align:center;font-weight:600;color:#475569;">' + r.total + '</td>';
+    html += '<td style="padding:8px;text-align:center;font-weight:600;color:#475569;">' + r.patients + '</td>';
+    html += '</tr>';
   });
+  html += '</table>';
   el.innerHTML = html;
 }
 
