@@ -3949,23 +3949,26 @@ function fetchActionRequiredData() {
 
 function showActionModal(type) {
   var title, body;
-  var _crioStudyUrl = function(sk) { return sk ? 'https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/' + sk + '/subjects' : ''; };
-  var _crioSubjectUrl = function(sk, subk) { return (sk && subk) ? 'https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/' + sk + '/subject/' + subk : ''; };
+  var _crioBase = 'https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa';
+  var _crioStudyUrl = function(sk) { return sk ? _crioBase + '/study/' + sk + '/subjects' : ''; };
+  var _crioSubjectUrl = function(sk, subk) { return (sk && subk) ? _crioBase + '/study/' + sk + '/subject/' + subk : ''; };
+  var _crioCommentUrl = function(sk, subk, svk, ck) { return (sk && subk && svk && ck) ? _crioBase + '/study/' + sk + '/subject/' + subk + '/completed-visit/' + svk + '?open_comment=' + ck : _crioSubjectUrl(sk, subk); };
+  var _crioTodoUrl = function(sk, subk) { return (sk && subk) ? _crioBase + '/study/' + sk + '/subject/' + subk + '/todos' : _crioStudyUrl(sk); };
   var _crioLink = function(text, url) { return url ? '<a href="' + escapeHTML(url) + '" target="_blank" style="color:#1843ad;text-decoration:underline;text-decoration-style:dotted">' + escapeHTML(text) + '</a>' : escapeHTML(text); };
 
   if (type === 'queries') {
     var rows = window._actionQueries || [];
     title = 'Open Queries (' + rows.length + ')';
-    body = '<table class="detail-table"><thead><tr><th>Study</th><th>Subject</th><th>Type</th><th>Message</th><th>Created By</th><th>Days</th></tr></thead><tbody>' +
+    body = '<table class="detail-table"><thead><tr><th>Study</th><th>Subject</th><th>Type</th><th>Message</th><th>By</th><th>Days</th><th></th></tr></thead><tbody>' +
       rows.slice(0, 100).map(function(r) {
-        var studyUrl = _crioStudyUrl(r.study_key);
-        var subUrl = _crioSubjectUrl(r.study_key, r.subject_key);
-        return '<tr><td style="font-size:11px">' + _crioLink(r.study_name||'', studyUrl) + '</td>' +
-          '<td style="font-size:11px">' + (r.subject_key ? _crioLink(r.subject_name||r.subject_key, subUrl) : '—') + '</td>' +
-          '<td>' + escapeHTML(r.comment_type||'') + '</td>' +
-          '<td style="font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHTML(r.message||'') + '">' + escapeHTML((r.message||'').substring(0,60)) + '</td>' +
-          '<td style="font-size:11px">' + escapeHTML(r.created_by||'') + '</td>' +
-          '<td style="font-weight:700;color:' + (parseInt(r.days_outstanding)>90?'#dc2626':parseInt(r.days_outstanding)>30?'#d97706':'#059669') + '">' + (r.days_outstanding||'') + 'd</td></tr>';
+        var commentUrl = _crioCommentUrl(r.study_key, r.subject_key, r.subject_visit_key, r.comment_key);
+        return '<tr><td style="font-size:11px">' + escapeHTML((r.study_name||'').split(' - ').pop()) + '</td>' +
+          '<td style="font-size:11px">' + escapeHTML(r.subject_name||'') + '</td>' +
+          '<td style="font-size:10px">' + escapeHTML(r.comment_type||'') + '</td>' +
+          '<td style="font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHTML(r.message||'') + '">' + escapeHTML((r.message||'').substring(0,50)) + '</td>' +
+          '<td style="font-size:10px">' + escapeHTML(r.created_by||'') + '</td>' +
+          '<td style="font-weight:700;color:' + (parseInt(r.days_outstanding)>90?'#dc2626':parseInt(r.days_outstanding)>30?'#d97706':'#059669') + '">' + (r.days_outstanding||'') + 'd</td>' +
+          '<td>' + _crioLink('Open', commentUrl) + '</td></tr>';
       }).join('') + '</tbody></table>';
   } else if (type === 'docs') {
     var rows = window._actionDocs || [];
@@ -3983,17 +3986,16 @@ function showActionModal(type) {
   } else if (type === 'todos') {
     var rows = window._actionTodos || [];
     title = 'Visit Todos (' + rows.length + ')';
-    body = '<table class="detail-table"><thead><tr><th>Study</th><th>Subject</th><th>Todo</th><th>Status</th><th>Due</th><th>Visit</th></tr></thead><tbody>' +
+    body = '<table class="detail-table"><thead><tr><th>Study</th><th>Subject</th><th>Todo</th><th>Status</th><th>Due</th><th></th></tr></thead><tbody>' +
       rows.slice(0, 100).map(function(r) {
         var isOverdue = r.status === 'Overdue';
-        var studyUrl = _crioStudyUrl(r.study_key);
-        var subUrl = _crioSubjectUrl(r.study_key, r.subject_key);
-        return '<tr style="' + (isOverdue?'background:#fef2f2':'') + '"><td style="font-size:11px">' + _crioLink(r.study_name||'', studyUrl) + '</td>' +
-          '<td style="font-size:11px">' + (r.subject_key ? _crioLink(r.subject_name||r.subject_key, subUrl) : '—') + '</td>' +
+        var todoUrl = _crioTodoUrl(r.study_key, r.subject_key);
+        return '<tr style="' + (isOverdue?'background:#fef2f2':'') + '"><td style="font-size:11px">' + escapeHTML((r.study_name||'').split(' - ').pop()) + '</td>' +
+          '<td style="font-size:11px">' + escapeHTML(r.subject_name||'') + '</td>' +
           '<td style="font-size:11px">' + escapeHTML(r.todo_name||'') + '</td>' +
           '<td><span style="font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px;background:' + (isOverdue?'#fef2f2':'#fffbeb') + ';color:' + (isOverdue?'#dc2626':'#d97706') + '">' + escapeHTML(r.status||'') + '</span></td>' +
           '<td style="white-space:nowrap;color:' + (isOverdue?'#dc2626':'') + '">' + escapeHTML(r.due_date||'') + '</td>' +
-          '<td style="font-size:11px">' + escapeHTML(r.visit_name||'') + '</td></tr>';
+          '<td>' + _crioLink('Open', todoUrl) + '</td></tr>';
       }).join('') + '</tbody></table>';
   } else if (type === 'training') {
     var rows = (window._actionTraining || []).filter(function(r) { return (parseInt(r.trainings_missing)||0) > 0 || (parseInt(r.duties_pending)||0) > 0; });

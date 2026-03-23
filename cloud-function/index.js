@@ -1164,6 +1164,8 @@ const FEEDS = {
       CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) AS created_by,
       COALESCE(NULLIF(TRIM(CONCAT(COALESCE(sub.first_name,''),' ',COALESCE(sub.last_name,''))), ''), CAST(c.subject_key AS STRING)) AS subject_name,
       CAST(c.subject_key AS STRING) AS subject_key,
+      CAST(c.comment_key AS STRING) AS comment_key,
+      CAST(c.subject_visit_key AS STRING) AS subject_visit_key,
       FORMAT_DATETIME('%Y-%m-%d', c.date_created) AS date_created,
       DATE_DIFF(CURRENT_DATE(), DATE(c.date_created), DAY) AS days_outstanding
     FROM ${tbl('comment')} c
