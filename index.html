@@ -2277,6 +2277,16 @@ const CRP_CONFIG = {
   CF_BASE: 'https://us-east1-crio-468120.cloudfunctions.net/crp-bq-feeds',
   USE_CLOUD_FUNCTION: true,
 
+  // Manual enrollment targets — overrides CRIO target_enrollment when CRIO has 0
+  // Key: protocol_number (substring match), Value: target
+  ENROLLMENT_TARGETS: {
+    '80202135SJS3001': 3,
+    'I8F-MC-GPHE': 4,
+    'J2A-MC-GZPO': 5,
+    'CDX0159-12': 3,
+    'EFC17600': 1,  // ESTUARY
+  },
+
   // Brand Colors (match CSS :root variables)
   BRAND: {
     NAVY:   '#072061',
@@ -5538,16 +5548,17 @@ function renderCoordWorkloadBalance() {
   var highCancel = coordStats.filter(function(c){return c.cancelRate>20;});
 
   var kpiStyle = 'padding:8px;border-radius:8px;text-align:center;cursor:pointer;transition:box-shadow .15s;';
-  var html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:14px;">';
-  html += '<div style="'+kpiStyle+'background:#eff6ff;" onclick="showCoordKpiPopup(\'visits\')"><div style="font-size:18px;font-weight:800;color:#3b82f6;">'+totalVisits+'</div><div style="font-size:9px;color:#3b82f6;font-weight:600;">Total Visits</div></div>';
-  html += '<div style="'+kpiStyle+'background:#f0fdf4;"><div style="font-size:18px;font-weight:800;color:#059669;">'+avgVisits+'</div><div style="font-size:9px;color:#059669;font-weight:600;">Avg/Coord</div></div>';
-  html += '<div style="'+kpiStyle+'background:'+(balanceScore>=80?'#f0fdf4':'#fffbeb')+';"><div style="font-size:18px;font-weight:800;color:'+balColor+';">'+balanceScore+'%</div><div style="font-size:9px;color:'+balColor+';font-weight:600;">Balance Score</div></div>';
-  html += '<div style="'+kpiStyle+'background:'+(highCancel.length>0?'#fef2f2':'#f0fdf4')+'" onclick="showCoordKpiPopup(\'highCancel\')"><div style="font-size:18px;font-weight:800;color:'+(highCancel.length>0?'#dc2626':'#059669')+';">'+highCancel.length+'</div><div style="font-size:9px;color:'+(highCancel.length>0?'#dc2626':'#059669')+';font-weight:600;">High Cancel Rate</div></div>';
+  var html = '<div style="font-size:11px;color:#64748b;margin-bottom:8px;font-weight:600;">Upcoming Visit Distribution (all scheduled visits)</div>';
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:14px;">';
+  html += '<div style="'+kpiStyle+'background:#eff6ff;" onclick="showCoordKpiPopup(\'visits\')" title="Total upcoming visits across all 5 coordinators"><div style="font-size:18px;font-weight:800;color:#3b82f6;">'+totalVisits+'</div><div style="font-size:9px;color:#3b82f6;font-weight:600;">Total Visits</div></div>';
+  html += '<div style="'+kpiStyle+'background:#f0fdf4;" title="Average upcoming visits per coordinator"><div style="font-size:18px;font-weight:800;color:#059669;">'+avgVisits+'</div><div style="font-size:9px;color:#059669;font-weight:600;">Avg/Coord</div></div>';
+  html += '<div style="'+kpiStyle+'background:'+(balanceScore>=80?'#f0fdf4':'#fffbeb')+';" title="How evenly visits are distributed — 100% = perfectly balanced"><div style="font-size:18px;font-weight:800;color:'+balColor+';">'+balanceScore+'%</div><div style="font-size:9px;color:'+balColor+';font-weight:600;">Balance Score</div></div>';
+  html += '<div style="'+kpiStyle+'background:'+(highCancel.length>0?'#fef2f2':'#f0fdf4')+'" onclick="showCoordKpiPopup(\'highCancel\')" title="Coordinators with cancellation rate above 20%"><div style="font-size:18px;font-weight:800;color:'+(highCancel.length>0?'#dc2626':'#059669')+';">'+highCancel.length+'</div><div style="font-size:9px;color:'+(highCancel.length>0?'#dc2626':'#059669')+';font-weight:600;">High Cancel Rate</div></div>';
   html += '</div>';
 
-  // Workload table
+  // Workload table — visits assigned per coordinator via user_appointment
   html += '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:4px;">';
-  html += '<tr style="background:#f8fafc;"><th style="text-align:left;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Coordinator</th><th style="text-align:left;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Visits</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Site</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Cancel Rate</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Patients</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Studies</th></tr>';
+  html += '<tr style="background:#f8fafc;"><th style="text-align:left;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Coordinator</th><th style="text-align:left;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;" title="Upcoming scheduled visits assigned to this coordinator">Upcoming Visits</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Site</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;" title="Cancellations / (Visits + Cancellations)">Cancel %</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;" title="Unique patients with upcoming visits">Patients</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;" title="Unique studies with upcoming visits">Studies</th></tr>';
   coordStats.forEach(function(c) {
     var pct = Math.round(c.visits / maxVisits * 100);
     var crColor = c.cancelRate > 20 ? '#dc2626' : c.cancelRate > 10 ? '#f59e0b' : '#059669';
@@ -12578,6 +12589,15 @@ function mergeCrioIntoStudies() {
     if (crio.target_enrollment > 0 && (!e.target || e.target === 0)) {
       e.target = crio.target_enrollment;
     }
+    // Manual override targets from config (when CRIO has 0)
+    if (!e.target || e.target === 0) {
+      var manualTargets = CRP_CONFIG.ENROLLMENT_TARGETS || {};
+      Object.keys(manualTargets).forEach(function(key) {
+        if (e.study.indexOf(key) !== -1 || crio.protocol_number.indexOf(key) !== -1) {
+          e.target = manualTargets[key];
+        }
+      });
+    }
 
     // Always use CRIO study_key for study_url (CRIO is authoritative for PHL site)
     if (crio.study_key) {
@@ -15015,7 +15035,7 @@ function renderCoordProductivity() {
   data.sort(function(a,b) { return b.total - a.total; });
   if (badge) badge.textContent = data.length + ' staff (30d)';
   var maxTotal = data[0].total || 1;
-  var html = '<div style="font-size:11px;color:#64748b;margin-bottom:8px;font-weight:600;">eSource & Outreach Activity (last 30 days)</div>';
+  var html = '<div style="font-size:11px;color:#64748b;margin-bottom:8px;font-weight:600;">eSource & Outreach Activity (last 30 days)</div><div style="font-size:10px;color:#94a3b8;margin-bottom:8px;">Total patient interactions from CRIO — calls, texts, emails, eSource questions answered</div>';
   html += '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
   html += '<tr style="background:#f8fafc;"><th style="text-align:left;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Name</th><th style="text-align:left;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Activity</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Total</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Patients</th></tr>';
   data.forEach(function(r) {
