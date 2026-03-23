@@ -3458,11 +3458,12 @@ function renderCoordWorkloadBalance() {
   var balColor = balanceScore >= 80 ? '#059669' : balanceScore >= 60 ? '#f59e0b' : '#dc2626';
   var highCancel = coordStats.filter(function(c){return c.cancelRate>20;});
 
+  var kpiStyle = 'padding:8px;border-radius:8px;text-align:center;cursor:pointer;transition:box-shadow .15s;';
   var html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:14px;">';
-  html += '<div style="padding:8px;background:#eff6ff;border-radius:8px;text-align:center;"><div style="font-size:18px;font-weight:800;color:#3b82f6;">'+totalVisits+'</div><div style="font-size:9px;color:#3b82f6;font-weight:600;">Total Visits</div></div>';
-  html += '<div style="padding:8px;background:#f0fdf4;border-radius:8px;text-align:center;"><div style="font-size:18px;font-weight:800;color:#059669;">'+avgVisits+'</div><div style="font-size:9px;color:#059669;font-weight:600;">Avg/Coord</div></div>';
-  html += '<div style="padding:8px;background:'+(balanceScore>=80?'#f0fdf4':'#fffbeb')+';border-radius:8px;text-align:center;"><div style="font-size:18px;font-weight:800;color:'+balColor+';">'+balanceScore+'%</div><div style="font-size:9px;color:'+balColor+';font-weight:600;">Balance Score</div></div>';
-  html += '<div style="padding:8px;background:'+(highCancel.length>0?'#fef2f2':'#f0fdf4')+';border-radius:8px;text-align:center;"><div style="font-size:18px;font-weight:800;color:'+(highCancel.length>0?'#dc2626':'#059669')+';">'+highCancel.length+'</div><div style="font-size:9px;color:'+(highCancel.length>0?'#dc2626':'#059669')+';font-weight:600;">High Cancel Rate</div></div>';
+  html += '<div style="'+kpiStyle+'background:#eff6ff;" onclick="showCoordKpiPopup(\'visits\')"><div style="font-size:18px;font-weight:800;color:#3b82f6;">'+totalVisits+'</div><div style="font-size:9px;color:#3b82f6;font-weight:600;">Total Visits</div></div>';
+  html += '<div style="'+kpiStyle+'background:#f0fdf4;"><div style="font-size:18px;font-weight:800;color:#059669;">'+avgVisits+'</div><div style="font-size:9px;color:#059669;font-weight:600;">Avg/Coord</div></div>';
+  html += '<div style="'+kpiStyle+'background:'+(balanceScore>=80?'#f0fdf4':'#fffbeb')+';"><div style="font-size:18px;font-weight:800;color:'+balColor+';">'+balanceScore+'%</div><div style="font-size:9px;color:'+balColor+';font-weight:600;">Balance Score</div></div>';
+  html += '<div style="'+kpiStyle+'background:'+(highCancel.length>0?'#fef2f2':'#f0fdf4')+'" onclick="showCoordKpiPopup(\'highCancel\')"><div style="font-size:18px;font-weight:800;color:'+(highCancel.length>0?'#dc2626':'#059669')+';">'+highCancel.length+'</div><div style="font-size:9px;color:'+(highCancel.length>0?'#dc2626':'#059669')+';font-weight:600;">High Cancel Rate</div></div>';
   html += '</div>';
 
   // Workload table
@@ -3539,33 +3540,30 @@ function renderInvCapacity() {
   var avgUtil = invStats.length > 0 ? Math.round(invStats.reduce(function(s,i){return s+i.utilPct;},0)/invStats.length) : 0;
   var avgUtilColor = avgUtil >= 70 ? '#059669' : avgUtil >= 40 ? '#f59e0b' : '#dc2626';
 
-  var html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(80px,1fr));gap:8px;margin-bottom:12px;">';
-  html += '<div style="padding:6px;background:#f5f3ff;border-radius:8px;text-align:center;"><div style="font-size:16px;font-weight:800;color:#7c3aed;">'+totalVisits+'</div><div style="font-size:9px;color:#7c3aed;font-weight:600;">Total Visits</div></div>';
-  html += '<div style="padding:6px;background:#eff6ff;border-radius:8px;text-align:center;"><div style="font-size:16px;font-weight:800;color:#3b82f6;">'+invStats.length+'</div><div style="font-size:9px;color:#3b82f6;font-weight:600;">Investigators</div></div>';
-  html += '<div style="padding:6px;background:'+(avgUtil>=70?'#f0fdf4':'#fffbeb')+';border-radius:8px;text-align:center;"><div style="font-size:16px;font-weight:800;color:'+avgUtilColor+';">'+avgUtil+'%</div><div style="font-size:9px;color:'+avgUtilColor+';font-weight:600;">Avg Util</div></div>';
+  var kpiStyleI = 'padding:8px;border-radius:8px;text-align:center;cursor:pointer;transition:box-shadow .15s;';
+  var html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:14px;">';
+  html += '<div style="'+kpiStyleI+'background:#f5f3ff;" onclick="showInvKpiPopup(\'visits\')"><div style="font-size:18px;font-weight:800;color:#7c3aed;">'+totalVisits+'</div><div style="font-size:9px;color:#7c3aed;font-weight:600;">Total Visits</div></div>';
+  html += '<div style="'+kpiStyleI+'background:#eff6ff;"><div style="font-size:18px;font-weight:800;color:#3b82f6;">'+invStats.length+'</div><div style="font-size:9px;color:#3b82f6;font-weight:600;">Investigators</div></div>';
+  html += '<div style="'+kpiStyleI+'background:'+(avgUtil>=70?'#f0fdf4':'#fffbeb')+';"><div style="font-size:18px;font-weight:800;color:'+avgUtilColor+';">'+avgUtil+'%</div><div style="font-size:9px;color:'+avgUtilColor+';font-weight:600;">Avg Utilization</div></div>';
   html += '</div>';
 
-  html += '<div style="display:grid;gap:6px;">';
+  html += '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:4px;">';
+  html += '<tr style="background:#f8fafc;"><th style="text-align:left;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Investigator</th><th style="text-align:left;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Visits</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Utilization</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Studies</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Avg/Day</th></tr>';
   invStats.forEach(function(inv) {
     var pct = Math.round(inv.visits / maxVisits * 100);
     var utilColor = inv.utilPct >= 80 ? '#059669' : inv.utilPct >= 50 ? '#f59e0b' : '#94a3b8';
-    var parts = inv.name.split(' ');
-    var shortName = parts[0] + (parts.length > 1 ? ' ' + parts[parts.length-1][0] + '.' : '');
-    var costHtml = inv.costPerVisit > 0 ? '<div style="text-align:center;font-size:10px;color:#059669;font-weight:600;">$'+inv.costPerVisit+'</div>' : '<div style="text-align:center;font-size:10px;color:#cbd5e1;">—</div>';
-    html += '<div style="display:grid;grid-template-columns:100px 1fr 40px 35px 35px 40px;align-items:center;gap:5px;font-size:11px;cursor:pointer;" onclick="showInvDetail(\''+jsAttr(inv.name)+'\')">';
-    html += '<div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+jsAttr(inv.name)+'">'+escapeHTML(shortName)+'</div>';
-    html += '<div style="background:#e2e8f0;border-radius:4px;height:14px;overflow:hidden;position:relative;">';
-    html += '<div style="height:100%;width:'+pct+'%;background:linear-gradient(90deg,#7c3aed,#a78bfa);border-radius:4px;"></div>';
-    html += '<div style="position:absolute;left:'+Math.min(pct,50)+'%;top:0;transform:translateX(4px);font-size:9px;font-weight:700;color:'+(pct>30?'#fff':'#1e293b')+';line-height:14px;">'+inv.visits+'</div>';
-    html += '</div>';
-    html += '<div style="text-align:center;font-size:10px;color:'+utilColor+';font-weight:700;">'+inv.utilPct+'%</div>';
-    html += '<div style="text-align:center;font-size:10px;color:#6366f1;font-weight:600;">'+inv.studies+'</div>';
-    html += '<div style="text-align:center;font-size:10px;color:#64748b;">'+inv.avgPerDay+'</div>';
-    html += costHtml;
-    html += '</div>';
+    html += '<tr style="border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showInvDetail(\''+jsAttr(inv.name)+'\')">';
+    html += '<td style="padding:8px;"><div style="font-weight:700;color:#1e293b;">'+escapeHTML(inv.name.split(' ')[0])+'</div></td>';
+    html += '<td style="padding:8px;"><div style="background:#e2e8f0;border-radius:5px;height:18px;overflow:hidden;position:relative;">';
+    html += '<div style="height:100%;width:'+pct+'%;background:linear-gradient(90deg,#7c3aed,#a78bfa);border-radius:5px;"></div>';
+    html += '<div style="position:absolute;left:8px;top:0;font-size:11px;font-weight:700;color:'+(pct>30?'#fff':'#1e293b')+';line-height:18px;">'+inv.visits+'</div>';
+    html += '</div></td>';
+    html += '<td style="padding:8px;text-align:center;font-weight:700;color:'+utilColor+';">'+inv.utilPct+'%</td>';
+    html += '<td style="padding:8px;text-align:center;font-weight:600;color:#475569;">'+inv.studies+'</td>';
+    html += '<td style="padding:8px;text-align:center;font-weight:600;color:#475569;">'+inv.avgPerDay+'</td>';
+    html += '</tr>';
   });
-  html += '</div>';
-  html += '<div style="margin-top:6px;font-size:9px;color:#94a3b8;text-align:right;">Util% · Studies · Avg/Day · $/Visit</div>';
+  html += '</table>';
   el.innerHTML = html;
 }
 
@@ -3599,43 +3597,126 @@ function renderRecruiterPerformance() {
     return { name: name, nick: nicknames[name] || name.split(' ')[0], upcoming: rv.length, cancels: rc.length, noShows: noShows, nsPct: nsPct, screenFails: screenFails, undoc: undoc };
   }).sort(function(a,b){ return b.upcoming - a.upcoming; });
 
-  if (badge) badge.textContent = stats.map(function(s){ return s.nick; }).join(' · ');
+  if (badge) badge.textContent = stats.length + ' recruiters';
 
   var maxVal = Math.max.apply(null, stats.map(function(s){ return Math.max(s.upcoming, s.cancels); }).concat([1]));
+  var totalUpcoming = stats.reduce(function(s,r){ return s+r.upcoming; },0);
+  var totalCancels = stats.reduce(function(s,r){ return s+r.cancels; },0);
+  var totalNoShows = stats.reduce(function(s,r){ return s+r.noShows; },0);
+  var avgNsPct = totalCancels > 0 ? Math.round(totalNoShows / totalCancels * 100) : 0;
 
-  var html = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 24px;">';
-  stats.forEach(function(s) {
-    var upPct = Math.round(s.upcoming / maxVal * 100);
-    var cPct = Math.round(s.cancels / maxVal * 100);
-    var undocColor = s.undoc > 2 ? '#d97706' : '#374151';
-    html += '<div style="padding:12px 0;border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showCoordDetail(\'' + jsAttr(s.name) + '\')">';
-    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">';
-    html += '<span style="font-size:13px;font-weight:700;color:var(--navy)">' + escapeHTML(s.nick) + '</span>';
-    html += '<div style="display:flex;gap:6px;">';
-    html += '<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#e0f2fe;color:#0369a1;font-weight:600;">' + s.upcoming + ' upcoming</span>';
-    html += '<span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#fef3c7;color:#92400e;font-weight:600;">' + s.cancels + ' cancels</span>';
-    html += '</div></div>';
-    html += '<div style="display:grid;grid-template-columns:60px 1fr 28px;gap:3px 6px;align-items:center;font-size:10px;color:var(--muted);">';
-    html += '<span>Upcoming</span><div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;"><div style="width:' + upPct + '%;height:100%;background:#072061;border-radius:3px;"></div></div>';
-    html += '<span style="text-align:right;font-weight:600;color:#072061">' + s.upcoming + '</span>';
-    html += '<span>Cancels</span><div style="height:5px;background:var(--border);border-radius:3px;overflow:hidden;"><div style="width:' + cPct + '%;height:100%;background:#f59e0b;border-radius:3px;"></div></div>';
-    html += '<span style="text-align:right;font-weight:600;color:#d97706">' + s.cancels + '</span>';
-    html += '</div>';
-    html += '<div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;">';
-    html += '<span style="font-size:10px;color:#6b7280;">No-shows: <b style="color:#374151">' + s.noShows + ' (' + s.nsPct + '%)</b></span>';
-    html += '<span style="font-size:10px;color:#6b7280;">Screen fails: <b>' + s.screenFails + '</b></span>';
-    html += '<span style="font-size:10px;color:#6b7280;">Undocumented: <b style="color:' + undocColor + '">' + s.undoc + '</b></span>';
-    html += '</div></div>';
-  });
+  var kpiStyleR = 'padding:8px;border-radius:8px;text-align:center;cursor:pointer;transition:box-shadow .15s;';
+  var html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:14px;">';
+  html += '<div style="'+kpiStyleR+'background:#eff6ff;" onclick="showRecruiterKpiPopup(\'upcoming\')"><div style="font-size:18px;font-weight:800;color:#3b82f6;">'+totalUpcoming+'</div><div style="font-size:9px;color:#3b82f6;font-weight:600;">Upcoming</div></div>';
+  html += '<div style="'+kpiStyleR+'background:#fffbeb;" onclick="showRecruiterKpiPopup(\'cancels\')"><div style="font-size:18px;font-weight:800;color:#d97706;">'+totalCancels+'</div><div style="font-size:9px;color:#d97706;font-weight:600;">Cancels</div></div>';
+  html += '<div style="'+kpiStyleR+'background:'+(avgNsPct>20?'#fef2f2':'#f0fdf4')+';"><div style="font-size:18px;font-weight:800;color:'+(avgNsPct>20?'#dc2626':'#059669')+';">'+avgNsPct+'%</div><div style="font-size:9px;color:'+(avgNsPct>20?'#dc2626':'#059669')+';font-weight:600;">No-Show Rate</div></div>';
   html += '</div>';
 
-  // ── eSource Productivity (who answered the most questions — from BQ) ──
-  if (window._recruiterStats && window._recruiterStats.length > 0) {
-    // recruiterStats has outreach data, but we also show eSource from esourceByUser
-    // For now, skip — eSource data shown in Coordinator Productivity below
-  }
+  html += '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:4px;">';
+  html += '<tr style="background:#f8fafc;"><th style="text-align:left;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Recruiter</th><th style="text-align:left;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Upcoming</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Cancels</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">No-Shows</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Screen Fails</th></tr>';
+  stats.forEach(function(s) {
+    var upPct = Math.round(s.upcoming / maxVal * 100);
+    var nsColor = s.nsPct > 30 ? '#dc2626' : s.nsPct > 15 ? '#f59e0b' : '#059669';
+    html += '<tr style="border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showCoordDetail(\'' + jsAttr(s.name) + '\')">';
+    html += '<td style="padding:8px;"><div style="font-weight:700;color:#1e293b;">' + escapeHTML(s.nick) + '</div></td>';
+    html += '<td style="padding:8px;"><div style="background:#e2e8f0;border-radius:5px;height:18px;overflow:hidden;position:relative;">';
+    html += '<div style="height:100%;width:'+upPct+'%;background:linear-gradient(90deg,#0369a1,#38bdf8);border-radius:5px;"></div>';
+    html += '<div style="position:absolute;left:8px;top:0;font-size:11px;font-weight:700;color:'+(upPct>30?'#fff':'#1e293b')+';line-height:18px;">'+s.upcoming+'</div>';
+    html += '</div></td>';
+    html += '<td style="padding:8px;text-align:center;font-weight:600;color:#d97706;">'+s.cancels+'</td>';
+    html += '<td style="padding:8px;text-align:center;font-weight:700;color:'+nsColor+';">'+s.noShows+' <span style="font-size:10px;font-weight:600;">('+s.nsPct+'%)</span></td>';
+    html += '<td style="padding:8px;text-align:center;font-weight:600;color:#475569;">'+s.screenFails+'</td>';
+    html += '</tr>';
+  });
+  html += '</table>';
 
   el.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// KPI Popups for Coordinator / Investigator / Recruiter summaries
+// ═══════════════════════════════════════════════════════════════
+function showCoordKpiPopup(type) {
+  var COORDS = CRP_CONFIG.SCHEDULE_COORDINATORS || CRP_CONFIG.COORDINATORS || [];
+  if (type === 'visits') {
+    var rows = COORDS.map(function(name) {
+      var v = (DATA.allVisitDetail||[]).filter(function(r){return r.coord===name;});
+      var c = (DATA.allCancels||[]).filter(function(r){return r.coord===name;});
+      return {name:name, visits:v.length, cancels:c.length};
+    }).sort(function(a,b){return b.visits-a.visits;});
+    var body = '<table class="detail-table"><thead><tr><th>Coordinator</th><th style="text-align:right">Visits</th><th style="text-align:right">Cancels</th><th style="text-align:right">Total</th></tr></thead><tbody>';
+    rows.forEach(function(r){
+      body += '<tr onclick="showCoordDetail(\''+jsAttr(r.name)+'\')" style="cursor:pointer"><td style="font-weight:600">'+escapeHTML(r.name)+'</td><td style="text-align:right;color:#3b82f6;font-weight:700">'+r.visits+'</td><td style="text-align:right;color:#d97706;font-weight:600">'+r.cancels+'</td><td style="text-align:right;font-weight:700">'+(r.visits+r.cancels)+'</td></tr>';
+    });
+    body += '</tbody></table>';
+    var total = rows.reduce(function(s,r){return s+r.visits;},0);
+    openModal('Coordinator Visits', total+' total upcoming visits', body);
+  } else if (type === 'highCancel') {
+    var rows2 = COORDS.map(function(name) {
+      var v = (DATA.allVisitDetail||[]).filter(function(r){return r.coord===name;});
+      var c = (DATA.allCancels||[]).filter(function(r){return r.coord===name;});
+      var rate = (v.length+c.length)>0 ? Math.round(c.length/(v.length+c.length)*100) : 0;
+      return {name:name, visits:v.length, cancels:c.length, rate:rate};
+    }).filter(function(r){return r.rate>20;}).sort(function(a,b){return b.rate-a.rate;});
+    var body2 = rows2.length === 0 ? '<p style="text-align:center;color:#059669;padding:20px">No coordinators above 20% cancel rate</p>' : '<table class="detail-table"><thead><tr><th>Coordinator</th><th style="text-align:right">Cancel Rate</th><th style="text-align:right">Cancels</th><th style="text-align:right">Visits</th></tr></thead><tbody>';
+    rows2.forEach(function(r){
+      body2 += '<tr onclick="showCoordDetail(\''+jsAttr(r.name)+'\')" style="cursor:pointer"><td style="font-weight:600">'+escapeHTML(r.name)+'</td><td style="text-align:right;color:#dc2626;font-weight:700">'+r.rate+'%</td><td style="text-align:right;color:#d97706;font-weight:600">'+r.cancels+'</td><td style="text-align:right">'+r.visits+'</td></tr>';
+    });
+    if (rows2.length) body2 += '</tbody></table>';
+    openModal('High Cancel Rate', 'Coordinators with >20% cancellation rate', body2);
+  }
+}
+
+function showInvKpiPopup(type) {
+  var INVS = CRP_CONFIG.INVESTIGATORS || [];
+  if (type === 'visits') {
+    var rows = INVS.map(function(name) {
+      var v = (DATA.allVisitDetail||[]).filter(function(r){return r.investigator===name;});
+      var studies = {};
+      v.forEach(function(r){studies[r.study]=1;});
+      return {name:name, visits:v.length, studies:Object.keys(studies).length};
+    }).sort(function(a,b){return b.visits-a.visits;});
+    var body = '<table class="detail-table"><thead><tr><th>Investigator</th><th style="text-align:right">Visits</th><th style="text-align:right">Studies</th></tr></thead><tbody>';
+    rows.forEach(function(r){
+      body += '<tr onclick="showInvDetail(\''+jsAttr(r.name)+'\')" style="cursor:pointer"><td style="font-weight:600">'+escapeHTML(r.name)+'</td><td style="text-align:right;color:#7c3aed;font-weight:700">'+r.visits+'</td><td style="text-align:right;font-weight:600;color:#475569">'+r.studies+'</td></tr>';
+    });
+    body += '</tbody></table>';
+    var total = rows.reduce(function(s,r){return s+r.visits;},0);
+    openModal('Investigator Visits', total+' total upcoming visits', body);
+  }
+}
+
+function showRecruiterKpiPopup(type) {
+  var schedSet = {};
+  (CRP_CONFIG.SCHEDULE_COORDINATORS || []).forEach(function(n){ schedSet[n] = true; });
+  var recruiters = (CRP_CONFIG.COORDINATORS || []).filter(function(n){ return !schedSet[n]; });
+  var nicknames = { 'Gabrijela Ateljevic': 'Gaby', 'Ema Gunic': 'Ema', 'Ana Lambic': 'Ana', 'Vlado Draganic': 'Vlado', 'Jana Milankovic': 'Jana' };
+  if (type === 'upcoming') {
+    var rows = recruiters.map(function(name) {
+      var v = (DATA.allVisitDetail||[]).filter(function(r){return r.coord===name;});
+      return {name:name, nick:nicknames[name]||name.split(' ')[0], visits:v.length};
+    }).sort(function(a,b){return b.visits-a.visits;});
+    var body = '<table class="detail-table"><thead><tr><th>Recruiter</th><th style="text-align:right">Upcoming Visits</th></tr></thead><tbody>';
+    rows.forEach(function(r){
+      body += '<tr onclick="showCoordDetail(\''+jsAttr(r.name)+'\')" style="cursor:pointer"><td style="font-weight:600">'+escapeHTML(r.nick)+'</td><td style="text-align:right;color:#3b82f6;font-weight:700">'+r.visits+'</td></tr>';
+    });
+    body += '</tbody></table>';
+    var total = rows.reduce(function(s,r){return s+r.visits;},0);
+    openModal('Recruiter Upcoming Visits', total+' total', body);
+  } else if (type === 'cancels') {
+    var rows2 = recruiters.map(function(name) {
+      var c = (DATA.allCancels||[]).filter(function(r){return r.coord===name;});
+      var noShows = c.filter(function(r){return r.category==='No Show';}).length;
+      return {name:name, nick:nicknames[name]||name.split(' ')[0], cancels:c.length, noShows:noShows};
+    }).sort(function(a,b){return b.cancels-a.cancels;});
+    var body2 = '<table class="detail-table"><thead><tr><th>Recruiter</th><th style="text-align:right">Cancels</th><th style="text-align:right">No-Shows</th></tr></thead><tbody>';
+    rows2.forEach(function(r){
+      body2 += '<tr onclick="showCoordDetail(\''+jsAttr(r.name)+'\')" style="cursor:pointer"><td style="font-weight:600">'+escapeHTML(r.nick)+'</td><td style="text-align:right;color:#d97706;font-weight:700">'+r.cancels+'</td><td style="text-align:right;color:#dc2626;font-weight:600">'+r.noShows+'</td></tr>';
+    });
+    body2 += '</tbody></table>';
+    var total2 = rows2.reduce(function(s,r){return s+r.cancels;},0);
+    openModal('Recruiter Cancellations', total2+' total', body2);
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════
