@@ -195,6 +195,7 @@ const FEEDS = {
     LEFT JOIN (SELECT su.study_key, CONCAT(u.first_name, ' ', u.last_name) AS name
       FROM ${tbl('study_user')} su JOIN ${tbl('user')} u ON su.user_key = u.user_key
       WHERE su.role = 2 AND su._fivetran_deleted = false
+        AND LOWER(CONCAT(u.first_name, ' ', u.last_name)) IN ('mario castellanos','stacey scott','ruby pereira','cady chilensky','angelina mcmullen','carly wood')
       QUALIFY ROW_NUMBER() OVER (PARTITION BY su.study_key ORDER BY su.date_created DESC) = 1) sc ON ca.study_key = sc.study_key
     LEFT JOIN (SELECT su.study_key, CONCAT(u.first_name, ' ', u.last_name) AS name
       FROM ${tbl('study_user')} su JOIN ${tbl('user')} u ON su.user_key = u.user_key
@@ -247,6 +248,7 @@ const FEEDS = {
     LEFT JOIN (SELECT su.study_key, CONCAT(u.first_name, ' ', u.last_name) AS name
       FROM ${tbl('study_user')} su JOIN ${tbl('user')} u ON su.user_key = u.user_key
       WHERE su.role = 2 AND su._fivetran_deleted = false
+        AND LOWER(CONCAT(u.first_name, ' ', u.last_name)) IN ('mario castellanos','stacey scott','ruby pereira','cady chilensky','angelina mcmullen','carly wood')
       QUALIFY ROW_NUMBER() OVER (PARTITION BY su.study_key ORDER BY su.date_created DESC) = 1) sc ON aal.study_key = sc.study_key
     LEFT JOIN (SELECT su.study_key, CONCAT(u.first_name, ' ', u.last_name) AS name
       FROM ${tbl('study_user')} su JOIN ${tbl('user')} u ON su.user_key = u.user_key
