@@ -548,9 +548,13 @@ const FEEDS = {
         COUNTIF(svi.status IN (22, 23)) AS completed
       FROM ${tbl('subject_visit_stats')} svs
       JOIN ${tbl('subject_visit')} svi ON svs.subject_visit_key = svi.subject_visit_key
+      JOIN ${tbl('study')} st ON svi.study_key = st.study_key
+      LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
       JOIN ${tbl('user')} u ON svs.coordinator_user_key = u.user_key
       WHERE svi.last_updated >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL ${days} DAY)
         AND svi._fivetran_deleted = false
+        AND st.is_active = 1 AND st.site_key NOT IN (5547)
+        ${STUDY_FILTER_SQL}
       GROUP BY coordinator
       HAVING visits_managed > 0
       ORDER BY visits_managed DESC`;
@@ -1494,6 +1498,34 @@ const FEEDS = {
     LEFT JOIN ${tbl('site')} si ON sp.site_key = si.site_key
     WHERE st.is_active = 1 AND sp._fivetran_deleted = false
     ORDER BY sp.payment_date DESC`
+  },
+
+  // ── 48. eReg Pending Documents (assigned/pending regulatory documents) ──
+  eregPending: {
+    query: () => `SELECT
+      CAST(rd.study_key AS STRING) AS study_key,
+      ${STUDY_NAME_SQL} AS study_name,
+      rd.name AS document_name,
+      COALESCE(rd.description, '') AS description,
+      CASE rd.status WHEN -1 THEN 'Deleted' WHEN 0 THEN 'Updated' WHEN 1 THEN 'Active' WHEN 2 THEN 'Incoming' WHEN 3 THEN 'Assigned' WHEN 4 THEN 'Rejected' WHEN 6 THEN 'Completed' WHEN 10 THEN 'Signed' ELSE CAST(rd.status AS STRING) END AS status,
+      rd.version,
+      COALESCE(rd.file_original_name, '') AS file_name,
+      FORMAT_DATETIME('%Y-%m-%d', rd.date_created) AS date_created,
+      FORMAT_DATETIME('%Y-%m-%d', rd.effective_date) AS effective_date,
+      FORMAT_DATETIME('%Y-%m-%d', rd.expiration_date) AS expiration_date,
+      CASE WHEN rd.is_expired = 1 THEN 'Yes' ELSE 'No' END AS expired,
+      CASE WHEN rd.is_esigned = 1 THEN 'Yes' ELSE 'No' END AS esigned,
+      CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) AS uploaded_by,
+      COALESCE(si.name, '') AS site_name
+    FROM ${tbl('regulatory_document')} rd
+    JOIN ${tbl('study')} st ON rd.study_key = st.study_key
+    LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
+    LEFT JOIN ${tbl('user')} u ON rd.user_key = u.user_key
+    LEFT JOIN ${tbl('site')} si ON rd.site_key = si.site_key
+    WHERE rd.is_active = 1 AND rd.status IN (2, 3)
+      AND st.is_active = 1 AND st.site_key NOT IN (5547)
+      ${STUDY_FILTER_SQL}
+    ORDER BY rd.date_created DESC`
   },
 
   // ── 47. Document Completion Summary (aggregate per study — was feed 39) ──

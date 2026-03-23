@@ -1207,6 +1207,12 @@ body {
       <div class="tb-value" style="color:#f59e0b" id="ar-todos">—</div>
       <div class="tb-sub" id="ar-todos-sub"></div>
     </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showActionModal('ereg')">
+      <div class="tb-label">eReg Pending</div>
+      <div class="tb-value" style="color:#7c3aed" id="ar-ereg">—</div>
+      <div class="tb-sub" id="ar-ereg-sub"></div>
+    </div>
   </div>
 
   <!-- Row 2: Cancel by Study + Reason Breakdown -->
@@ -5604,30 +5610,7 @@ function renderRecruiterPerformance() {
   });
   html += '</div>';
 
-  // ── Supplement with BQ recruiter outreach stats (calls/texts/emails) ──
-  if (window._recruiterStats && window._recruiterStats.length > 0) {
-    html += '<div style="margin-top:16px;padding-top:12px;border-top:2px solid #e2e8f0;">';
-    html += '<div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:8px;">Outreach Activity (30 days — from CRIO)</div>';
-    html += '<table style="width:100%;font-size:11px;border-collapse:collapse;"><thead><tr style="border-bottom:1px solid #e2e8f0;">';
-    html += '<th style="text-align:left;padding:4px 6px;color:#94a3b8;font-weight:600;">Recruiter</th>';
-    html += '<th style="text-align:right;padding:4px 6px;color:#94a3b8;font-weight:600;">Calls</th>';
-    html += '<th style="text-align:right;padding:4px 6px;color:#94a3b8;font-weight:600;">Texts</th>';
-    html += '<th style="text-align:right;padding:4px 6px;color:#94a3b8;font-weight:600;">Emails</th>';
-    html += '<th style="text-align:right;padding:4px 6px;color:#94a3b8;font-weight:600;">Interested</th>';
-    html += '<th style="text-align:right;padding:4px 6px;color:#94a3b8;font-weight:600;">Patients</th>';
-    html += '</tr></thead><tbody>';
-    window._recruiterStats.forEach(function(r) {
-      html += '<tr style="border-bottom:1px solid #f8fafc;">';
-      html += '<td style="padding:4px 6px;font-weight:600;">' + escapeHTML(r.recruiter || '') + '</td>';
-      html += '<td style="text-align:right;padding:4px 6px;">' + (r.phone_calls || 0) + '</td>';
-      html += '<td style="text-align:right;padding:4px 6px;">' + (r.texts || 0) + '</td>';
-      html += '<td style="text-align:right;padding:4px 6px;">' + (r.emails || 0) + '</td>';
-      html += '<td style="text-align:right;padding:4px 6px;color:#059669;font-weight:600;">' + (r.interested_responses || 0) + '</td>';
-      html += '<td style="text-align:right;padding:4px 6px;">' + (r.unique_patients || 0) + '</td>';
-      html += '</tr>';
-    });
-    html += '</tbody></table></div>';
-  }
+  // Outreach activity removed from overview — available via recruiterStats feed API
 
   el.innerHTML = html;
 }
@@ -5979,7 +5962,7 @@ function fetchActionRequiredData() {
   var _s = function(id, val) { var e = document.getElementById(id); if (e) e.textContent = val; };
 
   // Batch fetch all 5 feeds in one request (reduces HTTP overhead)
-  fetch(base + '?feed=batch&feeds=comments,documentSummary,visitTodos,regulatory,recruiterStats,demographics&format=json')
+  fetch(base + '?feed=batch&feeds=comments,documentSummary,visitTodos,regulatory,recruiterStats,demographics,eregPending&format=json')
   .then(function(r) { return r.json(); })
   .then(function(batch) {
     var results = batch.results || {};
@@ -6031,7 +6014,14 @@ function fetchActionRequiredData() {
     _s('ar-training', missingTotal);
     _s('ar-training-sub', gapStudies > 0 ? gapStudies + ' studies' : 'All compliant');
 
-    _log('Action Required: queries=' + comments.length + ', unsignedDocs=' + unsignedTotal + ', overdueTodos=' + overdue.length + ', trainingGaps=' + missingTotal + ', recruiters=' + window._recruiterStats.length);
+    // eReg Pending
+    var eregRows = (results.eregPending || {}).data || [];
+    window._actionEreg = eregRows;
+    _s('ar-ereg', eregRows.length);
+    var eregStudies = new Set(eregRows.map(function(r) { return r.study_key; })).size;
+    _s('ar-ereg-sub', eregRows.length > 0 ? eregStudies + ' studies' : 'All clear');
+
+    _log('Action Required: queries=' + comments.length + ', unsignedDocs=' + unsignedTotal + ', overdueTodos=' + overdue.length + ', eReg=' + eregRows.length + ', recruiters=' + window._recruiterStats.length);
     // Re-render recruiter card with BQ outreach data
     if (typeof renderRecruiterPerformance === 'function') try { renderRecruiterPerformance(); } catch(e2) {}
   }).catch(function(e) {
@@ -6098,6 +6088,22 @@ function showActionModal(type) {
           '<td class="r">' + (r.trainings_expired||0) + '</td>' +
           '<td class="r">' + (r.total_trainings||0) + '</td>' +
           '<td class="r">' + (r.duties_active||0) + '</td></tr>';
+      }).join('') + '</tbody></table>';
+  }
+  } else if (type === 'ereg') {
+    var rows = window._actionEreg || [];
+    title = 'eReg Pending Documents (' + rows.length + ')';
+    body = '<table class="detail-table"><thead><tr><th>Study</th><th>Document</th><th>Status</th><th>Version</th><th>Effective</th><th>Expiration</th><th>Uploaded By</th></tr></thead><tbody>' +
+      rows.slice(0, 100).map(function(r) {
+        var studyUrl = _crioStudyUrl(r.study_key);
+        var isExpired = r.expired === 'Yes';
+        return '<tr style="' + (isExpired?'background:#fef2f2':'') + '"><td style="font-size:11px">' + _crioLink(r.study_name||'', studyUrl) + '</td>' +
+          '<td style="font-size:11px">' + escapeHTML(r.document_name||'') + '</td>' +
+          '<td><span style="font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px;background:' + (r.status==='Assigned'?'#fef2f2':'#fffbeb') + ';color:' + (r.status==='Assigned'?'#dc2626':'#d97706') + '">' + escapeHTML(r.status||'') + '</span></td>' +
+          '<td style="font-size:11px">' + escapeHTML(r.version||'') + '</td>' +
+          '<td style="font-size:11px">' + escapeHTML(r.effective_date||'—') + '</td>' +
+          '<td style="font-size:11px;color:' + (isExpired?'#dc2626':'') + '">' + escapeHTML(r.expiration_date||'—') + (isExpired?' ⚠':'') + '</td>' +
+          '<td style="font-size:11px">' + escapeHTML(r.uploaded_by||'') + '</td></tr>';
       }).join('') + '</tbody></table>';
   }
   openModal(title, '', body || '<div style="padding:20px;color:#94a3b8">No data available</div>');
