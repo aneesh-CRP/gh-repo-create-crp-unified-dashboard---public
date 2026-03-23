@@ -4009,7 +4009,6 @@ function showActionModal(type) {
           '<td class="r">' + (r.total_trainings||0) + '</td>' +
           '<td class="r">' + (r.duties_active||0) + '</td></tr>';
       }).join('') + '</tbody></table>';
-  }
   } else if (type === 'ereg') {
     var rows = window._actionEreg || [];
     title = 'eReg Pending Documents (' + rows.length + ')';
