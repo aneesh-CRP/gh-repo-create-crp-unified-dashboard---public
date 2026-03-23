@@ -3963,7 +3963,7 @@ function showActionModal(type) {
       rows.slice(0, 100).map(function(r) {
         var commentUrl = _crioCommentUrl(r.study_key, r.subject_key, r.subject_visit_key, r.comment_key);
         return '<tr><td style="font-size:11px">' + escapeHTML((r.study_name||'').split(' - ').pop()) + '</td>' +
-          '<td style="font-size:11px">' + escapeHTML(r.subject_name||'') + '</td>' +
+          '<td style="font-size:11px">' + escapeHTML(maskPHI(r.subject_name||'')) + '</td>' +
           '<td style="font-size:10px">' + escapeHTML(r.comment_type||'') + '</td>' +
           '<td style="font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHTML(r.message||'') + '">' + escapeHTML((r.message||'').substring(0,50)) + '</td>' +
           '<td style="font-size:10px">' + escapeHTML(r.created_by||'') + '</td>' +
@@ -3991,7 +3991,7 @@ function showActionModal(type) {
         var isOverdue = r.status === 'Overdue';
         var todoUrl = _crioTodoUrl(r.study_key, r.subject_key);
         return '<tr style="' + (isOverdue?'background:#fef2f2':'') + '"><td style="font-size:11px">' + escapeHTML((r.study_name||'').split(' - ').pop()) + '</td>' +
-          '<td style="font-size:11px">' + escapeHTML(r.subject_name||'') + '</td>' +
+          '<td style="font-size:11px">' + escapeHTML(maskPHI(r.subject_name||'')) + '</td>' +
           '<td style="font-size:11px">' + escapeHTML(r.todo_name||'') + '</td>' +
           '<td><span style="font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px;background:' + (isOverdue?'#fef2f2':'#fffbeb') + ';color:' + (isOverdue?'#dc2626':'#d97706') + '">' + escapeHTML(r.status||'') + '</span></td>' +
           '<td style="white-space:nowrap;color:' + (isOverdue?'#dc2626':'') + '">' + escapeHTML(r.due_date||'') + '</td>' +
@@ -7722,7 +7722,7 @@ function renderAll() {
   }
   document.getElementById('kpi-upcoming').textContent = DATA.upcomingTotal || 0;
   document.getElementById('kpi-next14').textContent   = DATA.next14        || 0;
-  document.getElementById('kpi-risk').textContent     = (DATA.riskMatrix||[]).filter(r=>r.level==='critical'||r.level==='high').length;
+  document.getElementById('kpi-risk').textContent     = (DATA.riskFlags||[]).length;
   const _studiesEl = document.getElementById('kpi-studies');
   if (_studiesEl) _studiesEl.textContent = DATA.activeStudies || (DATA.riskMatrix||[]).length || 0;
   if (document.getElementById('sched-count'))
@@ -7890,7 +7890,7 @@ function showCancels(filterFn, title, sub) {
     <th onclick="sortDetailTable(this)">Site</th>
   </tr></thead><tbody>` +
   rows.map(r => `<tr>
-    <td>${extLink(r.name, r.study_url||r.url||'')}</td>
+    <td>${extLink(maskPHI(r.name), r.study_url||r.url||'')}</td>
     <td style="font-size:11px">${extLink(r.study, r.study_url||'')}</td>
     <td>${typeBadge2(r.type)}</td>
     <td style="color:#64748b;font-size:11px;white-space:nowrap">${r.date||r.cancel_date||'—'}</td>
@@ -7914,7 +7914,7 @@ function showSplitPopup(key, title) {
     '<th onclick="sortDetailTable(this)">Site</th>' +
     '</tr></thead><tbody>' +
     rows.map(function(r) { return '<tr>' +
-      '<td>' + extLink(r.name, r.study_url||r.url||'') + '</td>' +
+      '<td>' + extLink(maskPHI(r.name), r.study_url||r.url||'') + '</td>' +
       '<td style="font-size:11px">' + extLink(r.study, r.study_url||'') + '</td>' +
       '<td>' + typeBadge2(r.type) + '</td>' +
       '<td style="color:#64748b;font-size:11px;white-space:nowrap">' + (r.cancel_date||'—') + '</td>' +

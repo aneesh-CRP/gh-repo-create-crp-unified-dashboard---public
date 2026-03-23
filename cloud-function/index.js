@@ -138,7 +138,7 @@ const STUDY_FILTER_SQL = `AND LOWER(CONCAT(COALESCE(st.nickname, ''), ' ', COALE
       AND LOWER(CONCAT(COALESCE(st.nickname, ''), ' ', COALESCE(st.protocol_number, ''))) NOT LIKE '%sandbox%'
       AND LOWER(CONCAT(COALESCE(st.nickname, ''), ' ', COALESCE(st.protocol_number, ''))) NOT LIKE '%config study%'
       AND LOWER(CONCAT(COALESCE(st.nickname, ''), ' ', COALESCE(st.protocol_number, ''))) NOT LIKE '%covid_flu_rsv%'
-      AND LOWER(COALESCE(st.protocol_number, '')) NOT IN ('event')
+      AND LOWER(COALESCE(st.protocol_number, '')) NOT IN ('event', 'j2a-mc-gzps')
       AND LOWER(CONCAT(COALESCE(st.nickname, ''), ' ', COALESCE(st.protocol_number, ''))) NOT LIKE '%pre-screen%'
       AND st.status != 0`;
 
@@ -258,7 +258,6 @@ const FEEDS = {
       AND aal.date_created >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 90 DAY)
       AND st.is_active = 1 AND st.site_key NOT IN (5547)
       ${STUDY_FILTER_SQL}
-      AND LOWER(COALESCE(st.protocol_number, '')) != 'j2a-mc-gzps'
     ORDER BY aal.date_created DESC`,
     headers: {
       subject_full_name: 'Subject Full Name', study_name: 'Study Name', study_key: 'Study Key',
@@ -1177,6 +1176,7 @@ const FEEDS = {
     LEFT JOIN ${tbl('subject')} sub ON c.subject_key = sub.subject_key
     WHERE c._fivetran_deleted = false AND st.is_active = 1 AND st.site_key NOT IN (5547)
       AND c.is_resolved = 0
+      AND c.date_created >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 90 DAY)
     ORDER BY c.date_created ASC`
   },
 
