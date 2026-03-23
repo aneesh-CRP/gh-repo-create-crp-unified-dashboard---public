@@ -3048,7 +3048,7 @@ function buildReasonBreakdown() {
   var total = reasons.reduce(function(s, r) { return s + r.count; }, 0);
   var catColors = { 'Patient Cancelled': '#dc2626', 'Site Cancelled': '#f59e0b', 'No Show': '#f97316', 'Screen Fail / DNQ': '#6366f1',
     'Patient Withdrew': '#8b5cf6', 'Rescheduled': '#059669', 'Weather': '#0ea5e9', 'BMI / Labs': '#d946ef',
-    'Admin Error': '#64748b', 'Undocumented': '#94a3b8', 'Other': '#cbd5e1' };
+    'Admin Error': '#64748b', 'Undocumented': '#94a3b8', 'Other': '#475569' };
   el.innerHTML = reasons.map(function(r) {
     var cat = r.reason || r.category || '—';
     var pct = total > 0 ? Math.round(r.count / total * 100) : 0;
