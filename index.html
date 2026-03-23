@@ -10028,7 +10028,8 @@ function buildMedRecAlerts() {
 }
 
 function renderAll() {
-  document.getElementById('kpi-cancels').textContent  = DATA.cancelTotal  || 0;
+  var _kpiC = document.getElementById('kpi-cancels');
+  if (_kpiC) _kpiC.textContent = DATA.cancelTotal || 0;
   // Split KPI counters
   var _nsEl = document.getElementById('kpi-noshow');
   if (_nsEl) _nsEl.textContent = DATA.noShowTotal || 0;
@@ -10045,9 +10046,10 @@ function renderAll() {
     var pending = (DATA.pendingReschedules||[]).length;
     reschSub.textContent = pending ? pending + ' pending' : 'Rebooked';
   }
-  document.getElementById('kpi-upcoming').textContent = DATA.upcomingTotal || 0;
-  document.getElementById('kpi-next14').textContent   = DATA.next14        || 0;
-  document.getElementById('kpi-risk').textContent     = (DATA.riskFlags||[]).length;
+  var _sk = function(id,v){ var e=document.getElementById(id); if(e) e.textContent=v; };
+  _sk('kpi-upcoming', DATA.upcomingTotal || 0);
+  _sk('kpi-next14', DATA.next14 || 0);
+  _sk('kpi-risk', (DATA.riskFlags||[]).length);
   const _studiesEl = document.getElementById('kpi-studies');
   if (_studiesEl) _studiesEl.textContent = DATA.activeStudies || (DATA.riskMatrix||[]).length || 0;
   if (document.getElementById('sched-count'))
