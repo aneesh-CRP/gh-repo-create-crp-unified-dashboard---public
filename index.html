@@ -1283,6 +1283,8 @@ body {
         <span class="badge badge-green" id="sched-count">— visits</span>
         <span class="badge" id="sched-confirm-count" style="background:#059669;color:#fff;font-size:10px;padding:2px 8px;border-radius:10px;">0/0 confirmed</span>
         <button class="filter-btn active" onclick="schedFilter(this,'all')"  style="font-size:11px;padding:3px 8px;">All</button>
+        <button class="filter-btn"        onclick="schedFilter(this,'today')" style="font-size:11px;padding:3px 8px;">Today</button>
+        <button class="filter-btn"        onclick="schedFilter(this,'week')"  style="font-size:11px;padding:3px 8px;">This Week</button>
         <button class="filter-btn"        onclick="schedFilter(this,'14')"   style="font-size:11px;padding:3px 8px;">14 days</button>
         <button class="filter-btn"        onclick="schedFilter(this,'30')"   style="font-size:11px;padding:3px 8px;">30 days</button>
         <button class="filter-btn"        onclick="schedFilter(this,'phl')"  style="font-size:11px;padding:3px 8px;">PHL only</button>
@@ -4686,7 +4688,9 @@ function schedFilter(btn, filter) {
     const site = row.dataset.site || '';
     const days = (d - today) / 86400000;
     let vis = days >= 0; // always hide past
-    if (vis && filter === '14')  vis = days <= 14;
+    if (vis && filter === 'today') vis = days === 0;
+    else if (vis && filter === 'week') { var dow = today.getDay(); var daysToFri = dow === 0 ? -2 : 5 - dow; vis = days <= daysToFri; }
+    else if (vis && filter === '14')  vis = days <= 14;
     else if (vis && filter === '30')  vis = days <= 30;
     else if (vis && filter === 'phl') vis = !site.includes('Penn');
     else if (vis && filter === 'pnj') vis = site.includes('Penn');
