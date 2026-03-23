@@ -9838,9 +9838,9 @@ function renderCrioStudies() {
     var subs = subsByStudy[s.study_key] || {};
     var noshow = subs['SCHEDULED_V1_NO_SHOW_CANCELLED'] || 0;
     if (noshow > 0) {
-      winbacks.push({
+      if (!isPS) winbacks.push({
         study: s.protocol_number, key: s.study_key, noshow: noshow,
-        coord: cc(s.coordinator || ''), is_prescreen: isPS,
+        coord: cc(s.coordinator || ''), is_prescreen: false,
         total: s.subject_count
       });
     }
@@ -9885,16 +9885,15 @@ function renderCrioStudies() {
   });
   outreachNeeded.sort(function(a,b) { return b.prequalified - a.prequalified; });
 
-  // Total action items
+  // Total action items (protocol studies only, no pre-screening)
   var totalWinback = winbacks.reduce(function(s,w) { return s + w.noshow; }, 0);
   var totalQualNS = qualNotSched.reduce(function(s,q) { return s + q.screening; }, 0);
-  var totalOutreach = outreachNeeded.reduce(function(s,o) { return s + o.prequalified; }, 0);
   var totalActions = totalWinback + totalQualNS;
 
   // ── Render ──
   var html = '';
 
-  // KPI row: actionable counts
+  // KPI row: actionable counts (protocol studies only)
   html += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">';
   html += '<div style="background:#dc262612;padding:6px 12px;border-radius:8px;flex:1;min-width:90px;text-align:center">'
     + '<div style="font-size:20px;font-weight:700;color:#dc2626">' + totalWinback + '</div>'
@@ -9904,10 +9903,6 @@ function renderCrioStudies() {
     + '<div style="font-size:20px;font-weight:700;color:#d97706">' + totalQualNS + '</div>'
     + '<div style="font-size:10px;color:#64748b">In Screening</div>'
     + '<div style="font-size:9px;color:#d97706">Schedule V1</div></div>';
-  html += '<div style="background:#3b82f612;padding:6px 12px;border-radius:8px;flex:1;min-width:90px;text-align:center">'
-    + '<div style="font-size:20px;font-weight:700;color:#3b82f6">' + totalOutreach + '</div>'
-    + '<div style="font-size:10px;color:#64748b">Pre-Qualified</div>'
-    + '<div style="font-size:9px;color:#3b82f6">Needs Outreach</div></div>';
   html += '<div style="background:#05966912;padding:6px 12px;border-radius:8px;flex:1;min-width:90px;text-align:center">'
     + '<div style="font-size:20px;font-weight:700;color:#059669">' + corrections.length + '</div>'
     + '<div style="font-size:10px;color:#64748b">Data Fixes</div>'
@@ -10033,28 +10028,7 @@ function renderCrioStudies() {
     html += '</div>';
   }
 
-  // ── Section 3: Pre-Screening Outreach Needed ──
-  if (outreachNeeded.length > 0) {
-    html += '<div style="margin-bottom:14px">'
-      + '<div style="font-size:12px;font-weight:700;color:#3b82f6;margin-bottom:6px">Pre-Screening — Outreach Needed</div>'
-      + '<div style="font-size:10px;color:#64748b;margin-bottom:8px">Patients marked Pre-Qualified who may not have been contacted yet. Review for initial outreach or disposition.</div>';
-    outreachNeeded.forEach(function(o) {
-      var url = 'https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/' + o.study_key + '/subjects';
-      var protoNames = o.protocols.map(function(p) { return p.protocol_number; }).join(', ');
-      html += '<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;margin-bottom:3px;border-left:3px solid #3b82f6;background:#3b82f608;border-radius:0 6px 6px 0;font-size:11px">'
-        + '<span style="font-size:16px;font-weight:800;color:#3b82f6;min-width:28px;text-align:right">' + o.prequalified + '</span>'
-        + '<div style="flex:1">'
-        + '<a href="' + esc(url) + '" target="_blank" style="color:#3b82f6;font-weight:600;text-decoration:underline dotted">' + esc(o.name) + '</a>'
-        + (protoNames ? ' <span style="font-size:9px;color:#94a3b8">→ ' + esc(protoNames) + '</span>' : '')
-        + (o.coord ? ' <span style="color:#94a3b8">· ' + esc(o.coord) + '</span>' : '')
-        + '</div>'
-        + '<span style="font-size:10px;color:#64748b;white-space:nowrap">' + o.contact_pct + '% contacted</span>'
-        + '</div>';
-    });
-    html += '</div>';
-  }
-
-  // ── Section 4: Enrolled with no upcoming visit (study-level gap) ──
+  // ── Section 3: Enrolled with no upcoming visit (study-level gap) ──
   var enrolledNoVisit = [];
   var liveUpcoming = {};
   if (DATA) {
