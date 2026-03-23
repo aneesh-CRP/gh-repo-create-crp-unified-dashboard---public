@@ -5386,8 +5386,8 @@ function computeCoordGoals() {
   // Compute from allVisitDetail if coordGoals not pre-computed
   var COORDS = CRP_CONFIG.SCHEDULE_COORDINATORS || CRP_CONFIG.COORDINATORS || [];
   var COORD_LOWER = COORDS.map(function(c) { return c.toLowerCase(); });
-  var goals = { byDay: {}, byMonth: {} };
-  COORDS.forEach(function(c) { goals.byDay[c] = {}; goals.byMonth[c] = 0; });
+  var goals = { byDay: {}, byMonth: {}, byDayDetail: {} };
+  COORDS.forEach(function(c) { goals.byDay[c] = {}; goals.byMonth[c] = 0; goals.byDayDetail[c] = {}; });
   var seen = new Set();
   var visits = DATA.allVisitDetail || [];
   var now = new Date();
@@ -5406,6 +5406,8 @@ function computeCoordGoals() {
     if (seen.has(key)) return;
     seen.add(key);
     goals.byDay[name][date] = (goals.byDay[name][date]||0) + 1;
+    if (!goals.byDayDetail[name][date]) goals.byDayDetail[name][date] = [];
+    goals.byDayDetail[name][date].push({ patient: patient, study: r.study || '', url: r.patient_url || '' });
     if (date >= yy+'-'+mm+'-01' && date <= yy+'-'+mm+'-31') goals.byMonth[name]++;
   });
   return goals;
@@ -5506,8 +5508,8 @@ function renderCoordinatorGoals() {
     const monthVisits = goals.byMonth[name] || 0;
     const barPct = Math.min(100, Math.round(monthVisits / (monthMax * 1.1) * 100));
     const avg = avgPerDay[name].toFixed(1);
-    return `<tr style="border-bottom:1px solid var(--border)">
-      <td style="padding:8px 12px;font-weight:600">${name}</td>
+    return `<tr style="border-bottom:1px solid var(--border);cursor:pointer;" onclick="showCoordDetail('${jsAttr(name)}')">
+      <td style="padding:8px 12px;font-weight:600">${escapeHTML(name)}</td>
       <td style="padding:8px 8px;text-align:center;font-weight:700">${monthVisits}</td>
       <td style="padding:8px 8px;text-align:center;color:#6B7280">${avg}/day</td>
       <td style="padding:8px 12px"><div style="background:#E5E7EB;border-radius:6px;height:8px;overflow:hidden"><div style="background:#1843AD;height:100%;width:${barPct}%;border-radius:6px"></div></div></td>
@@ -8675,6 +8677,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
     coordGoals.byDayDetail[name][date].push({ patient: _ptName, study: _ptStudy, url: _ptUrl });
     if (date >= _cgMonthStart && date <= `${_cgYY}-${_cgMM}-31`) coordGoals.byMonth[name]++;
   });
+  DATA.coordGoals = coordGoals;
   window._coordGoals = coordGoals; // expose for staff calendar
 
   // ── cancelReasons (only true cancellations — excludes rescheduled, completed, admin error, fibroscan, study closed) ──
