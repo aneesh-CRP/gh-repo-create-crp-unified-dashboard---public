@@ -12947,7 +12947,7 @@ function renderCoordProductivity() {
   html += '<tr style="background:#f8fafc;"><th style="text-align:left;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Name</th><th style="text-align:left;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Activity</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Total</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Patients</th></tr>';
   data.forEach(function(r) {
     var barW = Math.round(r.total / maxTotal * 100);
-    html += '<tr style="border-bottom:1px solid #f1f5f9;">';
+    html += '<tr style="border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showCoordDetail(\''+jsAttr(r.name)+'\')">';
     html += '<td style="padding:8px;font-weight:700;color:#1e293b;">' + escapeHTML(r.name.split(' ')[0]) + '</td>';
     html += '<td style="padding:8px;"><div style="background:#e2e8f0;border-radius:5px;height:18px;position:relative;">';
     html += '<div style="width:' + barW + '%;background:linear-gradient(90deg,#3b82f6,#8b5cf6);height:100%;border-radius:5px;"></div>';
