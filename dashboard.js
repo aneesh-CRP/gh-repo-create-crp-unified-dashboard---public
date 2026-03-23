@@ -1594,7 +1594,7 @@ function switchTab(name, el) {
   if (navWrap) navWrap.classList.remove('open');
 
   // Performance tabs → delegate to switchView (handles lazy building)
-  const PERF_TABS = ['overview','studies','schedule','referrals','admin'];
+  const PERF_TABS = ['overview','studies','referrals','admin'];
   if (PERF_TABS.includes(name)) {
     // Hide finance+insights views first
     document.querySelectorAll('[id^="view-fin-"], #view-insights').forEach(v => {
@@ -4270,7 +4270,7 @@ function buildInsights() {
   const high = flags.filter(f => f.severity === 'high').length;
   if (flags.length > 0) {
     const sevDetail = [critical ? critical + ' critical' : '', high ? high + ' high' : ''].filter(Boolean).join(', ');
-    flagItems.push({ urgent: critical > 0, html: `<div class="insight-item ${critical > 0 ? 'danger' : 'warning'}" style="cursor:pointer" onclick="switchTab('schedule')">
+    flagItems.push({ urgent: critical > 0, html: `<div class="insight-item ${critical > 0 ? 'danger' : 'warning'}" style="cursor:pointer" onclick="switchTab('overview')">
       <span class="insight-icon">${critical > 0 ? '🔴' : '⚠️'}</span><div>
         <div class="insight-title">${flags.length} at-risk patient${flags.length>1?'s':''} with upcoming visits${sevDetail ? ' — ' + sevDetail : ''}</div>
         <div class="insight-desc">View details in <strong>Schedule → At-Risk Patients</strong></div>
@@ -4294,7 +4294,7 @@ function buildInsights() {
   const rpCount = (actionCount.open_reschedule_promises||[]).length;
   const totalActions = undocCount + nsCount + rpCount;
   if (totalActions > 0) {
-    flagItems.push({ urgent: false, html: `<div class="insight-item warning" style="cursor:pointer" onclick="switchTab('schedule')">
+    flagItems.push({ urgent: false, html: `<div class="insight-item warning" style="cursor:pointer" onclick="switchTab('overview')">
       <span class="insight-icon">📋</span><div>
         <div class="insight-title">${totalActions} open action items in the pipeline</div>
         <div class="insight-desc">${[undocCount?undocCount+' undocumented':'', nsCount?nsCount+' no-show follow-ups':'', rpCount?rpCount+' pending reschedules':''].filter(Boolean).join(' · ')} — see <strong>Schedule → Action Plan</strong></div>
@@ -4306,7 +4306,7 @@ function buildInsights() {
   var readyNV = findReadyNoVisit();
   if (refsNoMR.length > 0 || readyNV.length > 0) {
     const parts = [refsNoMR.length ? refsNoMR.length + ' referrals missing records' : '', readyNV.length ? readyNV.length + ' ready but unscheduled' : ''].filter(Boolean);
-    flagItems.push({ urgent: readyNV.length >= 3, html: `<div class="insight-item ${readyNV.length >= 3 ? 'danger' : 'warning'}" style="cursor:pointer" onclick="switchTab('schedule')">
+    flagItems.push({ urgent: readyNV.length >= 3, html: `<div class="insight-item ${readyNV.length >= 3 ? 'danger' : 'warning'}" style="cursor:pointer" onclick="switchTab('overview')">
       <span class="insight-icon">📋</span><div>
         <div class="insight-title">Medical records pipeline needs attention</div>
         <div class="insight-desc">${parts.join(' · ')} — see <strong>Schedule → Medical Records</strong></div>

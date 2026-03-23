@@ -1051,7 +1051,6 @@ body {
   <div id="nav-tabs-wrap" class="nav-tabs-wrapper">
     <span class="nav-tab active" onclick="switchTab('overview', this)" role="tab" aria-selected="true">Overview</span>
     <span class="nav-tab" onclick="switchTab('studies', this)" role="tab">Studies</span>
-    <span class="nav-tab" onclick="switchTab('schedule', this)" role="tab">Schedule</span>
     <span class="nav-tab" onclick="switchTab('referrals', this)" role="tab">Referrals</span>
     <span class="nav-tab" onclick="switchTab('admin', this)" role="tab">🔒 Admin</span>
     <span style="width:1px;background:#CBD5E0;margin:8px 3px"></span>
@@ -1217,25 +1216,16 @@ body {
   </div>
 
   <!-- Row 2: Study Breakdown (stacked) + Reasons -->
-  <div class="grid-65 fade-in">
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title">Study Breakdown (Last 2 Months)</span>
-        <span class="badge badge-gray">Cancels · No Shows · SF · Withdrew</span>
-      </div>
-      <div id="cancel-study-bars"></div>
+  <div class="card mb16 fade-in">
+    <div class="card-header">
+      <span class="card-title">Reasons by Category</span>
+      <span class="badge badge-gray">Last 2 months · excludes rescheduled</span>
     </div>
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title">Reasons by Category</span>
-        <span class="badge badge-gray">Last 2 months · excludes rescheduled</span>
-      </div>
-      <div id="reason-breakdown"></div>
-      <div class="chart-wrap" style="height:150px;display:none">
-        <canvas id="reasonChart"></canvas>
-      </div>
-      <div class="legend-list" style="margin-top:8px;display:none" id="reason-legend"></div>
+    <div id="reason-breakdown"></div>
+    <div class="chart-wrap" style="height:150px;display:none">
+      <canvas id="reasonChart"></canvas>
     </div>
+    <div class="legend-list" style="margin-top:8px;display:none" id="reason-legend"></div>
   </div>
 
   <!-- Row 4: Site Breakdown (stacked) -->
@@ -1247,6 +1237,209 @@ body {
     <div id="site-stacked-bars"></div>
     <div class="chart-wrap h200" style="display:none">
       <canvas id="siteChart"></canvas>
+    </div>
+  </div>
+
+  <!-- ══ SCHEDULE (merged from former Schedule tab) ══ -->
+
+  <!-- Schedule KPI Row -->
+  <div class="time-banner fade-in" style="margin-bottom:16px;">
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showUpcoming(null,'All Upcoming Visits')" title="Click to see all upcoming visits">
+      <div class="tb-label">📆 Total Upcoming</div>
+      <div class="tb-value green" id="sched-kpi-total">71</div>
+      <div class="tb-sub">Active scheduled visits</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showUpcoming(r=>!r.site.includes('Penn'),'Philadelphia Visits')" title="Click to see Philadelphia visits">
+      <div class="tb-label">🏙 Philadelphia</div>
+      <div class="tb-value blue" id="sched-kpi-philly">52</div>
+      <div class="tb-sub">76% of scheduled visits</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showUpcoming(r=>r.site.includes('Penn'),'Pennington Visits')" title="Click to see Pennington visits">
+      <div class="tb-label">🌿 Pennington</div>
+      <div class="tb-value" style="color:var(--green)" id="sched-kpi-penn">19</div>
+      <div class="tb-sub">24% of scheduled visits</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" id="sched-kpi-month1-section" onclick="showUpcoming(r=>r.date_iso&&r.date_iso.startsWith(window._schedMonth1Prefix||''),'This Month Visits')" title="Click to see this month's visits">
+      <div class="tb-label" id="sched-kpi-month1-label">📅 Month</div>
+      <div class="tb-value" style="color:var(--purple)" id="sched-kpi-march">0</div>
+      <div class="tb-sub">Visits this month</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" id="sched-kpi-month2-section" onclick="showUpcoming(r=>r.date_iso&&r.date_iso.startsWith(window._schedMonth2Prefix||''),'Next Month Visits')" title="Click to see next month's visits">
+      <div class="tb-label" id="sched-kpi-month2-label">📅 Month</div>
+      <div class="tb-value" style="color:var(--yellow)" id="sched-kpi-april">0</div>
+      <div class="tb-sub">Visits next month</div>
+    </div>
+  </div>
+
+  <!-- Full visit table -->
+  <div class="card fade-in">
+    <div class="card-header" style="flex-wrap:wrap;gap:8px;">
+      <span class="card-title">📆 All Upcoming Visits</span>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+        <span class="badge badge-green" id="sched-count">— visits</span>
+        <span class="badge" id="sched-confirm-count" style="background:#059669;color:#fff;font-size:10px;padding:2px 8px;border-radius:10px;">0/0 confirmed</span>
+        <button class="filter-btn active" onclick="schedFilter(this,'all')"  style="font-size:11px;padding:3px 8px;">All</button>
+        <button class="filter-btn"        onclick="schedFilter(this,'14')"   style="font-size:11px;padding:3px 8px;">14 days</button>
+        <button class="filter-btn"        onclick="schedFilter(this,'30')"   style="font-size:11px;padding:3px 8px;">30 days</button>
+        <button class="filter-btn"        onclick="schedFilter(this,'phl')"  style="font-size:11px;padding:3px 8px;">PHL only</button>
+        <button class="filter-btn"        onclick="schedFilter(this,'pnj')"  style="font-size:11px;padding:3px 8px;">PNJ only</button>
+      </div>
+    </div>
+    <div style="max-height:600px;overflow-y:auto;border-radius:0 0 8px 8px;">
+      <table class="data-table sortable" id="vis-table">
+        <thead>
+          <tr><th style="width:80px;font-size:10px">Confirm</th><th onclick="sortTable(this)">Date</th><th onclick="sortTable(this)">Study</th><th onclick="sortTable(this)">Visit</th><th onclick="sortTable(this)">Patient</th><th onclick="sortTable(this)">Status</th><th onclick="sortTable(this)">Med Records</th><th onclick="sortTable(this)">Coordinator</th><th onclick="sortTable(this)">Investigator</th><th onclick="sortTable(this)">Site</th></tr>
+        </thead>
+        <tbody id="upcoming-tbody">
+<tr><td colspan="10" style="text-align:center;padding:24px;color:#94a3b8;font-size:12px">Loading schedule from CRIO...</td></tr>
+</tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- At-Risk Patients -->
+  <div class="section-title" style="margin-bottom:10px;margin-top:16px;">🚨 At-Risk Patients — Immediate Action Required</div>
+  <div class="time-banner fade-in" style="margin-bottom:16px;">
+    <div class="tb-section">
+      <div class="tb-label">⚠️ At-Risk Patients</div>
+      <div class="tb-value red kpi-clickable" id="risk-kpi-count" onclick="showRiskFlags('At-Risk Patients')">2</div>
+      <div class="tb-sub">Cancelled 2× with upcoming visit</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showRiskFlags('Urgent — Next Visit Within 14 Days')" title="Click to see urgent risk patients">
+      <div class="tb-label">📞 Call This Week</div>
+      <div class="tb-value yellow" id="risk-kpi-urgent">2</div>
+      <div class="tb-sub">Next visit within 14 days</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showRiskStudies()" title="Click to see affected studies">
+      <div class="tb-label">🏥 Studies Affected</div>
+      <div class="tb-value blue" id="risk-kpi-studies">2</div>
+      <div class="tb-sub">Unique studies with risk flags</div>
+    </div>
+  </div>
+  <div class="card fade-in" style="margin-bottom:16px;">
+    <div class="card-header">
+      <span class="card-title">⚠️ Patients with 2+ Cancellations Who Have Upcoming Visits</span>
+      <span class="badge badge-red">Call before their next visit</span>
+    </div>
+    <div id="risk-flag-cards" style="padding:12px 16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px;"></div>
+  </div>
+
+  <!-- Upcoming by Study + Coordinator Workload -->
+  <div class="grid-2 mb16 fade-in">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Upcoming by Study</span>
+        <span class="badge badge-blue" id="sched-study-count">17 studies</span>
+      </div>
+      <div id="upcoming-study-bars" style="padding:12px 16px;max-height:320px;overflow-y:auto;"></div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Coordinator Workload & Productivity</span>
+        <span class="badge badge-blue" id="coord-prod-badge">Loading...</span>
+      </div>
+      <div id="coordBalanceContainer" style="padding:12px 16px;">
+        <p style="color:#94a3b8;font-size:12px">Loading workload data...</p>
+      </div>
+      <div id="coord-prod-container" style="padding:0 12px 12px;border-top:1px solid #f1f5f9;">
+      </div>
+    </div>
+  </div>
+
+  <!-- Coordinator Visit Tracker -->
+  <div class="card fade-in" style="margin-bottom:16px;">
+    <div style="padding:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div><div style="font-size:14px;font-weight:700;color:var(--navy)">Coordinator Visit Tracker</div><div style="font-size:10px;color:#94a3b8;">Daily visit counts per coordinator this week · weekdays only · from CRIO scheduled visits</div></div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <button onclick="exportCoordHistory()" title="Export coordinator history as JSON" style="background:none;border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:11px;color:var(--muted);cursor:pointer">&#x2B07; Export</button>
+          <div style="font-size:11px;color:var(--muted)" id="coord-week-label">This Week</div>
+        </div>
+      </div>
+      <div id="coordGoalsGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px"></div>
+      <div style="margin-top:16px">
+        <div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">Monthly Snapshot — <span id="coord-month-label">March 2026</span></div>
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:12px" id="coordMonthTable">
+            <thead><tr style="background:var(--surface2);border-bottom:2px solid var(--border)">
+              <th style="padding:8px 12px;text-align:left;font-weight:700">Coordinator</th>
+              <th style="padding:8px 8px;text-align:center;font-weight:700">Visits</th>
+              <th style="padding:8px 8px;text-align:center;font-weight:700">Avg/Day</th>
+              <th style="padding:8px 8px;text-align:center;font-weight:700">Volume</th>
+              <th style="padding:8px 8px;text-align:center;font-weight:700">Period</th>
+            </tr></thead>
+            <tbody id="coordMonthBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Investigator + Recruiter -->
+  <div class="grid-2 mb16 fade-in">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Investigator Workload</span>
+      </div>
+      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Upcoming visits per PI · utilization = days with visits / available days</div>
+      <div id="invCapacityContainer" style="padding:12px 16px;">
+        <p style="color:#94a3b8;font-size:12px">Loading investigator data...</p>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Recruiter Performance</span>
+        <span class="badge badge-gray" id="recruiter-perf-badge">Loading...</span>
+      </div>
+      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Outreach activity from CRIO patient_interaction · calls, texts, emails (last 30 days)</div>
+      <div id="recruiterPerfContainer" style="padding:0 16px 4px;">
+        <p style="color:#94a3b8;font-size:12px">Loading recruiter data...</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Coordinator Cancel Rate -->
+  <div class="card fade-in" style="margin-bottom:16px">
+    <div class="card-header">
+      <span class="card-title">Coordinator Cancel Rate Over Time</span>
+      <span class="badge badge-blue" style="font-size:10px">5 coordinators · cancels ÷ (visits + cancels) per week</span>
+    </div>
+    <div class="chart-wrap h220">
+      <canvas id="trendsCoordChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Key Insights -->
+  <div class="grid-2 mb16 fade-in">
+    <div class="card">
+      <div class="card-header"><span class="card-title">Flags Requiring Action</span></div>
+      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Auto-detected from at-risk patients, high cancel studies, and enrollment gaps</div>
+      <div class="insight-list" id="perf-insight-flags"></div>
+    </div>
+    <div class="card">
+      <div class="card-header"><span class="card-title">Positive Indicators</span></div>
+      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Trends improving, goals met, and operational wins detected this period</div>
+      <div class="insight-list" id="perf-insight-positive"></div>
+    </div>
+  </div>
+
+  <!-- Action Plan -->
+  <div class="section-title" style="margin-top:16px;">📋 Prioritized Action Plan</div>
+  <div class="grid-2">
+    <div>
+      <div class="steps-list" id="action-steps"></div>
+    </div>
+    <div>
+      <div class="card mb16">
+        <div class="card-header"><span class="card-title">🚫 Studies Needing Attention</span></div>
+        <div id="dormant-list"></div>
+      </div>
     </div>
   </div>
 
@@ -1336,232 +1529,6 @@ body {
 </div><!-- /view-studies -->
 
 
-<!-- ══ VIEW: SCHEDULE ══════════════════════ -->
-<div id="view-schedule" class="view">
-
-  <!-- KPI Row -->
-  <div class="time-banner fade-in" style="margin-bottom:16px;">
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showUpcoming(null,'All Upcoming Visits')" title="Click to see all upcoming visits">
-      <div class="tb-label">📆 Total Upcoming</div>
-      <div class="tb-value green" id="sched-kpi-total">71</div>
-      <div class="tb-sub">Active scheduled visits</div>
-    </div>
-    <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showUpcoming(r=>!r.site.includes('Penn'),'Philadelphia Visits')" title="Click to see Philadelphia visits">
-      <div class="tb-label">🏙 Philadelphia</div>
-      <div class="tb-value blue" id="sched-kpi-philly">52</div>
-      <div class="tb-sub">76% of scheduled visits</div>
-    </div>
-    <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showUpcoming(r=>r.site.includes('Penn'),'Pennington Visits')" title="Click to see Pennington visits">
-      <div class="tb-label">🌿 Pennington</div>
-      <div class="tb-value" style="color:var(--green)" id="sched-kpi-penn">19</div>
-      <div class="tb-sub">24% of scheduled visits</div>
-    </div>
-    <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" id="sched-kpi-month1-section" onclick="showUpcoming(r=>r.date_iso&&r.date_iso.startsWith(window._schedMonth1Prefix||''),'This Month Visits')" title="Click to see this month's visits">
-      <div class="tb-label" id="sched-kpi-month1-label">📅 Month</div>
-      <div class="tb-value" style="color:var(--purple)" id="sched-kpi-march">0</div>
-      <div class="tb-sub">Visits this month</div>
-    </div>
-    <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" id="sched-kpi-month2-section" onclick="showUpcoming(r=>r.date_iso&&r.date_iso.startsWith(window._schedMonth2Prefix||''),'Next Month Visits')" title="Click to see next month's visits">
-      <div class="tb-label" id="sched-kpi-month2-label">📅 Month</div>
-      <div class="tb-value" style="color:var(--yellow)" id="sched-kpi-april">0</div>
-      <div class="tb-sub">Visits next month</div>
-    </div>
-  </div>
-
-  <!-- Full visit table — moved up under KPIs for quick access -->
-  <div class="card fade-in">
-    <div class="card-header" style="flex-wrap:wrap;gap:8px;">
-      <span class="card-title">📆 All Upcoming Visits</span>
-      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
-        <span class="badge badge-green" id="sched-count">— visits</span>
-        <span class="badge" id="sched-confirm-count" style="background:#059669;color:#fff;font-size:10px;padding:2px 8px;border-radius:10px;">0/0 confirmed</span>
-        <button class="filter-btn active" onclick="schedFilter(this,'all')"  style="font-size:11px;padding:3px 8px;">All</button>
-        <button class="filter-btn"        onclick="schedFilter(this,'14')"   style="font-size:11px;padding:3px 8px;">14 days</button>
-        <button class="filter-btn"        onclick="schedFilter(this,'30')"   style="font-size:11px;padding:3px 8px;">30 days</button>
-        <button class="filter-btn"        onclick="schedFilter(this,'phl')"  style="font-size:11px;padding:3px 8px;">PHL only</button>
-        <button class="filter-btn"        onclick="schedFilter(this,'pnj')"  style="font-size:11px;padding:3px 8px;">PNJ only</button>
-      </div>
-    </div>
-    <div style="max-height:600px;overflow-y:auto;border-radius:0 0 8px 8px;">
-      <table class="data-table sortable" id="vis-table">
-        <thead>
-          <tr><th style="width:80px;font-size:10px">Confirm</th><th onclick="sortTable(this)">Date</th><th onclick="sortTable(this)">Study</th><th onclick="sortTable(this)">Visit</th><th onclick="sortTable(this)">Patient</th><th onclick="sortTable(this)">Status</th><th onclick="sortTable(this)">Med Records</th><th onclick="sortTable(this)">Coordinator</th><th onclick="sortTable(this)">Investigator</th><th onclick="sortTable(this)">Site</th></tr>
-        </thead>
-        <tbody id="upcoming-tbody">
-<tr><td colspan="10" style="text-align:center;padding:24px;color:#94a3b8;font-size:12px">Loading schedule from CRIO...</td></tr>
-<!-- Dynamic rows built by buildScheduleTable() from live CRIO data -->
-</tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- BQ: Visit Compliance -->
-  <div class="card fade-in" style="margin-bottom:16px;">
-    <div class="card-header">
-      <span class="card-title">Visit Compliance (90 days)</span>
-      <span class="badge badge-blue" id="compliance-badge">Loading...</span>
-    </div>
-    <div style="font-size:10px;color:#94a3b8;padding:0 12px;">Completed vs cancelled visits in the last 90 days from CRIO subject_visit data</div>
-    <div class="card-header" style="border:none;padding-top:0">
-    </div>
-    <div id="compliance-container" style="padding:12px;">
-      <div style="text-align:center;padding:20px;color:var(--muted);font-size:12px;">Loading...</div>
-    </div>
-  </div>
-
-  <!-- At-Risk Patients (moved from Actions) — most urgent, at top -->
-  <div class="section-title" style="margin-bottom:10px;">🚨 At-Risk Patients — Immediate Action Required</div>
-
-  <!-- KPI banner -->
-  <div class="time-banner fade-in" style="margin-bottom:16px;">
-    <div class="tb-section">
-      <div class="tb-label">⚠️ At-Risk Patients</div>
-      <div class="tb-value red kpi-clickable" id="risk-kpi-count" onclick="showRiskFlags('At-Risk Patients')">2</div>
-      <div class="tb-sub">Cancelled 2× with upcoming visit</div>
-    </div>
-    <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showRiskFlags('Urgent — Next Visit Within 14 Days')" title="Click to see urgent risk patients">
-      <div class="tb-label">📞 Call This Week</div>
-      <div class="tb-value yellow" id="risk-kpi-urgent">2</div>
-      <div class="tb-sub">Next visit within 14 days</div>
-    </div>
-    <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showRiskStudies()" title="Click to see affected studies">
-      <div class="tb-label">🏥 Studies Affected</div>
-      <div class="tb-value blue" id="risk-kpi-studies">2</div>
-      <div class="tb-sub">Unique studies with risk flags</div>
-    </div>
-  </div>
-
-  <!-- Risk flag cards -->
-  <div class="card fade-in" style="margin-bottom:16px;">
-    <div class="card-header">
-      <span class="card-title">⚠️ Patients with 2+ Cancellations Who Have Upcoming Visits</span>
-      <span class="badge badge-red">Call before their next visit</span>
-    </div>
-    <div id="risk-flag-cards" style="padding:12px 16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px;"></div>
-  </div>
-
-  </div>
-
-  <!-- Study breakdown + coord workload -->
-  <div class="grid-2 mb16 fade-in">
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title">Upcoming by Study</span>
-        <span class="badge badge-blue" id="sched-study-count">17 studies</span>
-      </div>
-      <div id="upcoming-study-bars" style="padding:12px 16px;max-height:320px;overflow-y:auto;"></div>
-    </div>
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title">Coordinator Workload & Productivity</span>
-        <span class="badge badge-blue" id="coord-prod-badge">Loading...</span>
-      </div>
-      <div id="coordBalanceContainer" style="padding:12px 16px;">
-        <p style="color:#94a3b8;font-size:12px">Loading workload data...</p>
-      </div>
-      <div id="coord-prod-container" style="padding:0 12px 12px;border-top:1px solid #f1f5f9;">
-      </div>
-    </div>
-  </div>
-
-  <!-- ── COORDINATOR VISIT TRACKER ── -->
-  <div class="card fade-in" style="margin-bottom:16px;">
-    <div style="padding:16px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <div><div style="font-size:14px;font-weight:700;color:var(--navy)">Coordinator Visit Tracker</div><div style="font-size:10px;color:#94a3b8;">Daily visit counts per coordinator this week · weekdays only · from CRIO scheduled visits</div></div>
-        <div style="display:flex;align-items:center;gap:8px">
-          <button onclick="exportCoordHistory()" title="Export coordinator history as JSON" style="background:none;border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:11px;color:var(--muted);cursor:pointer">&#x2B07; Export</button>
-          <div style="font-size:11px;color:var(--muted)" id="coord-week-label">This Week</div>
-        </div>
-      </div>
-      <div id="coordGoalsGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px"></div>
-      <div style="margin-top:16px">
-        <div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">Monthly Snapshot — <span id="coord-month-label">March 2026</span></div>
-        <div style="overflow-x:auto">
-          <table style="width:100%;border-collapse:collapse;font-size:12px" id="coordMonthTable">
-            <thead><tr style="background:var(--surface2);border-bottom:2px solid var(--border)">
-              <th style="padding:8px 12px;text-align:left;font-weight:700">Coordinator</th>
-              <th style="padding:8px 8px;text-align:center;font-weight:700">Visits</th>
-              <th style="padding:8px 8px;text-align:center;font-weight:700">Avg/Day</th>
-              <th style="padding:8px 8px;text-align:center;font-weight:700">Volume</th>
-              <th style="padding:8px 8px;text-align:center;font-weight:700">Period</th>
-            </tr></thead>
-            <tbody id="coordMonthBody"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Investigator + Recruiter side by side -->
-  <div class="grid-2 mb16 fade-in">
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title">Investigator Workload</span>
-      </div>
-      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Upcoming visits per PI · utilization = days with visits / available days</div>
-      <div id="invCapacityContainer" style="padding:12px 16px;">
-        <p style="color:#94a3b8;font-size:12px">Loading investigator data...</p>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title">Recruiter Performance</span>
-        <span class="badge badge-gray" id="recruiter-perf-badge">Loading...</span>
-      </div>
-      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Outreach activity from CRIO patient_interaction · calls, texts, emails (last 30 days)</div>
-      <div id="recruiterPerfContainer" style="padding:0 16px 4px;">
-        <p style="color:#94a3b8;font-size:12px">Loading recruiter data...</p>
-      </div>
-    </div>
-  </div>
-
-  <!-- Coordinator Cancel Rate Trend -->
-  <div class="card fade-in" style="margin-bottom:16px">
-    <div class="card-header">
-      <span class="card-title">Coordinator Cancel Rate Over Time</span>
-      <span class="badge badge-blue" style="font-size:10px">5 coordinators · cancels ÷ (visits + cancels) per week</span>
-    </div>
-    <div class="chart-wrap h220">
-      <canvas id="trendsCoordChart"></canvas>
-    </div>
-  </div>
-
-  <!-- Key Insights -->
-  <div class="grid-2 mb16 fade-in">
-    <div class="card">
-      <div class="card-header"><span class="card-title">Flags Requiring Action</span></div>
-      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Auto-detected from at-risk patients, high cancel studies, and enrollment gaps</div>
-      <div class="insight-list" id="perf-insight-flags"></div>
-    </div>
-    <div class="card">
-      <div class="card-header"><span class="card-title">Positive Indicators</span></div>
-      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Trends improving, goals met, and operational wins detected this period</div>
-      <div class="insight-list" id="perf-insight-positive"></div>
-    </div>
-  </div>
-
-  <!-- Prioritized Action Plan -->
-  <div class="section-title" style="margin-top:16px;">📋 Prioritized Action Plan</div>
-  <div class="grid-2">
-    <div>
-      <div class="steps-list" id="action-steps"></div>
-    </div>
-    <div>
-      <div class="card mb16">
-        <div class="card-header"><span class="card-title">🚫 Studies Needing Attention</span></div>
-        <div id="dormant-list"></div>
-      </div>
-    </div>
-  </div>
-
-</div><!-- /view-schedule -->
 
 
 
@@ -3729,7 +3696,7 @@ function switchTab(name, el) {
   if (navWrap) navWrap.classList.remove('open');
 
   // Performance tabs → delegate to switchView (handles lazy building)
-  const PERF_TABS = ['overview','studies','schedule','referrals','admin'];
+  const PERF_TABS = ['overview','studies','referrals','admin'];
   if (PERF_TABS.includes(name)) {
     // Hide finance+insights views first
     document.querySelectorAll('[id^="view-fin-"], #view-insights').forEach(v => {
@@ -6405,7 +6372,7 @@ function buildInsights() {
   const high = flags.filter(f => f.severity === 'high').length;
   if (flags.length > 0) {
     const sevDetail = [critical ? critical + ' critical' : '', high ? high + ' high' : ''].filter(Boolean).join(', ');
-    flagItems.push({ urgent: critical > 0, html: `<div class="insight-item ${critical > 0 ? 'danger' : 'warning'}" style="cursor:pointer" onclick="switchTab('schedule')">
+    flagItems.push({ urgent: critical > 0, html: `<div class="insight-item ${critical > 0 ? 'danger' : 'warning'}" style="cursor:pointer" onclick="switchTab('overview')">
       <span class="insight-icon">${critical > 0 ? '🔴' : '⚠️'}</span><div>
         <div class="insight-title">${flags.length} at-risk patient${flags.length>1?'s':''} with upcoming visits${sevDetail ? ' — ' + sevDetail : ''}</div>
         <div class="insight-desc">View details in <strong>Schedule → At-Risk Patients</strong></div>
@@ -6429,7 +6396,7 @@ function buildInsights() {
   const rpCount = (actionCount.open_reschedule_promises||[]).length;
   const totalActions = undocCount + nsCount + rpCount;
   if (totalActions > 0) {
-    flagItems.push({ urgent: false, html: `<div class="insight-item warning" style="cursor:pointer" onclick="switchTab('schedule')">
+    flagItems.push({ urgent: false, html: `<div class="insight-item warning" style="cursor:pointer" onclick="switchTab('overview')">
       <span class="insight-icon">📋</span><div>
         <div class="insight-title">${totalActions} open action items in the pipeline</div>
         <div class="insight-desc">${[undocCount?undocCount+' undocumented':'', nsCount?nsCount+' no-show follow-ups':'', rpCount?rpCount+' pending reschedules':''].filter(Boolean).join(' · ')} — see <strong>Schedule → Action Plan</strong></div>
@@ -6441,7 +6408,7 @@ function buildInsights() {
   var readyNV = findReadyNoVisit();
   if (refsNoMR.length > 0 || readyNV.length > 0) {
     const parts = [refsNoMR.length ? refsNoMR.length + ' referrals missing records' : '', readyNV.length ? readyNV.length + ' ready but unscheduled' : ''].filter(Boolean);
-    flagItems.push({ urgent: readyNV.length >= 3, html: `<div class="insight-item ${readyNV.length >= 3 ? 'danger' : 'warning'}" style="cursor:pointer" onclick="switchTab('schedule')">
+    flagItems.push({ urgent: readyNV.length >= 3, html: `<div class="insight-item ${readyNV.length >= 3 ? 'danger' : 'warning'}" style="cursor:pointer" onclick="switchTab('overview')">
       <span class="insight-icon">📋</span><div>
         <div class="insight-title">Medical records pipeline needs attention</div>
         <div class="insight-desc">${parts.join(' · ')} — see <strong>Schedule → Medical Records</strong></div>
