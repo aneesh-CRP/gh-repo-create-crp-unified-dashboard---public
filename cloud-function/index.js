@@ -1623,9 +1623,15 @@ const CLICKUP_API = 'https://api.clickup.com/api/v2';
 
 const REFERRAL_LISTS = [
   { id: '901413202462', name: 'Dr. Modarressi', source_type: 'physician' },
-  { id: '901413613356', name: 'Connolly Dermatology', source_type: 'physician' },
+  { id: '901414013590', name: 'Center For Primary Care Medicine', source_type: 'physician' },
   { id: '901413613360', name: 'Dr. Savita Singh', source_type: 'physician' },
-  { id: '901414013590', name: 'Center for Primary Care Medicine', source_type: 'physician' },
+  { id: '901414585282', name: 'Dr. Richard Mandel', source_type: 'physician' },
+  { id: '901414585292', name: 'Prohealth Associates', source_type: 'physician' },
+  { id: '901414585307', name: 'Parkwood', source_type: 'physician' },
+  { id: '901414585313', name: 'SkinSmart Dermatology', source_type: 'physician' },
+  { id: '901414585319', name: 'Princeton Dermatology', source_type: 'physician' },
+  { id: '901414585325', name: 'Aura Derm', source_type: 'physician' },
+  { id: '901413613356', name: 'Connolly Dermatology', source_type: 'physician' },
 ];
 const CAMPAIGN_LIST_ID = '901407896291';
 const MED_RECORDS_FOLDER_ID = '90147290121';
@@ -1684,7 +1690,25 @@ async function fetchAllClickUpTasks(listId) {
 function parseCustomFields(fields) {
   const obj = {};
   (fields || []).forEach(f => {
-    if (f.value != null) obj[f.name] = typeof f.value === 'object' ? JSON.stringify(f.value) : String(f.value);
+    if (f.value == null) return;
+    const opts = (f.type_config || {}).options || [];
+    if (f.type === 'drop_down' && typeof f.value === 'number' && opts.length > 0) {
+      // Dropdown: resolve index → label
+      const opt = opts[f.value];
+      obj[f.name] = opt ? (opt.name || opt.label || String(f.value)) : String(f.value);
+    } else if (f.type === 'labels' && Array.isArray(f.value) && opts.length > 0) {
+      // Labels: resolve UUIDs → label names
+      const labelMap = {};
+      opts.forEach(o => { labelMap[o.id] = o.label || o.name || o.id; });
+      obj[f.name] = f.value.map(id => labelMap[id] || id).join(', ');
+    } else if (f.type === 'date' && typeof f.value === 'number') {
+      // Date: epoch ms → YYYY-MM-DD
+      obj[f.name] = new Date(f.value).toISOString().split('T')[0];
+    } else if (f.type === 'date' && typeof f.value === 'string' && /^\d{10,}$/.test(f.value)) {
+      obj[f.name] = new Date(parseInt(f.value)).toISOString().split('T')[0];
+    } else {
+      obj[f.name] = typeof f.value === 'object' ? JSON.stringify(f.value) : String(f.value);
+    }
   });
   return obj;
 }
