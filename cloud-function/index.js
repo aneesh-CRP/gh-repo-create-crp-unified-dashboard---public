@@ -1167,6 +1167,8 @@ const FEEDS = {
       CAST(c.subject_key AS STRING) AS subject_key,
       CAST(c.comment_key AS STRING) AS comment_key,
       CAST(c.subject_visit_key AS STRING) AS subject_visit_key,
+      COALESCE(sc.name, '') AS assigned_to,
+      CASE svi.status WHEN 22 THEN 'completed-visit' WHEN 23 THEN 'completed-visit' WHEN 21 THEN 'completed-visit' WHEN 11 THEN 'visit' ELSE 'visit' END AS visit_path,
       FORMAT_DATETIME('%Y-%m-%d', c.date_created) AS date_created,
       DATE_DIFF(CURRENT_DATE(), DATE(c.date_created), DAY) AS days_outstanding
     FROM ${tbl('comment')} c
@@ -1174,6 +1176,12 @@ const FEEDS = {
     LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
     LEFT JOIN ${tbl('user')} u ON c.user_key = u.user_key
     LEFT JOIN ${tbl('subject')} sub ON c.subject_key = sub.subject_key
+    LEFT JOIN ${tbl('subject_visit')} svi ON c.subject_visit_key = svi.subject_visit_key
+    LEFT JOIN (SELECT su.study_key, CONCAT(u2.first_name, ' ', u2.last_name) AS name
+      FROM ${tbl('study_user')} su JOIN ${tbl('user')} u2 ON su.user_key = u2.user_key
+      WHERE su.role = 2 AND su._fivetran_deleted = false
+        AND LOWER(CONCAT(u2.first_name, ' ', u2.last_name)) IN ('mario castellanos','stacey scott','ruby pereira','cady chilensky','angelina mcmullen','carly wood')
+      QUALIFY ROW_NUMBER() OVER (PARTITION BY su.study_key ORDER BY su.date_created DESC) = 1) sc ON c.study_key = sc.study_key
     WHERE c._fivetran_deleted = false AND st.is_active = 1 AND st.site_key NOT IN (5547)
       AND c.is_resolved = 0
       AND c.date_created >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 90 DAY)

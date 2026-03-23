@@ -381,7 +381,7 @@ body {
 .tb-section {
   flex: 1; text-align: center; padding: 14px 10px;
   position: relative;
-  background: #fff;
+  background: #fafbfc;
   border: 1.5px solid #cbd5e1;
   border-radius: 10px;
   margin: 4px 0;
@@ -700,10 +700,10 @@ body {
 .detail-table tr:last-child td { border-bottom:none; }
 .detail-table tr:hover td { background:var(--surface2, #f8fafc); }
 .kpi-clickable {
-  cursor:pointer; text-decoration:underline; text-decoration-style:dotted;
-  text-underline-offset:3px; transition:opacity .15s;
+  cursor:pointer; text-decoration:none;
+  transition:background .15s, box-shadow .15s;
 }
-.kpi-clickable:hover { opacity:.75; }
+.kpi-clickable:hover { background:#f0f4fa; box-shadow:0 2px 8px rgba(7,32,97,0.1); }
 .modal-badge { font-size:10px; font-weight:700; padding:2px 7px; border-radius:4px; }
 
 .study-card:hover{box-shadow:0 6px 20px rgba(7,32,97,.12);transform:translateY(-1px);}

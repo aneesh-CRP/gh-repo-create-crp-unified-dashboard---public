@@ -381,7 +381,7 @@ body {
 .tb-section {
   flex: 1; text-align: center; padding: 14px 10px;
   position: relative;
-  background: #fff;
+  background: #fafbfc;
   border: 1.5px solid #cbd5e1;
   border-radius: 10px;
   margin: 4px 0;
@@ -700,10 +700,10 @@ body {
 .detail-table tr:last-child td { border-bottom:none; }
 .detail-table tr:hover td { background:var(--surface2, #f8fafc); }
 .kpi-clickable {
-  cursor:pointer; text-decoration:underline; text-decoration-style:dotted;
-  text-underline-offset:3px; transition:opacity .15s;
+  cursor:pointer; text-decoration:none;
+  transition:background .15s, box-shadow .15s;
 }
-.kpi-clickable:hover { opacity:.75; }
+.kpi-clickable:hover { background:#f0f4fa; box-shadow:0 2px 8px rgba(7,32,97,0.1); }
 .modal-badge { font-size:10px; font-weight:700; padding:2px 7px; border-radius:4px; }
 
 .study-card:hover{box-shadow:0 6px 20px rgba(7,32,97,.12);transform:translateY(-1px);}
@@ -6035,21 +6035,21 @@ function showActionModal(type) {
   var _crioBase = 'https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa';
   var _crioStudyUrl = function(sk) { return sk ? _crioBase + '/study/' + sk + '/subjects' : ''; };
   var _crioSubjectUrl = function(sk, subk) { return (sk && subk) ? _crioBase + '/study/' + sk + '/subject/' + subk : ''; };
-  var _crioCommentUrl = function(sk, subk, svk, ck) { return (sk && subk && svk && ck) ? _crioBase + '/study/' + sk + '/subject/' + subk + '/completed-visit/' + svk + '?open_comment=' + ck : _crioSubjectUrl(sk, subk); };
+  var _crioCommentUrl = function(sk, subk, svk, ck, vpath) { return (sk && subk && svk && ck) ? _crioBase + '/study/' + sk + '/subject/' + subk + '/' + (vpath||'completed-visit') + '/' + svk + '?open_comment=' + ck : _crioSubjectUrl(sk, subk); };
   var _crioTodoUrl = function(sk, subk) { return (sk && subk) ? _crioBase + '/study/' + sk + '/subject/' + subk + '/todos' : _crioStudyUrl(sk); };
   var _crioLink = function(text, url) { return url ? '<a href="' + escapeHTML(url) + '" target="_blank" style="color:#1843ad;text-decoration:underline;text-decoration-style:dotted">' + escapeHTML(text) + '</a>' : escapeHTML(text); };
 
   if (type === 'queries') {
     var rows = window._actionQueries || [];
     title = 'Open Queries (' + rows.length + ')';
-    body = '<table class="detail-table"><thead><tr><th>Study</th><th>Subject</th><th>Type</th><th>Message</th><th>By</th><th>Days</th><th></th></tr></thead><tbody>' +
+    body = '<table class="detail-table"><thead><tr><th>Study</th><th>Subject</th><th>Message</th><th>Created By</th><th>Assigned To</th><th>Days</th><th></th></tr></thead><tbody>' +
       rows.slice(0, 100).map(function(r) {
-        var commentUrl = _crioCommentUrl(r.study_key, r.subject_key, r.subject_visit_key, r.comment_key);
+        var commentUrl = _crioCommentUrl(r.study_key, r.subject_key, r.subject_visit_key, r.comment_key, r.visit_path);
         return '<tr><td style="font-size:11px">' + escapeHTML((r.study_name||'').split(' - ').pop()) + '</td>' +
           '<td style="font-size:11px">' + escapeHTML(maskPHI(r.subject_name||'')) + '</td>' +
-          '<td style="font-size:10px">' + escapeHTML(r.comment_type||'') + '</td>' +
-          '<td style="font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHTML(r.message||'') + '">' + escapeHTML((r.message||'').substring(0,50)) + '</td>' +
+          '<td style="font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHTML(r.message||'') + '">' + escapeHTML((r.message||'').substring(0,60)) + '</td>' +
           '<td style="font-size:10px">' + escapeHTML(r.created_by||'') + '</td>' +
+          '<td style="font-size:10px;font-weight:600">' + escapeHTML(r.assigned_to||'—') + '</td>' +
           '<td style="font-weight:700;color:' + (parseInt(r.days_outstanding)>90?'#dc2626':parseInt(r.days_outstanding)>30?'#d97706':'#059669') + '">' + (r.days_outstanding||'') + 'd</td>' +
           '<td>' + _crioLink('Open', commentUrl) + '</td></tr>';
       }).join('') + '</tbody></table>';
