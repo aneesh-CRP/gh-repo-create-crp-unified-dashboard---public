@@ -192,15 +192,18 @@ const FEEDS = {
     LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
     LEFT JOIN ${tbl('site')} si ON ca.site_key = si.site_key
     LEFT JOIN ${tbl('study_visit')} sv ON ca.study_visit_key = sv.study_visit_key
-    LEFT JOIN (SELECT su.study_key, CONCAT(u.first_name, ' ', u.last_name) AS name
-      FROM ${tbl('study_user')} su JOIN ${tbl('user')} u ON su.user_key = u.user_key
-      WHERE su.role = 2 AND su._fivetran_deleted = false
-        AND LOWER(CONCAT(u.first_name, ' ', u.last_name)) IN ('mario castellanos','stacey scott','ruby pereira','cady chilensky','angelina mcmullen','carly wood')
-      QUALIFY ROW_NUMBER() OVER (PARTITION BY su.study_key ORDER BY su.date_created DESC) = 1) sc ON ca.study_key = sc.study_key
-    LEFT JOIN (SELECT su.study_key, CONCAT(u.first_name, ' ', u.last_name) AS name
-      FROM ${tbl('study_user')} su JOIN ${tbl('user')} u ON su.user_key = u.user_key
-      WHERE su.role = 1 AND su._fivetran_deleted = false
-      QUALIFY ROW_NUMBER() OVER (PARTITION BY su.study_key ORDER BY su.date_created DESC) = 1) sp ON ca.study_key = sp.study_key
+    LEFT JOIN (SELECT ua.calendar_appointment_key, CONCAT(u.first_name, ' ', u.last_name) AS name
+      FROM ${tbl('user_appointment')} ua
+      JOIN ${tbl('study_user')} su ON ua.user_key = su.user_key AND ua.study_key = su.study_key AND su.role = 2
+      JOIN ${tbl('user')} u ON ua.user_key = u.user_key
+      WHERE ua._fivetran_deleted = false AND su._fivetran_deleted = false
+      QUALIFY ROW_NUMBER() OVER (PARTITION BY ua.calendar_appointment_key ORDER BY ua.date_created DESC) = 1) sc ON ca.calendar_appointment_key = sc.calendar_appointment_key
+    LEFT JOIN (SELECT ua.calendar_appointment_key, CONCAT(u.first_name, ' ', u.last_name) AS name
+      FROM ${tbl('user_appointment')} ua
+      JOIN ${tbl('study_user')} su ON ua.user_key = su.user_key AND ua.study_key = su.study_key AND su.role = 1
+      JOIN ${tbl('user')} u ON ua.user_key = u.user_key
+      WHERE ua._fivetran_deleted = false AND su._fivetran_deleted = false
+      QUALIFY ROW_NUMBER() OVER (PARTITION BY ua.calendar_appointment_key ORDER BY ua.date_created DESC) = 1) sp ON ca.calendar_appointment_key = sp.calendar_appointment_key
     WHERE ca.subject_key IS NOT NULL AND st.is_active = 1 AND st.site_key NOT IN (5547)
       AND ca.start >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 7 DAY)
       AND ca.start <= DATETIME_ADD(CURRENT_DATETIME(), INTERVAL 365 DAY)
@@ -245,15 +248,18 @@ const FEEDS = {
     LEFT JOIN ${tbl('subject')} sub ON aal.subject_key = sub.subject_key
     LEFT JOIN ${tbl('study_visit')} sv ON aal.study_visit_key = sv.study_visit_key
     LEFT JOIN ${tbl('calendar_appointment')} ca ON aal.calendar_appointment_key = ca.calendar_appointment_key
-    LEFT JOIN (SELECT su.study_key, CONCAT(u.first_name, ' ', u.last_name) AS name
-      FROM ${tbl('study_user')} su JOIN ${tbl('user')} u ON su.user_key = u.user_key
-      WHERE su.role = 2 AND su._fivetran_deleted = false
-        AND LOWER(CONCAT(u.first_name, ' ', u.last_name)) IN ('mario castellanos','stacey scott','ruby pereira','cady chilensky','angelina mcmullen','carly wood')
-      QUALIFY ROW_NUMBER() OVER (PARTITION BY su.study_key ORDER BY su.date_created DESC) = 1) sc ON aal.study_key = sc.study_key
-    LEFT JOIN (SELECT su.study_key, CONCAT(u.first_name, ' ', u.last_name) AS name
-      FROM ${tbl('study_user')} su JOIN ${tbl('user')} u ON su.user_key = u.user_key
-      WHERE su.role = 1 AND su._fivetran_deleted = false
-      QUALIFY ROW_NUMBER() OVER (PARTITION BY su.study_key ORDER BY su.date_created DESC) = 1) sp ON aal.study_key = sp.study_key
+    LEFT JOIN (SELECT ua.calendar_appointment_key, CONCAT(u.first_name, ' ', u.last_name) AS name
+      FROM ${tbl('user_appointment')} ua
+      JOIN ${tbl('study_user')} su ON ua.user_key = su.user_key AND ua.study_key = su.study_key AND su.role = 2
+      JOIN ${tbl('user')} u ON ua.user_key = u.user_key
+      WHERE ua._fivetran_deleted = false AND su._fivetran_deleted = false
+      QUALIFY ROW_NUMBER() OVER (PARTITION BY ua.calendar_appointment_key ORDER BY ua.date_created DESC) = 1) sc ON aal.calendar_appointment_key = sc.calendar_appointment_key
+    LEFT JOIN (SELECT ua.calendar_appointment_key, CONCAT(u.first_name, ' ', u.last_name) AS name
+      FROM ${tbl('user_appointment')} ua
+      JOIN ${tbl('study_user')} su ON ua.user_key = su.user_key AND ua.study_key = su.study_key AND su.role = 1
+      JOIN ${tbl('user')} u ON ua.user_key = u.user_key
+      WHERE ua._fivetran_deleted = false AND su._fivetran_deleted = false
+      QUALIFY ROW_NUMBER() OVER (PARTITION BY ua.calendar_appointment_key ORDER BY ua.date_created DESC) = 1) sp ON aal.calendar_appointment_key = sp.calendar_appointment_key
     WHERE aal.change_type = 4
       AND aal.date_created >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 90 DAY)
       AND st.is_active = 1 AND st.site_key NOT IN (5547)
