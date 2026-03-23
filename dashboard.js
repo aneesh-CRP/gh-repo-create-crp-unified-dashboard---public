@@ -3460,13 +3460,25 @@ function renderCoordinatorGoals() {
   var avgPerDay = {};
   COORDS.forEach(function(name) { avgPerDay[name] = workDaysElapsed > 0 ? (goals.byMonth[name] || 0) / workDaysElapsed : 0; });
 
+  // Build cancel counts per coordinator for cancel rate column
+  var _coordCancels = {};
+  (DATA.allCancels || []).forEach(function(c) {
+    var cn = c.coord || '';
+    _coordCancels[cn] = (_coordCancels[cn] || 0) + 1;
+  });
+
   monthBody.innerHTML = COORDS.map(name => {
     const monthVisits = goals.byMonth[name] || 0;
     const barPct = Math.min(100, Math.round(monthVisits / (monthMax * 1.1) * 100));
     const avg = avgPerDay[name].toFixed(1);
+    const cancels = _coordCancels[name] || 0;
+    const cancelRate = (monthVisits + cancels) > 0 ? Math.round(cancels / (monthVisits + cancels) * 100) : 0;
+    const crColor = cancelRate > 20 ? '#dc2626' : cancelRate > 10 ? '#f59e0b' : '#059669';
     return `<tr style="border-bottom:1px solid var(--border);cursor:pointer;" onclick="showCoordDetail('${jsAttr(name)}')">
       <td style="padding:8px 12px;font-weight:600">${escapeHTML(name)}</td>
       <td style="padding:8px 8px;text-align:center;font-weight:700">${monthVisits}</td>
+      <td style="padding:8px 8px;text-align:center;color:#d97706;font-weight:600">${cancels}</td>
+      <td style="padding:8px 8px;text-align:center;font-weight:700;color:${crColor}">${cancelRate}%</td>
       <td style="padding:8px 8px;text-align:center;color:#6B7280">${avg}/day</td>
       <td style="padding:8px 12px"><div style="background:#E5E7EB;border-radius:6px;height:8px;overflow:hidden"><div style="background:#1843AD;height:100%;width:${barPct}%;border-radius:6px"></div></div></td>
       <td style="padding:8px 8px;text-align:center;color:#6B7280;font-size:11px">${workDaysElapsed} days tracked</td>

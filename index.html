@@ -1294,35 +1294,14 @@ body {
   <!-- ═══ SECTION 3: STAFF PERFORMANCE ═══ -->
   <div class="section-title" style="margin-top:24px;margin-bottom:8px;">Staff Performance</div>
 
-  <!-- Coordinator Workload + Investigator -->
-  <div class="grid-2 mb16 fade-in">
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title">Coordinator Workload</span>
-        <span class="badge badge-blue" id="coord-prod-badge">Loading...</span>
-      </div>
-      <div id="coordBalanceContainer" style="padding:12px 16px;">
-        <p style="color:#94a3b8;font-size:12px">Loading workload data...</p>
-      </div>
-      <div id="coord-prod-container" style="padding:0 12px 12px;border-top:1px solid #f1f5f9;">
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title">Investigator Workload</span>
-      </div>
-      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Upcoming visits per PI · utilization = days with visits / available days</div>
-      <div id="invCapacityContainer" style="padding:12px 16px;">
-        <p style="color:#94a3b8;font-size:12px">Loading investigator data...</p>
-      </div>
-    </div>
-  </div>
+  <!-- Coordinator summary KPIs -->
+  <div id="coordBalanceContainer" style="margin-bottom:12px;"></div>
 
-  <!-- Coordinator Visit Tracker -->
+  <!-- Coordinator Visit Tracker (weekly cards + monthly table with cancel rate) -->
   <div class="card fade-in" style="margin-bottom:16px;">
     <div style="padding:16px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <div><div style="font-size:14px;font-weight:700;color:var(--navy)">Coordinator Visit Tracker</div><div style="font-size:10px;color:#94a3b8;">Daily visit counts per coordinator this week · weekdays only</div></div>
+        <div><div style="font-size:14px;font-weight:700;color:var(--navy)">Coordinator Visit Tracker</div><div style="font-size:10px;color:#94a3b8;">Daily visit counts this week · monthly summary with cancel rate</div></div>
         <div style="display:flex;align-items:center;gap:8px">
           <button onclick="exportCoordHistory()" title="Export coordinator history as JSON" style="background:none;border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:11px;color:var(--muted);cursor:pointer">&#x2B07; Export</button>
           <div style="font-size:11px;color:var(--muted)" id="coord-week-label">This Week</div>
@@ -1336,6 +1315,8 @@ body {
             <thead><tr style="background:var(--surface2);border-bottom:2px solid var(--border)">
               <th style="padding:8px 12px;text-align:left;font-weight:700">Coordinator</th>
               <th style="padding:8px 8px;text-align:center;font-weight:700">Visits</th>
+              <th style="padding:8px 8px;text-align:center;font-weight:700">Cancels</th>
+              <th style="padding:8px 8px;text-align:center;font-weight:700">Cancel Rate</th>
               <th style="padding:8px 8px;text-align:center;font-weight:700">Avg/Day</th>
               <th style="padding:8px 8px;text-align:center;font-weight:700">Volume</th>
               <th style="padding:8px 8px;text-align:center;font-weight:700">Period</th>
@@ -1347,8 +1328,17 @@ body {
     </div>
   </div>
 
-  <!-- Recruiter + Cancel Rate -->
+  <!-- Investigator + Recruiter side by side -->
   <div class="grid-2 mb16 fade-in">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Investigator Workload</span>
+      </div>
+      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Upcoming visits per PI · utilization = days with visits / available days</div>
+      <div id="invCapacityContainer" style="padding:12px 16px;">
+        <p style="color:#94a3b8;font-size:12px">Loading investigator data...</p>
+      </div>
+    </div>
     <div class="card">
       <div class="card-header">
         <span class="card-title">Recruiter Performance</span>
@@ -1359,16 +1349,11 @@ body {
         <p style="color:#94a3b8;font-size:12px">Loading recruiter data...</p>
       </div>
     </div>
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title">Coordinator Cancel Rate Over Time</span>
-        <span class="badge badge-blue" style="font-size:10px">5 coordinators · weekly</span>
-      </div>
-      <div class="chart-wrap h220">
-        <canvas id="trendsCoordChart"></canvas>
-      </div>
-    </div>
   </div>
+
+  <!-- Hidden containers for backward compat -->
+  <div id="coord-prod-container" style="display:none"></div>
+  <div style="display:none"><canvas id="trendsCoordChart"></canvas></div>
 
 </div><!-- /view-overview -->
 
@@ -5556,13 +5541,25 @@ function renderCoordinatorGoals() {
   var avgPerDay = {};
   COORDS.forEach(function(name) { avgPerDay[name] = workDaysElapsed > 0 ? (goals.byMonth[name] || 0) / workDaysElapsed : 0; });
 
+  // Build cancel counts per coordinator for cancel rate column
+  var _coordCancels = {};
+  (DATA.allCancels || []).forEach(function(c) {
+    var cn = c.coord || '';
+    _coordCancels[cn] = (_coordCancels[cn] || 0) + 1;
+  });
+
   monthBody.innerHTML = COORDS.map(name => {
     const monthVisits = goals.byMonth[name] || 0;
     const barPct = Math.min(100, Math.round(monthVisits / (monthMax * 1.1) * 100));
     const avg = avgPerDay[name].toFixed(1);
+    const cancels = _coordCancels[name] || 0;
+    const cancelRate = (monthVisits + cancels) > 0 ? Math.round(cancels / (monthVisits + cancels) * 100) : 0;
+    const crColor = cancelRate > 20 ? '#dc2626' : cancelRate > 10 ? '#f59e0b' : '#059669';
     return `<tr style="border-bottom:1px solid var(--border);cursor:pointer;" onclick="showCoordDetail('${jsAttr(name)}')">
       <td style="padding:8px 12px;font-weight:600">${escapeHTML(name)}</td>
       <td style="padding:8px 8px;text-align:center;font-weight:700">${monthVisits}</td>
+      <td style="padding:8px 8px;text-align:center;color:#d97706;font-weight:600">${cancels}</td>
+      <td style="padding:8px 8px;text-align:center;font-weight:700;color:${crColor}">${cancelRate}%</td>
       <td style="padding:8px 8px;text-align:center;color:#6B7280">${avg}/day</td>
       <td style="padding:8px 12px"><div style="background:#E5E7EB;border-radius:6px;height:8px;overflow:hidden"><div style="background:#1843AD;height:100%;width:${barPct}%;border-radius:6px"></div></div></td>
       <td style="padding:8px 8px;text-align:center;color:#6B7280;font-size:11px">${workDaysElapsed} days tracked</td>
