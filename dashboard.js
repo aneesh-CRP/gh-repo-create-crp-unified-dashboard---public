@@ -3973,16 +3973,16 @@ function showActionModal(type) {
   } else if (type === 'docs') {
     var rows = window._actionDocs || [];
     title = 'Unsigned Documents (' + rows.reduce(function(s,r){return s+(parseInt(r.active)||0)+(parseInt(r.assigned)||0)+(parseInt(r.incoming)||0);},0) + ')';
-    body = '<table class="detail-table"><thead><tr><th>Study</th><th>Total</th><th>Signed</th><th>Active</th><th>Assigned</th><th>Completion</th></tr></thead><tbody>' +
+    body = '<table class="detail-table"><thead><tr><th>Study</th><th>Total</th><th>Signed</th><th>Active</th><th>Assigned</th><th>Completion</th><th></th></tr></thead><tbody>' +
       rows.filter(function(r) { return (parseInt(r.active)||0) + (parseInt(r.assigned)||0) + (parseInt(r.incoming)||0) > 0; }).map(function(r) {
         var pct = parseFloat(r.completion_pct) || 0;
-        var studyUrl = _crioStudyUrl(r.study_key);
-        return '<tr><td style="font-size:11px">' + _crioLink(r.study_name||'', studyUrl) + '</td><td class="r">' + (r.total_documents||0) + '</td>' +
+        var filesUrl = r.study_key ? _crioBase + '/study/' + r.study_key + '/files' : '';
+        return '<tr><td style="font-size:11px">' + _crioLink((r.study_name||'').split(' - ').pop(), filesUrl) + '</td><td class="r">' + (r.total_documents||0) + '</td>' +
           '<td class="r">' + (r.signed||0) + '</td><td class="r" style="color:#d97706;font-weight:700">' + (r.active||0) + '</td>' +
           '<td class="r" style="color:#dc2626;font-weight:700">' + (r.assigned||0) + '</td>' +
-          '<td class="r"><span style="color:' + (pct>=95?'#059669':pct>=80?'#d97706':'#dc2626') + ';font-weight:700">' + pct + '%</span></td></tr>';
-      }).join('') + '</tbody></table>' +
-      '<div style="font-size:10px;color:#94a3b8;margin-top:8px">Click study name to open in CRIO → navigate to subject → Documents tab</div>';
+          '<td class="r"><span style="color:' + (pct>=95?'#059669':pct>=80?'#d97706':'#dc2626') + ';font-weight:700">' + pct + '%</span></td>' +
+          '<td>' + _crioLink('Files', filesUrl) + '</td></tr>';
+      }).join('') + '</tbody></table>';
   } else if (type === 'todos') {
     var rows = window._actionTodos || [];
     title = 'Visit Todos (' + rows.length + ')';
