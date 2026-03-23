@@ -12503,6 +12503,19 @@ function renderMilestoneTimeline() {
 }
 
 function renderStudiesTable() {
+  // Study summary KPIs
+  var _allStudies = DATA.mergedStudies || [];
+  var _skSet = function(id,v){ var e=document.getElementById(id); if(e) e.textContent=v; };
+  _skSet('sk-total', _allStudies.length);
+  _skSet('sk-enrolling', _allStudies.filter(function(s){return s.enroll_status==='Enrolling';}).length);
+  _skSet('sk-maintenance', _allStudies.filter(function(s){return s.enroll_status==='Maintenance';}).length);
+  _skSet('sk-startup', _allStudies.filter(function(s){return s.enroll_status==='Startup';}).length);
+  var _totalEnrolled = _allStudies.reduce(function(s,r){return s+(r.enrolled||0);},0);
+  _skSet('sk-enrolled', _totalEnrolled);
+  var _sfStudies = _allStudies.filter(function(s){return s.enroll_status==='Enrolling' && s.screen_fail_pct > 0;});
+  var _avgSF = _sfStudies.length > 0 ? Math.round(_sfStudies.reduce(function(s,r){return s+r.screen_fail_pct;},0)/_sfStudies.length) : 0;
+  _skSet('sk-sf-rate', _avgSF + '%');
+
   const studies = (DATA.mergedStudies || []).filter(s => {
     if (_studyFilter === 'all') return true;
     if (_studyFilter === 'critical') return s.risk_level === 'critical';

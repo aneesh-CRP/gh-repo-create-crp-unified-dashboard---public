@@ -1271,11 +1271,10 @@ body {
         <span class="card-title">Reasons by Category</span>
         <span class="badge badge-gray">Last 2 months · excludes rescheduled</span>
       </div>
-      <div id="reason-breakdown"></div>
-      <div class="chart-wrap" style="height:150px;display:none">
+      <div id="reason-breakdown" style="padding:8px 16px;"></div>
+      <div class="chart-wrap" style="height:160px;margin-top:8px;">
         <canvas id="reasonChart"></canvas>
       </div>
-      <div class="legend-list" style="margin-top:8px;display:none" id="reason-legend"></div>
     </div>
     <div class="card">
       <div class="card-header">
@@ -1383,6 +1382,21 @@ body {
       <div style="font-size:10px;color:#94a3b8;margin-top:2px;">Enrollment, risk scores, and pipeline data from CRIO BigQuery · click study name for full detail</div>
     </div>
   </div>
+  <!-- Study Summary KPIs -->
+  <div class="time-banner fade-in" style="margin-bottom:12px;" id="studies-kpi-strip">
+    <div class="tb-section"><div class="tb-label">Total Studies</div><div class="tb-value blue" id="sk-total">—</div></div>
+    <div class="tb-divider"></div>
+    <div class="tb-section"><div class="tb-label">Enrolling</div><div class="tb-value green" id="sk-enrolling">—</div></div>
+    <div class="tb-divider"></div>
+    <div class="tb-section"><div class="tb-label">Maintenance</div><div class="tb-value" style="color:#059669" id="sk-maintenance">—</div></div>
+    <div class="tb-divider"></div>
+    <div class="tb-section"><div class="tb-label">Startup</div><div class="tb-value" style="color:#d97706" id="sk-startup">—</div></div>
+    <div class="tb-divider"></div>
+    <div class="tb-section"><div class="tb-label">Total Enrolled</div><div class="tb-value" style="color:#7c3aed" id="sk-enrolled">—</div></div>
+    <div class="tb-divider"></div>
+    <div class="tb-section"><div class="tb-label">Avg SF Rate</div><div class="tb-value" style="color:#dc2626" id="sk-sf-rate">—</div></div>
+  </div>
+
   <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;position:relative;z-index:10;" id="studies-filter-bar">
       <button data-filter="all" class="sched-filter active" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid #1843ad;background:#e8eeff;color:#1843ad;cursor:pointer">All</button>
       <button data-filter="critical" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Critical</button>
@@ -1425,20 +1439,6 @@ body {
     </div>
   </div>
 
-
-  <!-- Enrollment Velocity (forecast vs actual) -->
-  <div class="card fade-in" style="margin-top:16px;margin-bottom:16px;">
-    <div class="card-header">
-      <span class="card-title">Enrollment Velocity</span>
-      <span class="badge badge-blue" id="enroll-velocity-badge">Loading...</span>
-    </div>
-    <div style="font-size:10px;color:#94a3b8;padding:0 12px;">Enrollment pace per study — subjects enrolled, screen fail rate, referral pipeline, and campaign activity</div>
-    <div class="card-header" style="border:none;padding-top:0">
-    </div>
-    <div id="enroll-velocity-container" style="padding:12px;">
-      <div style="text-align:center;padding:20px;color:var(--muted);font-size:12px;">Loading enrollment velocity data...</div>
-    </div>
-  </div>
 
 </div><!-- /view-studies -->
 
@@ -14599,6 +14599,19 @@ function renderMilestoneTimeline() {
 }
 
 function renderStudiesTable() {
+  // Study summary KPIs
+  var _allStudies = DATA.mergedStudies || [];
+  var _skSet = function(id,v){ var e=document.getElementById(id); if(e) e.textContent=v; };
+  _skSet('sk-total', _allStudies.length);
+  _skSet('sk-enrolling', _allStudies.filter(function(s){return s.enroll_status==='Enrolling';}).length);
+  _skSet('sk-maintenance', _allStudies.filter(function(s){return s.enroll_status==='Maintenance';}).length);
+  _skSet('sk-startup', _allStudies.filter(function(s){return s.enroll_status==='Startup';}).length);
+  var _totalEnrolled = _allStudies.reduce(function(s,r){return s+(r.enrolled||0);},0);
+  _skSet('sk-enrolled', _totalEnrolled);
+  var _sfStudies = _allStudies.filter(function(s){return s.enroll_status==='Enrolling' && s.screen_fail_pct > 0;});
+  var _avgSF = _sfStudies.length > 0 ? Math.round(_sfStudies.reduce(function(s,r){return s+r.screen_fail_pct;},0)/_sfStudies.length) : 0;
+  _skSet('sk-sf-rate', _avgSF + '%');
+
   const studies = (DATA.mergedStudies || []).filter(s => {
     if (_studyFilter === 'all') return true;
     if (_studyFilter === 'critical') return s.risk_level === 'critical';
