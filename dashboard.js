@@ -3388,7 +3388,7 @@ function renderCoordWorkloadBalance() {
     html += '</div>';
   });
   html += '</div>';
-  html += '<div style="margin-top:6px;font-size:9px;color:#94a3b8;text-align:right;">CR = cancel rate · Balance = 100% minus max deviation from average</div>';
+  html += '<div style="margin-top:6px;font-size:9px;color:#94a3b8;text-align:right;">Upcoming visits · CR = cancel rate · Balance = deviation from average</div>';
 
   el.innerHTML = html;
 }
@@ -3528,7 +3528,11 @@ function renderRecruiterPerformance() {
   });
   html += '</div>';
 
-  // Outreach activity removed from overview — available via recruiterStats feed API
+  // ── eSource Productivity (who answered the most questions — from BQ) ──
+  if (window._recruiterStats && window._recruiterStats.length > 0) {
+    // recruiterStats has outreach data, but we also show eSource from esourceByUser
+    // For now, skip — eSource data shown in Coordinator Productivity below
+  }
 
   el.innerHTML = html;
 }
@@ -12732,32 +12736,37 @@ function renderRetention() {
 function renderCoordProductivity() {
   var el = document.getElementById('coord-prod-container');
   var badge = document.getElementById('coord-prod-badge');
-  if (!el || BQ_COORDINATOR_DATA.length === 0) return;
-  // Filter to COORDINATORS only (exclude recruiters, admins, PIs)
-  var coordSet = new Set((CRP_CONFIG.COORDINATORS || []).map(function(n) { return n.toLowerCase(); }));
-  var data = BQ_COORDINATOR_DATA.filter(function(r) {
-    return coordSet.has((r.coordinator || '').toLowerCase());
-  }).sort(function(a, b) { return parseInt(b.visits_managed || 0) - parseInt(a.visits_managed || 0); });
-  if (badge) badge.textContent = data.length + ' coordinators';
-  var maxVisits = parseInt(data[0].visits_managed) || 1;
-  var html = '';
+  if (!el) return;
+  // Use eSource data if available, fall back to BQ coordinator feed
+  var coordSet = new Set((CRP_CONFIG.SCHEDULE_COORDINATORS || CRP_CONFIG.COORDINATORS || []).map(function(n) { return n.toLowerCase(); }));
+  var data = [];
+  if (window._recruiterStats && window._recruiterStats.length > 0) {
+    // Use recruiterStats (patient_interaction) for outreach activity
+    window._recruiterStats.forEach(function(r) {
+      if (coordSet.has((r.recruiter || '').toLowerCase())) {
+        data.push({ name: r.recruiter, calls: parseInt(r.phone_calls)||0, texts: parseInt(r.texts)||0,
+          emails: parseInt(r.emails)||0, patients: parseInt(r.unique_patients)||0,
+          interested: parseInt(r.interested_responses)||0, total: parseInt(r.total_interactions)||0 });
+      }
+    });
+  }
+  if (data.length === 0 && BQ_COORDINATOR_DATA.length > 0) {
+    BQ_COORDINATOR_DATA.filter(function(r) { return coordSet.has((r.coordinator||'').toLowerCase()); })
+      .forEach(function(r) { data.push({ name: r.coordinator, total: parseInt(r.visits_managed)||0, patients: parseInt(r.unique_subjects)||0 }); });
+  }
+  if (data.length === 0) return;
+  data.sort(function(a,b) { return b.total - a.total; });
+  if (badge) badge.textContent = data.length + ' staff (30d)';
+  var maxTotal = data[0].total || 1;
+  var html = '<div style="font-size:10px;color:#94a3b8;margin-bottom:6px;">eSource & outreach activity (last 30 days)</div>';
   data.forEach(function(r, i) {
-    var visits = parseInt(r.visits_managed) || 0;
-    var subjects = parseInt(r.unique_subjects) || 0;
-    var studies = parseInt(r.studies) || 0;
-    var cancelled = parseInt(r.cancelled) || 0;
-    var active = parseInt(r.active) || 0;
-    var cancelRate = visits > 0 ? ((cancelled / visits) * 100).toFixed(0) : '0';
-    var barW = (visits / maxVisits * 100).toFixed(0);
-    var medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '';
-    html += '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">' +
-      '<div style="width:22px;text-align:center;font-size:' + (medal ? '16px' : '11px') + ';color:var(--muted)">' + (medal || (i + 1)) + '</div>' +
-      '<div style="flex:1;min-width:0;"><div style="font-weight:600;font-size:12px;">' + escapeHTML(r.coordinator || '') + '</div>' +
-      '<div style="font-size:10px;color:var(--muted);">' + subjects + ' subjects · ' + studies + ' studies · ' + cancelRate + '% cancel</div></div>' +
-      '<div style="width:120px;"><div style="background:var(--surface2);border-radius:4px;height:18px;position:relative;">' +
+    var barW = Math.round(r.total / maxTotal * 100);
+    html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f1f5f9;">' +
+      '<div style="width:100px;font-weight:600;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHTML(r.name.split(' ')[0]) + '</div>' +
+      '<div style="flex:1;background:#e2e8f0;border-radius:4px;height:14px;position:relative;">' +
       '<div style="width:' + barW + '%;background:linear-gradient(90deg,#3b82f6,#8b5cf6);height:100%;border-radius:4px;"></div>' +
-      '<span style="position:absolute;right:4px;top:1px;font-size:10px;font-weight:700;color:' + (parseInt(barW) > 40 ? '#fff' : '#374151') + ';">' + visits + '</span>' +
-      '</div></div></div>';
+      '<span style="position:absolute;right:4px;top:0;font-size:9px;font-weight:700;color:' + (barW>40?'#fff':'#374151') + ';line-height:14px;">' + r.total + '</span></div>' +
+      '<div style="font-size:9px;color:#64748b;min-width:80px;text-align:right;">' + (r.calls ? r.calls+'c ' : '') + (r.texts ? r.texts+'t ' : '') + r.patients + 'p</div></div>';
   });
   el.innerHTML = html;
 }
