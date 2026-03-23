@@ -1053,7 +1053,6 @@ body {
     <span class="nav-tab" onclick="switchTab('studies', this)" role="tab">Studies</span>
     <span class="nav-tab" onclick="switchTab('schedule', this)" role="tab">Schedule</span>
     <span class="nav-tab" onclick="switchTab('referrals', this)" role="tab">Referrals</span>
-    <span class="nav-tab" onclick="switchTab('medrec', this)" role="tab">Med Records</span>
     <span class="nav-tab" onclick="switchTab('admin', this)" role="tab">🔒 Admin</span>
     <span style="width:1px;background:#CBD5E0;margin:8px 3px"></span>
     <span class="nav-tab fin-tab" onclick="switchTab('fin-overview',this)" role="tab">🔒 Finance</span>
@@ -1390,10 +1389,10 @@ body {
     <div style="max-height:600px;overflow-y:auto;border-radius:0 0 8px 8px;">
       <table class="data-table sortable" id="vis-table">
         <thead>
-          <tr><th style="width:80px;font-size:10px">Confirm</th><th onclick="sortTable(this)">Date</th><th onclick="sortTable(this)">Study</th><th onclick="sortTable(this)">Visit</th><th onclick="sortTable(this)">Patient</th><th onclick="sortTable(this)">Status</th><th onclick="sortTable(this)">Coordinator</th><th onclick="sortTable(this)">Investigator</th><th onclick="sortTable(this)">Site</th></tr>
+          <tr><th style="width:80px;font-size:10px">Confirm</th><th onclick="sortTable(this)">Date</th><th onclick="sortTable(this)">Study</th><th onclick="sortTable(this)">Visit</th><th onclick="sortTable(this)">Patient</th><th onclick="sortTable(this)">Status</th><th onclick="sortTable(this)">Med Records</th><th onclick="sortTable(this)">Coordinator</th><th onclick="sortTable(this)">Investigator</th><th onclick="sortTable(this)">Site</th></tr>
         </thead>
         <tbody id="upcoming-tbody">
-<tr><td colspan="9" style="text-align:center;padding:24px;color:#94a3b8;font-size:12px">Loading schedule from CRIO...</td></tr>
+<tr><td colspan="10" style="text-align:center;padding:24px;color:#94a3b8;font-size:12px">Loading schedule from CRIO...</td></tr>
 <!-- Dynamic rows built by buildScheduleTable() from live CRIO data -->
 </tbody>
       </table>
@@ -1883,64 +1882,6 @@ body {
 </div><!-- /view-referrals -->
 
 
-<!-- ══ VIEW: MED RECORDS ══════════════════════ -->
-<div id="view-medrec" class="view">
-
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;flex-wrap:wrap;gap:8px;">
-    <div>
-      <span class="card-title" style="font-size:16px;">Medical Records Status</span>
-      <span id="medrec-count-badge" style="font-size:12px;font-weight:500;color:var(--muted);margin-left:6px"></span>
-      <div style="font-size:10px;color:#94a3b8;margin-top:2px;">Screening patient records from ClickUp · medical release, PI approval, and records receipt tracking</div>
-    </div>
-  </div>
-
-  <!-- KPI Strip -->
-  <div class="time-banner fade-in" style="margin-bottom:16px;" id="medrec-kpi-strip"></div>
-
-  <!-- Filters -->
-  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;" id="medrec-filter-bar">
-    <button class="sched-filter active" onclick="filterMedRec('all',this)" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid #1843ad;background:#e8eeff;color:#1843ad;cursor:pointer">All Active</button>
-    <button class="sched-filter" onclick="filterMedRec('pending_release',this)" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Pending Release</button>
-    <button class="sched-filter" onclick="filterMedRec('under_review',this)" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Under Review</button>
-    <button class="sched-filter" onclick="filterMedRec('ready_sched',this)" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Ready to Schedule</button>
-    <button class="sched-filter" onclick="filterMedRec('in_screening',this)" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">In Screening</button>
-    <button class="sched-filter" onclick="filterMedRec('enrolled',this)" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Enrolled</button>
-    <button class="sched-filter" onclick="filterMedRec('pi_pending',this)" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">PI Pending</button>
-    <button class="sched-filter" onclick="filterMedRec('closed',this)" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Closed</button>
-  </div>
-
-  <!-- Main table -->
-  <div class="card fade-in">
-    <div style="overflow-x:auto;max-height:700px;overflow-y:auto;">
-      <table class="data-table sortable" id="medrec-table">
-        <thead>
-          <tr>
-            <th style="padding:10px 8px;text-align:left;font-weight:700;">Patient</th>
-            <th style="padding:10px 8px;text-align:left;font-weight:700;">Study</th>
-            <th style="padding:10px 8px;text-align:center;font-weight:700;">Status</th>
-            <th style="padding:10px 8px;text-align:center;font-weight:700;">Records</th>
-            <th style="padding:10px 8px;text-align:center;font-weight:700;">Med Release</th>
-            <th style="padding:10px 8px;text-align:center;font-weight:700;">PI Approval</th>
-            <th style="padding:10px 8px;text-align:center;font-weight:700;">Next Visit</th>
-            <th style="padding:10px 8px;text-align:left;font-weight:700;">Assignee</th>
-            <th style="padding:10px 8px;text-align:center;font-weight:700;">Updated</th>
-          </tr>
-        </thead>
-        <tbody id="medrec-tbody"></tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- By-Study breakdown -->
-  <div class="card fade-in" style="margin-top:16px;">
-    <div class="card-header">
-      <span class="card-title">Records by Study</span>
-    </div>
-    <div style="font-size:10px;color:#94a3b8;padding:0 16px;">Active vs closed patients per study · click to expand</div>
-    <div id="medrec-by-study" style="padding:12px 16px;"></div>
-  </div>
-
-</div><!-- /view-medrec -->
 
 
 <!-- ══ VIEW: CONNECT ══════════════════════ -->
@@ -3788,7 +3729,7 @@ function switchTab(name, el) {
   if (navWrap) navWrap.classList.remove('open');
 
   // Performance tabs → delegate to switchView (handles lazy building)
-  const PERF_TABS = ['overview','studies','schedule','referrals','medrec','admin'];
+  const PERF_TABS = ['overview','studies','schedule','referrals','admin'];
   if (PERF_TABS.includes(name)) {
     // Hide finance+insights views first
     document.querySelectorAll('[id^="view-fin-"], #view-insights').forEach(v => {
@@ -4676,6 +4617,16 @@ function buildScheduleTable() {
     var key = (c.name || '').toLowerCase().trim();
     if (key) cancelsByPatient[key] = (cancelsByPatient[key] || 0) + 1;
   });
+  // Build med records lookup by patient name (lowercase) for status column
+  var _mrByPatient = {};
+  if (typeof MED_RECORDS_DATA !== 'undefined' && MED_RECORDS_DATA && MED_RECORDS_DATA.length > 0) {
+    MED_RECORDS_DATA.forEach(function(mr) {
+      var key = (mr.name || '').toLowerCase().trim();
+      if (key) _mrByPatient[key] = mr;
+    });
+  }
+  var _mrStatusColors = {'Enrolled':'#059669','In Screening':'#8b5cf6','Visit Scheduled':'#06b6d4','Ready to Schedule':'#f59e0b','Pending Release':'#94a3b8','Under Review':'#64748b','DNQ':'#dc2626','Screen Fail':'#dc2626','No Show':'#dc2626','Complete':'#059669','Discontinued':'#94a3b8'};
+
   var html = '';
   for (var i = 0; i < visits.length; i++) {
     var v = visits[i];
@@ -4720,6 +4671,7 @@ function buildScheduleTable() {
       + '<td style="font-size:11px;color:var(--muted)">' + esc(v.visit||'—') + '</td>'
       + '<td style="font-weight:600">' + patHtml + riskBadge + '</td>'
       + '<td><span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:' + sc.bg + ';color:' + sc.fg + '">' + esc(v.status||'—') + '</span></td>'
+      + (function(){ var mr = _mrByPatient[patKey]; if (!mr) return '<td style="font-size:10px;color:#cbd5e1;text-align:center">—</td>'; var mc = _mrStatusColors[mr.status]||'#64748b'; return '<td style="text-align:center"><span style="font-size:9px;font-weight:600;padding:2px 5px;border-radius:4px;background:'+mc+'18;color:'+mc+';">'+esc(mr.status||'—')+'</span></td>'; })()
       + '<td style="font-size:11px">' + esc(v.coord||'—') + '</td>'
       + '<td style="' + invStyle + '">' + invText + '</td>'
       + '<td><span style="font-size:9px;font-weight:700;padding:2px 5px;border-radius:3px;' + siteBg + '">' + siteCode + '</span></td>'
@@ -6594,9 +6546,6 @@ function switchView(name, el) {
   }
   if (name === 'referrals') {
     setTimeout(() => initReferrals(), 50);
-  }
-  if (name === 'medrec') {
-    setTimeout(() => renderMedRecTab(), 50);
   }
   if (name === 'trends' && typeof LONGITUDINAL !== 'undefined' && LONGITUDINAL) {
     setTimeout(() => renderTrendsCharts(), 50);

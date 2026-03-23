@@ -1594,7 +1594,7 @@ function switchTab(name, el) {
   if (navWrap) navWrap.classList.remove('open');
 
   // Performance tabs → delegate to switchView (handles lazy building)
-  const PERF_TABS = ['overview','studies','schedule','referrals','medrec','admin'];
+  const PERF_TABS = ['overview','studies','schedule','referrals','admin'];
   if (PERF_TABS.includes(name)) {
     // Hide finance+insights views first
     document.querySelectorAll('[id^="view-fin-"], #view-insights').forEach(v => {
@@ -2482,6 +2482,16 @@ function buildScheduleTable() {
     var key = (c.name || '').toLowerCase().trim();
     if (key) cancelsByPatient[key] = (cancelsByPatient[key] || 0) + 1;
   });
+  // Build med records lookup by patient name (lowercase) for status column
+  var _mrByPatient = {};
+  if (typeof MED_RECORDS_DATA !== 'undefined' && MED_RECORDS_DATA && MED_RECORDS_DATA.length > 0) {
+    MED_RECORDS_DATA.forEach(function(mr) {
+      var key = (mr.name || '').toLowerCase().trim();
+      if (key) _mrByPatient[key] = mr;
+    });
+  }
+  var _mrStatusColors = {'Enrolled':'#059669','In Screening':'#8b5cf6','Visit Scheduled':'#06b6d4','Ready to Schedule':'#f59e0b','Pending Release':'#94a3b8','Under Review':'#64748b','DNQ':'#dc2626','Screen Fail':'#dc2626','No Show':'#dc2626','Complete':'#059669','Discontinued':'#94a3b8'};
+
   var html = '';
   for (var i = 0; i < visits.length; i++) {
     var v = visits[i];
@@ -2526,6 +2536,7 @@ function buildScheduleTable() {
       + '<td style="font-size:11px;color:var(--muted)">' + esc(v.visit||'—') + '</td>'
       + '<td style="font-weight:600">' + patHtml + riskBadge + '</td>'
       + '<td><span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:' + sc.bg + ';color:' + sc.fg + '">' + esc(v.status||'—') + '</span></td>'
+      + (function(){ var mr = _mrByPatient[patKey]; if (!mr) return '<td style="font-size:10px;color:#cbd5e1;text-align:center">—</td>'; var mc = _mrStatusColors[mr.status]||'#64748b'; return '<td style="text-align:center"><span style="font-size:9px;font-weight:600;padding:2px 5px;border-radius:4px;background:'+mc+'18;color:'+mc+';">'+esc(mr.status||'—')+'</span></td>'; })()
       + '<td style="font-size:11px">' + esc(v.coord||'—') + '</td>'
       + '<td style="' + invStyle + '">' + invText + '</td>'
       + '<td><span style="font-size:9px;font-weight:700;padding:2px 5px;border-radius:3px;' + siteBg + '">' + siteCode + '</span></td>'
@@ -4400,9 +4411,6 @@ function switchView(name, el) {
   }
   if (name === 'referrals') {
     setTimeout(() => initReferrals(), 50);
-  }
-  if (name === 'medrec') {
-    setTimeout(() => renderMedRecTab(), 50);
   }
   if (name === 'trends' && typeof LONGITUDINAL !== 'undefined' && LONGITUDINAL) {
     setTimeout(() => renderTrendsCharts(), 50);
