@@ -3582,12 +3582,14 @@ function renderRecruiterPerformance() {
   (CRP_CONFIG.SCHEDULE_COORDINATORS || []).forEach(function(n){ schedSet[n.toLowerCase()] = true; });
   var nicknames = { 'Gabrijela Ateljevic': 'Gaby', 'Ema Gunic': 'Ema', 'Ana Lambic': 'Ana', 'Vlado Draganic': 'Vlado', 'Jana Milankovic': 'Jana' };
 
-  // Use recruiterStats (patient_interaction) for outreach activity
+  // Use recruiterStats (patient_interaction) for outreach activity — only known recruiters
+  var recruiterSet = {};
+  (CRP_CONFIG.COORDINATORS || []).forEach(function(n){ if (!schedSet[n.toLowerCase()]) recruiterSet[n.toLowerCase()] = true; });
   var stats = [];
   if (window._recruiterStats && window._recruiterStats.length > 0) {
     window._recruiterStats.forEach(function(r) {
       var rName = r.recruiter || '';
-      if (schedSet[rName.toLowerCase()]) return; // skip coordinators
+      if (!recruiterSet[rName.toLowerCase()]) return; // only known recruiters
       stats.push({
         name: rName, nick: nicknames[rName] || rName.split(' ')[0],
         calls: parseInt(r.phone_calls)||0, texts: parseInt(r.texts)||0,
@@ -10650,11 +10652,20 @@ function mergeCrioIntoStudies() {
       crio_end_date: e.crio_end_date || '',
       phase: e.crio_phase || '',
       siv_date: e.looker_siv || '',
-      enrollment_start: e.looker_enrollment_start || '',
-      enrollment_close: e.looker_enrollment_close || '',
+      enrollment_start: e.looker_enrollment_start || e.crio_start_date || '',
+      enrollment_close: e.looker_enrollment_close || (() => {
+        // Estimate: enrollment_start + 9 months if no close date
+        var startDate = e.looker_enrollment_start || e.crio_start_date || '';
+        if (!startDate) return '';
+        var d = _parseDate(startDate);
+        if (!d) return '';
+        d.setMonth(d.getMonth() + 9);
+        return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+      })(),
       fps_date: e.looker_fps || '',
       irb_approval: e.looker_irb_approval || '',
       contract_signed: e.looker_contract_signed || '',
+      enrollment_close_estimated: !e.looker_enrollment_close && (e.looker_enrollment_start || e.crio_start_date) ? true : false,
       closeout_date: e.looker_closeout || '',
       last_updated: e.looker_last_updated || ''
     };
@@ -12360,7 +12371,7 @@ function renderStudiesTable() {
 
   // Sort
   if (_studySortCol >= 0) {
-    const keys = ['study','risk_score','cancels','upcoming','pct','screened','screening','screen_fail_pct'];
+    const keys = ['study','enroll_status','risk_score','cancels','upcoming','pct','screened','screening','screen_fail_pct'];
     const key = keys[_studySortCol] || 'risk_score';
     studies.sort((a,b) => {
       const va = a[key] ?? (_studySortAsc ? 'zzz' : -999);
@@ -12474,8 +12485,25 @@ function renderStudiesTable() {
 
     const sfColor = s.screen_fail_pct > 60 ? '#dc2626' : s.screen_fail_pct > 40 ? '#d97706' : 'var(--muted)';
 
+    // Enrollment close display — flag approaching dates, show estimated
+    const _ecDisplay = (() => {
+      if (!s.enrollment_close) return '—';
+      var d = Math.round((_parseDate(s.enrollment_close) - new Date()) / 86400000);
+      var color = d < 0 ? '#94a3b8' : d <= 30 ? '#dc2626' : d <= 60 ? '#d97706' : 'var(--muted)';
+      var weight = d <= 60 && d >= 0 ? '700' : '600';
+      var est = s.enrollment_close_estimated ? '<span style="font-size:8px;color:#94a3b8;"> est</span>' : '';
+      var warn = isEnrolling && d >= 0 && d <= 60 ? '<div style="font-size:8px;color:'+color+';font-weight:700;">'+d+'d left</div>' : '';
+      return '<span style="color:'+color+';font-weight:'+weight+'">'+escapeHTML(s.enrollment_close)+est+'</span>'+warn;
+    })();
+
+    // Referrals/FB/Total — only relevant for enrolling studies
+    const refCell = isEnrolling ? buildPipelineCell(s.study, safeStudy) : '<span style="color:#cbd5e1">—</span>';
+    const fbCell = isEnrolling ? buildFBLeadCell(s.study) : '<span style="color:#cbd5e1">—</span>';
+    const totalCell = isEnrolling ? buildTotalLeadsCell(s.study, safeStudy) : '<span style="color:#cbd5e1">—</span>';
+
     return `<tr style="border-bottom:1px solid var(--border);transition:background .1s" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
-      <td style="padding:10px 12px;min-width:160px">${studyCell}${statusBadge}${diversityBadge}${indicationTag}${alertTags}</td>
+      <td style="padding:10px 12px;min-width:160px">${studyCell}${diversityBadge}${indicationTag}${alertTags}</td>
+      <td style="padding:10px 8px;text-align:center"><span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:${_sbBg};color:${_sbFg}">${_sb||'—'}</span></td>
       <td style="padding:10px 8px;text-align:center">${riskScoreCell}</td>
       <td style="padding:10px 8px;text-align:center">${cancelsCell}</td>
       <td style="padding:10px 8px;text-align:center">${upcomingCell}</td>
@@ -12483,14 +12511,12 @@ function renderStudiesTable() {
       <td style="padding:10px 8px;text-align:center;font-size:11px;color:var(--muted)">${s.screened||0}</td>
       <td style="padding:10px 8px;text-align:center;font-size:11px;color:${s.screening>0?'#7c3aed':'var(--muted)'};font-weight:${s.screening>0?'700':'400'}">${s.screening||0}</td>
       <td style="padding:10px 8px;text-align:center;font-size:11px;color:${sfColor};font-weight:600">${s.screen_fail_pct > 0 ? s.screen_fail_pct+'%' : '—'}</td>
-      <td style="padding:10px 8px;font-size:11px;color:#475569;white-space:nowrap">${escapeHTML(s.crio_coordinator||'')}</td>
-      <td style="padding:10px 8px;font-size:11px;color:#475569;white-space:nowrap">${escapeHTML(s.crio_investigator||'')}</td>
       <td style="padding:10px 8px;text-align:center">${siteTags}</td>
       <td style="padding:10px 8px;text-align:center;font-size:10px;color:var(--muted);white-space:nowrap">${s.enrollment_start ? escapeHTML(s.enrollment_start) : '—'}</td>
-      <td style="padding:10px 8px;text-align:center;font-size:10px;color:${(function(){if(!s.enrollment_close)return 'var(--muted)';var d=Math.round((_parseDate(s.enrollment_close)-new Date())/86400000);return d<0?'#94a3b8':d<=30?'#dc2626':d<=60?'#d97706':'var(--muted)'})()};font-weight:${s.enrollment_close?'600':'400'};white-space:nowrap">${s.enrollment_close ? escapeHTML(s.enrollment_close) : '—'}</td>
-      <td style="padding:10px 8px;text-align:center">${buildPipelineCell(s.study, safeStudy)}</td>
-      <td style="padding:10px 8px;text-align:center">${buildFBLeadCell(s.study)}</td>
-      <td style="padding:10px 8px;text-align:center">${buildTotalLeadsCell(s.study, safeStudy)}</td>
+      <td style="padding:10px 8px;text-align:center;font-size:10px;white-space:nowrap">${_ecDisplay}</td>
+      <td style="padding:10px 8px;text-align:center">${refCell}</td>
+      <td style="padding:10px 8px;text-align:center">${fbCell}</td>
+      <td style="padding:10px 8px;text-align:center">${totalCell}</td>
     </tr>`;
   });
   const totalRows = allRows.length;

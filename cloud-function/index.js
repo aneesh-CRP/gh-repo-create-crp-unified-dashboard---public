@@ -279,14 +279,10 @@ const FEEDS = {
   // ── 3. Studies (uses CTEs to avoid correlated subqueries) ──
   studies: {
     query: () => `WITH
-      svs_coords AS (SELECT svi.study_key, svs.coordinator_user_key, COUNT(*) AS visit_count
-        FROM ${tbl('subject_visit_stats')} svs
-        JOIN ${tbl('subject_visit')} svi ON svs.subject_visit_key = svi.subject_visit_key
-        WHERE svs.coordinator_user_key IS NOT NULL AND svi._fivetran_deleted = false
-        GROUP BY svi.study_key, svs.coordinator_user_key),
-      ranked_coords AS (SELECT study_key, coordinator_user_key, ROW_NUMBER() OVER (PARTITION BY study_key ORDER BY visit_count DESC) AS rn FROM svs_coords),
-      coord_leaders AS (SELECT rc.study_key, CONCAT(u.first_name, ' ', u.last_name) AS name
-        FROM ranked_coords rc JOIN ${tbl('user')} u ON rc.coordinator_user_key = u.user_key WHERE rc.rn = 1),
+      coord_leaders AS (SELECT su.study_key, CONCAT(u.first_name, ' ', u.last_name) AS name
+        FROM ${tbl('study_user')} su
+        JOIN ${tbl('user')} u ON su.user_key = u.user_key
+        WHERE su.role = 2 AND su.is_role_leader = 1 AND su._fivetran_deleted = false),
       pi_leaders AS (SELECT su.study_key, CONCAT(u.first_name, ' ', u.last_name) AS name
         FROM ${tbl('study_user')} su JOIN ${tbl('user')} u ON su.user_key = u.user_key
         WHERE su.role = 1 AND su.is_role_leader = 1 AND su._fivetran_deleted = false),
