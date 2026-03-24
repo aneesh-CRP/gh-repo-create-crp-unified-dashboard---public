@@ -1106,7 +1106,7 @@ body {
 <div id="toast-container"></div>
 
 <!-- Print Header (visible only when printing) -->
-<div id="print-header">CRP Intelligence Dashboard</div>
+<div id="print-header">CRP Dashboard</div>
 
 <!-- ═══════════════════════════════════════
      MAIN
@@ -6271,7 +6271,7 @@ function buildInsights() {
     flagItems.push({ urgent: critical > 0, html: `<div class="insight-item ${critical > 0 ? 'danger' : 'warning'}" style="cursor:pointer" onclick="switchTab('actions')">
       <span class="insight-icon">${critical > 0 ? '🔴' : '⚠️'}</span><div>
         <div class="insight-title">${flags.length} at-risk patient${flags.length>1?'s':''} with upcoming visits${sevDetail ? ' — ' + sevDetail : ''}</div>
-        <div class="insight-desc">View details in <strong>Schedule → At-Risk Patients</strong></div>
+        <div class="insight-desc">View details in <strong>Actions tab</strong></div>
       </div></div>` });
   }
 
@@ -6295,7 +6295,7 @@ function buildInsights() {
     flagItems.push({ urgent: false, html: `<div class="insight-item warning" style="cursor:pointer" onclick="switchTab('actions')">
       <span class="insight-icon">📋</span><div>
         <div class="insight-title">${totalActions} open action items in the pipeline</div>
-        <div class="insight-desc">${[undocCount?undocCount+' undocumented':'', nsCount?nsCount+' no-show follow-ups':'', rpCount?rpCount+' pending reschedules':''].filter(Boolean).join(' · ')} — see <strong>Schedule → Action Plan</strong></div>
+        <div class="insight-desc">${[undocCount?undocCount+' undocumented':'', nsCount?nsCount+' no-show follow-ups':'', rpCount?rpCount+' pending reschedules':''].filter(Boolean).join(' · ')} — see <strong>Actions tab</strong></div>
       </div></div>` });
   }
 
@@ -6307,7 +6307,7 @@ function buildInsights() {
     flagItems.push({ urgent: readyNV.length >= 3, html: `<div class="insight-item ${readyNV.length >= 3 ? 'danger' : 'warning'}" style="cursor:pointer" onclick="switchTab('actions')">
       <span class="insight-icon">📋</span><div>
         <div class="insight-title">Medical records pipeline needs attention</div>
-        <div class="insight-desc">${parts.join(' · ')} — see <strong>Schedule → Medical Records</strong></div>
+        <div class="insight-desc">${parts.join(' · ')} — see <strong>Actions tab</strong></div>
       </div></div>` });
   }
 
@@ -15073,7 +15073,7 @@ function generateDailyEmail(type) {
   // Footer
   html += '<div style="background:#f1f5f9;padding:12px 24px;border-radius:0 0 8px 8px;font-size:11px;color:#64748b;text-align:center;">';
   html += '<a href="' + dashUrl + '" style="color:#2563eb;font-weight:600;">Open Live Dashboard</a> · Generated ' + today.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-  html += ' · CRP Intelligence Dashboard';
+  html += ' · CRP Dashboard';
   html += '</div>';
 
   html += '</div>';
@@ -15599,7 +15599,7 @@ window.addEventListener('hashchange', function() {
 // ═══ PRINT: BEFOREPRINT LISTENER ═══
 window.addEventListener('beforeprint', function() {
   var hdr = document.getElementById('print-header');
-  if (hdr) hdr.textContent = 'CRP Intelligence Dashboard — Printed ' + new Date().toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  if (hdr) hdr.textContent = 'CRP Dashboard — Printed ' + new Date().toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric',hour:'2-digit',minute:'2-digit'});
 });
 
 // ═══ DATA HEALTH MONITORING (global — called by async fetch functions) ═══
