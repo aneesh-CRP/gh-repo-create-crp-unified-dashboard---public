@@ -1730,7 +1730,7 @@ function renderInsights() {
       else if(ha||hc||lc){risk='Medium';rc='risk-medium';}
       const st=s.status||'--';
       const sc=st==='Enrolling'?'badge-green':st==='Maintenance'?'badge-yellow':'badge-gray';
-      const link=CRIO_LINKS[s.code]?'<a href="'+escapeHTML(CRIO_LINKS[s.code])+'" target="_blank" style="color:inherit;text-decoration:underline dotted">'+escapeHTML(s.name)+'</a>':escapeHTML(s.name);
+      const link=CRIO_LINKS[s.code]?'<a href="'+escapeHTML(CRIO_LINKS[s.code])+'" target="_blank" style="color:inherit;text-decoration:none">'+escapeHTML(s.name)+'</a>':escapeHTML(s.name);
       return '<tr class="clickable" onclick="showStudyModal(\''+jsAttr(s.name)+'\')"><td>'+link+'</td><td><span class="badge '+sc+'">'+escapeHTML(st)+'</span></td><td class="r">'+(s.cancels||'--')+'</td><td class="r">'+(s.upcoming||'--')+'</td><td class="r">$'+(s.totalAR/1000).toFixed(0)+'K</td><td class="r">'+pct+'%</td><td><span class="risk-tag '+rc+'">'+risk+'</span></td></tr>';
     }).join('');
   }
@@ -1746,7 +1746,7 @@ function renderInsights() {
       const avgVR=enrolled>0&&rev12>0?Math.round(rev12/(enrolled*12)):0;
       const lost=s.cancels*avgVR;
       totalLostEst+=lost;
-      const link=CRIO_LINKS[s.code]?'<a href="'+escapeHTML(CRIO_LINKS[s.code])+'" target="_blank" style="color:inherit;text-decoration:underline dotted">'+escapeHTML(s.code)+'</a>':escapeHTML(s.code);
+      const link=CRIO_LINKS[s.code]?'<a href="'+escapeHTML(CRIO_LINKS[s.code])+'" target="_blank" style="color:inherit;text-decoration:none">'+escapeHTML(s.code)+'</a>':escapeHTML(s.code);
       html+='<div style="background:#FEF2F2;border-radius:8px;padding:12px;border-left:3px solid #EF4444"><div style="font-weight:700;font-size:13px">'+link+'</div><div style="font-size:12px;color:#718096;margin-top:4px">'+s.cancels+' cancellations · '+s.upcoming+' upcoming</div><div style="font-size:14px;font-weight:700;color:#EF4444;margin-top:6px">~$'+(lost/1000).toFixed(0)+'K est. revenue impact</div></div>';
     });
     html+='</div>';
@@ -1903,7 +1903,7 @@ function renderInsights() {
       else if(pct>40){alert='Watch';ac='risk-medium';}
       else{alert='OK';ac='risk-low';}
       const nm=ms.name||code;
-      const link=CRIO_LINKS[code]?'<a href="'+escapeHTML(CRIO_LINKS[code])+'" target="_blank" style="color:inherit;text-decoration:underline dotted">'+escapeHTML(nm)+'</a>':escapeHTML(nm);
+      const link=CRIO_LINKS[code]?'<a href="'+escapeHTML(CRIO_LINKS[code])+'" target="_blank" style="color:inherit;text-decoration:none">'+escapeHTML(nm)+'</a>':escapeHTML(nm);
       rows.push({pct,html:'<tr class="clickable" onclick="showStudyModal(\''+jsAttr(code)+'\')"><td>'+link+'</td><td><span class="badge '+(st==='Enrolling'?'badge-green':st==='Maintenance'?'badge-yellow':'badge-gray')+'">'+en+' enrolled</span></td><td class="r">$'+(cur/1000).toFixed(0)+'K</td><td class="r" style="color:'+(pct>40?'#EF4444':'inherit')+'">$'+(over/1000).toFixed(0)+'K</td><td class="r" style="font-weight:700;color:'+(pct>60?'#dc2626':pct>40?'#F59E0B':'#10B981')+'">'+pct+'%</td><td><span class="risk-tag '+ac+'">'+alert+'</span></td></tr>'});
     });
     rows.sort((a,b)=>b.pct-a.pct);
@@ -2220,7 +2220,7 @@ function buildReasonChart() {
     row.onmouseenter = () => row.style.background = '#f1f5f9';
     row.onmouseleave = () => row.style.background = '';
     row.onclick = () => showCancelsByReason(d.reason);
-    row.innerHTML = `<div class="legend-dot" style="background:${COLORS[i]}"></div><span class="legend-label" style="color:#1843ad;text-decoration:underline dotted;flex:1">${escapeHTML(d.reason)}</span><span class="legend-val">${d.count}</span>`;
+    row.innerHTML = `<div class="legend-dot" style="background:${COLORS[i]}"></div><span class="legend-label" style="color:#1843ad;text-decoration:none;flex:1">${escapeHTML(d.reason)}</span><span class="legend-val">${d.count}</span>`;
     leg.appendChild(row);
   });
 }
@@ -2420,7 +2420,7 @@ function buildRiskFlagCards() {
   const clearedCount = doneFlags.length + naFlags.length;
   if (clearedCount > 0) {
     html += `<div style="padding:12px 0;text-align:center;">
-      <button onclick="var x=document.getElementById('risk-cleared-list');x.style.display=x.style.display==='none'?'block':'none'" style="background:none;border:none;font-size:12px;color:#94a3b8;cursor:pointer;text-decoration:underline dotted;">
+      <button onclick="var x=document.getElementById('risk-cleared-list');x.style.display=x.style.display==='none'?'block':'none'" style="background:none;border:none;font-size:12px;color:#94a3b8;cursor:pointer;text-decoration:none;">
         ${clearedCount} cleared — click to show
       </button>
       <div id="risk-cleared-list" style="display:none;margin-top:8px;text-align:left;">
@@ -2580,7 +2580,7 @@ function buildSchedStudyBars() {
           <div style="width:${pct}%;height:100%;background:${siteColor};border-radius:3px;"></div>
         </div>
       </div>
-      <span style="font-size:12px;font-weight:700;color:${siteColor};text-align:right;cursor:pointer;text-decoration:underline;text-decoration-style:dotted;" onclick="showUpcoming(r=>r.study==='${safeStudy}','${safeStudy} — Upcoming Visits')">${s.count}</span>
+      <span style="font-size:12px;font-weight:700;color:${siteColor};text-align:right;cursor:pointer;text-decoration:none;" onclick="showUpcoming(r=>r.study==='${safeStudy}','${safeStudy} — Upcoming Visits')">${s.count}</span>
       <span style="font-size:9px;font-weight:700;padding:2px 4px;border-radius:3px;background:${siteColor}20;color:${siteColor};text-align:center">${siteShort}</span>
     </div>`;
   }).join('');
@@ -4209,7 +4209,7 @@ function showActionModal(type) {
   var _crioSubjectUrl = function(sk, subk) { return (sk && subk) ? _crioBase + '/study/' + sk + '/subject/' + subk : ''; };
   var _crioCommentUrl = function(sk, subk, svk, ck, vpath) { return (sk && subk && svk && ck) ? _crioBase + '/study/' + sk + '/subject/' + subk + '/' + (vpath||'completed-visit') + '/' + svk + '?open_comment=' + ck : _crioSubjectUrl(sk, subk); };
   var _crioTodoUrl = function(sk, subk) { return (sk && subk) ? _crioBase + '/study/' + sk + '/subject/' + subk + '/todos' : _crioStudyUrl(sk); };
-  var _crioLink = function(text, url) { return url ? '<a href="' + escapeHTML(url) + '" target="_blank" style="color:#1843ad;text-decoration:underline;text-decoration-style:dotted">' + escapeHTML(text) + '</a>' : escapeHTML(text); };
+  var _crioLink = function(text, url) { return url ? '<a href="' + escapeHTML(url) + '" target="_blank" style="color:#1843ad;text-decoration:none">' + escapeHTML(text) + '</a>' : escapeHTML(text); };
 
   if (type === 'queries') {
     var rows = window._actionQueries || [];
@@ -7184,10 +7184,10 @@ function buildActionSteps() {
   function pLink(name,url,color){
     color=color||'#072061';
     var masked = maskPHI(name);
-    return url?`<a href="${url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:${color};font-weight:700;text-decoration:underline;text-decoration-style:dotted;">${masked}</a>`:`<strong style="color:${color}">${masked}</strong>`;
+    return url?`<a href="${url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:${color};font-weight:700;text-decoration:none;">${masked}</a>`:`<strong style="color:${color}">${masked}</strong>`;
   }
   function sLink(name,url){
-    return url?`<a href="${escapeHTML(url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:inherit;font-weight:600;text-decoration:underline;text-decoration-style:dotted;">${escapeHTML(name)}</a>`:`<span style="font-weight:600">${escapeHTML(name)}</span>`;
+    return url?`<a href="${escapeHTML(url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:inherit;font-weight:600;text-decoration:none;">${escapeHTML(name)}</a>`:`<span style="font-weight:600">${escapeHTML(name)}</span>`;
   }
   function typeBadge(type){
     const map={'No Show':['#fef2f2','#dc2626'],'Patient Cancelled':['#fff7ed','#c2410c'],'Site Cancelled':['#eff6ff','#1843ad']};
@@ -7434,7 +7434,7 @@ function buildActionSteps() {
   // Show dismissed count with undo option
   if (dismissedSteps.length > 0) {
     el.innerHTML += `<div style="padding:16px 0;text-align:center;">
-      <button onclick="document.getElementById('dismissed-actions-list').style.display=document.getElementById('dismissed-actions-list').style.display==='none'?'block':'none'" style="background:none;border:none;font-size:12px;color:#94a3b8;cursor:pointer;text-decoration:underline;text-decoration-style:dotted;">
+      <button onclick="document.getElementById('dismissed-actions-list').style.display=document.getElementById('dismissed-actions-list').style.display==='none'?'block':'none'" style="background:none;border:none;font-size:12px;color:#94a3b8;cursor:pointer;text-decoration:none;">
         ${dismissedSteps.length} cleared action${dismissedSteps.length>1?'s':''} — click to show
       </button>
       <div id="dismissed-actions-list" style="display:none;margin-top:12px;text-align:left;">
@@ -7461,7 +7461,7 @@ function buildActionSteps() {
     });
     dormEl.innerHTML=dormant.length>0
       ?dormant.map(c=>{const label=c.name||c.study||c.full||'Unknown';return c.study_url
-        ?`<div style="padding:8px 12px;border-left:3px solid #dc2626;margin-bottom:6px;background:#fef2f2;border-radius:0 6px 6px 0;font-size:12px;"><a href="${c.study_url}" target="_blank" rel="noopener" style="color:#dc2626;font-weight:600;text-decoration:underline;text-decoration-style:dotted;">${label}</a> — ${c.count} cancels, low upcoming pipeline</div>`
+        ?`<div style="padding:8px 12px;border-left:3px solid #dc2626;margin-bottom:6px;background:#fef2f2;border-radius:0 6px 6px 0;font-size:12px;"><a href="${c.study_url}" target="_blank" rel="noopener" style="color:#dc2626;font-weight:600;text-decoration:none;">${label}</a> — ${c.count} cancels, low upcoming pipeline</div>`
         :`<div style="padding:8px 12px;border-left:3px solid #dc2626;margin-bottom:6px;background:#fef2f2;border-radius:0 6px 6px 0;font-size:12px;"><span style="color:#dc2626;font-weight:600;">${label}</span> — ${c.count} cancels, low upcoming pipeline</div>`}
       ).join('')
       :'<div style="padding:12px;color:#94a3b8;font-size:12px;">No dormant studies detected</div>';
@@ -10112,7 +10112,7 @@ function renderCrioStudies() {
         + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'
         + '<span style="font-size:16px;font-weight:800;color:#dc2626;min-width:28px;text-align:right">' + w.noshow + '</span>'
         + '<div style="flex:1">'
-        + '<a href="' + esc(url) + '" target="_blank" style="color:#dc2626;font-weight:600;text-decoration:underline dotted;font-size:12px">' + esc(w.study) + '</a>' + tag
+        + '<a href="' + esc(url) + '" target="_blank" style="color:#dc2626;font-weight:600;text-decoration:none;font-size:12px">' + esc(w.study) + '</a>' + tag
         + (w.coord ? ' <span style="color:#94a3b8;font-size:11px">· ' + esc(w.coord) + '</span>' : '')
         + '</div></div>';
 
@@ -10139,7 +10139,7 @@ function renderCrioStudies() {
         });
         html += '</div>';
       } else {
-        html += '<div style="margin-left:36px;font-size:10px;color:#94a3b8;padding:2px 0">No recent cancel details available — <a href="' + esc(url) + '" target="_blank" style="color:#dc2626;text-decoration:underline dotted">view in CRIO</a></div>';
+        html += '<div style="margin-left:36px;font-size:10px;color:#94a3b8;padding:2px 0">No recent cancel details available — <a href="' + esc(url) + '" target="_blank" style="color:#dc2626;text-decoration:none">view in CRIO</a></div>';
       }
       html += '</div>';
     });
@@ -10164,7 +10164,7 @@ function renderCrioStudies() {
       var pts = prByStudy[study];
       var studyUrl = pts[0].study_url || '';
       var studyLink = studyUrl
-        ? '<a href="' + esc(studyUrl) + '" target="_blank" style="color:#c2410c;font-weight:600;text-decoration:underline dotted">' + esc(study) + '</a>'
+        ? '<a href="' + esc(studyUrl) + '" target="_blank" style="color:#c2410c;font-weight:600;text-decoration:none">' + esc(study) + '</a>'
         : '<b>' + esc(study) + '</b>';
       html += '<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;margin-bottom:3px;border-left:3px solid #c2410c;background:#c2410c08;border-radius:0 6px 6px 0;font-size:11px">'
         + '<span style="font-size:16px;font-weight:800;color:#c2410c;min-width:28px;text-align:right">' + pts.length + '</span>'
@@ -10190,7 +10190,7 @@ function renderCrioStudies() {
       html += '<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;margin-bottom:3px;border-left:3px solid #d97706;background:#d9770608;border-radius:0 6px 6px 0;font-size:11px">'
         + '<span style="font-size:16px;font-weight:800;color:#d97706;min-width:28px;text-align:right">' + q.screening + '</span>'
         + '<div style="flex:1">'
-        + '<a href="' + esc(url) + '" target="_blank" style="color:#d97706;font-weight:600;text-decoration:underline dotted">' + esc(q.study) + '</a>'
+        + '<a href="' + esc(url) + '" target="_blank" style="color:#d97706;font-weight:600;text-decoration:none">' + esc(q.study) + '</a>'
         + (q.scheduled_v1 > 0 ? ' <span style="font-size:9px;color:#059669">(' + q.scheduled_v1 + ' already scheduled)</span>' : '')
         + (q.coord ? ' <span style="color:#94a3b8">· ' + esc(q.coord) + '</span>' : '')
         + '</div>'
@@ -10240,7 +10240,7 @@ function renderCrioStudies() {
       html += '<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;margin-bottom:3px;border-left:3px solid #7c3aed;background:#7c3aed08;border-radius:0 6px 6px 0;font-size:11px">'
         + '<span style="font-size:16px;font-weight:800;color:#7c3aed;min-width:28px;text-align:right">' + e.gap + '</span>'
         + '<div style="flex:1">'
-        + '<a href="' + esc(url) + '" target="_blank" style="color:#7c3aed;font-weight:600;text-decoration:underline dotted">' + esc(e.study) + '</a>'
+        + '<a href="' + esc(url) + '" target="_blank" style="color:#7c3aed;font-weight:600;text-decoration:none">' + esc(e.study) + '</a>'
         + ' <span style="font-size:9px;color:#94a3b8">' + e.enrolled + ' enrolled, ' + e.upcoming + ' upcoming</span>'
         + (e.coord ? ' <span style="color:#94a3b8">· ' + esc(e.coord) + '</span>' : '')
         + '</div>'
@@ -10274,7 +10274,7 @@ function renderCrioStudies() {
 
       html += '<div style="padding:8px 10px;margin-bottom:8px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)">';
       html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
-        + '<a href="' + esc(url) + '" target="_blank" rel="noopener" style="font-weight:600;font-size:12px;color:var(--navy);text-decoration:underline dotted">' + esc(ps.name) + '</a>'
+        + '<a href="' + esc(url) + '" target="_blank" rel="noopener" style="font-weight:600;font-size:12px;color:var(--navy);text-decoration:none">' + esc(ps.name) + '</a>'
         + '<span style="font-size:10px;color:#64748b">' + esc(ps.coordinator) + '</span></div>';
 
       var stages = [
@@ -10321,7 +10321,7 @@ function renderCrioStudies() {
       var color = a.type === 'screen_fail' ? '#dc2626' : '#ef4444';
       var url = 'https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/' + a.key + '/subjects';
       html += '<div style="padding:5px 8px;margin-bottom:3px;border-left:2px solid ' + color + ';background:' + color + '08;border-radius:0 4px 4px 0;font-size:11px">'
-        + icon + ' <a href="' + esc(url) + '" target="_blank" style="color:' + color + ';font-weight:600;text-decoration:underline dotted">' + esc(a.study) + '</a>'
+        + icon + ' <a href="' + esc(url) + '" target="_blank" style="color:' + color + ';font-weight:600;text-decoration:none">' + esc(a.study) + '</a>'
         + ' — <b>' + a.pct + '%</b> ' + label + ' (' + a.value + '/' + a.total + ')'
         + (a.coord ? ' · ' + esc(a.coord) : '')
         + '</div>';
@@ -10421,7 +10421,7 @@ function renderCrioStudies() {
         if (src.comp > 0) parts.push(src.comp + ' completed');
         if (src.disc > 0) parts.push(src.disc + ' discontinued');
         var url = 'https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/' + src.key + '/subjects';
-        html += '<a href="' + esc(url) + '" target="_blank" style="color:#1843ad;text-decoration:underline dotted">' + esc(src.study) + '</a> (' + parts.join(', ') + ')';
+        html += '<a href="' + esc(url) + '" target="_blank" style="color:#1843ad;text-decoration:none">' + esc(src.study) + '</a> (' + parts.join(', ') + ')';
       });
       html += '</div>';
 
@@ -10430,7 +10430,7 @@ function renderCrioStudies() {
       o.enrolling.forEach(function(e, i) {
         if (i > 0) html += ', ';
         var url = 'https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/' + e.key + '/subjects';
-        html += '<a href="' + esc(url) + '" target="_blank" style="color:#059669;text-decoration:underline dotted">' + esc(e.study) + '</a>';
+        html += '<a href="' + esc(url) + '" target="_blank" style="color:#059669;text-decoration:none">' + esc(e.study) + '</a>';
       });
       html += '</div></div>';
     });
@@ -12752,7 +12752,7 @@ function renderStudiesTable() {
       pct >= 100 ? '#059669' : pct >= 75 ? '#1843ad' : pct >= 50 ? '#d97706' : pct >= 25 ? '#f97316' : '#dc2626';
 
     const safeStudy = jsAttr(s.study);
-    const studyCell = `<span style="font-weight:700;color:var(--navy);cursor:pointer;text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px;" data-action="studyUnified" data-study="${escapeHTML(s.study)}">${escapeHTML(s.study)}</span>` +
+    const studyCell = `<span style="font-weight:700;color:var(--navy);cursor:pointer;text-decoration:none;text-underline-offset:3px;" data-action="studyUnified" data-study="${escapeHTML(s.study)}">${escapeHTML(s.study)}</span>` +
       (s.study_url ? `<a href="${escapeHTML(s.study_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="margin-left:4px;opacity:0.4;vertical-align:middle"><svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>` : '');
     const _sb = s.enroll_status||'';
     const _sbBg = _sb==='Enrolling'?'#e8eeff':_sb==='Maintenance'?'#f0fdf4':_sb==='Startup'?'#fffbeb':_sb==='Pre-Closed'?'#fef2f2':_sb==='Suspended'?'#fef2f2':_sb==='Withdrawn'?'#f1f5f9':'#f1f5f9';
