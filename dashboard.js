@@ -9261,13 +9261,23 @@ function renderReferralDashboard() {
 // Referral CSV uses short nicknames; merged studies use full protocol numbers.
 // This map resolves known aliases. Fuzzy matching handles the rest (e.g., "EZEF" ⊂ "J3L-MC-EZEF").
 var REFERRAL_STUDY_MAP = {
+  // Nickname → CRIO protocol (lowercase)
   'prevent-hf-az-d6973 baxduo': 'd6973c00001',
   'az-baxduo':                   'd6973c00001',
-  'ocean(a)':                    'efc17599',
-  'sjogren\'s disease':          '80202135sjs3001',
+  'azure-outcomes':              'd7960c00015',
+  'ocean(a)':                    'c4951063',
+  'tp-400160':                   'mr-130a-01-td-3001',
+  'velota':                      '80202135sle3001',
+  'aqua':                        'efc17599',
+  'sjogren\'s disease':          'efc18366',
   'psa-2001':                    '88545223psa2001',
+  'pso3006':                     '77242113pso3006',
+  '405-201-00062':               'cdx0159-12',
+  'comp006':                     '80202135sjs3001',
   'mash prescreening':           'masld',
-  'aqua':                        'efc17600 (estuary)',
+  'axs-07-304':                  'migraine',
+  'laki':                        'j1g-mc-laki',
+  'gzby':                        'j1i-mc-gzby',
 };
 
 // Values in the referral study column that are NOT study names (doctor names, sources, dates, blanks)
