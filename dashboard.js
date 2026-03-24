@@ -9490,7 +9490,8 @@ function renderReferralDashboard() {
     var _vendorSourceMap = {
       'facebook': ['delfa','facebook','meta'],
       'subjectwell': ['subjectwell'],
-      'study teams': ['study team','study teams','trial partners'],
+      'study teams': ['study team','study teams'],
+      'trial partners': ['trial partners'],
       'study max': ['study max'],
       'studykik': ['studykik'],
       'iconnect': ['iconnect'],
