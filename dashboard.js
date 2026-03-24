@@ -10107,10 +10107,29 @@ function showReferralDetailModal(filterFn, title, subtitle) {
   // Reset CRIO lookup cache so it rebuilds with latest data
   _crioSubjectMap = null;
 
-  let html = `<table class="detail-table" style="width:100%;font-size:11px;"><thead><tr>
-    <th>Name</th><th>Study</th><th>ClickUp Stage</th><th>CRIO Status</th><th>CRIO Source</th><th>CU Source</th><th>Next Appt</th><th>Updated</th>
+  // Pre-compute source audit: ClickUp tracker (authoritative) vs CRIO referral_source
+  var _srcMismatches = 0, _srcMissing = 0, _srcTotal = 0;
+  var _displayRefs = refs.slice(0, 50);
+  _displayRefs.forEach(function(r) {
+    if (!r.tracker) return; // only audit provider tracker referrals
+    _srcTotal++;
+    var crioSrc = window._crioRefSourceMap ? window._crioRefSourceMap.get(r.name.toLowerCase().trim()) : null;
+    if (!crioSrc) { _srcMissing++; }
+    else if (crioSrc.toLowerCase().indexOf(r.tracker.toLowerCase()) === -1 && r.tracker.toLowerCase().indexOf(crioSrc.toLowerCase()) === -1) { _srcMismatches++; }
+  });
+
+  let html = '';
+  // Source audit banner (only if mismatches found)
+  if (_srcMismatches > 0 || _srcMissing > 0) {
+    html += `<div style="padding:8px 16px;background:#fffbeb;border-bottom:1px solid #fde68a;font-size:11px;color:#92400e;">
+      <strong>Source Audit:</strong> ${_srcMismatches > 0 ? _srcMismatches + ' mismatch' + (_srcMismatches>1?'es':'') + ' (CRIO source ≠ provider tracker)' : ''}${_srcMismatches > 0 && _srcMissing > 0 ? ' · ' : ''}${_srcMissing > 0 ? _srcMissing + ' missing CRIO source' : ''} — of ${_srcTotal} provider referrals
+    </div>`;
+  }
+
+  html += `<table class="detail-table" style="width:100%;font-size:11px;"><thead><tr>
+    <th>Name</th><th>Study</th><th>ClickUp Stage</th><th>CRIO Status</th><th>Source (CRIO → ClickUp)</th><th>Next Appt</th><th>Updated</th>
   </tr></thead><tbody>`;
-  refs.slice(0, 50).forEach(r => {
+  _displayRefs.forEach(r => {
     const nameKey = r.name.toLowerCase().trim();
     const pVisits = (DATA.allVisitDetail || []).filter(v => v.patient.toLowerCase().trim() === nameKey);
     const apptCell = pVisits.length > 0 ? `<span style="color:#059669;font-weight:600;">${escapeHTML(pVisits[0].date)}</span>` : escapeHTML(r.next_appt) || '<span style="color:#cbd5e1;">—</span>';
@@ -10119,13 +10138,30 @@ function showReferralDetailModal(filterFn, title, subtitle) {
     const _crioMatch = matchCrioPatient(r.name, r.phone);
     const _nameUrl = _crioMatch && _crioMatch.crio_url ? _crioMatch.crio_url : r.url;
     const _nameStyle = _crioMatch && _crioMatch.crio_url ? 'font-weight:600;color:#8b5cf6;text-decoration:none;' : 'font-weight:600;color:#1e293b;text-decoration:none;';
+    // Source comparison: ClickUp tracker (authoritative) vs CRIO referral_source
+    const _crioSrc = window._crioRefSourceMap ? window._crioRefSourceMap.get(nameKey) : null;
+    const _cuSrc = r.tracker || r.source || '';
+    var _srcCell = '';
+    if (_crioSrc && _cuSrc) {
+      var _match = _crioSrc.toLowerCase().indexOf(_cuSrc.toLowerCase()) !== -1 || _cuSrc.toLowerCase().indexOf(_crioSrc.toLowerCase()) !== -1;
+      if (_match) {
+        _srcCell = '<span style="color:#059669;" title="CRIO matches ClickUp">' + escapeHTML(_crioSrc) + '</span>';
+      } else {
+        _srcCell = '<span style="color:#dc2626;font-weight:600;" title="CRIO source does not match provider tracker">' + escapeHTML(_crioSrc) + '</span><div style="font-size:9px;color:#94a3b8;">CU: ' + escapeHTML(_cuSrc) + '</div>';
+      }
+    } else if (_crioSrc) {
+      _srcCell = '<span style="color:#8b5cf6;">' + escapeHTML(_crioSrc) + '</span>';
+    } else if (_cuSrc) {
+      _srcCell = '<span style="color:#d97706;" title="No CRIO source — needs update">' + escapeHTML(_cuSrc) + ' <em style="font-size:9px;">⚠ not in CRIO</em></span>';
+    } else {
+      _srcCell = '<span style="color:#cbd5e1;">—</span>';
+    }
     html += `<tr>
       <td style="padding:5px 8px;"><a href="${escapeHTML(_nameUrl)}" target="_blank" style="${_nameStyle}">${maskPHI(r.name)}</a>${_crioMatch && _crioMatch.crio_url ? ' <a href="'+escapeHTML(r.url)+'" target="_blank" style="font-size:9px;color:#94a3b8;" title="ClickUp task">CU</a>' : ''}</td>
       <td style="padding:5px 8px;font-size:10px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHTML(r.study||'—')}</td>
       <td style="padding:5px 8px;text-align:center;"><span style="padding:2px 6px;border-radius:3px;font-size:10px;font-weight:600;background:${(STAGE_COLORS[r.stage]||'#94a3b8')}22;color:${STAGE_COLORS[r.stage]||'#94a3b8'}">${escapeHTML(r.stage)}</span></td>
       <td style="padding:5px 8px;text-align:center;">${crioStatusBadge(r.name, r.phone)}</td>
-      <td style="padding:5px 8px;font-size:10px;color:#8b5cf6;">${escapeHTML((window._crioRefSourceMap && window._crioRefSourceMap.get(nameKey)) || '—')}</td>
-      <td style="padding:5px 8px;font-size:10px;color:#475569;">${escapeHTML(r.source)}</td>
+      <td style="padding:5px 8px;font-size:10px;">${_srcCell}</td>
       <td style="padding:5px 8px;">${apptCell}</td>
       <td style="padding:5px 8px;text-align:center;font-weight:600;color:${staleColor};">${r.days_since_update}d</td>
     </tr>`;
