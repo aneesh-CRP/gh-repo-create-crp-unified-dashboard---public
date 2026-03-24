@@ -5800,7 +5800,17 @@ async function fetchPatientDB() {
       state: (r['State']||'').trim(),
     }));
     PATIENT_DB_MAP = new Map(PATIENT_DB.map(p => [p.name_lower, p]));
-    _log(`CRP: Patient DB loaded — ${PATIENT_DB.length} records`);
+    // Phone lookup map for cross-referencing referrals → CRIO
+    window._crioPhoneMap = new Map();
+    PATIENT_DB.forEach(function(p) {
+      var phones = [p.mobile, p.home_phone, p.work_phone].filter(Boolean);
+      phones.forEach(function(ph) {
+        var digits = ph.replace(/\D/g, '');
+        var norm = digits.length >= 10 ? digits.slice(-10) : '';
+        if (norm) window._crioPhoneMap.set(norm, p);
+      });
+    });
+    _log(`CRP: Patient DB loaded — ${PATIENT_DB.length} records, ${window._crioPhoneMap.size} phone entries`);
 
     // Run cross-reference against active patients
     crossReferencePatients();
@@ -8971,47 +8981,82 @@ async function refreshReferrals() {
   }
 }
 
-// CRIO subject lookup by name (fuzzy) — returns {status, study} or null
+// CRIO patient matching: phone (primary) → name (fallback)
+// Returns { name, status, study, patient_key, crio_url, match_type } or null
 var _crioSubjectMap = null;
-function getCrioSubjectStatus(patientName) {
-  if (!CRIO_SUBJECTS_DATA || CRIO_SUBJECTS_DATA.length === 0) return null;
+function _normPhone(p) { var d = (p||'').replace(/\D/g,''); return d.length >= 10 ? d.slice(-10) : ''; }
+
+function matchCrioPatient(refName, refPhone) {
+  // Try phone match first (most reliable)
+  if (window._crioPhoneMap && refPhone) {
+    var ph = _normPhone(refPhone);
+    if (ph) {
+      var byPhone = window._crioPhoneMap.get(ph);
+      if (byPhone) {
+        var pk = byPhone.record || '';
+        return { name: byPhone.name, status: byPhone.status, patient_key: pk,
+          crio_url: pk ? 'https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/patient/' + pk : '',
+          match_type: 'phone' };
+      }
+    }
+  }
+  // Try name match from patient DB
+  var nameKey = (refName || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  if (PATIENT_DB_MAP && nameKey) {
+    var byName = PATIENT_DB_MAP.get(nameKey);
+    if (byName) {
+      var pk2 = byName.record || '';
+      return { name: byName.name, status: byName.status, patient_key: pk2,
+        crio_url: pk2 ? 'https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/patient/' + pk2 : '',
+        match_type: 'name' };
+    }
+    // Partial name match
+    var parts = nameKey.split(' ');
+    if (parts.length >= 2) {
+      var first = parts[0], last = parts[parts.length - 1];
+      for (var [k, v] of PATIENT_DB_MAP) {
+        if (k.indexOf(first) !== -1 && k.indexOf(last) !== -1) {
+          var pk3 = v.record || '';
+          return { name: v.name, status: v.status, patient_key: pk3,
+            crio_url: pk3 ? 'https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/patient/' + pk3 : '',
+            match_type: 'partial_name' };
+        }
+      }
+    }
+  }
+  // Try visit/cancel data for status (no patient_key)
   if (!_crioSubjectMap) {
     _crioSubjectMap = {};
-    // Build lookup from visits (has full names) + subjects (has status)
-    // Use allVisitDetail for name→study mapping, then subjects for status
-    var subsByKey = {};
-    CRIO_SUBJECTS_DATA.forEach(function(s) { subsByKey[s.subject_id || s.subject_key] = s; });
-    // Also build from patient names in visit data
     (DATA.allVisitDetail || []).forEach(function(v) {
       var key = (v.patient || '').toLowerCase().replace(/\s+/g, ' ').trim();
       if (key && !_crioSubjectMap[key]) _crioSubjectMap[key] = { status: v.status || '', study: v.study || '' };
     });
-    // Enrich with CRIO subject statuses (more authoritative)
     (DATA.allCancels || []).forEach(function(c) {
       var key = (c.name || '').toLowerCase().replace(/\s+/g, ' ').trim();
       if (key && !_crioSubjectMap[key]) _crioSubjectMap[key] = { status: c.subject_status || '', study: c.study || '' };
     });
   }
-  var nameKey = (patientName || '').toLowerCase().replace(/\s+/g, ' ').trim();
-  if (_crioSubjectMap[nameKey]) return _crioSubjectMap[nameKey];
-  // Try partial match (first + last name)
-  var parts = nameKey.split(' ');
-  if (parts.length >= 2) {
-    var first = parts[0], last = parts[parts.length - 1];
-    for (var k in _crioSubjectMap) {
-      if (k.indexOf(first) !== -1 && k.indexOf(last) !== -1) return _crioSubjectMap[k];
-    }
+  if (_crioSubjectMap[nameKey]) {
+    return { name: refName, status: _crioSubjectMap[nameKey].status, study: _crioSubjectMap[nameKey].study,
+      crio_url: '', match_type: 'visit_data' };
   }
   return null;
 }
 
-function crioStatusBadge(patientName) {
-  var match = getCrioSubjectStatus(patientName);
-  if (!match) return '<span style="font-size:9px;color:#cbd5e1;">Not in CRIO</span>';
-  var st = match.status || '';
-  var colors = {'Enrolled':'#059669','Screening':'#8b5cf6','Prequalified':'#3b82f6','Scheduled V1':'#06b6d4','Screen Fail':'#dc2626','Discontinued':'#94a3b8','Completed':'#059669','Not Interested':'#94a3b8','Not Eligible':'#dc2626'};
+function getCrioSubjectStatus(patientName, phone) {
+  var m = matchCrioPatient(patientName, phone);
+  return m ? { status: m.status, study: m.study || '' } : null;
+}
+
+function crioStatusBadge(patientName, phone) {
+  var match = matchCrioPatient(patientName, phone);
+  if (!match) return '<span style="font-size:9px;color:#dc2626;font-weight:600;">Not in CRIO</span>';
+  var st = match.status || 'In DB';
+  var colors = {'Enrolled':'#059669','Screening':'#8b5cf6','Prequalified':'#3b82f6','Scheduled V1':'#06b6d4','Screen Fail':'#dc2626','Discontinued':'#94a3b8','Completed':'#059669','Not Interested':'#94a3b8','Not Eligible':'#dc2626','Available':'#3b82f6','Do Not Solicit':'#dc2626','Deceased':'#dc2626'};
   var c = colors[st] || '#64748b';
-  return '<span style="font-size:9px;font-weight:600;padding:1px 5px;border-radius:3px;background:'+c+'18;color:'+c+';">'+escapeHTML(st)+'</span>';
+  var link = match.crio_url ? '<a href="'+escapeHTML(match.crio_url)+'" target="_blank" style="text-decoration:none;color:'+c+';" title="Open in CRIO">' : '';
+  var linkEnd = match.crio_url ? '</a>' : '';
+  return link+'<span style="font-size:9px;font-weight:600;padding:1px 5px;border-radius:3px;background:'+c+'18;color:'+c+';">'+escapeHTML(st)+'</span>'+linkEnd;
 }
 
 function renderReferralDashboard() {
@@ -9159,7 +9204,7 @@ function renderReferralDashboard() {
           <div style="font-size:10px;color:#94a3b8;">${escapeHTML(r.study || 'No study')} · ${escapeHTML(r.tracker)} · ${escapeHTML(r.stage)}</div>
         </div>
         <div style="display:flex;gap:8px;align-items:center;">
-          ${crioStatusBadge(r.name)}
+          ${crioStatusBadge(r.name, r.phone)}
           <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:${urgency}22;color:${urgency};">${r.days_since_update}d ago</span>
         </div>
       </div>`;
@@ -9197,7 +9242,7 @@ function renderReferralDashboard() {
     const _dnq = (sc['DNQ']||0) + (sc['Screen Fail']||0);
     const _screening = (sc['Pre-Screening']||0) + (sc['Screening']||0);
     const _stale = tasks.filter(t => !t.is_closed && t.days_since_update >= 7 && t.date_created && new Date(t.date_created).getTime() >= _sixtyDaysAgoT).length;
-    const _inCrio = tasks.filter(t => getCrioSubjectStatus(t.name) !== null).length;
+    const _inCrio = tasks.filter(t => matchCrioPatient(t.name, t.phone) !== null).length;
     // Verify: total should = newLead + contacted + screening + enrolled + dnq + lost + other
     unifiedRows.push({
       name: name, type: 'Provider', total: tasks.length,
@@ -9687,7 +9732,7 @@ function showReferralDetailModal(filterFn, title, subtitle) {
       <td style="padding:5px 8px;"><a href="${escapeHTML(r.url)}" target="_blank" style="font-weight:600;color:#1e293b;text-decoration:none;">${maskPHI(r.name)}</a></td>
       <td style="padding:5px 8px;font-size:10px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHTML(r.study||'—')}</td>
       <td style="padding:5px 8px;text-align:center;"><span style="padding:2px 6px;border-radius:3px;font-size:10px;font-weight:600;background:${(STAGE_COLORS[r.stage]||'#94a3b8')}22;color:${STAGE_COLORS[r.stage]||'#94a3b8'}">${escapeHTML(r.stage)}</span></td>
-      <td style="padding:5px 8px;text-align:center;">${crioStatusBadge(r.name)}</td>
+      <td style="padding:5px 8px;text-align:center;">${crioStatusBadge(r.name, r.phone)}</td>
       <td style="padding:5px 8px;font-size:10px;color:#475569;">${escapeHTML(r.source)}</td>
       <td style="padding:5px 8px;">${apptCell}</td>
       <td style="padding:5px 8px;text-align:center;font-weight:600;color:${staleColor};">${r.days_since_update}d</td>
