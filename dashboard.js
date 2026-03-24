@@ -9029,14 +9029,14 @@ function renderReferralDashboard() {
   function sgCount(group) { var t=0; if(group) group.forEach(function(s){t+=(stageCounts[s]||0);}); return t; }
 
   const el = id => document.getElementById(id);
-  el('ref-kpi-leads').textContent = stageCounts['New Lead'] || 0;
-  el('ref-kpi-contact').textContent = stageCounts['Contacted'] || 0;
-  el('ref-kpi-screening').textContent = sgCount(SG.SCREENING);
-  el('ref-kpi-enrolled').textContent = sgCount(SG.ENROLLED);
-  const totalIn = all.length;
-  const totalEnrolled = sgCount(SG.ENROLLED);
-  el('ref-kpi-conversion').textContent = totalIn ? Math.round(totalEnrolled / totalIn * 100) + '%' : '—';
-  el('ref-total-badge').textContent = all.length + ' total referrals';
+  var _kpiEl = function(id,v){ var e=document.getElementById(id); if(e) e.textContent=v; };
+  _kpiEl('ref-kpi-total', all.length);
+  _kpiEl('ref-kpi-leads', stageCounts['New Lead'] || 0);
+  _kpiEl('ref-kpi-contact', stageCounts['Contacted'] || 0);
+  _kpiEl('ref-kpi-screening', sgCount(SG.SCREENING));
+  _kpiEl('ref-kpi-enrolled', sgCount(SG.ENROLLED));
+  _kpiEl('ref-kpi-dnq', (stageCounts['DNQ']||0) + (stageCounts['Screen Fail']||0));
+  _kpiEl('ref-total-badge', all.length + ' referrals · ' + Object.keys(trackerMap||{}).length + ' sources');
 
   // ── Pipeline Funnel ──
   const funnelEl = el('ref-funnel-chart');
@@ -9193,16 +9193,16 @@ function renderReferralDashboard() {
   Object.entries(trackerMap).sort((a,b) => b[1].length - a[1].length).forEach(([name, tasks]) => {
     const sc = {};
     tasks.forEach(t => { sc[t.stage] = (sc[t.stage] || 0) + 1; });
-    const _enrolled = Array.from(SG.ENROLLED||[]).reduce((s,st)=>s+(sc[st]||0),0);
+    const _enrolled = (sc['Enrolled']||0) + (sc['Screened']||0);
     const _dnq = (sc['DNQ']||0) + (sc['Screen Fail']||0);
-    const _lost = sc['Lost']||0;
     const _screening = (sc['Pre-Screening']||0) + (sc['Screening']||0);
     const _stale = tasks.filter(t => !t.is_closed && t.days_since_update >= 7 && t.date_created && new Date(t.date_created).getTime() >= _sixtyDaysAgoT).length;
     const _inCrio = tasks.filter(t => getCrioSubjectStatus(t.name) !== null).length;
+    // Verify: total should = newLead + contacted + screening + enrolled + dnq + lost + other
     unifiedRows.push({
       name: name, type: 'Provider', total: tasks.length,
       newLead: sc['New Lead']||0, contacted: sc['Contacted']||0,
-      screening: _screening, enrolled: _enrolled, dnq: _dnq, lost: _lost,
+      screening: _screening, enrolled: _enrolled, dnq: _dnq,
       stale: _stale, inCrio: _inCrio, clickId: name
     });
   });
@@ -9287,7 +9287,20 @@ function renderReferralDashboard() {
         <td style="text-align:center;color:${r.stale>0?'#d97706':'#cbd5e1'};font-weight:${r.stale>0?'700':'400'};">${r.stale||'—'}</td>
         <td style="text-align:center;color:${r.inCrio>0?'#8b5cf6':'#cbd5e1'};font-weight:${r.inCrio>0?'700':'400'};">${r.inCrio||'—'}${crioDetail}</td>
       </tr>`;
-    }).join('')}</tbody>
+    }).join('')}
+    <tr style="border-top:2px solid var(--border);background:var(--surface2);font-weight:700;">
+      <td style="padding:8px 12px;">TOTAL</td>
+      <td></td>
+      <td style="text-align:center;">${unifiedRows.reduce((s,r)=>s+r.total,0)}</td>
+      <td style="text-align:center;">${unifiedRows.reduce((s,r)=>s+r.newLead,0)}</td>
+      <td style="text-align:center;">${unifiedRows.reduce((s,r)=>s+r.contacted,0)}</td>
+      <td style="text-align:center;">${unifiedRows.reduce((s,r)=>s+r.screening,0)}</td>
+      <td style="text-align:center;color:#059669;">${unifiedRows.reduce((s,r)=>s+r.enrolled,0)}</td>
+      <td style="text-align:center;color:#dc2626;">${unifiedRows.reduce((s,r)=>s+r.dnq,0)}</td>
+      <td style="text-align:center;color:#d97706;">${unifiedRows.reduce((s,r)=>s+r.stale,0)||'—'}</td>
+      <td style="text-align:center;color:#8b5cf6;">${unifiedRows.reduce((s,r)=>s+r.inCrio,0)}</td>
+    </tr>
+    </tbody>
   </table>`;
 
   // ── Old campaigns section (now merged into unified table above) ──
