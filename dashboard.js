@@ -9116,7 +9116,26 @@ function renderReferralDashboard() {
     </div>`;
   }).join('');
 
-  funnelEl.innerHTML = funnelHtml + (closedHtml ? '<div style="margin-top:10px;padding-top:8px;border-top:1px solid #f1f5f9;"><div style="font-size:10px;color:#94a3b8;margin-bottom:4px;text-align:right;width:100px;display:inline-block;">Closed</div></div>' + closedHtml : '');
+  // Date range + timestamp
+  var _refDates = all.map(function(r){return r.date_created;}).filter(Boolean).sort();
+  var _refRange = _refDates.length > 0 ? _refDates[0] + ' — ' + _refDates[_refDates.length-1] : '';
+  var _refTimestamp = '<div style="font-size:9px;color:#94a3b8;margin-top:10px;text-align:right;">Data: ' + all.length + ' referrals · ' + _refRange + ' · Pulled ' + new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}) + '</div>';
+
+  // DNQ breakdown by study
+  var _dnqByStudy = {};
+  all.filter(function(r){return r.stage==='DNQ'||r.stage==='Screen Fail';}).forEach(function(r){
+    var s = r.study || 'Unknown'; _dnqByStudy[s] = (_dnqByStudy[s]||0)+1;
+  });
+  var _dnqEntries = Object.entries(_dnqByStudy).sort(function(a,b){return b[1]-a[1];});
+  var _dnqMax = _dnqEntries.length > 0 ? _dnqEntries[0][1] : 1;
+  var _dnqTotal = _dnqEntries.reduce(function(s,e){return s+e[1];},0);
+  var dnqHtml = _dnqEntries.length > 0 ? '<div style="margin-top:14px;padding-top:10px;border-top:1px solid #f1f5f9;"><div style="font-size:11px;font-weight:700;color:#dc2626;margin-bottom:6px;">DNQ / Screen Fail by Study ('+_dnqTotal+')</div>' +
+    _dnqEntries.slice(0,8).map(function(e) {
+      var pct = Math.round(e[1]/_dnqMax*100);
+      return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;cursor:pointer;" onclick="showReferralDetailModal(function(r){return (r.stage===\'DNQ\'||r.stage===\'Screen Fail\')&&(r.study||\'\').indexOf(\''+jsAttr(e[0])+'\')!==-1;},\'DNQ — '+escapeHTML(e[0])+'\')"><div style="width:100px;font-size:10px;text-align:right;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+escapeHTML(e[0])+'">'+escapeHTML(e[0])+'</div><div style="flex:1;background:#fef2f2;border-radius:3px;height:16px;overflow:hidden;"><div style="width:'+pct+'%;background:#dc2626;height:100%;border-radius:3px;display:flex;align-items:center;"><span style="font-size:9px;font-weight:700;color:#fff;padding-left:6px;">'+e[1]+'</span></div></div></div>';
+    }).join('') + '</div>' : '';
+
+  funnelEl.innerHTML = funnelHtml + (closedHtml ? '<div style="margin-top:10px;padding-top:8px;border-top:1px solid #f1f5f9;"><div style="font-size:10px;color:#94a3b8;margin-bottom:4px;text-align:right;width:100px;display:inline-block;">Closed</div></div>' + closedHtml : '') + dnqHtml + _refTimestamp;
 
   // ── Source Breakdown ──
   const sourceEl = el('ref-source-chart');
@@ -9184,7 +9203,7 @@ function renderReferralDashboard() {
   // ── Stale Leads (active, not updated in 7+ days, created within last 60 days) ──
   const staleEl = el('ref-stale-list');
   const staleBadge = el('ref-stale-badge');
-  const _sixtyDaysAgo = Date.now() - 60 * 86400000;
+  const _sixtyDaysAgo = Date.now() - 90 * 86400000;
   const staleLeads = active.filter(r => {
     if (r.days_since_update < 7) return false;
     // Only include leads created within last 60 days — older leads are unlikely to still be in play
@@ -9222,7 +9241,7 @@ function renderReferralDashboard() {
     if (!trackerMap[r.tracker]) trackerMap[r.tracker] = [];
     trackerMap[r.tracker].push(r);
   });
-  const _sixtyDaysAgoT = Date.now() - 60 * 86400000;
+  const _ninetyDaysAgoT = Date.now() - 90 * 86400000;
 
   // Build campaign rows (active only)
   const activeCampaigns = CAMPAIGN_DATA.filter(c =>
@@ -9241,7 +9260,7 @@ function renderReferralDashboard() {
     const _enrolled = (sc['Enrolled']||0) + (sc['Screened']||0);
     const _dnq = (sc['DNQ']||0) + (sc['Screen Fail']||0);
     const _screening = (sc['Pre-Screening']||0) + (sc['Screening']||0);
-    const _stale = tasks.filter(t => !t.is_closed && t.days_since_update >= 7 && t.date_created && new Date(t.date_created).getTime() >= _sixtyDaysAgoT).length;
+    const _stale = tasks.filter(t => !t.is_closed && t.days_since_update >= 7 && t.days_since_update <= 90 && t.date_created && new Date(t.date_created).getTime() >= _ninetyDaysAgoT).length;
     const _inCrio = tasks.filter(t => matchCrioPatient(t.name, t.phone) !== null).length;
     // Verify: total should = newLead + contacted + screening + enrolled + dnq + lost + other
     unifiedRows.push({
@@ -9281,8 +9300,9 @@ function renderReferralDashboard() {
         });
       }
     }
+    var _campName = c.study + (c.vendor && c.vendor !== c.study ? ' / ' + c.vendor : '');
     unifiedRows.push({
-      name: c.study, type: c.vendor, total: c.first_contact + c.second_contact + c.third_contact,
+      name: _campName, type: 'Campaign', total: c.first_contact + c.second_contact + c.third_contact,
       newLead: c.new_referrals, contacted: c.first_contact, screening: _screening,
       enrolled: _enrolled, dnq: _dnq, lost: 0, stale: 0,
       inCrio: crioEnr + crioScr, crioEnrolled: crioEnr, crioScreening: crioScr,
