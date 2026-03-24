@@ -1452,15 +1452,19 @@ body {
   <!-- Referral Dashboard -->
   <div id="referral-dashboard" style="display:none;">
 
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-      <span class="card-title">📊 Referral Pipeline</span>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <span class="card-title" style="font-size:16px;">Referrals & Recruitment</span>
       <div style="display:flex;gap:8px;align-items:center;">
         <span class="data-badge" id="ref-status-badge" style="font-size:10px;">Loading...</span>
-        <button onclick="refreshReferrals()" style="padding:4px 12px;background:#e8eeff;color:#1843ad;border:1px solid #1843ad;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">↻ Refresh</button>
+        <button onclick="refreshReferrals()" style="padding:3px 10px;background:#e8eeff;color:#1843ad;border:1px solid #1843ad;border-radius:5px;font-size:10px;font-weight:600;cursor:pointer;">↻ Refresh</button>
       </div>
     </div>
 
-    <!-- Pipeline KPI Banner -->
+    <!-- ═══ SECTION 1: PROVIDER REFERRAL PIPELINE ═══ -->
+    <div class="section-title" style="margin-top:0;margin-bottom:8px;">Provider Referral Pipeline</div>
+    <div style="font-size:10px;color:#94a3b8;margin-bottom:12px;">Physician referrals + recruitment campaigns tracked in ClickUp · patients manually entered into CRIO after contact</div>
+
+    <!-- Pipeline KPIs -->
     <div class="time-banner fade-in" style="margin-bottom:16px;">
       <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showReferralDetailModal(function(){return true;},'All Referrals')">
         <div class="tb-label">Total</div>
@@ -1499,34 +1503,31 @@ body {
       </div>
     </div>
 
-    <!-- Pipeline Funnel -->
+    <!-- Pipeline Funnel + DNQ Breakdown -->
     <div class="card fade-in" style="margin-bottom:16px;">
       <div class="card-header">
         <span class="card-title">Pipeline Funnel</span>
         <span class="badge badge-blue" id="ref-total-badge">—</span>
       </div>
-      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">All referrals by stage · from ClickUp provider trackers (10 sources) · click stage for patient detail</div>
       <div style="padding:12px 16px;" id="ref-funnel-chart">
         <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Loading pipeline...</div>
       </div>
     </div>
 
-    <!-- All Referral Sources (providers + campaigns unified) -->
+    <!-- All Referral Sources -->
     <div class="card fade-in" style="margin-bottom:16px;">
       <div class="card-header">
-        <span class="card-title">All Referral Sources</span>
+        <span class="card-title">Referral Sources</span>
         <span class="badge badge-blue" id="ref-camp-badge">Loading...</span>
       </div>
-      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Provider trackers + active campaigns in one view · pipeline stages, DNQ, CRIO status · click for patient detail</div>
+      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Providers + campaigns · pipeline stages, CRIO match, needs entry flag · click row for patients</div>
       <div style="padding:0;" id="ref-tracker-detail">
         <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Loading referral sources...</div>
       </div>
     </div>
 
-    <!-- Hidden compat container -->
+    <!-- Hidden compat containers -->
     <div style="display:none" id="ref-campaigns-table"></div>
-
-    <!-- Hidden containers for removed sections (JS still renders to these) -->
     <div style="display:none" id="ref-source-chart"></div>
     <div style="display:none" id="ref-study-table"></div>
     <div style="display:none" id="ref-stale-list"></div>
@@ -1534,20 +1535,24 @@ body {
     <div style="display:none" id="contact-sequence-container"></div>
     <div style="display:none" id="ref-conversion-container"></div>
 
-    <!-- Facebook / Meta Lead Referrals -->
+    <!-- ═══ SECTION 2: DIGITAL MARKETING PIPELINE ═══ -->
+    <div class="section-title" style="margin-top:24px;margin-bottom:8px;">Digital Marketing Pipeline</div>
+    <div style="font-size:10px;color:#94a3b8;margin-bottom:12px;">Meta/Facebook ad leads flow directly into CRIO · tracked via Meta Marketing API + Facebook CRM sheet</div>
+
+    <!-- FB CRM Leads -->
     <div class="card fade-in" style="margin-bottom:16px;">
       <div class="card-header">
-        <span class="card-title">📘 Facebook / Meta Lead Referrals</span>
+        <span class="card-title">Facebook Lead Referrals</span>
         <span class="badge badge-blue" id="ref-fb-badge">Loading...</span>
       </div>
-      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Facebook CRM leads from Google Sheets · status distribution and campaign breakdown</div>
+      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Leads from Facebook forms · status distribution and campaign breakdown</div>
       <div style="padding:0;" id="ref-fb-table">
-        <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Fetching Facebook CRM data...</div>
+        <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Loading Facebook leads...</div>
       </div>
     </div>
 
-    <!-- ═══ Marketing Intelligence (Meta Ads API — live) ═══ -->
-    <div class="section-title" style="margin-top:16px;">📈 Meta Marketing Intelligence</div>
+    <!-- Meta Campaign Performance -->
+    <div class="section-title" style="margin-top:16px;margin-bottom:8px;">Meta Ad Performance (last 30 days)</div>
 
     <div class="card fade-in" style="margin-bottom:16px;">
       <div class="card-header">
