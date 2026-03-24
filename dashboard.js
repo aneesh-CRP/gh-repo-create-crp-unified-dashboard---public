@@ -9429,9 +9429,10 @@ function renderReferralDashboard() {
   const campBadge = el('ref-camp-badge');
   _crioSubjectMap = null; // Reset CRIO cache
 
-  // Build provider tracker rows
+  // Build provider tracker rows (skip referrals with blank tracker name)
   const trackerMap = {};
   all.forEach(r => {
+    if (!r.tracker) return;
     if (!trackerMap[r.tracker]) trackerMap[r.tracker] = [];
     trackerMap[r.tracker].push(r);
   });
