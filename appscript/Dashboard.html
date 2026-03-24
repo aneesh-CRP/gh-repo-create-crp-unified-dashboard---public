@@ -1884,6 +1884,19 @@ body {
       </div>
     </div>
 
+    <!-- Coordinator Cancel Breakdown by Type -->
+    <div class="card fade-in">
+      <div class="card-header">
+        <span class="card-title">Coordinator Cancel Breakdown</span>
+        <span class="badge badge-gray" id="coord-cancel-type-badge">No Show / Site / Patient</span>
+      </div>
+      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Cancellation type distribution per coordinator — stacked by No Show, Site Cancelled, Patient Cancelled</div>
+      <div class="chart-wrap h220">
+        <canvas id="coordCancelTypeChart"></canvas>
+      </div>
+      <div id="coord-cancel-type-table" style="padding:0;"></div>
+    </div>
+
     <!-- Master sheet connection panel -->
     <div class="card fade-in">
       <div class="card-header">

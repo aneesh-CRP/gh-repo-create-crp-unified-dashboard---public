@@ -1884,6 +1884,19 @@ body {
       </div>
     </div>
 
+    <!-- Coordinator Cancel Breakdown by Type -->
+    <div class="card fade-in">
+      <div class="card-header">
+        <span class="card-title">Coordinator Cancel Breakdown</span>
+        <span class="badge badge-gray" id="coord-cancel-type-badge">No Show / Site / Patient</span>
+      </div>
+      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Cancellation type distribution per coordinator — stacked by No Show, Site Cancelled, Patient Cancelled</div>
+      <div class="chart-wrap h220">
+        <canvas id="coordCancelTypeChart"></canvas>
+      </div>
+      <div id="coord-cancel-type-table" style="padding:0;"></div>
+    </div>
+
     <!-- Master sheet connection panel -->
     <div class="card fade-in">
       <div class="card-header">
@@ -5625,6 +5638,109 @@ function renderCoordWorkloadBalance() {
   html += '</table>';
 
   el.innerHTML = html;
+}
+
+// ═══ COORDINATOR CANCEL BREAKDOWN BY TYPE (No Show / Site / Patient) ═══
+function renderCoordCancelTypeChart() {
+  var canvas = document.getElementById('coordCancelTypeChart');
+  var tableEl = document.getElementById('coord-cancel-type-table');
+  var badge = document.getElementById('coord-cancel-type-badge');
+  if (!canvas || !DATA.allCancels || DATA.allCancels.length === 0) return;
+
+  var COORDS = CRP_CONFIG.COORDINATORS || [];
+  if (COORDS.length === 0) return;
+
+  var noShowData = [], siteCxData = [], patCxData = [], otherData = [];
+  var coordStats = [];
+
+  COORDS.forEach(function(name) {
+    var cx = DATA.allCancels.filter(function(c) { return c.coord === name; });
+    var ns = cx.filter(function(c) { return c.type === 'No Show'; }).length;
+    var sc = cx.filter(function(c) { return c.type === 'Site Cancelled'; }).length;
+    var pc = cx.filter(function(c) { return c.type === 'Patient Cancelled'; }).length;
+    var ot = cx.length - ns - sc - pc;
+    noShowData.push(ns);
+    siteCxData.push(sc);
+    patCxData.push(pc);
+    otherData.push(ot);
+    coordStats.push({ name: name, total: cx.length, noShow: ns, site: sc, patient: pc, other: ot });
+  });
+
+  // Sort by total cancels descending for the table
+  var sorted = coordStats.slice().sort(function(a, b) { return b.total - a.total; });
+  var totalAll = sorted.reduce(function(s, r) { return s + r.total; }, 0);
+  var totalNS = sorted.reduce(function(s, r) { return s + r.noShow; }, 0);
+  var totalSC = sorted.reduce(function(s, r) { return s + r.site; }, 0);
+  var totalPC = sorted.reduce(function(s, r) { return s + r.patient; }, 0);
+
+  if (badge) badge.textContent = totalNS + ' no show · ' + totalSC + ' site · ' + totalPC + ' patient';
+
+  // Chart — use all coordinators sorted by total
+  var chartOrder = sorted.map(function(r) { return r.name; });
+  mkChart('coordCancelTypeChart', {
+    type: 'bar',
+    data: {
+      labels: chartOrder.map(function(n) { return n.split(' ')[0]; }),
+      datasets: [
+        { label: 'No Show', data: chartOrder.map(function(n) { var s = coordStats.find(function(r) { return r.name === n; }); return s ? s.noShow : 0; }), backgroundColor: '#dc2626', borderRadius: 3 },
+        { label: 'Site Cancelled', data: chartOrder.map(function(n) { var s = coordStats.find(function(r) { return r.name === n; }); return s ? s.site : 0; }), backgroundColor: '#1843ad', borderRadius: 3 },
+        { label: 'Patient Cancelled', data: chartOrder.map(function(n) { var s = coordStats.find(function(r) { return r.name === n; }); return s ? s.patient : 0; }), backgroundColor: '#c2410c', borderRadius: 3 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10, family: 'IBM Plex Sans' } } },
+        tooltip: { callbacks: { label: function(ctx) { return ctx.dataset.label + ': ' + ctx.raw; } } }
+      },
+      scales: {
+        x: { type: 'category', stacked: true, ticks: { font: { size: 10 } } },
+        y: { type: 'linear', stacked: true, beginAtZero: true, ticks: { font: { size: 10 }, stepSize: 1 } }
+      }
+    }
+  });
+
+  // Detail table below chart
+  if (tableEl) {
+    var h = '<table class="fin-table" style="width:100%;font-size:11px;"><thead><tr>';
+    h += '<th style="text-align:left;padding:8px 12px;">Coordinator</th>';
+    h += '<th style="text-align:center;">Total</th>';
+    h += '<th style="text-align:center;color:#dc2626;">No Show</th>';
+    h += '<th style="text-align:center;color:#1843ad;">Site</th>';
+    h += '<th style="text-align:center;color:#c2410c;">Patient</th>';
+    h += '<th style="text-align:center;min-width:120px;">Breakdown</th>';
+    h += '</tr></thead><tbody>';
+    sorted.forEach(function(r) {
+      if (r.total === 0) return;
+      var nsPct = r.total > 0 ? Math.round(r.noShow / r.total * 100) : 0;
+      var scPct = r.total > 0 ? Math.round(r.site / r.total * 100) : 0;
+      var pcPct = r.total > 0 ? Math.round(r.patient / r.total * 100) : 0;
+      h += '<tr style="border-bottom:1px solid #f1f5f9;cursor:pointer" onclick="showCoordDetail(\'' + jsAttr(r.name) + '\')">';
+      h += '<td style="padding:7px 12px;font-weight:600;">' + escapeHTML(r.name.split(' ')[0]) + '</td>';
+      h += '<td style="text-align:center;font-weight:700;">' + r.total + '</td>';
+      h += '<td style="text-align:center;color:#dc2626;font-weight:' + (r.noShow > 0 ? '700' : '400') + ';">' + (r.noShow || '—') + '</td>';
+      h += '<td style="text-align:center;color:#1843ad;font-weight:' + (r.site > 0 ? '700' : '400') + ';">' + (r.site || '—') + '</td>';
+      h += '<td style="text-align:center;color:#c2410c;font-weight:' + (r.patient > 0 ? '700' : '400') + ';">' + (r.patient || '—') + '</td>';
+      // Stacked bar
+      h += '<td style="padding:4px 8px;"><div style="display:flex;gap:1px;height:14px;border-radius:3px;overflow:hidden;">';
+      if (nsPct > 0) h += '<div style="width:' + nsPct + '%;background:#dc2626;" title="No Show ' + nsPct + '%"></div>';
+      if (scPct > 0) h += '<div style="width:' + scPct + '%;background:#1843ad;" title="Site ' + scPct + '%"></div>';
+      if (pcPct > 0) h += '<div style="width:' + pcPct + '%;background:#c2410c;" title="Patient ' + pcPct + '%"></div>';
+      var remPct = 100 - nsPct - scPct - pcPct;
+      if (remPct > 0) h += '<div style="width:' + remPct + '%;background:#e2e8f0;" title="Other"></div>';
+      h += '</div></td>';
+      h += '</tr>';
+    });
+    // Total row
+    h += '<tr style="border-top:2px solid var(--border);background:var(--surface2);font-weight:700;">';
+    h += '<td style="padding:8px 12px;">TOTAL</td>';
+    h += '<td style="text-align:center;">' + totalAll + '</td>';
+    h += '<td style="text-align:center;color:#dc2626;">' + totalNS + '</td>';
+    h += '<td style="text-align:center;color:#1843ad;">' + totalSC + '</td>';
+    h += '<td style="text-align:center;color:#c2410c;">' + totalPC + '</td>';
+    h += '<td></td></tr>';
+    h += '</tbody></table>';
+    tableEl.innerHTML = h;
+  }
 }
 
 function renderInvCapacity() {
@@ -10078,6 +10194,7 @@ function renderAll() {
   safe(buildSiteStackedBars, 'buildSiteStackedBars');
   safe(renderCoordinatorGoals, 'renderCoordinatorGoals');
   safe(renderCoordWorkloadBalance, 'renderCoordWorkloadBalance');
+  safe(renderCoordCancelTypeChart, 'renderCoordCancelTypeChart');
   safe(renderInvCapacity, 'renderInvCapacity');
   safe(renderRecruiterPerformance, 'renderRecruiterPerformance');
   safe(buildActionSteps,     'buildActionSteps');
@@ -15526,8 +15643,9 @@ function switchAdmin(section, btn) {
     b.style.background = 'var(--surface)'; b.style.color = 'var(--muted)'; b.style.borderColor = 'var(--border)';
   });
   if (btn) { btn.style.background = '#e8eeff'; btn.style.color = '#1843ad'; btn.style.borderColor = '#1843ad'; }
-  if (section === 'trends' && typeof renderTrendsCharts === 'function') {
-    try { renderTrendsCharts(); } catch(e) { _log('renderTrendsCharts: ' + e.message); }
+  if (section === 'trends') {
+    if (typeof renderTrendsCharts === 'function') { try { renderTrendsCharts(); } catch(e) { _log('renderTrendsCharts: ' + e.message); } }
+    if (typeof renderCoordCancelTypeChart === 'function') { try { renderCoordCancelTypeChart(); } catch(e) { _log('renderCoordCancelTypeChart: ' + e.message); } }
   }
   if (section === 'auditlog') renderAuditLogView();
 }
