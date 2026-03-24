@@ -9481,28 +9481,39 @@ function renderReferralDashboard() {
     var _pipelineEnrolled = Array.from(SG.ENROLLED||[]).reduce((s,st)=>s+(msc[st]||0),0);
     const _dnq = (msc['DNQ']||0) + (msc['Screen Fail']||0);
     var _pipelineScreening = (msc['Pre-Screening']||0) + (msc['Screening']||0);
-    // CRIO cross-ref — use as primary source for screening/enrolled since
-    // campaign leads often go directly to CRIO without ClickUp pipeline tracking
-    var crioEnr = 0, crioScr = 0;
-    if (CRIO_SUBJECTS_DATA && CRIO_STUDIES_DATA) {
-      var _resolvedProtos = resolveCampaignProtocols(sn);
-      // Find all matching CRIO studies (may span multiple protocols)
-      var _matchedCrioStudies = CRIO_STUDIES_DATA.filter(function(cs) {
-        var pn = (cs.protocol_number||'').toLowerCase();
-        if (pn.length < 4) return false;
-        if (_resolvedProtos.some(function(rp) { return pn === rp || pn.indexOf(rp) !== -1; })) return true;
-        return pn.indexOf(sn) !== -1 || sn.indexOf(pn) !== -1;
-      });
-      _matchedCrioStudies.forEach(function(crioStudy) {
-        CRIO_SUBJECTS_DATA.forEach(function(sub) {
-          if (String(sub.study_key) !== String(crioStudy.study_key)) return;
-          var st = (sub.status||'').toUpperCase();
-          if (st === 'ENROLLED') crioEnr++;
-          if (st === 'SCREENING' || st === 'SCHEDULED_V1') crioScr++;
-        });
+    // CRIO cross-ref — filter by referral source from BQ recruiting data
+    // so campaign rows only count patients whose CRIO source matches the vendor
+    var crioEnr = 0, crioScr = 0, crioTotal = 0;
+    var _resolvedProtos = resolveCampaignProtocols(sn);
+    // Map campaign vendor to CRIO referral source names
+    var _vendorLower = (c.vendor||'').toLowerCase();
+    var _vendorSourceMap = {
+      'facebook': ['delfa','facebook','meta'],
+      'subjectwell': ['subjectwell'],
+      'study teams': ['study team','study teams','trial partners'],
+      'study max': ['study max'],
+      'studykik': ['studykik'],
+      'iconnect': ['iconnect'],
+      'gardinia - clinlife': ['clinlife','gardinia']
+    };
+    var _vendorSources = _vendorSourceMap[_vendorLower] || [_vendorLower];
+    if (window._recruitingData && window._recruitingData.length > 0 && _resolvedProtos.length > 0) {
+      // Use BQ recruiting data: filter by study protocol AND referral source
+      window._recruitingData.forEach(function(rec) {
+        var studyName = (rec.study_name||'').toLowerCase();
+        var matchesStudy = _resolvedProtos.some(function(p) { return studyName.indexOf(p) !== -1; }) || studyName.indexOf(sn) !== -1;
+        if (!matchesStudy) return;
+        var src = (rec.referral_source||'').toLowerCase();
+        var matchesVendor = _vendorSources.some(function(vs) { return src.indexOf(vs) !== -1 || vs.indexOf(src) !== -1; });
+        if (!matchesVendor && src) return; // has a source but doesn't match this vendor
+        if (!matchesVendor && !src) return; // no source at all — can't attribute
+        crioTotal++;
+        var st = (rec.recruiting_status||'').toLowerCase();
+        if (st === 'success') crioEnr++;
+        if (st === 'screening' || st === 'interested') crioScr++;
       });
     }
-    // Use whichever source has higher counts (CRIO is authoritative for campaigns)
+    // Use recruiting data counts (vendor-filtered) as primary, pipeline as fallback
     var _enrolled = Math.max(_pipelineEnrolled, crioEnr);
     var _screening = Math.max(_pipelineScreening, crioScr);
     var _vendorPrefix = {'facebook':'Meta','subjectwell':'SW','study teams':'ST','study max':'SM','studykik':'SK','iconnect':'IC','gardinia - clinlife':'CL'};
@@ -9512,7 +9523,7 @@ function renderReferralDashboard() {
       name: _campName, type: 'Campaign', total: c.first_contact + c.second_contact + c.third_contact,
       newLead: c.new_referrals, contacted: c.first_contact, screening: _screening,
       enrolled: _enrolled, dnq: _dnq, lost: 0, stale: 0,
-      inCrio: crioEnr + crioScr, crioEnrolled: crioEnr, crioScreening: crioScr,
+      inCrio: crioTotal || (crioEnr + crioScr), crioEnrolled: crioEnr, crioScreening: crioScr,
       needsEntry: 0, clickId: null, isCampaign: true, url: c.url
     });
   });
