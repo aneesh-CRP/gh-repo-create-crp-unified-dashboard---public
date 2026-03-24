@@ -1494,7 +1494,7 @@ function togglePHIMask() {
   PHI_MASKED = !PHI_MASKED;
   var btn = document.getElementById('phi-toggle-btn');
   if (btn) {
-    btn.innerHTML = PHI_MASKED ? '&#x1f512; PHI Masked' : '&#x1f513; PHI Visible';
+    btn.innerHTML = PHI_MASKED ? '&#x1f512; PHI' : '&#x1f513; PHI';
     btn.title = PHI_MASKED ? 'Click to reveal patient names' : 'Click to mask patient names';
     btn.style.background = PHI_MASKED ? '#059669' : '#dc2626';
   }

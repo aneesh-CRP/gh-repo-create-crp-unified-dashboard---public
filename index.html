@@ -336,7 +336,7 @@ body {
 .nav-sub { font-size: 11px; color: var(--muted); }
 .nav-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .nav-tab {
-  padding: 5px 10px; border-radius: 6px; font-size: 12px; font-weight: 500;
+  padding: 4px 8px; border-radius: 5px; font-size: 11px; font-weight: 500;
   cursor: pointer; color: var(--muted); transition: all 0.15s;
   border: 1px solid transparent; white-space: nowrap;
 }
@@ -1045,35 +1045,35 @@ body {
     </g>
   </g>
 </svg></div>
-    <div class="nav-title" style="color:#072061;font-weight:700;font-size:14px;white-space:nowrap;">CRP <span style="color:#ff9933;">Intelligence</span></div>
+    <div class="nav-title" style="color:#072061;font-weight:700;font-size:13px;white-space:nowrap;">CRP</div>
   </div>
   <button class="nav-hamburger" onclick="document.getElementById('nav-tabs-wrap').classList.toggle('open')" aria-label="Toggle navigation">☰</button>
   <div id="nav-tabs-wrap" class="nav-tabs-wrapper">
     <span class="nav-tab active" onclick="switchTab('overview', this)" role="tab" aria-selected="true">Overview</span>
     <span class="nav-tab" onclick="switchTab('studies', this)" role="tab">Studies</span>
     <span class="nav-tab" onclick="switchTab('referrals', this)" role="tab">Referrals</span>
-    <span class="nav-tab" onclick="switchTab('actions', this)" role="tab">Action Plan</span>
+    <span class="nav-tab" onclick="switchTab('actions', this)" role="tab">Actions</span>
     <span class="nav-tab" onclick="switchTab('admin', this)" role="tab">🔒 Admin</span>
-    <span style="width:1px;background:#CBD5E0;margin:8px 3px"></span>
+    <span style="width:1px;background:#CBD5E0;margin:8px 2px"></span>
     <span class="nav-tab fin-tab" onclick="switchTab('fin-overview',this)" role="tab">🔒 Finance</span>
-    <span class="nav-tab fin-tab" onclick="switchTab('fin-collections',this)">🔒 Collections</span>
-    <span class="nav-tab fin-tab" onclick="switchTab('fin-aging',this)">🔒 Aging AR</span>
+    <span class="nav-tab fin-tab" onclick="switchTab('fin-collections',this)">🔒 Collect</span>
+    <span class="nav-tab fin-tab" onclick="switchTab('fin-aging',this)">🔒 Aging</span>
     <span class="nav-tab fin-tab" onclick="switchTab('fin-revenue',this)">🔒 Billing</span>
-    <span class="nav-tab fin-tab" onclick="switchTab('fin-qb',this)">🔒 CRIO vs QB</span>
-    <span style="width:1px;background:#CBD5E0;margin:8px 3px"></span>
+    <span class="nav-tab fin-tab" onclick="switchTab('fin-qb',this)">🔒 QB</span>
+    <span style="width:1px;background:#CBD5E0;margin:8px 2px"></span>
     <span class="nav-tab fin-tab" onclick="switchTab('insights',this)" role="tab">🔒 Insights</span>
   </div>
-  <div class="nav-right" style="margin-left:auto;">
-    <div id="search-container" style="position:relative;">
-      <input type="text" id="global-search" placeholder="Search..." autocomplete="off" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:11px;width:130px;background:var(--surface);color:var(--text);">
+  <div class="nav-right" style="margin-left:auto;gap:4px;">
+    <span class="data-badge" id="last-refresh-badge" style="font-size:10px;padding:2px 6px;">Loading...</span>
+    <button id="theme-toggle-btn" onclick="toggleDarkMode()" title="Toggle dark mode" style="padding:2px 6px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;font-size:12px;cursor:pointer;line-height:1;">🌙</button>
+    <button id="phi-toggle-btn" onclick="togglePHIMask()" title="Click to reveal patient names" style="padding:2px 6px;background:#059669;color:white;border:none;border-radius:4px;font-size:9px;font-weight:600;cursor:pointer;">&#x1f512; PHI</button>
+    <button id="dh-toggle-btn" onclick="toggleHealthStrip()" title="Data health status" style="padding:2px 6px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;font-size:9px;font-weight:600;cursor:pointer;color:var(--muted);display:none;">Health</button>
+    <button class="refresh-btn" id="refresh-btn" onclick="manualRefresh()" style="padding:2px 8px;font-size:10px;">↻</button>
+    <span class="data-badge" id="data-source-badge" style="display:none;"></span>
+    <div id="search-container" style="position:relative;display:none;">
+      <input type="text" id="global-search" placeholder="Search..." autocomplete="off" style="padding:3px 6px;border:1px solid var(--border);border-radius:4px;font-size:10px;width:90px;background:var(--surface);color:var(--text);">
       <div id="search-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:6px;margin-top:4px;max-height:300px;overflow-y:auto;z-index:1000;box-shadow:0 4px 12px rgba(0,0,0,0.15);font-size:12px;"></div>
     </div>
-    <span class="data-badge" id="data-source-badge" style="display:none;"></span>
-    <span class="data-badge" id="last-refresh-badge">Loading live data...</span>
-    <button id="theme-toggle-btn" onclick="toggleDarkMode()" title="Toggle dark mode" style="padding:4px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;font-size:13px;cursor:pointer;line-height:1;">🌙</button>
-    <button id="phi-toggle-btn" onclick="togglePHIMask()" title="Click to reveal patient names" style="padding:4px 10px;background:#059669;color:white;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;letter-spacing:0.3px;">&#x1f512; PHI Masked</button>
-    <button id="dh-toggle-btn" onclick="toggleHealthStrip()" title="Data health status" style="padding:4px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;color:var(--muted);display:none;" aria-label="Toggle data health">⏳ Health</button>
-    <button class="refresh-btn" id="refresh-btn" onclick="manualRefresh()">&#x21bb; Refresh</button>
   </div>
 </nav>
 <div id="fallback-banner" style="display:none;background:#fef2f2;border-bottom:2px solid #fecaca;padding:6px 16px;font-size:12px;color:#991b1b;text-align:center;font-weight:600;">⚠ Showing sample data — live data unavailable. <button onclick="manualRefresh()" style="background:#dc2626;color:white;border:none;border-radius:4px;padding:2px 10px;font-size:11px;cursor:pointer;margin-left:8px;">Retry</button></div>
@@ -3463,7 +3463,7 @@ function togglePHIMask() {
   PHI_MASKED = !PHI_MASKED;
   var btn = document.getElementById('phi-toggle-btn');
   if (btn) {
-    btn.innerHTML = PHI_MASKED ? '&#x1f512; PHI Masked' : '&#x1f513; PHI Visible';
+    btn.innerHTML = PHI_MASKED ? '&#x1f512; PHI' : '&#x1f513; PHI';
     btn.title = PHI_MASKED ? 'Click to reveal patient names' : 'Click to mask patient names';
     btn.style.background = PHI_MASKED ? '#059669' : '#dc2626';
   }
