@@ -1685,7 +1685,20 @@ body {
     </div>
   </div>
 
-  <!-- 5. PATIENT CONTACT QUALITY -->
+  <!-- 5. CRIO RECONCILIATION -->
+  <div class="section-title" style="margin-top:16px;margin-bottom:10px;">🔄 CRIO Reconciliation</div>
+  <div class="card fade-in" style="margin-bottom:16px;">
+    <div class="card-header">
+      <span class="card-title">Referrals Needing CRIO Entry</span>
+      <span class="badge badge-red" id="crio-recon-badge">—</span>
+    </div>
+    <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Patients at Pre-Screening or later in ClickUp but not found in CRIO patient database · match by phone + name</div>
+    <div id="crio-recon-container" style="padding:12px;">
+      <div style="text-align:center;padding:20px;color:var(--muted);font-size:12px;">Loading reconciliation data...</div>
+    </div>
+  </div>
+
+  <!-- 6. PATIENT CONTACT QUALITY -->
   <div class="section-title" style="margin-top:16px;margin-bottom:10px;">📇 Patient Contact Quality</div>
   <div class="time-banner fade-in" style="margin-bottom:16px;">
     <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showContactAlerts('red')">
@@ -10938,6 +10951,7 @@ async function refreshReferrals() {
     // Refresh cross-source KPIs now that referral data is loaded
     safe(buildRecruitmentKPIs, 'buildRecruitmentKPIs');
     safe(buildInsights, 'buildInsights');
+    safe(renderCrioReconciliation, 'renderCrioReconciliation');
     if (typeof renderStudiesTable === 'function') try { renderStudiesTable(); } catch(e) { _log('renderStudiesTable: ' + e.message); }
     // Re-render cross-source marketing intelligence (Meta data may already be loaded)
     safe(renderEnrollmentVelocity, 'renderEnrollmentVelocity');
@@ -11349,9 +11363,11 @@ function renderReferralDashboard() {
     <tbody>${unifiedRows.map(r => {
       const tc = typeColors[r.type.toLowerCase()] || typeColors[r.type] || '#64748b';
       const tn = r.clickId ? jsAttr(r.clickId) : '';
+      var _campSafe = r.isCampaign ? jsAttr(r.name) : '';
       function _td(count, label, style) {
         if (!count) return '<td style="text-align:center;color:#cbd5e1;">—</td>';
         if (r.clickId) return '<td style="text-align:center;cursor:pointer;' + (style||'') + '" onclick="showTrackerStageDetail(\'' + tn + '\',\'' + (label||'all') + '\')">' + count + '</td>';
+        if (r.isCampaign) return '<td style="text-align:center;cursor:pointer;' + (style||'') + '" onclick="showCampaignStudyDetail(\'' + _campSafe + '\')">' + count + '</td>';
         return '<td style="text-align:center;' + (style||'') + '">' + count + '</td>';
       }
       const nameHtml = r.url ? '<a href="'+escapeHTML(r.url)+'" target="_blank" style="color:#1e293b;text-decoration:none;font-weight:600;">'+escapeHTML(r.name)+'</a>' : '<span style="font-weight:600;">'+escapeHTML(r.name)+'</span>';
@@ -11730,6 +11746,50 @@ function showCampaignDetailModal(studyName) {
 }
 
 // ── Tracker + Stage detail popup (from Physician Tracker table) ──
+function renderCrioReconciliation() {
+  var el = document.getElementById('crio-recon-container');
+  var badge = document.getElementById('crio-recon-badge');
+  if (!el || !REFERRAL_DATA || REFERRAL_DATA.length === 0) return;
+
+  var advanced = new Set(['Pre-Screening','Screening','Screened','Enrolled']);
+  var needsEntry = REFERRAL_DATA.filter(function(r) {
+    if (r.is_closed === 'TRUE' || r.is_closed === true) return false;
+    if (!advanced.has(r.stage)) return false;
+    if (r.tracker === 'Prohealth Associates') return false;
+    return matchCrioPatient(r.name, r.phone) === null;
+  });
+
+  if (badge) badge.textContent = needsEntry.length > 0 ? needsEntry.length + ' patients' : 'All clear';
+
+  if (needsEntry.length === 0) {
+    el.innerHTML = '<div style="text-align:center;padding:20px;color:#059669;font-size:13px;">All active referrals at Pre-Screening+ are matched in CRIO</div>';
+    return;
+  }
+
+  var html = '<table class="detail-table" style="width:100%;font-size:11px;"><thead><tr><th>Patient</th><th>Tracker</th><th>Study</th><th>Stage</th><th>Phone</th><th>Days in Stage</th></tr></thead><tbody>';
+  needsEntry.forEach(function(r) {
+    html += '<tr><td style="padding:5px 8px;font-weight:600;"><a href="' + escapeHTML(r.url) + '" target="_blank" style="color:#1e293b;text-decoration:none;">' + maskPHI(r.name) + '</a></td>';
+    html += '<td style="padding:5px 8px;font-size:10px;">' + escapeHTML(r.tracker) + '</td>';
+    html += '<td style="padding:5px 8px;font-size:10px;">' + escapeHTML(r.study || '—') + '</td>';
+    html += '<td style="padding:5px 8px;text-align:center;"><span style="padding:2px 6px;border-radius:3px;font-size:10px;font-weight:600;background:#dc262618;color:#dc2626;">' + escapeHTML(r.stage) + '</span></td>';
+    html += '<td style="padding:5px 8px;font-size:10px;">' + escapeHTML(r.phone || '—') + '</td>';
+    html += '<td style="padding:5px 8px;text-align:center;font-weight:600;color:#d97706;">' + (r.days_since_update || '—') + 'd</td>';
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  el.innerHTML = html;
+}
+
+function showCampaignStudyDetail(campName) {
+  // Strip prefix (Meta:, SW:, etc.) to get study name
+  var study = campName.replace(/^(Meta|SW|ST|SM|SK|IC|CL):\s*/, '').split(' / ')[0].toLowerCase().trim();
+  var filterFn = function(r) {
+    var rs = (r.study || '').toLowerCase().trim();
+    return rs.length >= 3 && study.length >= 3 && (rs.indexOf(study) !== -1 || study.indexOf(rs) !== -1);
+  };
+  showReferralDetailModal(filterFn, campName);
+}
+
 function showTrackerStageDetail(tracker, stageLabel) {
   var SG = ((CRP_CONFIG.CLICKUP||{}).STAGE_GROUPS||{});
   var enrolledSet = SG.ENROLLED || new Set();
