@@ -9166,69 +9166,134 @@ function renderReferralDashboard() {
     }).join('') + (staleLeads.length > 15 ? `<div style="text-align:center;padding:8px;font-size:11px;color:#94a3b8;">+${staleLeads.length - 15} more</div>` : '');
   }
 
-  // ── Pipeline by Referral Source ──
+  // ── All Referral Sources (providers + campaigns unified) ──
   const trackerEl = el('ref-tracker-detail');
+  const campBadge = el('ref-camp-badge');
+  _crioSubjectMap = null; // Reset CRIO cache
+
+  // Build provider tracker rows
   const trackerMap = {};
   all.forEach(r => {
     if (!trackerMap[r.tracker]) trackerMap[r.tracker] = [];
     trackerMap[r.tracker].push(r);
   });
-  // Count stale per tracker
   const _sixtyDaysAgoT = Date.now() - 60 * 86400000;
-  const trackerRows = Object.entries(trackerMap).sort((a,b) => b[1].length - a[1].length);
-  // Reset CRIO cache for fresh lookups
-  _crioSubjectMap = null;
-  trackerEl.innerHTML = `<table class="fin-table" style="width:100%;font-size:12px;">
+
+  // Build campaign rows (active only)
+  const activeCampaigns = CAMPAIGN_DATA.filter(c =>
+    (c.vendor||'').toLowerCase() !== 'not active' &&
+    (c.vendor||'').toLowerCase() !== 'complete' &&
+    (c.first_contact > 0 || c.new_referrals > 0)
+  );
+
+  // Unified rows array
+  var unifiedRows = [];
+
+  // Add provider trackers
+  Object.entries(trackerMap).sort((a,b) => b[1].length - a[1].length).forEach(([name, tasks]) => {
+    const sc = {};
+    tasks.forEach(t => { sc[t.stage] = (sc[t.stage] || 0) + 1; });
+    const _enrolled = Array.from(SG.ENROLLED||[]).reduce((s,st)=>s+(sc[st]||0),0);
+    const _dnq = (sc['DNQ']||0) + (sc['Screen Fail']||0);
+    const _lost = sc['Lost']||0;
+    const _screening = (sc['Pre-Screening']||0) + (sc['Screening']||0);
+    const _stale = tasks.filter(t => !t.is_closed && t.days_since_update >= 7 && t.date_created && new Date(t.date_created).getTime() >= _sixtyDaysAgoT).length;
+    const _inCrio = tasks.filter(t => getCrioSubjectStatus(t.name) !== null).length;
+    unifiedRows.push({
+      name: name, type: 'Provider', total: tasks.length,
+      newLead: sc['New Lead']||0, contacted: sc['Contacted']||0,
+      screening: _screening, enrolled: _enrolled, dnq: _dnq, lost: _lost,
+      stale: _stale, inCrio: _inCrio, clickId: name
+    });
+  });
+
+  // Add active campaigns
+  activeCampaigns.forEach(c => {
+    const sn = (c.study||'').toLowerCase().trim();
+    // Match referrals from pipeline to this campaign's study
+    const matchedRefs = REFERRAL_DATA.filter(r => {
+      const rs = (r.study||'').toLowerCase().trim();
+      return rs.length >= 3 && sn.length >= 3 && (rs.indexOf(sn) !== -1 || sn.indexOf(rs) !== -1);
+    });
+    const msc = {};
+    matchedRefs.forEach(r => { msc[r.stage] = (msc[r.stage]||0)+1; });
+    const _enrolled = Array.from(SG.ENROLLED||[]).reduce((s,st)=>s+(msc[st]||0),0);
+    const _dnq = (msc['DNQ']||0) + (msc['Screen Fail']||0);
+    const _screening = (msc['Pre-Screening']||0) + (msc['Screening']||0);
+    // CRIO cross-ref
+    var crioEnr = 0, crioScr = 0;
+    if (CRIO_SUBJECTS_DATA && CRIO_STUDIES_DATA) {
+      var crioStudy = CRIO_STUDIES_DATA.find(function(cs) {
+        var pn = (cs.protocol_number||'').toLowerCase();
+        return pn.length >= 4 && (pn.indexOf(sn) !== -1 || sn.indexOf(pn) !== -1);
+      });
+      if (crioStudy) {
+        CRIO_SUBJECTS_DATA.forEach(function(sub) {
+          if (String(sub.study_key) !== String(crioStudy.study_key)) return;
+          var st = (sub.status||'').toUpperCase();
+          if (st === 'ENROLLED') crioEnr++;
+          if (st === 'SCREENING' || st === 'SCHEDULED_V1') crioScr++;
+        });
+      }
+    }
+    unifiedRows.push({
+      name: c.study, type: c.vendor, total: c.first_contact + c.second_contact + c.third_contact,
+      newLead: c.new_referrals, contacted: c.first_contact, screening: _screening,
+      enrolled: _enrolled, dnq: _dnq, lost: 0, stale: 0,
+      inCrio: crioEnr + crioScr, crioEnrolled: crioEnr, crioScreening: crioScr,
+      clickId: null, isCampaign: true, url: c.url
+    });
+  });
+
+  if (campBadge) campBadge.textContent = unifiedRows.length + ' sources';
+  var staleBadge = el('ref-stale-badge');
+  var totalStale = unifiedRows.reduce(function(s,r){return s+r.stale;},0);
+  if (staleBadge) staleBadge.textContent = totalStale > 0 ? totalStale + ' stale' : 'All active';
+
+  // Render unified table
+  var typeColors = {'Provider':'#072061','facebook':'#3b82f6','subjectwell':'#8b5cf6','study teams':'#059669','study max':'#d97706','studykik':'#f59e0b','iconnect':'#06b6d4','gardinia - clinlife':'#ec4899'};
+  trackerEl.innerHTML = `<table class="fin-table" style="width:100%;font-size:11px;">
     <thead><tr>
-      <th style="text-align:left;padding:10px 12px;">Referral Source</th>
+      <th style="text-align:left;padding:8px 12px;">Source</th>
+      <th style="text-align:center;">Type</th>
       <th style="text-align:center;">Total</th>
       <th style="text-align:center;">New</th>
       <th style="text-align:center;">Contacted</th>
       <th style="text-align:center;">Screening</th>
       <th style="text-align:center;color:#059669;">Enrolled</th>
-      <th style="text-align:center;color:#dc2626;">DNQ/Lost</th>
+      <th style="text-align:center;color:#dc2626;">DNQ/SF</th>
       <th style="text-align:center;color:#d97706;">Stale</th>
       <th style="text-align:center;color:#8b5cf6;">In CRIO</th>
     </tr></thead>
-    <tbody>${trackerRows.map(([name, tasks]) => {
-      const sc = {};
-      tasks.forEach(t => { sc[t.stage] = (sc[t.stage] || 0) + 1; });
-      const tn = jsAttr(name);
-      const _enrolled = Array.from(SG.ENROLLED||[]).reduce((s,st)=>s+(sc[st]||0),0);
-      const _closed = Array.from(SG.CLOSED||[]).reduce((s,st)=>s+(sc[st]||0),0);
-      const _screening = (sc['Pre-Screening']||0) + (sc['Screening']||0);
-      const _stale = tasks.filter(t => !t.is_closed && t.days_since_update >= 7 && t.date_created && new Date(t.date_created).getTime() >= _sixtyDaysAgoT).length;
-      const _inCrio = tasks.filter(t => getCrioSubjectStatus(t.name) !== null).length;
+    <tbody>${unifiedRows.map(r => {
+      const tc = typeColors[r.type.toLowerCase()] || typeColors[r.type] || '#64748b';
+      const tn = r.clickId ? jsAttr(r.clickId) : '';
       function _td(count, label, style) {
         if (!count) return '<td style="text-align:center;color:#cbd5e1;">—</td>';
-        return '<td style="text-align:center;cursor:pointer;' + (style||'') + '" onclick="showTrackerStageDetail(\'' + tn + '\',\'' + label + '\')">' + count + '</td>';
+        if (r.clickId) return '<td style="text-align:center;cursor:pointer;' + (style||'') + '" onclick="showTrackerStageDetail(\'' + tn + '\',\'' + (label||'all') + '\')">' + count + '</td>';
+        return '<td style="text-align:center;' + (style||'') + '">' + count + '</td>';
       }
-      return `<tr>
-        <td style="padding:8px 12px;font-weight:600;cursor:pointer;" onclick="showTrackerStageDetail('${tn}','all')">${escapeHTML(name)}</td>
-        <td style="text-align:center;font-weight:700;cursor:pointer;" onclick="showTrackerStageDetail('${tn}','all')">${tasks.length}</td>
-        ${_td(sc['New Lead']||0,'New Lead')}
-        ${_td(sc['Contacted']||0,'Contacted')}
-        ${_td(_screening,'Screening')}
-        ${_td(_enrolled,'Enrolled','color:#059669;font-weight:700;')}
-        ${_td(_closed,'DNQ/Lost','color:#dc2626;')}
-        <td style="text-align:center;color:${_stale>0?'#d97706':'#cbd5e1'};font-weight:${_stale>0?'700':'400'};">${_stale||'—'}</td>
-        <td style="text-align:center;color:${_inCrio>0?'#8b5cf6':'#cbd5e1'};font-weight:${_inCrio>0?'700':'400'};">${_inCrio||'—'}</td>
+      const nameHtml = r.url ? '<a href="'+escapeHTML(r.url)+'" target="_blank" style="color:#1e293b;text-decoration:none;font-weight:600;">'+escapeHTML(r.name)+'</a>' : '<span style="font-weight:600;">'+escapeHTML(r.name)+'</span>';
+      const crioDetail = r.crioEnrolled > 0 || r.crioScreening > 0 ? '<div style="font-size:9px;color:#8b5cf6;">'+r.crioScreening+'scr / '+r.crioEnrolled+'enr</div>' : '';
+      return `<tr style="border-bottom:1px solid #f1f5f9;"${r.clickId ? ' onclick="showTrackerStageDetail(\''+tn+'\',\'all\')" style="cursor:pointer;border-bottom:1px solid #f1f5f9;"' : ''}>
+        <td style="padding:8px 12px;">${nameHtml}</td>
+        <td style="text-align:center;"><span style="font-size:9px;font-weight:600;padding:2px 6px;border-radius:4px;background:${tc}15;color:${tc};">${escapeHTML(r.type)}</span></td>
+        <td style="text-align:center;font-weight:700;">${r.total}</td>
+        ${_td(r.newLead,'New Lead')}
+        ${_td(r.contacted,'Contacted')}
+        ${_td(r.screening,'Screening')}
+        ${_td(r.enrolled,'Enrolled','color:#059669;font-weight:700;')}
+        ${_td(r.dnq,'DNQ/Lost','color:#dc2626;')}
+        <td style="text-align:center;color:${r.stale>0?'#d97706':'#cbd5e1'};font-weight:${r.stale>0?'700':'400'};">${r.stale||'—'}</td>
+        <td style="text-align:center;color:${r.inCrio>0?'#8b5cf6':'#cbd5e1'};font-weight:${r.inCrio>0?'700':'400'};">${r.inCrio||'—'}${crioDetail}</td>
       </tr>`;
     }).join('')}</tbody>
   </table>`;
 
-  // ── Central Campaigns (merged with cross-reference) ──
-  const campEl = el('ref-campaigns-table');
-  const campBadge = el('ref-camp-badge');
-  if (CAMPAIGN_DATA.length === 0) {
-    campEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">No campaign data available</div>';
-    if (campBadge) campBadge.textContent = '—';
-  } else {
+  // ── Old campaigns section (now merged into unified table above) ──
+  if (false) {
     const campaigns = CAMPAIGN_DATA.filter(c => c.first_contact > 0 || c.new_referrals > 0)
       .sort((a,b) => b.first_contact - a.first_contact);
-    if (campBadge) campBadge.textContent = campaigns.length + ' active campaigns';
-
-    // Enrich each campaign with cross-reference data
     const enriched = campaigns.map(c => {
       const sn = c.study.toLowerCase().trim();
       const referrals = REFERRAL_DATA.filter(r => {
