@@ -4307,7 +4307,7 @@ function fetchActionRequiredData() {
       // Build referral_source lookup: patient name (lower) → referral_source
       window._crioRefSourceMap = new Map();
       window._recruitingData.forEach(function(r) {
-        var name = ((r.first_name||'') + ' ' + (r.last_name||'')).toLowerCase().trim().replace(/\s+/g, ' ');
+        var name = (r.patient_name||'').toLowerCase().trim().replace(/\s+/g, ' ');
         if (name && r.referral_source) window._crioRefSourceMap.set(name, r.referral_source);
       });
       _log('CRP: Recruiting data loaded — ' + window._recruitingData.length + ' records, ' + window._crioRefSourceMap.size + ' with referral source');
