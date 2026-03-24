@@ -783,7 +783,7 @@ function showUnpaidAPModal(){
   let h='<table><thead><tr><th>Study</th><th class="r">Total</th><th class="r">Visits</th><th class="r">Procedures</th></tr></thead><tbody>';let t={a:0,v:0,p:0};
   UNPAID_AP.forEach(r=>{h+='<tr><td>'+slink(r.study)+'</td><td class="r">'+fmt(r.total)+'</td><td class="r">'+fmt(r.visits)+'</td><td class="r">'+fmt(r.procs)+'</td></tr>';t.a+=r.total;t.v+=r.visits;t.p+=r.procs;});
   h+='<tr class="total-row"><td>TOTAL</td><td class="r">'+fmt(t.a)+'</td><td class="r">'+fmt(t.v)+'</td><td class="r">'+fmt(t.p)+'</td></tr></tbody></table>';
-  showFinModal('Unpaid Autopay — 13 Studies',h);
+  showFinModal('Unpaid Autopay — ' + UNPAID_AP.length + ' Studies',h);
 }
 function showUninvoicedModal(){
   let h='<table><thead><tr><th>Study</th><th class="r">Amount</th></tr></thead><tbody>';let tot=0;
@@ -793,13 +793,13 @@ function showUninvoicedModal(){
 }
 function showRev12mModal(){
   let h='<table><thead><tr><th>Study</th><th class="r">Revenue</th></tr></thead><tbody>';let tot=0;
-  Object.entries(STUDY_REVENUE_12M).sort((a,b)=>b[1]-a[1]).forEach(([s,v])=>{if(v>0){h+='<tr><td>'+s+'</td><td class="r">'+fmt(v)+'</td></tr>';tot+=v;}});
+  Object.entries(STUDY_REVENUE_12M).sort((a,b)=>b[1]-a[1]).forEach(([s,v])=>{if(v>0){h+='<tr><td>'+escapeHTML(s)+'</td><td class="r">'+fmt(v)+'</td></tr>';tot+=v;}});
   h+='<tr class="total-row"><td>TOTAL</td><td class="r">'+fmt(tot)+'</td></tr></tbody></table>';
   showFinModal('12-Month Revenue by Study',h);
 }
 function showForecastModal(){
   showFinModal('90-Day Cash Forecast — Methodology','<p style="margin-bottom:12px;font-size:13px;color:#4A5568">Forecast based on current AR aging buckets weighted by historical collection probability rates:</p><table><thead><tr><th>Bucket</th><th class="r">Collection Rate</th><th class="r">Invoice AR</th><th class="r">Autopay AR</th><th class="r">Expected</th></tr></thead><tbody>'+
-  [{k:'current',l:'Current (0-30d)',r:0.88},{k:'d30_60',l:'30-60 Days',r:0.78},{k:'d61_90',l:'61-90 Days',r:0.62},{k:'d91_120',l:'91-120 Days',r:0.45},{k:'d121_150',l:'121-150 Days',r:0.28},{k:'d150plus',l:'>150 Days',r:0.12}].map(b=>{
+  [{k:'current',l:'Current (0-30d)'},{k:'d30_60',l:'30-60 Days'},{k:'d61_90',l:'61-90 Days'},{k:'d91_120',l:'91-120 Days'},{k:'d121_150',l:'121-150 Days'},{k:'d150plus',l:'>150 Days'}].map(b=>{b.r=BUCKET_COLLECT_RATES[b.k];return b;}).map(b=>{
     const iv=AGING_INV.reduce((s,x)=>s+(x[b.k]||0),0);const ap=AGING_AP.reduce((s,x)=>s+(x[b.k]||0),0);
     return'<tr><td>'+b.l+'</td><td class="r">'+(b.r*100)+'%</td><td class="r">'+fmt(iv)+'</td><td class="r">'+fmt(ap)+'</td><td class="r">'+fmt((iv+ap)*b.r)+'</td></tr>';
   }).join('')+'</tbody></table>');
@@ -985,7 +985,7 @@ function renderRevenueTab() {
   if (el('rev-per-study')) { el('rev-per-study').textContent = fmtK(revPerStudy); }
   if (el('rev-per-study-sub')) { el('rev-per-study-sub').textContent = studyCount + ' active studies'; }
   if (el('rev-top-type') && topType) { el('rev-top-type').textContent = topType.type; }
-  if (el('rev-top-type-sub') && topType) { el('rev-top-type-sub').textContent = '$' + (topType.amount/1000000).toFixed(2) + 'M (' + Math.round(topType.amount/total12m*100) + '%)'; }
+  if (el('rev-top-type-sub') && topType) { el('rev-top-type-sub').textContent = '$' + (topType.amount/1000000).toFixed(2) + 'M (' + (total12m > 0 ? Math.round(topType.amount/total12m*100) : 0) + '%)'; }
 
   // Revenue Trend chart (duplicate of overview revChart but on Revenue tab)
   drawRevChartOn('revChartDetail');
@@ -1221,6 +1221,8 @@ function saveNote(inv){
 }
 function toggleNote(inv){const el=document.querySelector('[data-inv="'+inv+'"]');if(el)el.classList.toggle('active');}
 function renderCollections(){
+  // Panel count
+  var _pc=document.getElementById('coll-panel-count');if(_pc)_pc.textContent='All Unpaid Invoices ('+collData.length+')';
   // Summary
   const counts={New:0,Contacted:0,Escalated:0,Disputed:0,Resolved:0};
   collData.forEach(i=>counts[i.status]=(counts[i.status]||0)+1);
@@ -1231,7 +1233,7 @@ function renderCollections(){
   // Table
   let d=collFilter==='All'?[...collData]:collData.filter(i=>i.status===collFilter);
   if(collSort==='days')d.sort((a,b)=>b.days-a.days);
-  else if(collSort==='amount')d.sort((a,b)=>Math.abs(b.amount)-Math.abs(a.amount));
+  else if(collSort==='amount')d.sort((a,b)=>Math.abs(b.unpaid)-Math.abs(a.unpaid));
   else{const o={New:0,Contacted:1,Escalated:2,Disputed:3,Resolved:4};d.sort((a,b)=>o[a.status]-o[b.status]);}
   const pm={New:'pill-new',Contacted:'pill-contacted',Escalated:'pill-escalated',Disputed:'pill-disputed',Resolved:'pill-resolved'};
   document.getElementById('collBody').innerHTML=d.map(r=>'<tr><td>'+slink(r.study)+'</td><td>'+escapeHTML(r.invoice)+'</td><td class="r" style="font-weight:700;color:'+(r.days>365?'#DC2626':r.days>180?'#EA580C':'#4A5568')+'">'+r.days+'</td><td class="r">'+fmt(r.unpaid)+'</td><td><span class="pill '+(pm[r.status]||'pill-new')+'" onclick="cycleSt(\''+jsAttr(r.invoice)+'\')" title="Click to cycle status">'+escapeHTML(r.status)+'</span></td><td><button class="notes-btn" onclick="toggleNote(\''+jsAttr(r.invoice)+'\')">Notes</button><input class="notes-input" data-inv="'+escapeHTML(r.invoice)+'" value="'+escapeHTML(r.notes||'')+'" onblur="saveNote(\''+jsAttr(r.invoice)+'\')" onkeypress="if(event.key===\'Enter\')saveNote(\''+jsAttr(r.invoice)+'\')" placeholder="Add note..."></td></tr>').join('');
@@ -1259,7 +1261,7 @@ function renderAlerts(){
 // ══════════ FORECAST ══════════
 function renderForecast(){
   let f30=0,f60=0,f90=0;
-  [AGING_INV,AGING_AP].forEach(arr=>{arr.forEach(s=>{f30+=s.current*BUCKET_COLLECT_RATES.current;f60+=s.d30_60*BUCKET_COLLECT_RATES.d30_60;f90+=s.d61_90*BUCKET_COLLECT_RATES.d61_90;});});
+  [AGING_INV,AGING_AP].forEach(arr=>{arr.forEach(s=>{f30+=s.current*BUCKET_COLLECT_RATES.current;f60+=s.d30_60*BUCKET_COLLECT_RATES.d30_60;f90+=s.d61_90*BUCKET_COLLECT_RATES.d61_90+s.d91_120*BUCKET_COLLECT_RATES.d91_120+s.d121_150*BUCKET_COLLECT_RATES.d121_150+s.d150plus*BUCKET_COLLECT_RATES.d150plus;});});
   document.getElementById('fc30').textContent=fmtK(f30);
   document.getElementById('fc60').textContent=fmtK(f60);
   document.getElementById('fc90').textContent=fmtK(f90);
@@ -1706,7 +1708,7 @@ function renderInsights() {
 
   const totalCollected = MONTHLY_PAYMENTS.reduce((s,m) => s+m.amount, 0);
   const totalBilled = totalCollected + totalInvAR + totalApAR;
-  const efficiency = ((totalCollected / totalBilled) * 100).toFixed(0);
+  const efficiency = totalBilled > 0 ? ((totalCollected / totalBilled) * 100).toFixed(0) : '0';
   if (el('ins-collect-eff')) el('ins-collect-eff').textContent = efficiency + '%';
 
   const highAgingAR = AGING_INV.reduce((s,r) => s + r.d91_120 + r.d121_150 + r.d150plus, 0) +
@@ -3027,9 +3029,9 @@ function showHorizonDetail(type, weekLabel) {
         <th style="padding:8px;text-align:left">Reason</th><th style="padding:8px;text-align:left">Date</th>
       </tr></thead><tbody>${rows.map(r => `<tr style="border-bottom:1px solid #f1f5f9">
         <td style="padding:6px 8px"><a href="${r.url}" target="_blank" style="text-decoration:none;color:var(--navy);font-weight:600">${maskPHI(r.name)}${linkIcon}</a></td>
-        <td style="padding:6px 8px;font-size:11px">${r.study}</td>
-        <td style="padding:6px 8px;font-size:11px;color:var(--muted)">${(r.reason||'').substring(0,50)}</td>
-        <td style="padding:6px 8px;font-size:11px">${r.cancel_date}</td>
+        <td style="padding:6px 8px;font-size:11px">${escapeHTML(r.study)}</td>
+        <td style="padding:6px 8px;font-size:11px;color:var(--muted)">${escapeHTML((r.reason||'').substring(0,50))}</td>
+        <td style="padding:6px 8px;font-size:11px">${escapeHTML(r.cancel_date)}</td>
       </tr>`).join('')}</tbody></table>`;
   } else {
     tableHTML = `<table style="width:100%;border-collapse:collapse;font-size:12px">
@@ -3038,12 +3040,12 @@ function showHorizonDetail(type, weekLabel) {
         <th style="padding:8px;text-align:left">Study</th><th style="padding:8px;text-align:left">Visit</th>
         <th style="padding:8px;text-align:left">Coordinator</th><th style="padding:8px;text-align:left">Investigator</th>
       </tr></thead><tbody>${rows.map(r => `<tr style="border-bottom:1px solid #f1f5f9">
-        <td style="padding:6px 8px;font-weight:600;color:var(--blue)">${r.date}</td>
+        <td style="padding:6px 8px;font-weight:600;color:var(--blue)">${escapeHTML(r.date)}</td>
         <td style="padding:6px 8px"><a href="${r.patient_url}" target="_blank" style="text-decoration:none;color:var(--navy);font-weight:600">${maskPHI(r.patient)}${linkIcon}</a></td>
-        <td style="padding:6px 8px;font-size:11px">${r.study}</td>
-        <td style="padding:6px 8px;font-size:11px;color:var(--muted)">${r.visit}</td>
-        <td style="padding:6px 8px;font-size:11px">${r.coord}</td>
-        <td style="padding:6px 8px;font-size:11px;color:${r.investigator ? '#7c3aed' : '#cbd5e1'}">${r.investigator || '—'}</td>
+        <td style="padding:6px 8px;font-size:11px">${escapeHTML(r.study)}</td>
+        <td style="padding:6px 8px;font-size:11px;color:var(--muted)">${escapeHTML(r.visit)}</td>
+        <td style="padding:6px 8px;font-size:11px">${escapeHTML(r.coord)}</td>
+        <td style="padding:6px 8px;font-size:11px;color:${r.investigator ? '#7c3aed' : '#cbd5e1'}">${escapeHTML(r.investigator || '—')}</td>
       </tr>`).join('')}</tbody></table>`;
   }
 
@@ -3394,7 +3396,7 @@ function computeCoordGoals() {
     var idx = COORD_LOWER.indexOf(rawName.toLowerCase());
     if (idx === -1) return;
     var name = COORDS[idx];
-    var key = name + '|' + date + '|' + patient;
+    var key = buildKey(name, date, patient);
     if (seen.has(key)) return;
     seen.add(key);
     goals.byDay[name][date] = (goals.byDay[name][date]||0) + 1;
@@ -3608,7 +3610,7 @@ function renderInvCapacity() {
     var allDates = iv.map(function(v){return v.date_iso;}).filter(Boolean).sort();
     var dataWeeks = 2; // fallback
     if (allDates.length >= 2) {
-      var spanMs = new Date(allDates[allDates.length-1]) - new Date(allDates[0]);
+      var spanMs = (parseDate(allDates[allDates.length-1])||new Date()) - (parseDate(allDates[0])||new Date());
       dataWeeks = Math.max(1, Math.round(spanMs / 604800000)); // 7 days in ms
     }
     var utilPct = dayCount > 0 && availDays > 0 ? Math.min(100, Math.round(dayCount / (availDays * dataWeeks) * 100)) : 0;
@@ -4736,8 +4738,8 @@ function parseRevenueCSV(rows) {
   }).forEach(r => {
     const dateStr = r['Service Date'] || '';
     if (!dateStr) return;
-    const d = new Date(dateStr);
-    if (isNaN(d)) return;
+    const d = parseDate(dateStr);
+    if (!d) return;
     const mk = d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }).replace(' ', " '");
     const payType = (r['Revenue Payment Type'] || '').toLowerCase();
     const amount = num(r['Amount']);
@@ -4778,8 +4780,8 @@ function parsePaymentsCSV(rows) {
   }).forEach(r => {
     const dateStr = r['Received Date'] || '';
     if (!dateStr) return;
-    const d = new Date(dateStr);
-    if (isNaN(d)) return;
+    const d = parseDate(dateStr);
+    if (!d) return;
     const mk = d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }).replace(' ', " '");
     const amount = num(r['Amount']);
     if (!months[mk]) { months[mk] = 0; monthOrder.push({ month: mk, sort: d }); }
@@ -4985,7 +4987,7 @@ async function fetchFinanceBQ() {
       if (!study || unpaid <= 0) return;
       if (!agingByStudy[study]) agingByStudy[study] = { study: study, current: 0, d30_60: 0, d61_90: 0, d91_120: 0, d121_150: 0, d150plus: 0 };
       var a = agingByStudy[study];
-      if (overdue <= 0) a.current += unpaid;
+      if (overdue <= 30) a.current += unpaid;
       else if (overdue <= 60) a.d30_60 += unpaid;
       else if (overdue <= 90) a.d61_90 += unpaid;
       else if (overdue <= 120) a.d91_120 += unpaid;
@@ -6680,7 +6682,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
     const idx = COORD_LOWER.indexOf(rawName.toLowerCase());
     if (idx === -1) return;
     const name = COORD_NAMES[idx]; // use canonical name
-    const key = name + '|' + date + '|' + subjectId;
+    const key = buildKey(name, date, subjectId);
     if (seenCoordVisits.has(key)) return;
     seenCoordVisits.add(key);
     coordGoals.byDay[name][date] = (coordGoals.byDay[name][date]||0) + 1;
@@ -8519,10 +8521,10 @@ function showStudyDetail(studyName, studyUrl) {
     upcoming.map(r=>`<tr>
       <td style="font-weight:600;color:#1843ad">${r.date}</td>
       <td>${patientLink(r.patient,r.patient_url)}</td>
-      <td style="font-size:11px;color:#64748b">${r.visit}</td>
+      <td style="font-size:11px;color:#64748b">${escapeHTML(r.visit)}</td>
       <td>${statusBadge(r.status)}</td>
-      <td style="font-size:11px">${r.coord}</td>
-      <td style="font-size:11px;color:${r.investigator?'#7c3aed':'#cbd5e1'}">${r.investigator||'—'}</td>
+      <td style="font-size:11px">${escapeHTML(r.coord)}</td>
+      <td style="font-size:11px;color:${r.investigator?'#7c3aed':'#cbd5e1'}">${escapeHTML(r.investigator||'—')}</td>
     </tr>`).join('') + `</tbody></table>`;
   }
   if(allCancelRows.length) {
@@ -8533,9 +8535,9 @@ function showStudyDetail(studyName, studyUrl) {
     allCancelRows.map(r=>`<tr>
       <td>${extLink(r.name,r.url)}</td>
       <td>${typeBadge2(r.type)}</td>
-      <td style="font-size:11px;color:#64748b">${r.cancel_date||'—'}</td>
-      <td style="font-size:11px;color:#64748b;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(r.reason||'').replace(/"/g,"'")}">${r.reason||'<em style="color:#dc2626">Missing</em>'}</td>
-      <td style="font-size:11px">${r.coord||'—'}</td>
+      <td style="font-size:11px;color:#64748b">${escapeHTML(r.cancel_date||'—')}</td>
+      <td style="font-size:11px;color:#64748b;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHTML(r.reason||'')}">${escapeHTML(r.reason)||'<em style="color:#dc2626">Missing</em>'}</td>
+      <td style="font-size:11px">${escapeHTML(r.coord||'—')}</td>
     </tr>`).join('') + `</tbody></table>`;
   }
   if(!body) body = '<p style="color:#94a3b8;padding:20px;text-align:center">No detail data available</p>';
@@ -8806,9 +8808,9 @@ function showCoordDetail(coordName) {
       <td style="font-weight:600;color:#1843ad;white-space:nowrap">${r.date}</td>
       <td>${patientLink(r.patient,r.patient_url)}</td>
       <td style="font-size:11px">${extLink(r.study,r.study_url)}</td>
-      <td style="font-size:11px;color:#64748b">${r.visit}</td>
+      <td style="font-size:11px;color:#64748b">${escapeHTML(r.visit)}</td>
       <td>${statusBadge(r.status)}</td>
-      <td style="font-size:11px;color:${r.investigator?'#7c3aed':'#cbd5e1'}">${r.investigator||'—'}</td>
+      <td style="font-size:11px;color:${r.investigator?'#7c3aed':'#cbd5e1'}">${escapeHTML(r.investigator||'—')}</td>
     </tr>`).join('') + `</tbody></table>`;
   }
   if(allCancelRows.length) {
@@ -8820,8 +8822,8 @@ function showCoordDetail(coordName) {
       <td>${extLink(r.name,r.url)}</td>
       <td style="font-size:11px">${extLink(r.study,r.study_url)}</td>
       <td>${typeBadge2(r.type)}</td>
-      <td style="font-size:11px;color:#64748b">${r.cancel_date||'—'}</td>
-      <td style="font-size:11px;color:#64748b;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(r.reason||'').replace(/"/g,"'")}">${r.reason||'<em style="color:#dc2626">Missing</em>'}</td>
+      <td style="font-size:11px;color:#64748b">${escapeHTML(r.cancel_date||'—')}</td>
+      <td style="font-size:11px;color:#64748b;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHTML(r.reason||'')}">${escapeHTML(r.reason)||'<em style="color:#dc2626">Missing</em>'}</td>
     </tr>`).join('') + `</tbody></table>`;
   }
   if(!body) body = '<p style="color:#94a3b8;padding:20px;text-align:center">No records found</p>';
@@ -9321,10 +9323,11 @@ function renderReferralDashboard() {
     });
     const msc = {};
     matchedRefs.forEach(r => { msc[r.stage] = (msc[r.stage]||0)+1; });
-    const _enrolled = Array.from(SG.ENROLLED||[]).reduce((s,st)=>s+(msc[st]||0),0);
+    var _pipelineEnrolled = Array.from(SG.ENROLLED||[]).reduce((s,st)=>s+(msc[st]||0),0);
     const _dnq = (msc['DNQ']||0) + (msc['Screen Fail']||0);
-    const _screening = (msc['Pre-Screening']||0) + (msc['Screening']||0);
-    // CRIO cross-ref
+    var _pipelineScreening = (msc['Pre-Screening']||0) + (msc['Screening']||0);
+    // CRIO cross-ref — use as primary source for screening/enrolled since
+    // campaign leads often go directly to CRIO without ClickUp pipeline tracking
     var crioEnr = 0, crioScr = 0;
     if (CRIO_SUBJECTS_DATA && CRIO_STUDIES_DATA) {
       var crioStudy = CRIO_STUDIES_DATA.find(function(cs) {
@@ -9340,6 +9343,9 @@ function renderReferralDashboard() {
         });
       }
     }
+    // Use whichever source has higher counts (CRIO is authoritative for campaigns)
+    var _enrolled = Math.max(_pipelineEnrolled, crioEnr);
+    var _screening = Math.max(_pipelineScreening, crioScr);
     var _vendorPrefix = {'facebook':'Meta','subjectwell':'SW','study teams':'ST','study max':'SM','studykik':'SK','iconnect':'IC','gardinia - clinlife':'CL'};
     var _prefix = _vendorPrefix[(c.vendor||'').toLowerCase()] || c.vendor;
     var _campName = _prefix + ': ' + c.study;
@@ -13648,7 +13654,7 @@ function renderCoordProductivity() {
     html += '<td style="padding:8px;font-weight:700;color:#1e293b;">' + escapeHTML(r.name.split(' ')[0]) + '</td>';
     html += '<td style="padding:8px;"><div style="background:#e2e8f0;border-radius:5px;height:18px;position:relative;">';
     html += '<div style="width:' + barW + '%;background:linear-gradient(90deg,#3b82f6,#8b5cf6);height:100%;border-radius:5px;"></div>';
-    html += '<span style="position:absolute;left:8px;top:0;font-size:11px;font-weight:700;color:' + (barW>40?'#fff':'#374151') + ';line-height:18px;">' + r.total + '</span></div></td>';
+    html += '<span style="position:absolute;left:8px;top:0;font-size:11px;font-weight:700;color:' + (barW>30?'#fff':'#374151') + ';line-height:18px;">' + r.total + '</span></div></td>';
     html += '<td style="padding:8px;text-align:center;font-weight:600;color:#475569;">' + r.total + '</td>';
     html += '<td style="padding:8px;text-align:center;font-weight:600;color:#475569;">' + r.patients + '</td>';
     html += '</tr>';

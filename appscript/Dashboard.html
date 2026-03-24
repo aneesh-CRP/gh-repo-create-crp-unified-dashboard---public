@@ -2189,7 +2189,7 @@ body {
   </div>
 
   <div class="panel">
-    <div class="panel-head"><span>All Unpaid Invoices (42)</span></div>
+    <div class="panel-head"><span id="coll-panel-count">All Unpaid Invoices</span></div>
     <div class="panel-body" style="overflow-x:auto">
       <table class="tbl">
         <thead><tr><th>Study</th><th>Invoice</th><th class="r">Days</th><th class="r">Amount</th><th>Status</th><th>Notes</th></tr></thead>
@@ -2488,7 +2488,7 @@ body {
   <div class="hero-row" style="margin-bottom:20px">
     <div class="hero-cell">
       <div class="hero-label">Studies Tracked</div>
-      <div class="hero-val kpi-clickable" style="color:#2d5a87;cursor:pointer" id="ins-studies" onclick="showFinModal('All Tracked Studies',FIN_MERGED_STUDIES.map(r=>'<tr><td>'+slink(r.study)+'</td><td><span class=\'badge\'>'+r.status+'</span></td><td class=\'r\'>'+r.enrolled+'</td></tr>').join(''),true)">--</div>
+      <div class="hero-val kpi-clickable" style="color:#2d5a87;cursor:pointer" id="ins-studies" onclick="showFinModal('All Tracked Studies','<table><thead><tr><th>Study</th><th>Status</th><th class=\'r\'>Enrolled</th></tr></thead><tbody>'+FIN_MERGED_STUDIES.map(r=>'<tr><td>'+slink(r.study)+'</td><td><span class=\'badge\'>'+escapeHTML(r.status)+'</span></td><td class=\'r\'>'+r.enrolled+'</td></tr>').join('')+'</tbody></table>')">--</div>
       <div class="hero-sub">Across operations & finance</div>
     </div>
     <div class="hero-cell">
