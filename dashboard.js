@@ -9148,24 +9148,29 @@ function renderReferralDashboard() {
     }).join('') + (staleLeads.length > 15 ? `<div style="text-align:center;padding:8px;font-size:11px;color:#94a3b8;">+${staleLeads.length - 15} more</div>` : '');
   }
 
-  // ── Tracker Detail ──
+  // ── Pipeline by Referral Source ──
   const trackerEl = el('ref-tracker-detail');
   const trackerMap = {};
   all.forEach(r => {
     if (!trackerMap[r.tracker]) trackerMap[r.tracker] = [];
     trackerMap[r.tracker].push(r);
   });
+  // Count stale per tracker
+  const _sixtyDaysAgoT = Date.now() - 60 * 86400000;
   const trackerRows = Object.entries(trackerMap).sort((a,b) => b[1].length - a[1].length);
+  // Reset CRIO cache for fresh lookups
+  _crioSubjectMap = null;
   trackerEl.innerHTML = `<table class="fin-table" style="width:100%;font-size:12px;">
     <thead><tr>
-      <th style="text-align:left;padding:10px 12px;">Tracker</th>
+      <th style="text-align:left;padding:10px 12px;">Referral Source</th>
       <th style="text-align:center;">Total</th>
-      <th style="text-align:center;">New Lead</th>
+      <th style="text-align:center;">New</th>
       <th style="text-align:center;">Contacted</th>
-      <th style="text-align:center;">Pre-Screen</th>
       <th style="text-align:center;">Screening</th>
-      <th style="text-align:center;">Enrolled</th>
-      <th style="text-align:center;">DNQ/Lost</th>
+      <th style="text-align:center;color:#059669;">Enrolled</th>
+      <th style="text-align:center;color:#dc2626;">DNQ/Lost</th>
+      <th style="text-align:center;color:#d97706;">Stale</th>
+      <th style="text-align:center;color:#8b5cf6;">In CRIO</th>
     </tr></thead>
     <tbody>${trackerRows.map(([name, tasks]) => {
       const sc = {};
@@ -9173,19 +9178,23 @@ function renderReferralDashboard() {
       const tn = jsAttr(name);
       const _enrolled = Array.from(SG.ENROLLED||[]).reduce((s,st)=>s+(sc[st]||0),0);
       const _closed = Array.from(SG.CLOSED||[]).reduce((s,st)=>s+(sc[st]||0),0);
-      function _td(count, filterExpr, label, color) {
-        if (!count) return '<td style="text-align:center;color:#cbd5e1;">0</td>';
-        return '<td style="text-align:center;cursor:pointer;' + (color||'') + '" onclick="showTrackerStageDetail(\'' + tn + '\',\'' + label + '\')">' + count + '</td>';
+      const _screening = (sc['Pre-Screening']||0) + (sc['Screening']||0);
+      const _stale = tasks.filter(t => !t.is_closed && t.days_since_update >= 7 && t.date_created && new Date(t.date_created).getTime() >= _sixtyDaysAgoT).length;
+      const _inCrio = tasks.filter(t => getCrioSubjectStatus(t.name) !== null).length;
+      function _td(count, label, style) {
+        if (!count) return '<td style="text-align:center;color:#cbd5e1;">—</td>';
+        return '<td style="text-align:center;cursor:pointer;' + (style||'') + '" onclick="showTrackerStageDetail(\'' + tn + '\',\'' + label + '\')">' + count + '</td>';
       }
       return `<tr>
         <td style="padding:8px 12px;font-weight:600;cursor:pointer;" onclick="showTrackerStageDetail('${tn}','all')">${escapeHTML(name)}</td>
         <td style="text-align:center;font-weight:700;cursor:pointer;" onclick="showTrackerStageDetail('${tn}','all')">${tasks.length}</td>
-        ${_td(sc['New Lead']||0,null,'New Lead')}
-        ${_td(sc['Contacted']||0,null,'Contacted')}
-        ${_td(sc['Pre-Screening']||0,null,'Pre-Screening')}
-        ${_td(sc['Screening']||0,null,'Screening')}
-        ${_td(_enrolled,null,'Enrolled','color:#059669;font-weight:700;')}
-        ${_td(_closed,null,'DNQ/Lost','color:#dc2626;')}
+        ${_td(sc['New Lead']||0,'New Lead')}
+        ${_td(sc['Contacted']||0,'Contacted')}
+        ${_td(_screening,'Screening')}
+        ${_td(_enrolled,'Enrolled','color:#059669;font-weight:700;')}
+        ${_td(_closed,'DNQ/Lost','color:#dc2626;')}
+        <td style="text-align:center;color:${_stale>0?'#d97706':'#cbd5e1'};font-weight:${_stale>0?'700':'400'};">${_stale||'—'}</td>
+        <td style="text-align:center;color:${_inCrio>0?'#8b5cf6':'#cbd5e1'};font-weight:${_inCrio>0?'700':'400'};">${_inCrio||'—'}</td>
       </tr>`;
     }).join('')}</tbody>
   </table>`;
