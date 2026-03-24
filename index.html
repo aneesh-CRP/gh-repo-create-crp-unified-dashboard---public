@@ -1171,22 +1171,13 @@ body {
     <div style="max-height:600px;overflow-y:auto;border-radius:0 0 8px 8px;">
       <table class="data-table sortable" id="vis-table">
         <thead>
-          <tr><th style="width:80px;font-size:10px">Confirm</th><th onclick="sortTable(this)">Date</th><th onclick="sortTable(this)">Study</th><th onclick="sortTable(this)">Visit</th><th onclick="sortTable(this)">Patient</th><th onclick="sortTable(this)">Status</th><th onclick="sortTable(this)">Med Records</th><th onclick="sortTable(this)">Coordinator</th><th onclick="sortTable(this)">Investigator</th><th onclick="sortTable(this)">Site</th></tr>
+          <tr><th style="width:80px;font-size:10px">Confirm</th><th onclick="sortTable(this)">Date</th><th onclick="sortTable(this)">Study</th><th onclick="sortTable(this)">Visit</th><th onclick="sortTable(this)">Patient</th><th onclick="sortTable(this)">Status</th><th onclick="sortTable(this)">Coordinator</th><th onclick="sortTable(this)">Investigator</th><th onclick="sortTable(this)">Site</th></tr>
         </thead>
         <tbody id="upcoming-tbody">
-<tr><td colspan="10" style="text-align:center;padding:24px;color:#94a3b8;font-size:12px">Loading schedule from CRIO...</td></tr>
+<tr><td colspan="9" style="text-align:center;padding:24px;color:#94a3b8;font-size:12px">Loading schedule from CRIO...</td></tr>
 </tbody>
       </table>
     </div>
-  </div>
-
-  <!-- Upcoming by Study -->
-  <div class="card mb16 fade-in" style="margin-top:16px;">
-    <div class="card-header">
-      <span class="card-title">Upcoming by Study</span>
-      <span class="badge badge-blue" id="sched-study-count">17 studies</span>
-    </div>
-    <div id="upcoming-study-bars" style="padding:12px 16px;max-height:320px;overflow-y:auto;"></div>
   </div>
 
   <!-- ═══ SECTION 2: CANCELLATION ANALYSIS ═══ -->
@@ -1380,6 +1371,16 @@ body {
     <div class="tb-section"><div class="tb-label">Total Enrolled</div><div class="tb-value" style="color:#7c3aed" id="sk-enrolled">—</div></div>
     <div class="tb-divider"></div>
     <div class="tb-section"><div class="tb-label">Avg SF Rate</div><div class="tb-value" style="color:#dc2626" id="sk-sf-rate">—</div></div>
+  </div>
+
+  <!-- Upcoming by Study (visual distribution) -->
+  <div class="card mb16 fade-in">
+    <div class="card-header">
+      <span class="card-title">Upcoming Visits by Study</span>
+      <span class="badge badge-blue" id="sched-study-count">—</span>
+    </div>
+    <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Scheduled visits per study · click count to see details</div>
+    <div id="upcoming-study-bars" style="padding:12px 16px;max-height:280px;overflow-y:auto;"></div>
   </div>
 
   <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;position:relative;z-index:10;" id="studies-filter-bar">
@@ -4595,7 +4596,6 @@ function buildScheduleTable() {
       + '<td style="font-size:11px;color:var(--muted)">' + esc(v.visit||'—') + '</td>'
       + '<td style="font-weight:600">' + patHtml + riskBadge + '</td>'
       + '<td><span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:' + sc.bg + ';color:' + sc.fg + '">' + esc(v.status||'—') + '</span></td>'
-      + (function(){ var mr = _mrByPatient[patKey]; if (!mr) return '<td style="font-size:10px;color:#cbd5e1;text-align:center">—</td>'; var mc = _mrStatusColors[mr.status]||'#64748b'; return '<td style="text-align:center"><span style="font-size:9px;font-weight:600;padding:2px 5px;border-radius:4px;background:'+mc+'18;color:'+mc+';">'+esc(mr.status||'—')+'</span></td>'; })()
       + '<td style="font-size:11px">' + esc(v.coord||'—') + '</td>'
       + '<td style="' + invStyle + '">' + invText + '</td>'
       + '<td><span style="font-size:9px;font-weight:700;padding:2px 5px;border-radius:3px;' + siteBg + '">' + siteCode + '</span></td>'

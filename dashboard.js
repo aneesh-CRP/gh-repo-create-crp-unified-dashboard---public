@@ -2552,7 +2552,6 @@ function buildScheduleTable() {
       + '<td style="font-size:11px;color:var(--muted)">' + esc(v.visit||'—') + '</td>'
       + '<td style="font-weight:600">' + patHtml + riskBadge + '</td>'
       + '<td><span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:' + sc.bg + ';color:' + sc.fg + '">' + esc(v.status||'—') + '</span></td>'
-      + (function(){ var mr = _mrByPatient[patKey]; if (!mr) return '<td style="font-size:10px;color:#cbd5e1;text-align:center">—</td>'; var mc = _mrStatusColors[mr.status]||'#64748b'; return '<td style="text-align:center"><span style="font-size:9px;font-weight:600;padding:2px 5px;border-radius:4px;background:'+mc+'18;color:'+mc+';">'+esc(mr.status||'—')+'</span></td>'; })()
       + '<td style="font-size:11px">' + esc(v.coord||'—') + '</td>'
       + '<td style="' + invStyle + '">' + invText + '</td>'
       + '<td><span style="font-size:9px;font-weight:700;padding:2px 5px;border-radius:3px;' + siteBg + '">' + siteCode + '</span></td>'
