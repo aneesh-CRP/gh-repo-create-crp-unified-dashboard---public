@@ -9059,10 +9059,27 @@ function crioStatusBadge(patientName, phone) {
   return link+'<span style="font-size:9px;font-weight:600;padding:1px 5px;border-radius:3px;background:'+c+'18;color:'+c+';">'+escapeHTML(st)+'</span>'+linkEnd;
 }
 
+var _refTimeFilter = 'all';
+function setRefTimeFilter(days, btn) {
+  _refTimeFilter = days;
+  document.querySelectorAll('#ref-funnel-chart').forEach(function(){});
+  var card = btn ? btn.closest('.card-header') : null;
+  if (card) card.querySelectorAll('.filter-btn').forEach(function(b) { b.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+  renderReferralDashboard();
+}
+
 function renderReferralDashboard() {
   const CU = CRP_CONFIG.CLICKUP;
   const active = REFERRAL_DATA.filter(r => !r.is_closed);
-  const all = REFERRAL_DATA;
+  // Apply time filter
+  var _filterCutoff = null;
+  if (_refTimeFilter !== 'all') {
+    var _days = parseInt(_refTimeFilter) || 90;
+    _filterCutoff = new Date(); _filterCutoff.setDate(_filterCutoff.getDate() - _days);
+    _filterCutoff = _filterCutoff.toISOString().split('T')[0];
+  }
+  const all = _filterCutoff ? REFERRAL_DATA.filter(function(r) { return (r.date_created || '') >= _filterCutoff; }) : REFERRAL_DATA;
 
   // ── KPIs ──
   const stageCounts = {};
@@ -9129,18 +9146,27 @@ function renderReferralDashboard() {
   var _refRange = _refDates.length > 0 ? _refDates[0] + ' — ' + _refDates[_refDates.length-1] : '';
   var _refTimestamp = '<div style="font-size:9px;color:#94a3b8;margin-top:10px;text-align:right;">Data: ' + all.length + ' referrals · ' + _refRange + ' · Pulled ' + new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}) + '</div>';
 
-  // DNQ breakdown by study
-  var _dnqByStudy = {};
-  all.filter(function(r){return r.stage==='DNQ'||r.stage==='Screen Fail';}).forEach(function(r){
-    var s = r.study || 'Unknown'; _dnqByStudy[s] = (_dnqByStudy[s]||0)+1;
-  });
-  var _dnqEntries = Object.entries(_dnqByStudy).sort(function(a,b){return b[1]-a[1];});
+  // DNQ breakdown — aggregate from CRIO (primary) + ClickUp
+  var _dnqCategories = {'Not Eligible':0,'Not Interested':0,'Screen Fail':0,'No Show/Cancelled V1':0};
+  // CRIO subjects (authoritative for DNQ reasons)
+  if (CRIO_SUBJECTS_DATA && CRIO_SUBJECTS_DATA.length > 0) {
+    CRIO_SUBJECTS_DATA.forEach(function(s) {
+      if (_dnqCategories.hasOwnProperty(s.status)) _dnqCategories[s.status]++;
+    });
+  }
+  // Add ClickUp DNQ/SF that aren't in CRIO categories
+  var _clickupDnq = all.filter(function(r){return r.stage==='DNQ';}).length;
+  var _clickupSF = all.filter(function(r){return r.stage==='Screen Fail';}).length;
+
+  var _dnqEntries = Object.entries(_dnqCategories).filter(function(e){return e[1]>0;}).sort(function(a,b){return b[1]-a[1];});
   var _dnqMax = _dnqEntries.length > 0 ? _dnqEntries[0][1] : 1;
   var _dnqTotal = _dnqEntries.reduce(function(s,e){return s+e[1];},0);
-  var dnqHtml = _dnqEntries.length > 0 ? '<div style="margin-top:14px;padding-top:10px;border-top:1px solid #f1f5f9;"><div style="font-size:11px;font-weight:700;color:#dc2626;margin-bottom:6px;">DNQ / Screen Fail by Study ('+_dnqTotal+')</div>' +
-    _dnqEntries.slice(0,8).map(function(e) {
+  var _dnqColors = {'Not Eligible':'#dc2626','Not Interested':'#d97706','Screen Fail':'#8b5cf6','No Show/Cancelled V1':'#f97316'};
+  var dnqHtml = _dnqEntries.length > 0 ? '<div style="margin-top:14px;padding-top:10px;border-top:1px solid #f1f5f9;"><div style="font-size:11px;font-weight:700;color:#dc2626;margin-bottom:6px;">DNQ Reasons from CRIO ('+_dnqTotal.toLocaleString()+' subjects) · ClickUp: '+_clickupDnq+' DNQ, '+_clickupSF+' SF</div>' +
+    _dnqEntries.map(function(e) {
       var pct = Math.round(e[1]/_dnqMax*100);
-      return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;cursor:pointer;" onclick="showReferralDetailModal(function(r){return (r.stage===\'DNQ\'||r.stage===\'Screen Fail\')&&(r.study||\'\').indexOf(\''+jsAttr(e[0])+'\')!==-1;},\'DNQ — '+escapeHTML(e[0])+'\')"><div style="width:100px;font-size:10px;text-align:right;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+escapeHTML(e[0])+'">'+escapeHTML(e[0])+'</div><div style="flex:1;background:#fef2f2;border-radius:3px;height:16px;overflow:hidden;"><div style="width:'+pct+'%;background:#dc2626;height:100%;border-radius:3px;display:flex;align-items:center;"><span style="font-size:9px;font-weight:700;color:#fff;padding-left:6px;">'+e[1]+'</span></div></div></div>';
+      var color = _dnqColors[e[0]] || '#dc2626';
+      return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;"><div style="width:130px;font-size:10px;text-align:right;color:#64748b;">'+escapeHTML(e[0])+'</div><div style="flex:1;background:#fef2f2;border-radius:3px;height:18px;overflow:hidden;"><div style="width:'+pct+'%;background:'+color+';height:100%;border-radius:3px;display:flex;align-items:center;"><span style="font-size:9px;font-weight:700;color:#fff;padding-left:6px;">'+e[1].toLocaleString()+'</span></div></div></div>';
     }).join('') + '</div>' : '';
 
   funnelEl.innerHTML = funnelHtml + (closedHtml ? '<div style="margin-top:10px;padding-top:8px;border-top:1px solid #f1f5f9;"><div style="font-size:10px;color:#94a3b8;margin-bottom:4px;text-align:right;width:100px;display:inline-block;">Closed</div></div>' + closedHtml : '') + dnqHtml + _refTimestamp;
@@ -9310,7 +9336,9 @@ function renderReferralDashboard() {
         });
       }
     }
-    var _campName = c.study + (c.vendor && c.vendor !== c.study ? ' / ' + c.vendor : '');
+    var _vendorPrefix = {'facebook':'Meta','subjectwell':'SW','study teams':'ST','study max':'SM','studykik':'SK','iconnect':'IC','gardinia - clinlife':'CL'};
+    var _prefix = _vendorPrefix[(c.vendor||'').toLowerCase()] || c.vendor;
+    var _campName = _prefix + ': ' + c.study;
     unifiedRows.push({
       name: _campName, type: 'Campaign', total: c.first_contact + c.second_contact + c.third_contact,
       newLead: c.new_referrals, contacted: c.first_contact, screening: _screening,
