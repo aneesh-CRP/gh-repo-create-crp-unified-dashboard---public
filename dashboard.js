@@ -208,6 +208,21 @@ const CRP_CONFIG = {
     'J2A-MC-GZPO': 5,
     'CDX0159-12': 3,
     'EFC17600': 1,  // ESTUARY
+    '20230222': 10,  // Ocean(a)
+    '80202135SLE3001': 3,  // Gardenia
+    '88545223PSA2001': 3,  // Velota
+    '95597528ADM2001': 5,
+    'ATD002': 5,
+    'C4951063': 5,
+    'D6973C00001': 10,  // PREVENT-HF (both sites)
+    'D7960C00015': 8,  // AZURE-Outcomes
+    'EFC17599': 5,  // AQUA
+    'J3F-MC-EZCC': 4,
+    'M23-698': 5,
+    'M23-714': 5,
+    'M24-601': 3,
+    'MR-130A-01-TD-3001': 15,
+    'N1T-MC-MALO': 10,
   },
 
   // Brand Colors (match CSS :root variables)
