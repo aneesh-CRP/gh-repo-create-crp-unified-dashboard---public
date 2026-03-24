@@ -11235,7 +11235,7 @@ function renderReferralDashboard() {
       }
       const nameHtml = r.url ? '<a href="'+escapeHTML(r.url)+'" target="_blank" style="color:#1e293b;text-decoration:none;font-weight:600;">'+escapeHTML(r.name)+'</a>' : '<span style="font-weight:600;">'+escapeHTML(r.name)+'</span>';
       const crioDetail = r.crioEnrolled > 0 || r.crioScreening > 0 ? '<div style="font-size:9px;color:#8b5cf6;">'+r.crioScreening+'scr / '+r.crioEnrolled+'enr</div>' : '';
-      return `<tr style="border-bottom:1px solid #f1f5f9;"${r.clickId ? ' onclick="showTrackerStageDetail(\''+tn+'\',\'all\')" style="cursor:pointer;border-bottom:1px solid #f1f5f9;"' : ''}>
+      return `<tr style="border-bottom:1px solid #f1f5f9;${r.clickId?'cursor:pointer;':''}"${r.clickId ? ' onclick="showTrackerStageDetail(\''+tn+'\',\'all\')"' : ''}>
         <td style="padding:8px 12px;">${nameHtml}</td>
         <td style="text-align:center;"><span style="font-size:9px;font-weight:600;padding:2px 6px;border-radius:4px;background:${tc}15;color:${tc};">${escapeHTML(r.type)}</span></td>
         <td style="text-align:center;font-weight:700;">${r.total}</td>
