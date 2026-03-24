@@ -135,6 +135,44 @@ function matchStudyName(a, b) {
   return false;
 }
 
+// Resolve a campaign/study name to protocol numbers via FB_CAMPAIGN_MAP + REFERRAL_STUDY_MAP
+function resolveCampaignProtocols(name) {
+  var sn = normalize(name);
+  var protos = [];
+  var campMap = ((CRP_CONFIG.CLICKUP || {}).FB_CAMPAIGN_MAP || {});
+  Object.keys(campMap).forEach(function(key) {
+    if (sn.indexOf(key) !== -1 || key.indexOf(sn) !== -1) {
+      campMap[key].forEach(function(p) { var lp = p.toLowerCase(); if (protos.indexOf(lp) === -1) protos.push(lp); });
+    }
+  });
+  if (typeof REFERRAL_STUDY_MAP !== 'undefined' && REFERRAL_STUDY_MAP[sn]) {
+    var rp = REFERRAL_STUDY_MAP[sn]; if (protos.indexOf(rp) === -1) protos.push(rp);
+  }
+  return protos;
+}
+
+// Enhanced study match: also resolves campaign names via FB_CAMPAIGN_MAP
+function matchStudyOrCampaign(a, b) {
+  if (matchStudyName(a, b)) return true;
+  // Try resolving a as campaign → protocols, then match each against b
+  var protosA = resolveCampaignProtocols(a);
+  if (protosA.length > 0) {
+    var nb = normalize(b);
+    for (var i = 0; i < protosA.length; i++) {
+      if (nb.indexOf(protosA[i]) !== -1 || protosA[i].indexOf(nb.split(' - ').pop().trim()) !== -1) return true;
+    }
+  }
+  // Try resolving b as campaign → protocols, then match each against a
+  var protosB = resolveCampaignProtocols(b);
+  if (protosB.length > 0) {
+    var na = normalize(a);
+    for (var j = 0; j < protosB.length; j++) {
+      if (na.indexOf(protosB[j]) !== -1 || protosB[j].indexOf(na.split(' - ').pop().trim()) !== -1) return true;
+    }
+  }
+  return false;
+}
+
 // Parse date robustly — handles YYYY-MM-DD, MM/DD/YYYY, Month DD YYYY
 function parseLocalDate(s) {
   if (!s) return null;
@@ -356,8 +394,8 @@ const CRP_CONFIG = {
       'high triglycerides_v2': ['J2A-MC-GZPS'],
       'high triglycerides_v1': ['J2A-MC-GZPO'],
       'high triglycerides':    ['J2A-MC-GZPS'],  // fallback for unversioned
-      'diabetes':              ['I8F-MC-GPHE', 'J2A-MC-GZGS'],
-      'heart health':          ['D7960C00015', 'D6973C00001', 'J1I-MC-GZBO'],
+      'diabetes':              ['I8F-MC-GPHE', 'J2A-MC-GZGS', 'N1T-MC-MALO', 'D6973C00001'],
+      'heart health':          ['D7960C00015', 'D6973C00001', 'J1I-MC-GZBO', 'N1T-MC-MALO', '20230222'],
       'eczema':                ['M20-465', 'M23-698', 'M24-601', '95597528ADM2001'],
       'chronic hives':         ['CDX0159-12'],
       'menstural migraines':   ['M23-714', 'C4951063'],  // campaign typo preserved
@@ -4943,7 +4981,7 @@ function buildMergedStudies(agingInv, agingAp, uninvoiced) {
     const inv = agingInv.find(r => r.study === s);
     const ap = agingAp.find(r => r.study === s);
     const un = uninvoiced.find(r => r.study === s);
-    var crioMatch = (typeof CRIO_STUDIES_DATA !== 'undefined') && CRIO_STUDIES_DATA.find(function(cs) { return cs.protocol_number === code || s.includes(cs.protocol_number); });
+    var crioMatch = (typeof CRIO_STUDIES_DATA !== 'undefined') && CRIO_STUDIES_DATA.find(function(cs) { var pn = (cs.protocol_number||'').toLowerCase(); return pn === code.toLowerCase() || s.toLowerCase().includes(pn); });
     var enrollStatus = crioMatch ? ({'ENROLLING':'Enrolling','MAINTENANCE':'Maintenance','STARTUP':'Startup','PRECLOSED':'Pre-Closed','CLOSED':'Closed','SUSPENDED':'Suspended','WITHDRAWN':'Withdrawn','CONFIGURING':'Configuring'}[crioMatch.status] || crioMatch.status || 'Active') : 'Active';
     return { study: code, full: s, invAR: inv ? Math.round(sumBuckets(inv) * 100) / 100 : 0, apAR: ap ? Math.round(sumBuckets(ap) * 100) / 100 : 0, uninvoiced: un ? un.amount : 0, status: enrollStatus, enrolled: crioMatch ? crioMatch.subject_count : 0 };
   });
@@ -8650,7 +8688,7 @@ function showStudyUnifiedModal(studyName) {
   }
 
   /* 4 — Campaign Activity (from CAMPAIGN_DATA) */
-  var campaigns = CAMPAIGN_DATA.filter(function(c) { return matchesStudy(c.study||c.campaign, studyName); });
+  var campaigns = CAMPAIGN_DATA.filter(function(c) { return matchStudyOrCampaign(c.study||c.campaign, studyName); });
   if (campaigns.length > 0) {
     var totalContacts = campaigns.reduce(function(sum, c) { return sum + (c.contacts||0); }, 0);
     var totalConversions = campaigns.reduce(function(sum, c) { return sum + (c.conversions||0); }, 0);
@@ -9762,17 +9800,22 @@ function showCampaignDetailModal(studyName) {
   // 2. PATIENT_DB (status of participants)
   // 3. DATA.allVisitDetail (upcoming appointments)
   const sn = studyName.toLowerCase().trim();
+  // Resolve campaign name → protocol numbers for matching
+  const _protos = resolveCampaignProtocols(studyName);
 
-  // Find referrals matching this campaign study
+  // Find referrals matching this campaign study (by name or resolved protocols)
   const referrals = REFERRAL_DATA.filter(r => {
     const rs = (r.study||'').toLowerCase().trim();
-    return rs === sn || rs.includes(sn) || sn.includes(rs);
+    if (rs === sn || rs.includes(sn) || sn.includes(rs)) return true;
+    return _protos.some(function(p) { return rs.includes(p) || p.includes(rs); });
   });
 
-  // Find upcoming visits for this study
-  const upcoming = (DATA.allVisitDetail || []).filter(v =>
-    v.study.toLowerCase().includes(sn) || sn.includes(v.study.toLowerCase())
-  );
+  // Find upcoming visits for this study (by name or resolved protocols)
+  const upcoming = (DATA.allVisitDetail || []).filter(v => {
+    var vs = v.study.toLowerCase().trim();
+    if (vs.includes(sn) || sn.includes(vs)) return true;
+    return _protos.some(function(p) { return vs.includes(p); });
+  });
 
   // Campaign metadata
   const campaign = CAMPAIGN_DATA.find(c => c.study === studyName);
@@ -9884,9 +9927,12 @@ function renderCrioReconciliation() {
 function showCampaignStudyDetail(campName) {
   // Strip prefix (Meta:, SW:, etc.) to get study name
   var study = campName.replace(/^(Meta|SW|ST|SM|SK|IC|CL):\s*/, '').split(' / ')[0].toLowerCase().trim();
+  // Resolve campaign name → protocol numbers for matching
+  var _protos = resolveCampaignProtocols(study);
   var filterFn = function(r) {
     var rs = (r.study || '').toLowerCase().trim();
-    return rs.length >= 3 && study.length >= 3 && (rs.indexOf(study) !== -1 || study.indexOf(rs) !== -1);
+    if (rs.length >= 3 && study.length >= 3 && (rs.indexOf(study) !== -1 || study.indexOf(rs) !== -1)) return true;
+    return _protos.some(function(p) { return rs.indexOf(p) !== -1 || p.indexOf(rs) !== -1; });
   };
   showReferralDetailModal(filterFn, campName);
 }
