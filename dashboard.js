@@ -8927,6 +8927,9 @@ async function refreshReferrals() {
       safe(buildRecruitmentKPIs, 'buildRecruitmentKPIs');
       if (typeof renderStudiesTable === 'function') try { renderStudiesTable(); } catch(e) { _log('renderStudiesTable: ' + e.message); }
     }).catch(e => console.warn('FB CRM fetch failed:', e));
+
+    // Fetch Study Master List from ClickUp (enriches Studies tab)
+    fetchStudyMasterList().catch(e => console.warn('Study Master List fetch failed:', e));
   } catch(e) {
     console.error('CRP Referrals: CSV fetch failed', e);
     if (badge) badge.textContent = '❌ Fetch failed';
@@ -9158,7 +9161,27 @@ function renderReferralDashboard() {
         const dbMatch = PATIENT_DB_MAP.get(r.name.toLowerCase().trim());
         if (dbMatch && dbMatch.status !== 'Available') flagged++;
       });
-      return { ...c, scheduledCount, convRate, pipeline: referrals.length, active: referrals.filter(r=>!r.is_closed).length, upcomingVisits: upcoming.length, flagged };
+      // CRIO subject cross-reference: match study name to get real enrollment numbers
+      var crioScreening = 0, crioEnrolled = 0, crioSF = 0, crioDNQ = 0, crioCompleted = 0;
+      if (CRIO_SUBJECTS_DATA && CRIO_SUBJECTS_DATA.length > 0 && CRIO_STUDIES_DATA && CRIO_STUDIES_DATA.length > 0) {
+        // Find matching CRIO study by fuzzy protocol match
+        var crioStudy = CRIO_STUDIES_DATA.find(function(cs) {
+          var pn = (cs.protocol_number||'').toLowerCase();
+          return pn.length >= 4 && (pn.indexOf(sn) !== -1 || sn.indexOf(pn) !== -1);
+        });
+        if (crioStudy) {
+          CRIO_SUBJECTS_DATA.forEach(function(sub) {
+            if (String(sub.study_key) !== String(crioStudy.study_key)) return;
+            var st = (sub.status||'').toUpperCase();
+            if (st === 'SCREENING' || st === 'SCHEDULED_V1') crioScreening++;
+            else if (st === 'ENROLLED') crioEnrolled++;
+            else if (st === 'SCREEN_FAIL') crioSF++;
+            else if (st === 'NOT_ELIGIBLE' || st === 'NOT_INTERESTED') crioDNQ++;
+            else if (st === 'COMPLETED') crioCompleted++;
+          });
+        }
+      }
+      return { ...c, scheduledCount, convRate, pipeline: referrals.length, active: referrals.filter(r=>!r.is_closed).length, upcomingVisits: upcoming.length, flagged, crioScreening, crioEnrolled, crioSF, crioDNQ, crioCompleted };
     });
 
     // KPI summary bar
@@ -9176,7 +9199,8 @@ function renderReferralDashboard() {
       <div style="text-align:center;min-width:70px;cursor:pointer;" onclick="showReferralDetailModal(function(r){var SG=((CRP_CONFIG.CLICKUP||{}).STAGE_GROUPS||{});return SG.SCHEDULED&&SG.SCHEDULED.has(r.stage);},'Scheduled Referrals')"><div style="font-size:18px;font-weight:800;color:#8b5cf6;">${totalScheduled}</div><div style="font-size:10px;color:#94a3b8;">Scheduled</div></div>
       <div style="text-align:center;min-width:70px;"><div style="font-size:18px;font-weight:800;color:${overallConv>=20?'#059669':overallConv>=10?'#d97706':'#dc2626'};">${overallConv}%</div><div style="font-size:10px;color:#94a3b8;">Conv. Rate</div></div>
       <div style="text-align:center;min-width:70px;cursor:pointer;" onclick="showReferralDetailModal(function(r){return !r.is_closed;},'Active Pipeline')"><div style="font-size:18px;font-weight:800;color:#1843ad;">${totalPipeline}</div><div style="font-size:10px;color:#94a3b8;">In Pipeline</div></div>
-      <div style="text-align:center;min-width:70px;"><div style="font-size:18px;font-weight:800;color:#06b6d4;">${totalUpcoming}</div><div style="font-size:10px;color:#94a3b8;">Upcoming Visits</div></div>
+      <div style="text-align:center;min-width:70px;"><div style="font-size:18px;font-weight:800;color:#8b5cf6;">${enriched.reduce((s,c)=>s+c.crioScreening,0)}</div><div style="font-size:10px;color:#94a3b8;">CRIO Screening</div></div>
+      <div style="text-align:center;min-width:70px;"><div style="font-size:18px;font-weight:800;color:#059669;">${enriched.reduce((s,c)=>s+c.crioEnrolled,0)}</div><div style="font-size:10px;color:#94a3b8;">CRIO Enrolled</div></div>
     </div>`;
 
     campHtml += `<div style="overflow-x:auto;"><table class="fin-table" style="width:100%;font-size:11px;">
@@ -9190,8 +9214,9 @@ function renderReferralDashboard() {
         <th style="text-align:center;">Scheduled</th>
         <th style="text-align:center;">Conv %</th>
         <th style="text-align:center;">Pipeline</th>
-        <th style="text-align:center;">Upcoming</th>
-        <th style="text-align:center;">Flags</th>
+        <th style="text-align:center;color:#8b5cf6;">CRIO Screen</th>
+        <th style="text-align:center;color:#059669;">CRIO Enrolled</th>
+        <th style="text-align:center;color:#dc2626;">CRIO SF</th>
       </tr></thead>
       <tbody>${enriched.map(c => {
         const crColor = c.convRate >= 20 ? '#059669' : c.convRate >= 10 ? '#d97706' : '#dc2626';
@@ -9205,8 +9230,9 @@ function renderReferralDashboard() {
           <td style="text-align:center;color:#8b5cf6;font-weight:700;">${c.scheduledCount}</td>
           <td style="text-align:center;font-weight:700;color:${crColor};">${c.convRate}%</td>
           <td style="text-align:center;color:#1843ad;">${c.pipeline > 0 ? c.active+'/'+c.pipeline : '—'}</td>
-          <td style="text-align:center;color:#06b6d4;font-weight:600;">${c.upcomingVisits || '—'}</td>
-          <td style="text-align:center;color:${c.flagged>0?'#dc2626':'#059669'};font-weight:${c.flagged>0?'700':'400'};">${c.flagged>0?'⚠ '+c.flagged:'✓'}</td>
+          <td style="text-align:center;color:#8b5cf6;font-weight:${c.crioScreening>0?'700':'400'};">${c.crioScreening||'—'}</td>
+          <td style="text-align:center;color:#059669;font-weight:${c.crioEnrolled>0?'700':'400'};">${c.crioEnrolled||'—'}</td>
+          <td style="text-align:center;color:#dc2626;font-weight:${c.crioSF>0?'700':'400'};">${c.crioSF||'—'}</td>
         </tr>`;
       }).join('')}</tbody>
     </table></div>`;
@@ -10986,6 +11012,72 @@ function renderMedRecTab() {
 }
 
 // ══════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════
+// STUDY MASTER LIST (ClickUp enrichment for Studies tab)
+// ══════════════════════════════════════════════════════════════
+var STUDY_MASTER_DATA = [];
+
+async function fetchStudyMasterList() {
+  if (!CRP_CONFIG.USE_CLOUD_FUNCTION || !CRP_CONFIG.CF_BASE) return;
+  try {
+    var resp = await fetch(CRP_CONFIG.CF_BASE + '?feed=studyMasterList&format=json');
+    var json = await resp.json();
+    STUDY_MASTER_DATA = json.data || [];
+    _log('Study Master List: ' + STUDY_MASTER_DATA.length + ' studies from ClickUp');
+    if (STUDY_MASTER_DATA.length > 0) {
+      enrichStudiesWithMasterList();
+      safe(renderStudiesTable, 'renderStudiesTable-masterList');
+    }
+  } catch(e) { _log('Study Master List fetch failed: ' + e.message); }
+}
+
+function enrichStudiesWithMasterList() {
+  if (!DATA || !DATA.enrollmentData || STUDY_MASTER_DATA.length === 0) return;
+  // Build lookup by study name (fuzzy: protocol substring match)
+  var masterByName = {};
+  STUDY_MASTER_DATA.forEach(function(m) {
+    var key = (m.study || '').toLowerCase().replace(/\s+/g, '');
+    if (key) masterByName[key] = m;
+  });
+
+  DATA.enrollmentData.forEach(function(e) {
+    var sn = (e.study || '').toLowerCase().replace(/\s+/g, '');
+    // Try exact match first, then substring
+    var match = masterByName[sn];
+    if (!match) {
+      for (var key in masterByName) {
+        if (key.length >= 4 && (sn.indexOf(key) !== -1 || key.indexOf(sn) !== -1)) {
+          match = masterByName[key]; break;
+        }
+      }
+    }
+    if (match) {
+      if (match.sponsor && match.sponsor !== '—') e.clickup_sponsor = match.sponsor;
+      if (match.cro) e.clickup_cro = match.cro;
+      if (match.pi && match.pi !== '—') e.clickup_pi = match.pi;
+      if (match.primary_coordinator) e.clickup_coordinator = match.primary_coordinator;
+      if (match.therapeutic_area) e.clickup_therapeutic_area = match.therapeutic_area;
+      if (match.site) e.clickup_site = match.site;
+      if (match.site_number) e.clickup_site_number = match.site_number;
+      if (match.crio_esource) e.clickup_esource_status = match.crio_esource;
+    }
+  });
+
+  // Propagate to mergedStudies
+  if (DATA.mergedStudies) {
+    DATA.mergedStudies.forEach(function(ms) {
+      var ed = DATA.enrollmentData.find(function(e) { return e.study === ms.study; });
+      if (ed) {
+        ms.sponsor = ed.clickup_sponsor || ms.sponsor || '';
+        ms.cro = ed.clickup_cro || '';
+        ms.therapeutic_area = ed.clickup_therapeutic_area || ms.therapeutic_area || '';
+      }
+    });
+  }
+  _log('Study Master List: enriched ' + DATA.enrollmentData.length + ' studies');
+}
+
+// ══════════════════════════════════════════════════════════════
 // PATIENT TRACKER NJ (PENNINGTON)
 // ══════════════════════════════════════════════════════════════
 
@@ -12545,7 +12637,7 @@ function renderStudiesTable() {
 
   // Sort
   if (_studySortCol >= 0) {
-    const keys = ['study','enroll_status','risk_score','cancels','upcoming','pct','screened','screening','screen_fail_pct'];
+    const keys = ['study','enroll_status','risk_score','cancels','upcoming','pct','screened','screening','screen_fail_pct','sponsor'];
     const key = keys[_studySortCol] || 'risk_score';
     studies.sort((a,b) => {
       const va = a[key] ?? (_studySortAsc ? 'zzz' : -999);
@@ -12685,6 +12777,8 @@ function renderStudiesTable() {
       <td style="padding:10px 8px;text-align:center;font-size:11px;color:var(--muted)">${s.screened||0}</td>
       <td style="padding:10px 8px;text-align:center;font-size:11px;color:${s.screening>0?'#7c3aed':'var(--muted)'};font-weight:${s.screening>0?'700':'400'}">${s.screening||0}</td>
       <td style="padding:10px 8px;text-align:center;font-size:11px;color:${sfColor};font-weight:600">${s.screen_fail_pct > 0 ? s.screen_fail_pct+'%' : '—'}</td>
+      <td style="padding:10px 8px;font-size:10px;color:#475569;white-space:nowrap;max-width:100px;overflow:hidden;text-overflow:ellipsis;" title="${escapeHTML(s.sponsor||'')}">${escapeHTML(s.sponsor||'—')}</td>
+      <td style="padding:10px 8px;font-size:10px;color:#475569;white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis;" title="${escapeHTML(s.therapeutic_area||'')}">${escapeHTML(s.therapeutic_area||'—')}</td>
       <td style="padding:10px 8px;text-align:center">${siteTags}</td>
       <td style="padding:10px 8px;text-align:center;font-size:10px;color:var(--muted);white-space:nowrap">${s.enrollment_start ? escapeHTML(s.enrollment_start) : '—'}</td>
       <td style="padding:10px 8px;text-align:center;font-size:10px;white-space:nowrap">${_ecDisplay}</td>
