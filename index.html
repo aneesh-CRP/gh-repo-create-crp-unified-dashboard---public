@@ -1094,6 +1094,7 @@ body {
   <span id="dh-crio-subjects" class="dh-chip">⏳ CRIO Subjects</span>
   <span id="dh-bq-cancels" class="dh-chip" style="display:none">⏳ BQ Cancels</span>
   <span style="margin-left:auto;font-size:10px;color:#A0AEC0;" id="dh-freshness"></span>
+  <span style="font-size:10px;color:#A0AEC0;margin-left:8px;" id="dh-version"></span>
 </div>
 <style>
 .dh-chip { padding:2px 8px; border-radius:4px; font-weight:600; font-size:10px; letter-spacing:0.3px; background:var(--surface2); color:var(--muted); transition: all 0.3s; }
@@ -1540,6 +1541,16 @@ body {
     <div style="display:none" id="vendor-analytics-container"></div>
     <div style="display:none" id="contact-sequence-container"></div>
     <div style="display:none" id="ref-conversion-container"></div>
+
+    <!-- All Sources Conversion Performance -->
+    <div class="card fade-in" style="margin-bottom:16px;">
+      <div class="card-header">
+        <span class="card-title">📊 All Sources — Conversion Performance</span>
+        <span class="badge badge-purple" id="ref-conversion-badge">Loading...</span>
+      </div>
+      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Conversion rates across all referral sources · New → Screening → Enrolled · ranked by effectiveness</div>
+      <div style="padding:0;" id="ref-all-conversion"></div>
+    </div>
 
     <!-- ═══ SECTION 2: DIGITAL MARKETING PIPELINE ═══ -->
     <div class="section-title" style="margin-top:24px;margin-bottom:8px;">Digital Marketing Pipeline</div>
@@ -2143,7 +2154,7 @@ function parseLocalDate(s) {
 // ═══ SERVICE WORKER REGISTRATION ═══
 if ('serviceWorker' in navigator && !(typeof google !== 'undefined' && google.script && google.script.run)) {
   // Force update: unregister old SW, clear caches, re-register
-  var _swVersion = 'v10';
+  var _swVersion = 'v11';
   var _lastSW = localStorage.getItem('crp_sw_version');
   if (_lastSW && _lastSW !== _swVersion) {
     navigator.serviceWorker.getRegistrations().then(function(regs) {
@@ -2154,8 +2165,11 @@ if ('serviceWorker' in navigator && !(typeof google !== 'undefined' && google.sc
     });
   }
   localStorage.setItem('crp_sw_version', _swVersion);
+  // Show version in data health strip
+  var _vEl = document.getElementById('dh-version');
+  if (_vEl) _vEl.textContent = 'SW ' + _swVersion;
   var swPath = (location.pathname.replace(/\/[^/]*$/, '') || '') + '/sw.js';
-  navigator.serviceWorker.register(swPath).then(function(reg) {
+  navigator.serviceWorker.register(swPath, { updateViaCache: 'none' }).then(function(reg) {
     _log('CRP: Service worker registered, scope:', reg.scope);
     reg.addEventListener('updatefound', function() {
       var newSW = reg.installing;
@@ -11401,6 +11415,71 @@ function renderReferralDashboard() {
     </tr>
     </tbody>
   </table>`;
+
+  // ── All Sources Conversion Performance ──
+  var convEl = el('ref-all-conversion');
+  var convBadge = el('ref-conversion-badge');
+  if (convEl && unifiedRows.length > 0) {
+    // Calculate conversion metrics for each source
+    var convRows = unifiedRows.filter(function(r) { return r.total > 0; }).map(function(r) {
+      var screenRate = r.total > 0 ? Math.round((r.screening + r.enrolled) / r.total * 100) : 0;
+      var enrollRate = r.total > 0 ? Math.round(r.enrolled / r.total * 100) : 0;
+      var dnqRate = r.total > 0 ? Math.round(r.dnq / r.total * 100) : 0;
+      var crioRate = r.total > 0 ? Math.round(r.inCrio / r.total * 100) : 0;
+      return { name: r.name, type: r.type, total: r.total, screening: r.screening, enrolled: r.enrolled, dnq: r.dnq, inCrio: r.inCrio, screenRate: screenRate, enrollRate: enrollRate, dnqRate: dnqRate, crioRate: crioRate, needsEntry: r.needsEntry||0 };
+    }).sort(function(a, b) { return b.enrollRate - a.enrollRate || b.screenRate - a.screenRate; });
+
+    var totAll = convRows.reduce(function(s,r){return s+r.total;},0);
+    var totEnr = convRows.reduce(function(s,r){return s+r.enrolled;},0);
+    var totScr = convRows.reduce(function(s,r){return s+r.screening;},0);
+    var totDnq = convRows.reduce(function(s,r){return s+r.dnq;},0);
+    var totCrio = convRows.reduce(function(s,r){return s+r.inCrio;},0);
+    var overallEnroll = totAll > 0 ? Math.round(totEnr/totAll*100) : 0;
+    var overallScreen = totAll > 0 ? Math.round((totScr+totEnr)/totAll*100) : 0;
+
+    if (convBadge) convBadge.textContent = overallEnroll + '% enroll rate · ' + convRows.length + ' sources';
+
+    var ch = '<div style="display:flex;gap:16px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid #f1f5f9;">';
+    ch += '<div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#3b82f6;">'+totAll+'</div><div style="font-size:10px;color:#94a3b8;">Total Referrals</div></div>';
+    ch += '<div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#8b5cf6;">'+overallScreen+'%</div><div style="font-size:10px;color:#94a3b8;">Screen Rate</div></div>';
+    ch += '<div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#059669;">'+overallEnroll+'%</div><div style="font-size:10px;color:#94a3b8;">Enroll Rate</div></div>';
+    ch += '<div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#dc2626;">'+Math.round(totDnq/Math.max(totAll,1)*100)+'%</div><div style="font-size:10px;color:#94a3b8;">DNQ Rate</div></div>';
+    ch += '<div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#6366f1;">'+Math.round(totCrio/Math.max(totAll,1)*100)+'%</div><div style="font-size:10px;color:#94a3b8;">CRIO Match</div></div>';
+    ch += '</div>';
+
+    ch += '<div style="overflow-x:auto;"><table class="fin-table" style="width:100%;font-size:11px;"><thead><tr>';
+    ch += '<th style="text-align:left;padding:8px 12px;">Source</th>';
+    ch += '<th style="text-align:center;">Type</th>';
+    ch += '<th style="text-align:center;">Total</th>';
+    ch += '<th style="text-align:center;">Screen Rate</th>';
+    ch += '<th style="text-align:center;">Enroll Rate</th>';
+    ch += '<th style="text-align:center;">DNQ Rate</th>';
+    ch += '<th style="text-align:center;">CRIO Match</th>';
+    ch += '<th style="text-align:center;min-width:120px;">Conversion Funnel</th>';
+    ch += '</tr></thead><tbody>';
+    convRows.forEach(function(r) {
+      var erColor = r.enrollRate >= 15 ? '#059669' : r.enrollRate >= 5 ? '#d97706' : '#dc2626';
+      var srColor = r.screenRate >= 30 ? '#059669' : r.screenRate >= 15 ? '#d97706' : '#dc2626';
+      var funnelW1 = 100, funnelW2 = r.screenRate, funnelW3 = r.enrollRate;
+      ch += '<tr style="border-bottom:1px solid #f1f5f9;">';
+      ch += '<td style="padding:7px 12px;font-weight:600;">'+escapeHTML(r.name)+'</td>';
+      ch += '<td style="text-align:center;"><span style="font-size:9px;font-weight:600;padding:2px 6px;border-radius:4px;background:'+(r.type==='Provider'?'#07206115':'#3b82f615')+';color:'+(r.type==='Provider'?'#072061':'#3b82f6')+';">'+escapeHTML(r.type)+'</span></td>';
+      ch += '<td style="text-align:center;font-weight:700;">'+r.total+'</td>';
+      ch += '<td style="text-align:center;font-weight:600;color:'+srColor+';">'+r.screenRate+'%</td>';
+      ch += '<td style="text-align:center;font-weight:700;color:'+erColor+';">'+r.enrollRate+'%</td>';
+      ch += '<td style="text-align:center;color:'+(r.dnqRate>30?'#dc2626':'#94a3b8')+';">'+r.dnqRate+'%</td>';
+      ch += '<td style="text-align:center;color:'+(r.crioRate>50?'#8b5cf6':'#94a3b8')+';">'+r.crioRate+'%</td>';
+      // Mini horizontal funnel bar
+      ch += '<td style="padding:4px 8px;"><div style="display:flex;gap:1px;height:14px;border-radius:3px;overflow:hidden;">';
+      ch += '<div style="width:'+Math.max(funnelW1-funnelW2,1)+'%;background:#cbd5e1;" title="Not progressed"></div>';
+      ch += '<div style="width:'+Math.max(funnelW2-funnelW3,0)+'%;background:#8b5cf6;" title="Screening"></div>';
+      ch += '<div style="width:'+funnelW3+'%;background:#059669;" title="Enrolled"></div>';
+      ch += '</div></td>';
+      ch += '</tr>';
+    });
+    ch += '</tbody></table></div>';
+    convEl.innerHTML = ch;
+  }
 
   // ── Old campaigns section (now merged into unified table above) ──
   if (false) {

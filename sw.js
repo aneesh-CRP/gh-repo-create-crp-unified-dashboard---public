@@ -1,5 +1,5 @@
 // CRP Dashboard Service Worker — Offline Support + Smart Caching
-const CACHE_NAME = 'crp-dashboard-v10';
+const CACHE_NAME = 'crp-dashboard-v11';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -80,10 +80,10 @@ self.addEventListener('fetch', function(event) {
     return;
   }
 
-  // HTML and JS files: network-first (always get latest code)
+  // HTML and JS files: network-first with revalidation (always get latest code)
   if (url.endsWith('.html') || url.endsWith('.js') || url.endsWith('/')) {
     event.respondWith(
-      fetch(event.request).then(function(response) {
+      fetch(event.request, { cache: 'no-cache' }).then(function(response) {
         if (response.ok) {
           var clone = response.clone();
           caches.open(CACHE_NAME).then(function(cache) {

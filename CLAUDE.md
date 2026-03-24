@@ -65,7 +65,7 @@
 | `splitAndDedup()` + trends aggregation | Key format, dedup consistency |
 | `renderAll()` KPI updates | Hardcoded text, missing dynamic updates |
 | `renderInvCapacity()` | Correct variable names (iv not visits) |
-| Schedule KPI HTML (~1395-1415) | Hardcoded months, onclick filter prefixes |
+| Overview KPI HTML (~1395-1415) | Hardcoded months, onclick filter prefixes |
 | `autoRefreshAll()` | Health button update, render order |
 | `buildRiskFlagCards()` | Hardcoded year in date parsing |
 | `buildSiteChart()` | Null guards on DOM chains |
@@ -74,6 +74,39 @@
 
 **DATA.allVisitDetail[]**: name, url, study, study_url, date_iso, coord, investigator, patient, patient_url, visit, status, site
 **DATA.allCancels[]**: name, url, study, study_url, subject_status, coord, investigator, type, reason, visit, category, cancel_date, site
+
+## Dashboard Tabs
+
+**Main Navigation (5 tabs):**
+1. **Overview** (default) — KPIs, visit calendar, risk flags, action required banner
+2. **Studies** — Study cards, enrollment, investigator capacity, site chart
+3. **Referrals** — Referral pipeline, campaign performance, provider trackers, CRIO matching
+4. **Actions** — Coordinator tasks, data quality alerts, follow-ups
+5. **Admin** (locked) — Trends, coordinator performance, admin controls
+
+**Finance Tabs (6, locked):**
+6. Finance — GAAP revenue, study finance summaries
+7. Collect — Invoice collection tracking
+8. Aging — Aging invoices, reconciliation
+9. Billing — Procedure revenue, cost config
+10. QB — QuickBooks sync
+11. Insights — Cross-tab analytics
+
+## Integrations
+
+### ClickUp — 10 Provider Trackers
+Dr. Modarressi, Center For Primary Care Medicine, Dr. Savita Singh, Dr. Richard Mandel, Prohealth Associates, Parkwood, SkinSmart Dermatology, Princeton Dermatology, Aura Derm, Connolly Dermatology
+
+### CRIO Patient Matching (priority order)
+1. **Phone match** — normalize to last 10 digits, lookup in `_crioPhoneMap`
+2. **Name match** — full name normalization, lookup in `PATIENT_DB_MAP`
+3. **Partial name match** — first+last parts search in `PATIENT_DB_MAP`
+4. Fallback to visit/cancel data (no patient_key)
+
+### Meta Marketing API
+- 60-day long-lived token (expires ~2026-05-22)
+- Ad account: `act_1368706200208131`, API v21.0
+- 6 campaigns: high triglycerides (v1/v2), diabetes, heart health, eczema, chronic hives, menstrual migraines
 
 ## Config
 - `CRP_CONFIG.COORDINATORS` — all 10
@@ -91,7 +124,7 @@
 ### Batch Endpoint
 `?feed=batch&feeds=name1,name2,name3&format=json` — runs multiple feeds in one HTTP request, returns `{ results: { name1: { rows, data }, name2: { rows, data } } }`. Used by dashboard for Action Required banner (4 feeds) and GAAP finance (4 feeds).
 
-### 47 BQ Feeds
+### 54 BQ Feeds
 
 | # | Feed | Source Table(s) | Key Join |
 |---|------|----------------|----------|
@@ -142,6 +175,26 @@
 | 45 | subjectAudit | subject_status_audit_log | subject_key |
 | 46 | stipendPayments | stipend_payment + subject_payment + stipend_account | stipend_payment_key |
 | 47 | documentSummary | subject_document (aggregated) | study_key |
+| 48 | prescrVisits | prescreening visits | subject_visit_key |
+| 49 | agingInvoices | invoice (aging detail) | study_key |
+| 50 | payments | payment (detail) | study_key |
+| 51 | revenueItems | revenue_item (detail) | study_key |
+| 52 | monthlyRevenue | revenue_item (monthly agg) | — |
+| 53 | stipends | subject_payment | study_key |
+| 54 | batch | multi-feed endpoint | — |
+
+### 8 ClickUp Feeds
+
+| # | Feed | Source |
+|---|------|--------|
+| 1 | referrals | Referral Pipeline (4 physician lists) |
+| 2 | campaigns | Central Campaigns list |
+| 3 | medRecords | Medical Records folder |
+| 4 | monitoringVisits | Monitoring Visit Tracker |
+| 5 | docExpiries | Document Expiries |
+| 6 | irbExpirations | IRB Expirations |
+| 7 | studyMasterList | Study Master List |
+| 8 | providerTrackers | Provider Trackers (10 physician lists) |
 
 ### GAAP UUID Join
 GAAP tables use STRING UUIDs (`study_id`, `site_id`). Join to study table via `study.external_id`, NOT `CAST(study_key AS STRING)`.
@@ -156,8 +209,8 @@ GAAP tables use STRING UUIDs (`study_id`, `site_id`). Join to study table via `s
 - **document.status**: -1=Deleted, 0=Updated, 1=Active, 2=Incoming, 3=Assigned, 4=Rejected, 6=Completed, 10=Signed
 
 ### Dashboard Load Phases
-1. **Phase 1** (Critical): visits, cancels, audit log → renders Overview, Schedule, Actions
-2. **Phase 2** (Finance): 5 core finance feeds + 4 GAAP feeds (batched) → renders Finance tab
-3. **Phase 3** (Supplemental): Action Required batch (4 feeds), Patient DB, Facebook CRM
-4. **Phase 4** (Referrals): referrals, campaigns, medRecords from Google Sheets CSV
+1. **Phase 1** (Critical): visits, cancels, audit log → renders Overview, Studies, Actions
+2. **Phase 2** (Finance): 5 core finance feeds + 4 GAAP feeds (batched) → renders Finance tabs
+3. **Phase 3** (Supplemental): Action Required batch (4 feeds), Patient DB, Meta Ads CRM
+4. **Phase 4** (Referrals): ClickUp referrals, campaigns, medRecords, provider trackers
 5. **Late render**: CRIO studies + subjects, expansion feeds (funnel, retention, coordinators, compliance)

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CRP · Unified Intelligence Dashboard</title>
+<title>CRP Dashboard</title>
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -336,7 +336,7 @@ body {
 .nav-sub { font-size: 11px; color: var(--muted); }
 .nav-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 .nav-tab {
-  padding: 5px 10px; border-radius: 6px; font-size: 12px; font-weight: 500;
+  padding: 4px 8px; border-radius: 5px; font-size: 11px; font-weight: 500;
   cursor: pointer; color: var(--muted); transition: all 0.15s;
   border: 1px solid transparent; white-space: nowrap;
 }
@@ -1045,35 +1045,35 @@ body {
     </g>
   </g>
 </svg></div>
-    <div class="nav-title" style="color:#072061;font-weight:700;font-size:14px;white-space:nowrap;">CRP <span style="color:#ff9933;">Intelligence</span></div>
+    <div class="nav-title" style="color:#072061;font-weight:700;font-size:13px;white-space:nowrap;">CRP</div>
   </div>
   <button class="nav-hamburger" onclick="document.getElementById('nav-tabs-wrap').classList.toggle('open')" aria-label="Toggle navigation">☰</button>
   <div id="nav-tabs-wrap" class="nav-tabs-wrapper">
     <span class="nav-tab active" onclick="switchTab('overview', this)" role="tab" aria-selected="true">Overview</span>
     <span class="nav-tab" onclick="switchTab('studies', this)" role="tab">Studies</span>
     <span class="nav-tab" onclick="switchTab('referrals', this)" role="tab">Referrals</span>
-    <span class="nav-tab" onclick="switchTab('actions', this)" role="tab">Action Plan</span>
+    <span class="nav-tab" onclick="switchTab('actions', this)" role="tab">Actions</span>
     <span class="nav-tab" onclick="switchTab('admin', this)" role="tab">🔒 Admin</span>
-    <span style="width:1px;background:#CBD5E0;margin:8px 3px"></span>
+    <span style="width:1px;background:#CBD5E0;margin:8px 2px"></span>
     <span class="nav-tab fin-tab" onclick="switchTab('fin-overview',this)" role="tab">🔒 Finance</span>
-    <span class="nav-tab fin-tab" onclick="switchTab('fin-collections',this)">🔒 Collections</span>
-    <span class="nav-tab fin-tab" onclick="switchTab('fin-aging',this)">🔒 Aging AR</span>
+    <span class="nav-tab fin-tab" onclick="switchTab('fin-collections',this)">🔒 Collect</span>
+    <span class="nav-tab fin-tab" onclick="switchTab('fin-aging',this)">🔒 Aging</span>
     <span class="nav-tab fin-tab" onclick="switchTab('fin-revenue',this)">🔒 Billing</span>
-    <span class="nav-tab fin-tab" onclick="switchTab('fin-qb',this)">🔒 CRIO vs QB</span>
-    <span style="width:1px;background:#CBD5E0;margin:8px 3px"></span>
+    <span class="nav-tab fin-tab" onclick="switchTab('fin-qb',this)">🔒 QB</span>
+    <span style="width:1px;background:#CBD5E0;margin:8px 2px"></span>
     <span class="nav-tab fin-tab" onclick="switchTab('insights',this)" role="tab">🔒 Insights</span>
   </div>
-  <div class="nav-right" style="margin-left:auto;">
-    <div id="search-container" style="position:relative;">
-      <input type="text" id="global-search" placeholder="Search..." autocomplete="off" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:11px;width:130px;background:var(--surface);color:var(--text);">
+  <div class="nav-right" style="margin-left:auto;gap:4px;">
+    <span class="data-badge" id="last-refresh-badge" style="font-size:10px;padding:2px 6px;">Loading...</span>
+    <button id="theme-toggle-btn" onclick="toggleDarkMode()" title="Toggle dark mode" style="padding:2px 6px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;font-size:12px;cursor:pointer;line-height:1;">🌙</button>
+    <button id="phi-toggle-btn" onclick="togglePHIMask()" title="Click to reveal patient names" style="padding:2px 6px;background:#059669;color:white;border:none;border-radius:4px;font-size:9px;font-weight:600;cursor:pointer;">&#x1f512; PHI</button>
+    <button id="dh-toggle-btn" onclick="toggleHealthStrip()" title="Data health status" style="padding:2px 6px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;font-size:9px;font-weight:600;cursor:pointer;color:var(--muted);display:none;">Health</button>
+    <button class="refresh-btn" id="refresh-btn" onclick="manualRefresh()" style="padding:2px 8px;font-size:10px;">↻</button>
+    <span class="data-badge" id="data-source-badge" style="display:none;"></span>
+    <div id="search-container" style="position:relative;display:none;">
+      <input type="text" id="global-search" placeholder="Search..." autocomplete="off" style="padding:3px 6px;border:1px solid var(--border);border-radius:4px;font-size:10px;width:90px;background:var(--surface);color:var(--text);">
       <div id="search-results" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:6px;margin-top:4px;max-height:300px;overflow-y:auto;z-index:1000;box-shadow:0 4px 12px rgba(0,0,0,0.15);font-size:12px;"></div>
     </div>
-    <span class="data-badge" id="data-source-badge" style="display:none;"></span>
-    <span class="data-badge" id="last-refresh-badge">Loading live data...</span>
-    <button id="theme-toggle-btn" onclick="toggleDarkMode()" title="Toggle dark mode" style="padding:4px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;font-size:13px;cursor:pointer;line-height:1;">🌙</button>
-    <button id="phi-toggle-btn" onclick="togglePHIMask()" title="Click to reveal patient names" style="padding:4px 10px;background:#059669;color:white;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;letter-spacing:0.3px;">&#x1f512; PHI Masked</button>
-    <button id="dh-toggle-btn" onclick="toggleHealthStrip()" title="Data health status" style="padding:4px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;color:var(--muted);display:none;" aria-label="Toggle data health">⏳ Health</button>
-    <button class="refresh-btn" id="refresh-btn" onclick="manualRefresh()">&#x21bb; Refresh</button>
   </div>
 </nav>
 <div id="fallback-banner" style="display:none;background:#fef2f2;border-bottom:2px solid #fecaca;padding:6px 16px;font-size:12px;color:#991b1b;text-align:center;font-weight:600;">⚠ Showing sample data — live data unavailable. <button onclick="manualRefresh()" style="background:#dc2626;color:white;border:none;border-radius:4px;padding:2px 10px;font-size:11px;cursor:pointer;margin-left:8px;">Retry</button></div>
@@ -1094,6 +1094,7 @@ body {
   <span id="dh-crio-subjects" class="dh-chip">⏳ CRIO Subjects</span>
   <span id="dh-bq-cancels" class="dh-chip" style="display:none">⏳ BQ Cancels</span>
   <span style="margin-left:auto;font-size:10px;color:#A0AEC0;" id="dh-freshness"></span>
+  <span style="font-size:10px;color:#A0AEC0;margin-left:8px;" id="dh-version"></span>
 </div>
 <style>
 .dh-chip { padding:2px 8px; border-radius:4px; font-weight:600; font-size:10px; letter-spacing:0.3px; background:var(--surface2); color:var(--muted); transition: all 0.3s; }
@@ -1106,7 +1107,7 @@ body {
 <div id="toast-container"></div>
 
 <!-- Print Header (visible only when printing) -->
-<div id="print-header">CRP Intelligence Dashboard</div>
+<div id="print-header">CRP Dashboard</div>
 
 <!-- ═══════════════════════════════════════
      MAIN
@@ -1171,22 +1172,13 @@ body {
     <div style="max-height:600px;overflow-y:auto;border-radius:0 0 8px 8px;">
       <table class="data-table sortable" id="vis-table">
         <thead>
-          <tr><th style="width:80px;font-size:10px">Confirm</th><th onclick="sortTable(this)">Date</th><th onclick="sortTable(this)">Study</th><th onclick="sortTable(this)">Visit</th><th onclick="sortTable(this)">Patient</th><th onclick="sortTable(this)">Status</th><th onclick="sortTable(this)">Med Records</th><th onclick="sortTable(this)">Coordinator</th><th onclick="sortTable(this)">Investigator</th><th onclick="sortTable(this)">Site</th></tr>
+          <tr><th style="width:80px;font-size:10px">Confirm</th><th onclick="sortTable(this)">Date</th><th onclick="sortTable(this)">Study</th><th onclick="sortTable(this)">Visit</th><th onclick="sortTable(this)">Patient</th><th onclick="sortTable(this)">Status</th><th onclick="sortTable(this)">Coordinator</th><th onclick="sortTable(this)">Investigator</th><th onclick="sortTable(this)">Site</th></tr>
         </thead>
         <tbody id="upcoming-tbody">
-<tr><td colspan="10" style="text-align:center;padding:24px;color:#94a3b8;font-size:12px">Loading schedule from CRIO...</td></tr>
+<tr><td colspan="9" style="text-align:center;padding:24px;color:#94a3b8;font-size:12px">Loading schedule from CRIO...</td></tr>
 </tbody>
       </table>
     </div>
-  </div>
-
-  <!-- Upcoming by Study -->
-  <div class="card mb16 fade-in" style="margin-top:16px;">
-    <div class="card-header">
-      <span class="card-title">Upcoming by Study</span>
-      <span class="badge badge-blue" id="sched-study-count">17 studies</span>
-    </div>
-    <div id="upcoming-study-bars" style="padding:12px 16px;max-height:320px;overflow-y:auto;"></div>
   </div>
 
   <!-- ═══ SECTION 2: CANCELLATION ANALYSIS ═══ -->
@@ -1369,17 +1361,27 @@ body {
   </div>
   <!-- Study Summary KPIs -->
   <div class="time-banner fade-in" style="margin-bottom:12px;" id="studies-kpi-strip">
-    <div class="tb-section"><div class="tb-label">Total Studies</div><div class="tb-value blue" id="sk-total">—</div></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterStudiesFromKPI('all')"><div class="tb-label">Total Studies</div><div class="tb-value blue" id="sk-total">—</div></div>
     <div class="tb-divider"></div>
-    <div class="tb-section"><div class="tb-label">Enrolling</div><div class="tb-value green" id="sk-enrolling">—</div></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterStudiesFromKPI('enrolling')"><div class="tb-label">Enrolling</div><div class="tb-value green" id="sk-enrolling">—</div></div>
     <div class="tb-divider"></div>
-    <div class="tb-section"><div class="tb-label">Maintenance</div><div class="tb-value" style="color:#059669" id="sk-maintenance">—</div></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterStudiesFromKPI('maintenance')"><div class="tb-label">Maintenance</div><div class="tb-value" style="color:#059669" id="sk-maintenance">—</div></div>
     <div class="tb-divider"></div>
-    <div class="tb-section"><div class="tb-label">Startup</div><div class="tb-value" style="color:#d97706" id="sk-startup">—</div></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterStudiesFromKPI('startup')"><div class="tb-label">Startup</div><div class="tb-value" style="color:#d97706" id="sk-startup">—</div></div>
     <div class="tb-divider"></div>
-    <div class="tb-section"><div class="tb-label">Total Enrolled</div><div class="tb-value" style="color:#7c3aed" id="sk-enrolled">—</div></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterStudiesFromKPI('all')"><div class="tb-label">Total Enrolled</div><div class="tb-value" style="color:#7c3aed" id="sk-enrolled">—</div></div>
     <div class="tb-divider"></div>
-    <div class="tb-section"><div class="tb-label">Avg SF Rate</div><div class="tb-value" style="color:#dc2626" id="sk-sf-rate">—</div></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterStudiesFromKPI('all')"><div class="tb-label">Avg SF Rate</div><div class="tb-value" style="color:#dc2626" id="sk-sf-rate">—</div></div>
+  </div>
+
+  <!-- Upcoming by Study (visual distribution) -->
+  <div class="card mb16 fade-in">
+    <div class="card-header">
+      <span class="card-title">Upcoming Visits by Study</span>
+      <span class="badge badge-blue" id="sched-study-count">—</span>
+    </div>
+    <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Scheduled visits per study · click count to see details</div>
+    <div id="upcoming-study-bars" style="padding:12px 16px;max-height:280px;overflow-y:auto;"></div>
   </div>
 
   <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;position:relative;z-index:10;" id="studies-filter-bar">
@@ -1411,6 +1413,8 @@ body {
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;" onclick="sortMergedTable(this,6)">Screened ↕</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;" onclick="sortMergedTable(this,7)">In Screen ↕</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;" onclick="sortMergedTable(this,8)">SF Rate ↕</th>
+            <th style="padding:10px 8px;text-align:left;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;" onclick="sortMergedTable(this,9)">Sponsor ↕</th>
+            <th style="padding:10px 8px;text-align:left;font-weight:700;color:var(--text);white-space:nowrap;">Therapeutic Area</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Site</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Enroll Start</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Enroll End</th>
@@ -1449,260 +1453,163 @@ body {
   <!-- Referral Dashboard -->
   <div id="referral-dashboard" style="display:none;">
 
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-      <span class="card-title">📊 Referral Pipeline</span>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <span class="card-title" style="font-size:16px;">Referrals & Recruitment</span>
       <div style="display:flex;gap:8px;align-items:center;">
         <span class="data-badge" id="ref-status-badge" style="font-size:10px;">Loading...</span>
-        <button onclick="refreshReferrals()" style="padding:4px 12px;background:#e8eeff;color:#1843ad;border:1px solid #1843ad;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">↻ Refresh</button>
+        <button onclick="refreshReferrals()" style="padding:3px 10px;background:#e8eeff;color:#1843ad;border:1px solid #1843ad;border-radius:5px;font-size:10px;font-weight:600;cursor:pointer;">↻ Refresh</button>
       </div>
     </div>
 
-    <!-- Pipeline KPI Banner -->
+    <!-- ═══ SECTION 1: PROVIDER REFERRAL PIPELINE ═══ -->
+    <div class="section-title" style="margin-top:0;margin-bottom:8px;">Provider Referral Pipeline</div>
+    <div style="font-size:10px;color:#94a3b8;margin-bottom:12px;">Physician referrals + recruitment campaigns tracked in ClickUp · patients manually entered into CRIO after contact · <span id="ref-pipeline-freshness">loading...</span></div>
+
+    <!-- Pipeline KPIs -->
     <div class="time-banner fade-in" style="margin-bottom:16px;">
-      <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showReferralDetailModal(r=>r.stage==='New Lead','New Leads','Pending outreach + to contact')" title="Click to see new leads">
-        <div class="tb-label">📥 New Leads</div>
-        <div class="tb-value blue" id="ref-kpi-leads">—</div>
-        <div class="tb-sub">Pending outreach + to contact</div>
+      <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showReferralDetailModal(function(){return true;},'All Referrals')">
+        <div class="tb-label">Total</div>
+        <div class="tb-value blue" id="ref-kpi-total">—</div>
+        <div class="tb-sub">All referrals</div>
       </div>
       <div class="tb-divider"></div>
-      <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showReferralDetailModal(r=>r.stage==='Contacted','In Contact','Interested + actively engaged')" title="Click to see contacted referrals">
-        <div class="tb-label">📞 In Contact</div>
-        <div class="tb-value yellow" id="ref-kpi-contact">—</div>
-        <div class="tb-sub">Interested + actively engaged</div>
+      <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showReferralDetailModal(r=>r.stage==='New Lead','New Leads')">
+        <div class="tb-label">New Leads</div>
+        <div class="tb-value" style="color:#3b82f6" id="ref-kpi-leads">—</div>
+        <div class="tb-sub">Pending outreach</div>
       </div>
       <div class="tb-divider"></div>
-      <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showReferralDetailModal(r=>CRP_CONFIG.CLICKUP.STAGE_GROUPS.SCREENING.has(r.stage),'Screening Referrals','Pre-screening + screening')" title="Click to see screening referrals">
-        <div class="tb-label">🩺 Screening</div>
+      <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showReferralDetailModal(r=>r.stage==='Contacted','Contacted')">
+        <div class="tb-label">Contacted</div>
+        <div class="tb-value" style="color:#d97706" id="ref-kpi-contact">—</div>
+        <div class="tb-sub">In contact</div>
+      </div>
+      <div class="tb-divider"></div>
+      <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showReferralDetailModal(r=>CRP_CONFIG.CLICKUP.STAGE_GROUPS.SCREENING.has(r.stage),'Screening')">
+        <div class="tb-label">Screening</div>
         <div class="tb-value green" id="ref-kpi-screening">—</div>
-        <div class="tb-sub">Pre-screening + screening</div>
+        <div class="tb-sub">Pre-screen + screening</div>
       </div>
       <div class="tb-divider"></div>
-      <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showReferralDetailModal(r=>CRP_CONFIG.CLICKUP.STAGE_GROUPS.ENROLLED.has(r.stage),'Enrolled Referrals','Randomized + completed')" title="Click to see enrolled referrals">
-        <div class="tb-label">✅ Enrolled</div>
+      <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showReferralDetailModal(r=>CRP_CONFIG.CLICKUP.STAGE_GROUPS.ENROLLED.has(r.stage),'Enrolled')">
+        <div class="tb-label">Enrolled</div>
         <div class="tb-value" style="color:#059669" id="ref-kpi-enrolled">—</div>
-        <div class="tb-sub">Randomized + completed</div>
+        <div class="tb-sub">Screened + enrolled</div>
       </div>
       <div class="tb-divider"></div>
-      <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showReferralDetailModal(r=>!r.is_closed,'All Active Referrals','Full pipeline breakdown')" title="Click to see conversion details">
-        <div class="tb-label">📊 Conversion</div>
-        <div class="tb-value" style="color:#7C3AED" id="ref-kpi-conversion">—</div>
-        <div class="tb-sub">Lead → Enrolled rate</div>
+      <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showReferralDetailModal(r=>r.stage==='DNQ'||r.stage==='Screen Fail','DNQ / Screen Fail')">
+        <div class="tb-label">DNQ/SF</div>
+        <div class="tb-value" style="color:#dc2626" id="ref-kpi-dnq">—</div>
+        <div class="tb-sub">Did not qualify</div>
       </div>
     </div>
 
-    <!-- Pipeline Funnel + Source Breakdown -->
-    <div class="grid-2" style="margin-bottom:16px;">
-      <div class="card fade-in">
-        <div class="card-header">
-          <span class="card-title">Pipeline Funnel</span>
+    <!-- Pipeline Funnel + DNQ Breakdown -->
+    <div class="card fade-in" style="margin-bottom:16px;">
+      <div class="card-header" style="flex-wrap:wrap;gap:8px;">
+        <span class="card-title">Pipeline Funnel</span>
+        <div style="display:flex;gap:4px;align-items:center;">
           <span class="badge badge-blue" id="ref-total-badge">—</span>
-        </div>
-        <div style="font-size:10px;color:#94a3b8;padding:0 16px;">All active referrals by stage · from ClickUp via Google Sheets</div>
-        <div class="card-header" style="border:none;padding-top:0">
-        </div>
-        <div style="padding:12px 16px;" id="ref-funnel-chart">
-          <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Loading pipeline...</div>
+          <button class="filter-btn active" onclick="setRefTimeFilter('all',this)" style="font-size:10px;padding:2px 8px;">All Time</button>
+          <button class="filter-btn" onclick="setRefTimeFilter('90',this)" style="font-size:10px;padding:2px 8px;">90 Days</button>
+          <button class="filter-btn" onclick="setRefTimeFilter('30',this)" style="font-size:10px;padding:2px 8px;">30 Days</button>
+          <button class="filter-btn" onclick="setRefTimeFilter('7',this)" style="font-size:10px;padding:2px 8px;">This Week</button>
         </div>
       </div>
-      <div class="card fade-in">
-        <div class="card-header">
-          <span class="card-title">Referral Source Breakdown</span>
-        </div>
-        <div style="font-size:10px;color:#94a3b8;padding:0 16px;">Where referrals originate — physician, Facebook, walk-in, etc.</div>
-        <div class="card-header" style="border:none;padding-top:0">
-        </div>
-        <div style="padding:12px 16px;" id="ref-source-chart">
-          <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Loading sources...</div>
-        </div>
+      <div style="padding:12px 16px;" id="ref-funnel-chart">
+        <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Loading pipeline...</div>
       </div>
     </div>
 
-    <!-- Pipeline by Study + Stale Leads -->
-    <div class="grid-2" style="margin-bottom:16px;">
-      <div class="card fade-in">
-        <div class="card-header">
-          <span class="card-title">Pipeline by Study</span>
-        </div>
-        <div style="font-size:10px;color:#94a3b8;padding:0 16px;">Active referrals grouped by study · all stages</div>
-        <div class="card-header" style="border:none;padding-top:0">
-        </div>
-        <div style="padding:0;" id="ref-study-table">
-          <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Loading...</div>
-        </div>
-      </div>
-      <div class="card fade-in">
-        <div class="card-header">
-          <span class="card-title">⚠️ Stale Leads</span>
-          <span class="badge badge-yellow" id="ref-stale-badge">—</span>
-        </div>
-        <div style="padding:12px 16px;" id="ref-stale-list">
-          <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Loading...</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Tracker Detail Cards -->
+    <!-- All Referral Sources -->
     <div class="card fade-in" style="margin-bottom:16px;">
       <div class="card-header">
-        <span class="card-title">📇 Physician Tracker Detail</span>
-      </div>
-      <div style="font-size:10px;color:#94a3b8;padding:0 16px;">Referring physicians from ClickUp Provider Trackers · referral volume and study matches</div>
-      <div class="card-header" style="border:none;padding-top:0">
-      </div>
-      <div style="padding:0;" id="ref-tracker-detail">
-        <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Loading tracker data...</div>
-      </div>
-    </div>
-
-    <!-- Central Campaigns — Unified Metrics + Cross-Reference -->
-    <div class="card fade-in" style="margin-bottom:16px;">
-      <div class="card-header">
-        <span class="card-title">📣 Central Campaigns — Metrics &amp; Conversion Tracking</span>
+        <span class="card-title">Referral Sources</span>
         <span class="badge badge-blue" id="ref-camp-badge">Loading...</span>
       </div>
-      <div style="padding:0;" id="ref-campaigns-table">
-        <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Loading campaigns...</div>
+      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Providers + campaigns · pipeline stages, CRIO match, needs entry flag · click row for patients</div>
+      <div style="padding:0;" id="ref-tracker-detail">
+        <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Loading referral sources...</div>
       </div>
     </div>
 
+    <!-- Hidden compat containers -->
+    <div style="display:none" id="ref-campaigns-table"></div>
+    <div style="display:none" id="ref-source-chart"></div>
+    <div style="display:none" id="ref-study-table"></div>
+    <div style="display:none" id="ref-stale-list"></div>
+    <div style="display:none" id="vendor-analytics-container"></div>
+    <div style="display:none" id="contact-sequence-container"></div>
+    <div style="display:none" id="ref-conversion-container"></div>
 
-    <!-- Vendor Analytics -->
+    <!-- All Sources Conversion Performance -->
     <div class="card fade-in" style="margin-bottom:16px;">
       <div class="card-header">
-        <span class="card-title">Vendor Performance Comparison</span>
-        <span class="badge badge-blue" id="vendor-analytics-badge" style="display:none">0</span>
+        <span class="card-title">📊 All Sources — Conversion Performance</span>
+        <span class="badge badge-purple" id="ref-conversion-badge">Loading...</span>
       </div>
-      <div style="font-size:10px;color:#94a3b8;padding:0 12px;">Referral volume and conversion by source vendor · from ClickUp referral data</div>
-      <div class="card-header" style="border:none;padding-top:0">
-        <button onclick="exportTableById('vendor-analytics-container','vendor-analytics')" style="font-size:10px;padding:3px 8px;border-radius:4px;border:1px solid #e2e8f0;background:white;cursor:pointer;margin-left:auto;">Export CSV</button>
-      </div>
-      <div id="vendor-analytics-container" style="padding:12px;">
-        <div style="text-align:center;padding:20px;color:var(--muted);font-size:12px;">Loading vendor data...</div>
-      </div>
+      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Conversion rates across all referral sources · New → Screening → Enrolled · ranked by effectiveness</div>
+      <div style="padding:0;" id="ref-all-conversion"></div>
     </div>
 
-    <!-- Contact Sequence Funnel -->
+    <!-- ═══ SECTION 2: DIGITAL MARKETING PIPELINE ═══ -->
+    <div class="section-title" style="margin-top:24px;margin-bottom:8px;">Digital Marketing Pipeline</div>
+    <div style="font-size:10px;color:#94a3b8;margin-bottom:12px;">Meta/Facebook ad leads flow directly into CRIO · tracked via Meta Marketing API (last 30 days) + Facebook CRM sheet · <span id="ref-meta-freshness">loading...</span></div>
+
+    <!-- FB CRM Leads -->
     <div class="card fade-in" style="margin-bottom:16px;">
       <div class="card-header">
-        <span class="card-title">Contact Sequence Effectiveness</span>
+        <span class="card-title">Facebook Lead Referrals</span>
+        <span class="badge badge-blue" id="ref-fb-badge">Loading...</span>
       </div>
-      <div style="font-size:10px;color:#94a3b8;padding:0 12px;">1st, 2nd, 3rd contact attempt conversion rates · from ClickUp referral tracking</div>
-      <div class="card-header" style="border:none;padding-top:0">
-      </div>
-      <div id="contact-sequence-container" style="padding:12px;">
-        <div style="text-align:center;padding:20px;color:var(--muted);font-size:12px;">Loading contact data...</div>
+      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Leads from Facebook forms · status distribution and campaign breakdown</div>
+      <div style="padding:0;" id="ref-fb-table">
+        <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Loading Facebook leads...</div>
       </div>
     </div>
 
-    <!-- Referral-to-Enrollment Funnel -->
+    <!-- Meta Campaign Performance -->
+    <div class="section-title" style="margin-top:16px;margin-bottom:8px;">Meta Ad Performance (last 30 days)</div>
+
     <div class="card fade-in" style="margin-bottom:16px;">
       <div class="card-header">
-        <span class="card-title">Referral-to-Enrollment Conversion by Source</span>
+        <span class="card-title">📈 Campaign Performance & Trends</span>
+        <span class="badge badge-blue" id="meta-ads-badge">Loading...</span>
       </div>
-      <div style="font-size:10px;color:#94a3b8;padding:0 12px;">% of referrals that reached enrolled status · by referral source type</div>
-      <div class="card-header" style="border:none;padding-top:0">
-        <span class="badge badge-purple" id="ref-conversion-badge" style="display:none">0</span>
-        <button onclick="exportTableById('ref-conversion-container','referral-conversion')" style="font-size:10px;padding:3px 8px;border-radius:4px;border:1px solid #e2e8f0;background:white;cursor:pointer;margin-left:auto;">Export CSV</button>
-      </div>
-      <div id="ref-conversion-container" style="padding:12px;">
-        <div style="text-align:center;padding:20px;color:var(--muted);font-size:12px;">Loading conversion data...</div>
-      </div>
+      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Meta Marketing API · impressions, clicks, leads, cost per lead (last 30 days)</div>
+      <div style="padding:0;" id="meta-ads-container"></div>
     </div>
 
-    <!-- ═══ Marketing Intelligence (Meta Ads API) ═══ -->
-    <div class="section-title" style="margin-top:16px;">📈 Marketing Intelligence</div>
+    <div class="card fade-in" style="margin-bottom:16px;">
+      <div class="card-header">
+        <span class="card-title">🎯 Campaign Funnel — Lead to Enrollment</span>
+        <span class="badge badge-purple" id="meta-funnel-badge">—</span>
+      </div>
+      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Meta leads → CRM → referral pipeline → CRIO screening → enrolled</div>
+      <div style="padding:0;" id="meta-funnel-container"></div>
+    </div>
 
-    <!-- Campaign Health Alerts -->
+    <div class="card fade-in" style="margin-bottom:16px;">
+      <div class="card-header">
+        <span class="card-title">🔗 Campaign ↔ Study Alignment</span>
+        <span class="badge badge-blue" id="meta-alignment-badge">—</span>
+      </div>
+      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Which campaigns map to which studies · enrolling studies with no campaign flagged</div>
+      <div id="meta-alignment-container" style="padding:12px 16px;"></div>
+    </div>
+
     <div class="card fade-in" style="margin-bottom:16px;">
       <div class="card-header">
         <span class="card-title">⚠️ Campaign Health Alerts</span>
         <span class="badge badge-yellow" id="meta-alerts-badge">Checking...</span>
       </div>
-      <div style="font-size:10px;color:#94a3b8;padding:0 16px;">Low-performing or paused Meta campaigns that may need attention</div>
-      <div class="card-header" style="border:none;padding-top:0">
-      </div>
-      <div id="meta-alerts-container" style="padding:12px 16px;">
-        <div style="text-align:center;padding:12px;color:var(--muted);font-size:13px;">Loading campaign data...</div>
-      </div>
+      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Low-performing or paused campaigns, creative fatigue, budget reallocation opportunities</div>
+      <div id="meta-alerts-container" style="padding:12px 16px;"></div>
     </div>
 
-    <!-- Full-Funnel Tracker (no dollar amounts) -->
-    <div class="card fade-in" style="margin-bottom:16px;">
-      <div class="card-header">
-        <span class="card-title">🎯 Campaign Funnel — Lead to Enrollment</span>
-      </div>
-      <div style="font-size:10px;color:#94a3b8;padding:0 16px;">Meta ad impressions → clicks → leads → referrals → screening → enrolled</div>
-      <div class="card-header" style="border:none;padding-top:0">
-        <span class="badge badge-purple" id="meta-funnel-badge">—</span>
-      </div>
-      <div style="padding:0;" id="meta-funnel-container">
-        <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Building funnel data...</div>
-      </div>
-    </div>
-
-    <!-- Campaign Performance with Sparklines -->
-    <div class="card fade-in" style="margin-bottom:16px;">
-      <div class="card-header">
-        <span class="card-title">📈 Campaign Performance &amp; Trends</span>
-        <span class="badge badge-blue" id="meta-ads-badge">Loading...</span>
-      </div>
-      <div style="font-size:10px;color:#94a3b8;padding:0 16px;">Meta Marketing API · impressions, clicks, leads, cost per lead (last 30 days)</div>
-      <div class="card-header" style="border:none;padding-top:0">
-      </div>
-      <div style="padding:0;" id="meta-ads-container">
-        <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Fetching Meta campaign data...</div>
-      </div>
-    </div>
-
-    <!-- Campaign ↔ Study Alignment -->
-    <div class="card fade-in" style="margin-bottom:16px;">
-      <div class="card-header">
-        <span class="card-title">🔗 Campaign ↔ Study Alignment</span>
-      </div>
-      <div style="font-size:10px;color:#94a3b8;padding:0 16px;">Which Meta campaigns map to which studies · lead volume and conversion match</div>
-      <div class="card-header" style="border:none;padding-top:0">
-        <span class="badge badge-blue" id="meta-alignment-badge">—</span>
-      </div>
-      <div id="meta-alignment-container" style="padding:12px 16px;">
-        <div style="text-align:center;padding:12px;color:var(--muted);font-size:13px;">Loading alignment data...</div>
-      </div>
-    </div>
-
-    <!-- Facebook CRM -->
-    <!-- Patient Pipeline by Site -->
-    <div class="card fade-in" style="margin-bottom:16px;">
-      <div class="card-header">
-        <span class="card-title">🏥 Patient Pipeline by Office</span>
-      </div>
-      <div style="font-size:10px;color:#94a3b8;padding:0 16px;">Facebook CRM leads by site location · stage breakdown per office</div>
-      <div class="card-header" style="border:none;padding-top:0">
-        <span class="badge badge-blue" id="pipeline-site-badge">Loading...</span>
-      </div>
-      <div id="pipeline-site-content" style="padding:16px;">
-        <div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">Loading patient pipeline data...</div>
-      </div>
-    </div>
-
-    <div class="card fade-in" style="margin-bottom:16px;">
-      <div class="card-header">
-        <span class="card-title">📘 Facebook / Meta Lead Referrals</span>
-        <span class="badge badge-blue" id="ref-fb-badge">Loading...</span>
-      </div>
-      <div style="padding:0;" id="ref-fb-table">
-        <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Fetching Facebook CRM sheet...</div>
-      </div>
-    </div>
-
-    <!-- BQ: Patient Conversion Funnel -->
-    <div class="card fade-in" style="margin-bottom:16px;">
-      <div class="card-header">
-        <span class="card-title">Patient Conversion Funnel</span>
-        <span class="badge badge-blue" id="ref-funnel-badge">Loading...</span>
-      </div>
-      <div id="ref-funnel-container" style="padding:12px;">
-        <div style="text-align:center;padding:20px;color:var(--muted);font-size:12px;">Loading funnel data...</div>
-      </div>
-    </div>
+    <!-- Hidden containers for unused sections -->
+    <div style="display:none" id="pipeline-site-content"></div>
+    <div style="display:none" id="ref-funnel-container"></div>
 
   </div><!-- /referral-dashboard -->
 
@@ -1789,7 +1696,20 @@ body {
     </div>
   </div>
 
-  <!-- 5. PATIENT CONTACT QUALITY -->
+  <!-- 5. CRIO RECONCILIATION -->
+  <div class="section-title" style="margin-top:16px;margin-bottom:10px;">🔄 CRIO Reconciliation</div>
+  <div class="card fade-in" style="margin-bottom:16px;">
+    <div class="card-header">
+      <span class="card-title">Referrals Needing CRIO Entry</span>
+      <span class="badge badge-red" id="crio-recon-badge">—</span>
+    </div>
+    <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Patients at Pre-Screening or later in ClickUp but not found in CRIO patient database · match by phone + name</div>
+    <div id="crio-recon-container" style="padding:12px;">
+      <div style="text-align:center;padding:20px;color:var(--muted);font-size:12px;">Loading reconciliation data...</div>
+    </div>
+  </div>
+
+  <!-- 6. PATIENT CONTACT QUALITY -->
   <div class="section-title" style="margin-top:16px;margin-bottom:10px;">📇 Patient Contact Quality</div>
   <div class="time-banner fade-in" style="margin-bottom:16px;">
     <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showContactAlerts('red')">
