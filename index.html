@@ -1360,17 +1360,17 @@ body {
   </div>
   <!-- Study Summary KPIs -->
   <div class="time-banner fade-in" style="margin-bottom:12px;" id="studies-kpi-strip">
-    <div class="tb-section"><div class="tb-label">Total Studies</div><div class="tb-value blue" id="sk-total">—</div></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterStudiesFromKPI('all')"><div class="tb-label">Total Studies</div><div class="tb-value blue" id="sk-total">—</div></div>
     <div class="tb-divider"></div>
-    <div class="tb-section"><div class="tb-label">Enrolling</div><div class="tb-value green" id="sk-enrolling">—</div></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterStudiesFromKPI('enrolling')"><div class="tb-label">Enrolling</div><div class="tb-value green" id="sk-enrolling">—</div></div>
     <div class="tb-divider"></div>
-    <div class="tb-section"><div class="tb-label">Maintenance</div><div class="tb-value" style="color:#059669" id="sk-maintenance">—</div></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterStudiesFromKPI('maintenance')"><div class="tb-label">Maintenance</div><div class="tb-value" style="color:#059669" id="sk-maintenance">—</div></div>
     <div class="tb-divider"></div>
-    <div class="tb-section"><div class="tb-label">Startup</div><div class="tb-value" style="color:#d97706" id="sk-startup">—</div></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterStudiesFromKPI('startup')"><div class="tb-label">Startup</div><div class="tb-value" style="color:#d97706" id="sk-startup">—</div></div>
     <div class="tb-divider"></div>
-    <div class="tb-section"><div class="tb-label">Total Enrolled</div><div class="tb-value" style="color:#7c3aed" id="sk-enrolled">—</div></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterStudiesFromKPI('all')"><div class="tb-label">Total Enrolled</div><div class="tb-value" style="color:#7c3aed" id="sk-enrolled">—</div></div>
     <div class="tb-divider"></div>
-    <div class="tb-section"><div class="tb-label">Avg SF Rate</div><div class="tb-value" style="color:#dc2626" id="sk-sf-rate">—</div></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterStudiesFromKPI('all')"><div class="tb-label">Avg SF Rate</div><div class="tb-value" style="color:#dc2626" id="sk-sf-rate">—</div></div>
   </div>
 
   <!-- Upcoming by Study (visual distribution) -->
@@ -14439,6 +14439,11 @@ function loadLongitudinalData() {
 let _studyFilter = 'all';
 let _studySortCol = -1, _studySortAsc = false;
 let _studyPageSize = 50;
+
+function filterStudiesFromKPI(type) {
+  var btn = document.querySelector('#studies-filter-bar [data-filter="'+type+'"]');
+  filterStudies(type, btn);
+}
 
 function filterStudies(type, btn) {
   _studyFilter = type;

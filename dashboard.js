@@ -12471,6 +12471,11 @@ let _studyFilter = 'all';
 let _studySortCol = -1, _studySortAsc = false;
 let _studyPageSize = 50;
 
+function filterStudiesFromKPI(type) {
+  var btn = document.querySelector('#studies-filter-bar [data-filter="'+type+'"]');
+  filterStudies(type, btn);
+}
+
 function filterStudies(type, btn) {
   _studyFilter = type;
   document.querySelectorAll('#studies-filter-bar .sched-filter').forEach(b => {
