@@ -9265,24 +9265,25 @@ var REFERRAL_STUDY_MAP = {
   'prevent-hf-az-d6973 baxduo': 'd6973c00001',
   'az-baxduo':                   'd6973c00001',
   'azure-outcomes':              'd7960c00015',
-  'ocean(a)':                    'c4951063',
-  'tp-400160':                   'mr-130a-01-td-3001',
+  'ocean(a)':                    '20230222',
   'velota':                      '80202135sle3001',
   'aqua':                        'efc17599',
-  'sjogren\'s disease':          'efc18366',
   'psa-2001':                    '88545223psa2001',
   'pso3006':                     '77242113pso3006',
   '405-201-00062':               'cdx0159-12',
-  'comp006':                     '80202135sjs3001',
   'mash prescreening':           'masld',
   'axs-07-304':                  'migraine',
   'laki':                        'j1g-mc-laki',
   'gzby':                        'j1i-mc-gzby',
 };
 
-// Values in the referral study column that are NOT study names (doctor names, sources, dates, blanks)
+// Referral study names to ignore (not in CRIO or closed/irrelevant)
 var REFERRAL_STUDY_SKIP = {'': 1, 'taher modarressi': 1, 'center for primary care medicine': 1,
-  'connolly dermatology': 1, 'dr. savita singh': 1};
+  'connolly dermatology': 1, 'dr. savita singh': 1,
+  'tp-400160': 1, 'free01-mdd-201': 1, 'nmra-335140-301': 1, 'comp006': 1,
+  'sjogren\'s disease': 1, 'j2p-mc-gzgw': 1, 'j2p-mc-lxbd': 1,
+  'd5985c00002': 1, 'i4v-mc-jajd': 1};
+
 function isReferralStudyGarbage(rs) {
   if (REFERRAL_STUDY_SKIP[rs]) return true;
   if (/^\d{4}-\d{2}-\d{2}$/.test(rs)) return true;  // date values
