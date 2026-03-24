@@ -9368,24 +9368,11 @@ function renderReferralDashboard() {
     // campaign leads often go directly to CRIO without ClickUp pipeline tracking
     var crioEnr = 0, crioScr = 0;
     if (CRIO_SUBJECTS_DATA && CRIO_STUDIES_DATA) {
-      // Resolve campaign study name → protocol numbers via FB_CAMPAIGN_MAP + REFERRAL_STUDY_MAP
-      var _campMap = ((CRP_CONFIG.CLICKUP || {}).FB_CAMPAIGN_MAP || {});
-      var _resolvedProtos = [];
-      // Direct match via FB_CAMPAIGN_MAP (campaign name → protocol list)
-      Object.keys(_campMap).forEach(function(key) {
-        if (sn.indexOf(key) !== -1 || key.indexOf(sn) !== -1) {
-          _campMap[key].forEach(function(p) { _resolvedProtos.push(p.toLowerCase()); });
-        }
-      });
-      // Also try REFERRAL_STUDY_MAP alias resolution
-      if (typeof REFERRAL_STUDY_MAP !== 'undefined' && REFERRAL_STUDY_MAP[sn]) {
-        _resolvedProtos.push(REFERRAL_STUDY_MAP[sn]);
-      }
+      var _resolvedProtos = resolveCampaignProtocols(sn);
       // Find all matching CRIO studies (may span multiple protocols)
       var _matchedCrioStudies = CRIO_STUDIES_DATA.filter(function(cs) {
         var pn = (cs.protocol_number||'').toLowerCase();
         if (pn.length < 4) return false;
-        // Match by resolved protocols first, then fallback to name match
         if (_resolvedProtos.some(function(rp) { return pn === rp || pn.indexOf(rp) !== -1; })) return true;
         return pn.indexOf(sn) !== -1 || sn.indexOf(pn) !== -1;
       });
@@ -9806,8 +9793,9 @@ function showCampaignDetailModal(studyName) {
   // Find referrals matching this campaign study (by name or resolved protocols)
   const referrals = REFERRAL_DATA.filter(r => {
     const rs = (r.study||'').toLowerCase().trim();
+    if (rs.length < 3) return false;
     if (rs === sn || rs.includes(sn) || sn.includes(rs)) return true;
-    return _protos.some(function(p) { return rs.includes(p) || p.includes(rs); });
+    return _protos.some(function(p) { return rs.includes(p) || (rs.length >= 4 && p.includes(rs)); });
   });
 
   // Find upcoming visits for this study (by name or resolved protocols)
@@ -9932,7 +9920,7 @@ function showCampaignStudyDetail(campName) {
   var filterFn = function(r) {
     var rs = (r.study || '').toLowerCase().trim();
     if (rs.length >= 3 && study.length >= 3 && (rs.indexOf(study) !== -1 || study.indexOf(rs) !== -1)) return true;
-    return _protos.some(function(p) { return rs.indexOf(p) !== -1 || p.indexOf(rs) !== -1; });
+    return rs.length >= 3 && _protos.some(function(p) { return rs.indexOf(p) !== -1 || (rs.length >= 4 && p.indexOf(rs) !== -1); });
   };
   showReferralDetailModal(filterFn, campName);
 }
