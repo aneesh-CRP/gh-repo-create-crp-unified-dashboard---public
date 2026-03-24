@@ -11331,18 +11331,35 @@ function renderReferralDashboard() {
     // campaign leads often go directly to CRIO without ClickUp pipeline tracking
     var crioEnr = 0, crioScr = 0;
     if (CRIO_SUBJECTS_DATA && CRIO_STUDIES_DATA) {
-      var crioStudy = CRIO_STUDIES_DATA.find(function(cs) {
-        var pn = (cs.protocol_number||'').toLowerCase();
-        return pn.length >= 4 && (pn.indexOf(sn) !== -1 || sn.indexOf(pn) !== -1);
+      // Resolve campaign study name → protocol numbers via FB_CAMPAIGN_MAP + REFERRAL_STUDY_MAP
+      var _campMap = ((CRP_CONFIG.CLICKUP || {}).FB_CAMPAIGN_MAP || {});
+      var _resolvedProtos = [];
+      // Direct match via FB_CAMPAIGN_MAP (campaign name → protocol list)
+      Object.keys(_campMap).forEach(function(key) {
+        if (sn.indexOf(key) !== -1 || key.indexOf(sn) !== -1) {
+          _campMap[key].forEach(function(p) { _resolvedProtos.push(p.toLowerCase()); });
+        }
       });
-      if (crioStudy) {
+      // Also try REFERRAL_STUDY_MAP alias resolution
+      if (typeof REFERRAL_STUDY_MAP !== 'undefined' && REFERRAL_STUDY_MAP[sn]) {
+        _resolvedProtos.push(REFERRAL_STUDY_MAP[sn]);
+      }
+      // Find all matching CRIO studies (may span multiple protocols)
+      var _matchedCrioStudies = CRIO_STUDIES_DATA.filter(function(cs) {
+        var pn = (cs.protocol_number||'').toLowerCase();
+        if (pn.length < 4) return false;
+        // Match by resolved protocols first, then fallback to name match
+        if (_resolvedProtos.some(function(rp) { return pn === rp || pn.indexOf(rp) !== -1; })) return true;
+        return pn.indexOf(sn) !== -1 || sn.indexOf(pn) !== -1;
+      });
+      _matchedCrioStudies.forEach(function(crioStudy) {
         CRIO_SUBJECTS_DATA.forEach(function(sub) {
           if (String(sub.study_key) !== String(crioStudy.study_key)) return;
           var st = (sub.status||'').toUpperCase();
           if (st === 'ENROLLED') crioEnr++;
           if (st === 'SCREENING' || st === 'SCHEDULED_V1') crioScr++;
         });
-      }
+      });
     }
     // Use whichever source has higher counts (CRIO is authoritative for campaigns)
     var _enrolled = Math.max(_pipelineEnrolled, crioEnr);
