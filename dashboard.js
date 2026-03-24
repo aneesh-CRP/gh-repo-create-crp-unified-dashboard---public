@@ -9036,7 +9036,7 @@ function renderReferralDashboard() {
   _kpiEl('ref-kpi-screening', sgCount(SG.SCREENING));
   _kpiEl('ref-kpi-enrolled', sgCount(SG.ENROLLED));
   _kpiEl('ref-kpi-dnq', (stageCounts['DNQ']||0) + (stageCounts['Screen Fail']||0));
-  _kpiEl('ref-total-badge', all.length + ' referrals · ' + Object.keys(trackerMap||{}).length + ' sources');
+  _kpiEl('ref-total-badge', all.length + ' referrals');
 
   // ── Pipeline Funnel ──
   const funnelEl = el('ref-funnel-chart');
