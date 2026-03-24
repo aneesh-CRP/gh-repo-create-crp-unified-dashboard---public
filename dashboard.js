@@ -9082,6 +9082,14 @@ function renderReferralDashboard() {
   _kpiEl('ref-kpi-enrolled', sgCount(SG.ENROLLED));
   _kpiEl('ref-kpi-dnq', (stageCounts['DNQ']||0) + (stageCounts['Screen Fail']||0));
   _kpiEl('ref-total-badge', all.length + ' referrals');
+  // Freshness info
+  var _refDatesAll = all.map(function(r){return r.date_created;}).filter(Boolean).sort();
+  var _refUpdates = all.map(function(r){return r.date_updated;}).filter(Boolean).sort();
+  var _freshEl = document.getElementById('ref-pipeline-freshness');
+  if (_freshEl && _refDatesAll.length) {
+    var newest = _refUpdates.length ? _refUpdates[_refUpdates.length-1] : _refDatesAll[_refDatesAll.length-1];
+    _freshEl.textContent = 'Data: ' + _refDatesAll[0] + ' — ' + _refDatesAll[_refDatesAll.length-1] + ' · Last updated: ' + newest + ' · Pulled ' + new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+  }
 
   // ── Pipeline Funnel ──
   const funnelEl = el('ref-funnel-chart');
@@ -11540,6 +11548,8 @@ async function fetchMetaAds() {
     });
 
     _log('CRP: Meta Ads loaded — ' + META_ADS_DATA.length + ' campaigns, ' + META_ADS_WEEKLY.length + ' weekly rows');
+    var _metaFresh = document.getElementById('ref-meta-freshness');
+    if (_metaFresh) _metaFresh.textContent = META_ADS_DATA.length + ' campaigns · ' + Math.round(META_ADS_DATA.reduce(function(s,c){return s+c.leads;},0)) + ' leads (30d) · Pulled ' + new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
     renderMetaAds();
     renderMetaAlerts();
     renderMetaFunnel();
