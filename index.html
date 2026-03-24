@@ -1546,7 +1546,7 @@ body {
     <div class="card fade-in" style="margin-bottom:16px;">
       <div class="card-header">
         <span class="card-title">📊 All Sources — Conversion Performance</span>
-        <span class="badge badge-purple" id="ref-conversion-badge">Loading...</span>
+        <span class="badge badge-purple" id="ref-allconv-badge">Loading...</span>
       </div>
       <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Conversion rates across all referral sources · New → Screening → Enrolled · ranked by effectiveness</div>
       <div style="padding:0;" id="ref-all-conversion"></div>
@@ -11418,7 +11418,7 @@ function renderReferralDashboard() {
 
   // ── All Sources Conversion Performance ──
   var convEl = el('ref-all-conversion');
-  var convBadge = el('ref-conversion-badge');
+  var convBadge = el('ref-allconv-badge');
   if (convEl && unifiedRows.length > 0) {
     // Calculate conversion metrics for each source
     var convRows = unifiedRows.filter(function(r) { return r.total > 0; }).map(function(r) {

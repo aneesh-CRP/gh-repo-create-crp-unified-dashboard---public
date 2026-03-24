@@ -9417,7 +9417,7 @@ function renderReferralDashboard() {
 
   // ── All Sources Conversion Performance ──
   var convEl = el('ref-all-conversion');
-  var convBadge = el('ref-conversion-badge');
+  var convBadge = el('ref-allconv-badge');
   if (convEl && unifiedRows.length > 0) {
     // Calculate conversion metrics for each source
     var convRows = unifiedRows.filter(function(r) { return r.total > 0; }).map(function(r) {
