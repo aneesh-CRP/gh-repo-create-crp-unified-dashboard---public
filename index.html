@@ -11212,9 +11212,9 @@ function renderReferralDashboard() {
   });
 
   if (campBadge) campBadge.textContent = unifiedRows.length + ' sources';
-  var staleBadge = el('ref-stale-badge');
+  var _staleBadge2 = el('ref-stale-badge');
   var totalStale = unifiedRows.reduce(function(s,r){return s+r.stale;},0);
-  if (staleBadge) staleBadge.textContent = totalStale > 0 ? totalStale + ' stale' : 'All active';
+  if (_staleBadge2) _staleBadge2.textContent = totalStale > 0 ? totalStale + ' stale' : 'All active';
 
   // Render unified table
   var typeColors = {'Provider':'#072061','facebook':'#3b82f6','subjectwell':'#8b5cf6','study teams':'#059669','study max':'#d97706','studykik':'#f59e0b','iconnect':'#06b6d4','gardinia - clinlife':'#ec4899'};
