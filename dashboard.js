@@ -9262,12 +9262,14 @@ function renderReferralDashboard() {
     const _screening = (sc['Pre-Screening']||0) + (sc['Screening']||0);
     const _stale = tasks.filter(t => !t.is_closed && t.days_since_update >= 7 && t.days_since_update <= 90 && t.date_created && new Date(t.date_created).getTime() >= _ninetyDaysAgoT).length;
     const _inCrio = tasks.filter(t => matchCrioPatient(t.name, t.phone) !== null).length;
-    // Verify: total should = newLead + contacted + screening + enrolled + dnq + lost + other
+    // Needs Entry: patients at Pre-Screening+ stage but NOT in CRIO
+    const _advancedStages = new Set(['Pre-Screening','Screening','Screened','Enrolled']);
+    const _needsEntry = tasks.filter(t => _advancedStages.has(t.stage) && matchCrioPatient(t.name, t.phone) === null).length;
     unifiedRows.push({
       name: name, type: 'Provider', total: tasks.length,
       newLead: sc['New Lead']||0, contacted: sc['Contacted']||0,
       screening: _screening, enrolled: _enrolled, dnq: _dnq,
-      stale: _stale, inCrio: _inCrio, clickId: name
+      stale: _stale, inCrio: _inCrio, needsEntry: _needsEntry, clickId: name
     });
   });
 
@@ -9306,7 +9308,7 @@ function renderReferralDashboard() {
       newLead: c.new_referrals, contacted: c.first_contact, screening: _screening,
       enrolled: _enrolled, dnq: _dnq, lost: 0, stale: 0,
       inCrio: crioEnr + crioScr, crioEnrolled: crioEnr, crioScreening: crioScr,
-      clickId: null, isCampaign: true, url: c.url
+      needsEntry: 0, clickId: null, isCampaign: true, url: c.url
     });
   });
 
@@ -9329,6 +9331,7 @@ function renderReferralDashboard() {
       <th style="text-align:center;color:#dc2626;">DNQ/SF</th>
       <th style="text-align:center;color:#d97706;">Stale</th>
       <th style="text-align:center;color:#8b5cf6;">In CRIO</th>
+      <th style="text-align:center;color:#dc2626;">Needs Entry</th>
     </tr></thead>
     <tbody>${unifiedRows.map(r => {
       const tc = typeColors[r.type.toLowerCase()] || typeColors[r.type] || '#64748b';
@@ -9351,6 +9354,7 @@ function renderReferralDashboard() {
         ${_td(r.dnq,'DNQ/Lost','color:#dc2626;')}
         <td style="text-align:center;color:${r.stale>0?'#d97706':'#cbd5e1'};font-weight:${r.stale>0?'700':'400'};">${r.stale||'—'}</td>
         <td style="text-align:center;color:${r.inCrio>0?'#8b5cf6':'#cbd5e1'};font-weight:${r.inCrio>0?'700':'400'};">${r.inCrio||'—'}${crioDetail}</td>
+        <td style="text-align:center;color:${r.needsEntry>0?'#dc2626':'#cbd5e1'};font-weight:${r.needsEntry>0?'700':'400'};">${r.needsEntry>0?'⚠ '+r.needsEntry:'—'}</td>
       </tr>`;
     }).join('')}
     <tr style="border-top:2px solid var(--border);background:var(--surface2);font-weight:700;">
@@ -9364,6 +9368,7 @@ function renderReferralDashboard() {
       <td style="text-align:center;color:#dc2626;">${unifiedRows.reduce((s,r)=>s+r.dnq,0)}</td>
       <td style="text-align:center;color:#d97706;">${unifiedRows.reduce((s,r)=>s+r.stale,0)||'—'}</td>
       <td style="text-align:center;color:#8b5cf6;">${unifiedRows.reduce((s,r)=>s+r.inCrio,0)}</td>
+      <td style="text-align:center;color:#dc2626;">${unifiedRows.reduce((s,r)=>s+(r.needsEntry||0),0)||'—'}</td>
     </tr>
     </tbody>
   </table>`;
