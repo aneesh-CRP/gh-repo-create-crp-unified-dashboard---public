@@ -3751,7 +3751,7 @@ function renderInvCapacity() {
     var allDates = iv.map(function(v){return v.date_iso;}).filter(Boolean).sort();
     var dataWeeks = 2; // fallback
     if (allDates.length >= 2) {
-      var spanMs = (parseDate(allDates[allDates.length-1])||new Date()) - (parseDate(allDates[0])||new Date());
+      var spanMs = (_parseDate(allDates[allDates.length-1])||new Date()) - (_parseDate(allDates[0])||new Date());
       dataWeeks = Math.max(1, Math.round(spanMs / 604800000)); // 7 days in ms
     }
     var utilPct = dayCount > 0 && availDays > 0 ? Math.min(100, Math.round(dayCount / (availDays * dataWeeks) * 100)) : 0;
@@ -4879,7 +4879,7 @@ function parseRevenueCSV(rows) {
   }).forEach(r => {
     const dateStr = r['Service Date'] || '';
     if (!dateStr) return;
-    const d = parseDate(dateStr);
+    const d = _parseDate(dateStr);
     if (!d) return;
     const mk = d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }).replace(' ', " '");
     const payType = (r['Revenue Payment Type'] || '').toLowerCase();
@@ -4921,7 +4921,7 @@ function parsePaymentsCSV(rows) {
   }).forEach(r => {
     const dateStr = r['Received Date'] || '';
     if (!dateStr) return;
-    const d = parseDate(dateStr);
+    const d = _parseDate(dateStr);
     if (!d) return;
     const mk = d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }).replace(' ', " '");
     const amount = num(r['Amount']);
