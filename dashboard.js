@@ -720,7 +720,7 @@ function pid(s){const m=s.match(/- ([A-Z0-9][A-Za-z0-9\-]+ ?(\(.+?\))?)/);return
 function slink(s){var es=escapeHTML(s);const p=pid(s);if(p&&CRIO_LINKS[p])return'<a href="'+escapeHTML(CRIO_LINKS[p])+'" target="_blank" class="study-link">'+es+'</a>';return es;}
 
 // ══════════ MODAL ══════════
-function showFinModal(t,html){document.getElementById('mTitle').textContent=t;document.getElementById('mBody').innerHTML=html;document.getElementById('modalBg').classList.add('active');}
+function showFinModal(t,html){var _mt=document.getElementById('mTitle'),_mb=document.getElementById('mBody'),_bg=document.getElementById('modalBg');if(!_mt||!_mb||!_bg)return;_mt.textContent=t;_mb.innerHTML=html;_bg.classList.add('active');}
 function closeFinModal(){document.getElementById('modalBg').classList.remove('active');}
 document.addEventListener('DOMContentLoaded',()=>{
   const mb=document.getElementById('modalBg');
@@ -905,13 +905,13 @@ function drawPayChart(){
 
 // ══════════ TABLE RENDERING ══════════
 function renderARStudies(){
-  const tb=document.getElementById('arStudiesBody');
+  const tb=document.getElementById('arStudiesBody');if(!tb)return;
   tb.innerHTML=TOP_AR_STUDIES.map(r=>{const pct=r.collected>0?((r.collected/(r.collected+r.total))*100).toFixed(0):'0';
     return'<tr class="clickable" onclick="showStudyModal(\''+jsAttr(r.study)+'\')">' +
       '<td>'+slink(r.study)+'</td><td class="r">'+fmt(r.invAR)+'</td><td class="r">'+fmt(r.apAR)+'</td><td class="r">'+fmt(r.total)+'</td><td class="r">'+fmt(r.collected)+'</td><td class="r">'+pct+'%</td></tr>';}).join('');
 }
 function renderAgingTables(){
-  const inv=document.getElementById('invAgingBody');const ap=document.getElementById('apAgingBody');
+  const inv=document.getElementById('invAgingBody');const ap=document.getElementById('apAgingBody');if(!inv||!ap)return;
   let it={c:0,a:0,b:0,d:0,e:0,f:0},at={c:0,a:0,b:0,d:0,e:0,f:0};
   inv.innerHTML=AGING_INV.map(r=>{const t=r.current+r.d30_60+r.d61_90+r.d91_120+r.d121_150+r.d150plus;it.c+=r.current;it.a+=r.d30_60;it.b+=r.d61_90;it.d+=r.d91_120;it.e+=r.d121_150;it.f+=r.d150plus;
     return'<tr class="clickable" onclick="showStudyModal(\''+jsAttr(r.study)+'\')">' +
@@ -924,13 +924,14 @@ function renderAgingTables(){
 }
 function renderAgingKPIs(){
   const bks=[{k:'current',l:'Current (0-30d)',c:'#10B981'},{k:'d30_60',l:'30-60 Days',c:'#F59E0B'},{k:'d61_90',l:'61-90 Days',c:'#F97316'},{k:'d91_120',l:'91-120 Days',c:'#EF4444'},{k:'d121_150',l:'121-150 Days',c:'#DC2626'},{k:'d150plus',l:'>150 Days',c:'#7F1D1D'}];
-  document.getElementById('agingKPIs').innerHTML=bks.map(b=>{
+  var _akEl=document.getElementById('agingKPIs');if(!_akEl)return;
+  _akEl.innerHTML=bks.map(b=>{
     const iv=AGING_INV.reduce((s,x)=>s+(x[b.k]||0),0);const ap=AGING_AP.reduce((s,x)=>s+(x[b.k]||0),0);const t=iv+ap;
     return'<div class="kpi click" onclick="showBucketModal(\''+b.k+'\')"><div class="kpi-stripe" style="background:'+b.c+'"></div><div class="label">'+b.l+'</div><div class="value" style="color:'+b.c+'">'+fmtK(t)+'</div><div class="sub">Inv '+fmtK(iv)+' + AP '+fmtK(ap)+'</div></div>';
   }).join('');
 }
 function renderRevByStudy(){
-  const tb=document.getElementById('revByStudyBody');let tot=0;
+  const tb=document.getElementById('revByStudyBody');if(!tb)return;let tot=0;
   tb.innerHTML=Object.entries(STUDY_REVENUE_12M).sort((a,b)=>b[1]-a[1]).filter(([_,v])=>v>0).map(([s,v])=>{tot+=v;return'<tr class="clickable" onclick="showStudyModal(\''+jsAttr(s)+'\')"><td>'+slink(s)+'</td><td class="r">'+fmt(v)+'</td></tr>';}).join('');
   tb.innerHTML+='<tr class="total-row"><td>TOTAL</td><td class="r">'+fmt(tot)+'</td></tr>';
 }
