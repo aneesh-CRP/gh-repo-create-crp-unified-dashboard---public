@@ -2121,9 +2121,27 @@ function parseLocalDate(s) {
 
 // ═══ SERVICE WORKER REGISTRATION ═══
 if ('serviceWorker' in navigator && !(typeof google !== 'undefined' && google.script && google.script.run)) {
+  // Force update: unregister old SW, clear caches, re-register
+  var _swVersion = 'v10';
+  var _lastSW = localStorage.getItem('crp_sw_version');
+  if (_lastSW && _lastSW !== _swVersion) {
+    navigator.serviceWorker.getRegistrations().then(function(regs) {
+      regs.forEach(function(r) { r.unregister(); });
+      caches.keys().then(function(keys) { keys.forEach(function(k) { caches.delete(k); }); });
+      localStorage.setItem('crp_sw_version', _swVersion);
+      _log('CRP: SW force-updated from ' + _lastSW + ' to ' + _swVersion);
+    });
+  }
+  localStorage.setItem('crp_sw_version', _swVersion);
   var swPath = (location.pathname.replace(/\/[^/]*$/, '') || '') + '/sw.js';
   navigator.serviceWorker.register(swPath).then(function(reg) {
     _log('CRP: Service worker registered, scope:', reg.scope);
+    reg.addEventListener('updatefound', function() {
+      var newSW = reg.installing;
+      if (newSW) newSW.addEventListener('statechange', function() {
+        if (newSW.state === 'activated') { _log('CRP: New SW activated'); }
+      });
+    });
   }).catch(function(err) {
     console.warn('CRP: Service worker registration failed:', err);
   });
