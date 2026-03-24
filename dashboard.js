@@ -13622,7 +13622,7 @@ document.addEventListener('visibilitychange', function() {
 window.addEventListener('hashchange', function() {
   var hash = location.hash.replace('#', '');
   if (!hash) return;
-  if (hash === 'actions') hash = 'schedule'; // Actions tab removed
+  if (hash === 'schedule') hash = 'overview'; // Schedule tab merged into Overview
   var tab = document.querySelector(".nav-tab[onclick*='" + hash + "']");
   switchTab(hash, tab || null);
 });
@@ -13727,8 +13727,8 @@ async function _crpInit() {
   var _initTab = 'overview';
   if (location.hash) {
     var _hashTab = location.hash.replace('#', '');
-    if (_hashTab === 'actions') _hashTab = 'schedule'; // Actions tab removed — redirect to Schedule
-    var _allTabs = ['overview','studies','schedule','referrals','admin','fin-overview','fin-collections','fin-aging','fin-revenue','insights'];
+    if (_hashTab === 'schedule') _hashTab = 'overview'; // Schedule merged into Overview
+    var _allTabs = ['overview','studies','referrals','actions','admin','fin-overview','fin-collections','fin-aging','fin-revenue','fin-qb','insights'];
     if (_allTabs.indexOf(_hashTab) !== -1) _initTab = _hashTab;
   }
   var _initTabEl = document.querySelector(".nav-tab[onclick*='" + _initTab + "']");
