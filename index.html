@@ -1623,11 +1623,46 @@ body {
       </div>
     </div>
 
-    <!-- Hidden containers for backward compat (Meta API — reactivate when token refreshed) -->
-    <div style="display:none" id="meta-alerts-container"></div>
-    <div style="display:none" id="meta-funnel-container"></div>
-    <div style="display:none" id="meta-ads-container"></div>
-    <div style="display:none" id="meta-alignment-container"></div>
+    <!-- ═══ Marketing Intelligence (Meta Ads API — live) ═══ -->
+    <div class="section-title" style="margin-top:16px;">📈 Meta Marketing Intelligence</div>
+
+    <div class="card fade-in" style="margin-bottom:16px;">
+      <div class="card-header">
+        <span class="card-title">📈 Campaign Performance & Trends</span>
+        <span class="badge badge-blue" id="meta-ads-badge">Loading...</span>
+      </div>
+      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Meta Marketing API · impressions, clicks, leads, cost per lead (last 30 days)</div>
+      <div style="padding:0;" id="meta-ads-container"></div>
+    </div>
+
+    <div class="card fade-in" style="margin-bottom:16px;">
+      <div class="card-header">
+        <span class="card-title">🎯 Campaign Funnel — Lead to Enrollment</span>
+        <span class="badge badge-purple" id="meta-funnel-badge">—</span>
+      </div>
+      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Meta leads → CRM → referral pipeline → CRIO screening → enrolled</div>
+      <div style="padding:0;" id="meta-funnel-container"></div>
+    </div>
+
+    <div class="card fade-in" style="margin-bottom:16px;">
+      <div class="card-header">
+        <span class="card-title">🔗 Campaign ↔ Study Alignment</span>
+        <span class="badge badge-blue" id="meta-alignment-badge">—</span>
+      </div>
+      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Which campaigns map to which studies · enrolling studies with no campaign flagged</div>
+      <div id="meta-alignment-container" style="padding:12px 16px;"></div>
+    </div>
+
+    <div class="card fade-in" style="margin-bottom:16px;">
+      <div class="card-header">
+        <span class="card-title">⚠️ Campaign Health Alerts</span>
+        <span class="badge badge-yellow" id="meta-alerts-badge">Checking...</span>
+      </div>
+      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Low-performing or paused campaigns, creative fatigue, budget reallocation opportunities</div>
+      <div id="meta-alerts-container" style="padding:12px 16px;"></div>
+    </div>
+
+    <!-- Hidden containers for unused sections -->
     <div style="display:none" id="pipeline-site-content"></div>
     <div style="display:none" id="ref-funnel-container"></div>
 
@@ -2317,7 +2352,7 @@ const CRP_CONFIG = {
     FACEBOOK_CRM_URL: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vR2y6TsaFLnVQcyskBntErNr5zl1WZRxZhWo-0cOIgMfEWvNm6NStcYatK9MF7U2tj4QDlnOCnopHri/pub?output=csv',
     // Meta Marketing API — live campaign insights (token expires ~60 days, regenerate at developers.facebook.com)
     META_ADS: {
-      ACCESS_TOKEN: 'EAAR30KmZARsIBQZBI3rY5NT5M943KyilrUywGRUupe0Nm4CYflEZBSrksryHFVYk3dZBcPqo9g906vH7ZAltDLWQZAAp1DaExCTc0l6pMQgVxFB2PkJ1ROjde42mefqp1AsCJ7sfJhuWeqkEP1g5IW55BZBINJARxo011ThFW7ngim76f93ax3hVrofPa6f0Qdy7rkLSw6wuVOI',
+      ACCESS_TOKEN: 'EAAR30KmZARsIBRKt4KRQZBg4X2VZB5MvqcYC9e71gSiL3mZAv2MvZAdq3LUj3LMpJ3cnhfQB69UtPRllSNUykotiRurZAwvPNinAb3ba9oV3J6fjuf7TyPxckKJRWQvsc0Dvs7C7XMDXj4tApvSYpTNmlkKp7L9YrZAHKflT0eENltYcKOI7ooLenhV4Ns5JuAjJqHFiTiRhIwhFpCbH2ybFSGhfyjnDZBszJk8aZAbtHbuSafECRclQ4uGCNMD54ZBdmHNZCkHrZAcfDsZAG0WLALPYv13L8XSUNkZCtpXgZDZD',
       AD_ACCOUNT_ID: 'act_1368706200208131',
       API_VERSION: 'v21.0',
     },

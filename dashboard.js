@@ -309,7 +309,7 @@ const CRP_CONFIG = {
     FACEBOOK_CRM_URL: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vR2y6TsaFLnVQcyskBntErNr5zl1WZRxZhWo-0cOIgMfEWvNm6NStcYatK9MF7U2tj4QDlnOCnopHri/pub?output=csv',
     // Meta Marketing API — live campaign insights (token expires ~60 days, regenerate at developers.facebook.com)
     META_ADS: {
-      ACCESS_TOKEN: 'EAAR30KmZARsIBQZBI3rY5NT5M943KyilrUywGRUupe0Nm4CYflEZBSrksryHFVYk3dZBcPqo9g906vH7ZAltDLWQZAAp1DaExCTc0l6pMQgVxFB2PkJ1ROjde42mefqp1AsCJ7sfJhuWeqkEP1g5IW55BZBINJARxo011ThFW7ngim76f93ax3hVrofPa6f0Qdy7rkLSw6wuVOI',
+      ACCESS_TOKEN: 'EAAR30KmZARsIBRKt4KRQZBg4X2VZB5MvqcYC9e71gSiL3mZAv2MvZAdq3LUj3LMpJ3cnhfQB69UtPRllSNUykotiRurZAwvPNinAb3ba9oV3J6fjuf7TyPxckKJRWQvsc0Dvs7C7XMDXj4tApvSYpTNmlkKp7L9YrZAHKflT0eENltYcKOI7ooLenhV4Ns5JuAjJqHFiTiRhIwhFpCbH2ybFSGhfyjnDZBszJk8aZAbtHbuSafECRclQ4uGCNMD54ZBdmHNZCkHrZAcfDsZAG0WLALPYv13L8XSUNkZCtpXgZDZD',
       AD_ACCOUNT_ID: 'act_1368706200208131',
       API_VERSION: 'v21.0',
     },
