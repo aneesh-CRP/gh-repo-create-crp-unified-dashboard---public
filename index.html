@@ -1609,100 +1609,25 @@ body {
       </div>
     </div>
 
-    <!-- ═══ Marketing Intelligence (Meta Ads API) ═══ -->
-    <div class="section-title" style="margin-top:16px;">📈 Marketing Intelligence</div>
-
-    <!-- Campaign Health Alerts -->
-    <div class="card fade-in" style="margin-bottom:16px;">
-      <div class="card-header">
-        <span class="card-title">⚠️ Campaign Health Alerts</span>
-        <span class="badge badge-yellow" id="meta-alerts-badge">Checking...</span>
-      </div>
-      <div style="font-size:10px;color:#94a3b8;padding:0 16px;">Low-performing or paused Meta campaigns that may need attention</div>
-      <div class="card-header" style="border:none;padding-top:0">
-      </div>
-      <div id="meta-alerts-container" style="padding:12px 16px;">
-        <div style="text-align:center;padding:12px;color:var(--muted);font-size:13px;">Loading campaign data...</div>
-      </div>
-    </div>
-
-    <!-- Full-Funnel Tracker (no dollar amounts) -->
-    <div class="card fade-in" style="margin-bottom:16px;">
-      <div class="card-header">
-        <span class="card-title">🎯 Campaign Funnel — Lead to Enrollment</span>
-      </div>
-      <div style="font-size:10px;color:#94a3b8;padding:0 16px;">Meta ad impressions → clicks → leads → referrals → screening → enrolled</div>
-      <div class="card-header" style="border:none;padding-top:0">
-        <span class="badge badge-purple" id="meta-funnel-badge">—</span>
-      </div>
-      <div style="padding:0;" id="meta-funnel-container">
-        <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Building funnel data...</div>
-      </div>
-    </div>
-
-    <!-- Campaign Performance with Sparklines -->
-    <div class="card fade-in" style="margin-bottom:16px;">
-      <div class="card-header">
-        <span class="card-title">📈 Campaign Performance &amp; Trends</span>
-        <span class="badge badge-blue" id="meta-ads-badge">Loading...</span>
-      </div>
-      <div style="font-size:10px;color:#94a3b8;padding:0 16px;">Meta Marketing API · impressions, clicks, leads, cost per lead (last 30 days)</div>
-      <div class="card-header" style="border:none;padding-top:0">
-      </div>
-      <div style="padding:0;" id="meta-ads-container">
-        <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Fetching Meta campaign data...</div>
-      </div>
-    </div>
-
-    <!-- Campaign ↔ Study Alignment -->
-    <div class="card fade-in" style="margin-bottom:16px;">
-      <div class="card-header">
-        <span class="card-title">🔗 Campaign ↔ Study Alignment</span>
-      </div>
-      <div style="font-size:10px;color:#94a3b8;padding:0 16px;">Which Meta campaigns map to which studies · lead volume and conversion match</div>
-      <div class="card-header" style="border:none;padding-top:0">
-        <span class="badge badge-blue" id="meta-alignment-badge">—</span>
-      </div>
-      <div id="meta-alignment-container" style="padding:12px 16px;">
-        <div style="text-align:center;padding:12px;color:var(--muted);font-size:13px;">Loading alignment data...</div>
-      </div>
-    </div>
-
-    <!-- Facebook CRM -->
-    <!-- Patient Pipeline by Site -->
-    <div class="card fade-in" style="margin-bottom:16px;">
-      <div class="card-header">
-        <span class="card-title">🏥 Patient Pipeline by Office</span>
-      </div>
-      <div style="font-size:10px;color:#94a3b8;padding:0 16px;">Facebook CRM leads by site location · stage breakdown per office</div>
-      <div class="card-header" style="border:none;padding-top:0">
-        <span class="badge badge-blue" id="pipeline-site-badge">Loading...</span>
-      </div>
-      <div id="pipeline-site-content" style="padding:16px;">
-        <div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">Loading patient pipeline data...</div>
-      </div>
-    </div>
-
+    <!-- Facebook / Meta Lead Referrals -->
     <div class="card fade-in" style="margin-bottom:16px;">
       <div class="card-header">
         <span class="card-title">📘 Facebook / Meta Lead Referrals</span>
         <span class="badge badge-blue" id="ref-fb-badge">Loading...</span>
       </div>
+      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Facebook CRM leads from Google Sheets · status distribution and campaign breakdown</div>
       <div style="padding:0;" id="ref-fb-table">
-        <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Fetching Facebook CRM sheet...</div>
+        <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Fetching Facebook CRM data...</div>
       </div>
     </div>
 
-    <!-- BQ: Patient Conversion Funnel -->
-    <div class="card fade-in" style="margin-bottom:16px;">
-      <div class="card-header">
-        <span class="card-title">Patient Conversion Funnel</span>
-        <span class="badge badge-blue" id="ref-funnel-badge">Loading...</span>
-      </div>
-      <div id="ref-funnel-container" style="padding:12px;">
-        <div style="text-align:center;padding:20px;color:var(--muted);font-size:12px;">Loading funnel data...</div>
-      </div>
-    </div>
+    <!-- Hidden containers for backward compat (Meta API — reactivate when token refreshed) -->
+    <div style="display:none" id="meta-alerts-container"></div>
+    <div style="display:none" id="meta-funnel-container"></div>
+    <div style="display:none" id="meta-ads-container"></div>
+    <div style="display:none" id="meta-alignment-container"></div>
+    <div style="display:none" id="pipeline-site-content"></div>
+    <div style="display:none" id="ref-funnel-container"></div>
 
   </div><!-- /referral-dashboard -->
 
