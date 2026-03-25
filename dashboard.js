@@ -1790,8 +1790,7 @@ function renderRevenuePerUser() {
 
 function initFinanceDashboard(forceRefresh) {
   if (finInitDone && !forceRefresh) return;
-  // Guard: ensure finance globals have data before rendering
-  if ((!AGING_INV || !AGING_INV.length) && (!UNPAID_INVOICES || !UNPAID_INVOICES.length) && (!TOP_AR_STUDIES || !TOP_AR_STUDIES.length)) { _log('CRP Finance: No data at all — skipping init'); return; }
+  _log('CRP Finance: initFinanceDashboard called, AGING_INV=' + (AGING_INV||[]).length + ' UNPAID=' + (UNPAID_INVOICES||[]).length + ' TOP_AR=' + (TOP_AR_STUDIES||[]).length);
   finInitDone = true;
   // Update all overview KPIs dynamically
   try { updateFinanceOverviewKPIs(); } catch(e) { _log('updateFinanceOverviewKPIs: ' + e.message); }
