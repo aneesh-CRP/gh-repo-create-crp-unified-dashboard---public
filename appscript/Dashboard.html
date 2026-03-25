@@ -1523,11 +1523,17 @@ body {
 
     <!-- All Referral Sources -->
     <div class="card fade-in" style="margin-bottom:16px;">
-      <div class="card-header">
+      <div class="card-header" style="flex-wrap:wrap;gap:8px;">
         <span class="card-title">Referral Sources</span>
+        <div style="display:flex;gap:4px;align-items:center;">
+          <button class="filter-btn active" onclick="setRefTimeFilter('all',this)">All</button>
+          <button class="filter-btn" onclick="setRefTimeFilter('30',this)">30d</button>
+          <button class="filter-btn" onclick="setRefTimeFilter('60',this)">60d</button>
+          <button class="filter-btn" onclick="setRefTimeFilter('90',this)">90d</button>
+        </div>
         <span class="badge badge-blue" id="ref-camp-badge">Loading...</span>
       </div>
-      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Providers + campaigns · pipeline stages, CRIO match, needs entry flag · click row for patients</div>
+      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Providers + campaigns · sortable by column · click numbers for detail · CRIO-verified conversions</div>
       <div style="padding:0;" id="ref-tracker-detail">
         <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Loading referral sources...</div>
       </div>

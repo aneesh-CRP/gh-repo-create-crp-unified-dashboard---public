@@ -1523,11 +1523,17 @@ body {
 
     <!-- All Referral Sources -->
     <div class="card fade-in" style="margin-bottom:16px;">
-      <div class="card-header">
+      <div class="card-header" style="flex-wrap:wrap;gap:8px;">
         <span class="card-title">Referral Sources</span>
+        <div style="display:flex;gap:4px;align-items:center;">
+          <button class="filter-btn active" onclick="setRefTimeFilter('all',this)">All</button>
+          <button class="filter-btn" onclick="setRefTimeFilter('30',this)">30d</button>
+          <button class="filter-btn" onclick="setRefTimeFilter('60',this)">60d</button>
+          <button class="filter-btn" onclick="setRefTimeFilter('90',this)">90d</button>
+        </div>
         <span class="badge badge-blue" id="ref-camp-badge">Loading...</span>
       </div>
-      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Providers + campaigns · pipeline stages, CRIO match, needs entry flag · click row for patients</div>
+      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Providers + campaigns · sortable by column · click numbers for detail · CRIO-verified conversions</div>
       <div style="padding:0;" id="ref-tracker-detail">
         <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Loading referral sources...</div>
       </div>
@@ -2469,6 +2475,36 @@ const CRP_CONFIG = {
   // Clinical coordinators who schedule patient visits (shown in Schedule tab)
   SCHEDULE_COORDINATORS: ['Mario Castellanos','Stacey Scott','Ruby Pereira','Cady Chilensky','Angelina McMullen'],
   INVESTIGATORS: ['Taher Modarressi','Eugene Andruczyk','Lolita Vaughan','Michael Tomeo','Joseph Heether','Jason Schoenfeld','Donna Gavarone','Lawrence Leventhal'],
+  // CRIO referral_source → canonical provider name (normalizes inconsistent CRIO naming)
+  SOURCE_NAME_MAP: {
+    'dr. taher modarressit':                'Dr. Modarressi',
+    'dr. taher - princeton cardiometabolic health': 'Dr. Modarressi',
+    'dr. taher modarressi':                 'Dr. Modarressi',
+    'dr. savita singh':                     'Dr. Savita Singh',
+    'princeton cardiometabolic':            'Dr. Savita Singh',
+    'connolly dermatology':                 'Connolly Dermatology',
+    'center for primary care medicine':     'Center for Primary Care Medicine',
+    'prohealth associates':                 'Prohealth Associates',
+    'parkwood medical practice':            'Parkwood',
+    'parkwood':                             'Parkwood',
+    'aura derm':                            'Aura Derm',
+    'princeton derm':                       'Princeton Dermatology',
+    'dr gavarone':                          'Dr. Modarressi',
+    'dr brian shaffer':                     'Dr. Modarressi',
+    'delfa':                                'Meta (DELFA)',
+    'facebook':                             'Meta (DELFA)',
+    'study team':                           'Study Team',
+    'study teams':                          'Study Team',
+    'study max':                            'Study Max',
+    'trial partners':                       'Trial Partners',
+    'studykik':                             'StudyKik',
+    'subjectwell':                          'SubjectWell',
+    'clinlife':                             'ClinLife',
+    'autorecruit':                          'AutoRecruit',
+    'acurian':                              'Acurian',
+    'tristar':                              'Tristar',
+    'iconnect':                             'iConnect',
+  },
   // Default PI for each study (fallback when audit log doesn't resolve investigator)
   STUDY_INVESTIGATORS: {
     // Format: 'study name fragment (lowercase)': 'Investigator Name'
@@ -6294,7 +6330,10 @@ function fetchActionRequiredData() {
       window._crioRefSourceMap = new Map();
       window._recruitingData.forEach(function(r) {
         var name = (r.patient_name||'').toLowerCase().trim().replace(/\s+/g, ' ');
-        if (name && r.referral_source) window._crioRefSourceMap.set(name, r.referral_source);
+        if (name && r.referral_source) {
+          var _srcNorm = (CRP_CONFIG.SOURCE_NAME_MAP || {})[r.referral_source.toLowerCase().trim()] || r.referral_source;
+          window._crioRefSourceMap.set(name, _srcNorm);
+        }
       });
       _log('CRP: Recruiting data loaded — ' + window._recruitingData.length + ' records, ' + window._crioRefSourceMap.size + ' with referral source');
     }
@@ -14149,6 +14188,21 @@ function renderMetaFunnel() {
       });
     }
 
+    // CRIO-verified conversions from BQ recruiting data (DELFA source = Meta)
+    var crioScreening = 0, crioEnrolled = 0, crioTotal = 0;
+    if (window._recruitingData && studies.length > 0) {
+      window._recruitingData.forEach(function(rec) {
+        var src = (rec.referral_source||'').toLowerCase();
+        if (src.indexOf('delfa') === -1 && src.indexOf('facebook') === -1) return;
+        var sn = (rec.study_name||'').toLowerCase();
+        if (!studies.some(function(s) { return sn.indexOf(s.toLowerCase()) !== -1; })) return;
+        crioTotal++;
+        var st = (rec.recruiting_status||'').toLowerCase();
+        if (st === 'success') crioEnrolled++;
+        if (st === 'screening' || st === 'interested') crioScreening++;
+      });
+    }
+
     // CTMS visits for mapped studies
     var ctmsVisits = 0;
     if (studies.length > 0 && DATA && DATA.allVisitDetail) {
@@ -14158,11 +14212,11 @@ function renderMetaFunnel() {
       });
     }
 
-    return { campaign: c.campaign, metaLeads: c.leads, crmLeads: crmLeads, inPipeline: inPipeline, contacted: contacted, screening: screening, enrolled: enrolled, ctmsVisits: ctmsVisits, studies: studies };
+    return { campaign: c.campaign, metaLeads: c.leads, crmLeads: crmLeads, inPipeline: inPipeline, contacted: contacted, screening: screening, enrolled: enrolled, ctmsVisits: ctmsVisits, studies: studies, crioScreening: crioScreening, crioEnrolled: crioEnrolled, crioTotal: crioTotal };
   }).sort(function(a, b) { return b.metaLeads - a.metaLeads; });
 
-  var totals = { meta: 0, crm: 0, pipeline: 0, screening: 0, enrolled: 0, visits: 0 };
-  funnelRows.forEach(function(r) { totals.meta += r.metaLeads; totals.pipeline += r.inPipeline; totals.screening += r.screening; totals.enrolled += r.enrolled; totals.visits += r.ctmsVisits; });
+  var totals = { meta: 0, crm: 0, pipeline: 0, screening: 0, enrolled: 0, visits: 0, crioScr: 0, crioEnr: 0 };
+  funnelRows.forEach(function(r) { totals.meta += r.metaLeads; totals.pipeline += r.inPipeline; totals.screening += r.screening; totals.enrolled += r.enrolled; totals.visits += r.ctmsVisits; totals.crioScr += r.crioScreening; totals.crioEnr += r.crioEnrolled; });
   // Unique CRM total (avoid double-counting leads matching multiple campaigns)
   if (fbStudyCol) {
     var crmSeen = new Set();
@@ -14173,16 +14227,16 @@ function renderMetaFunnel() {
       if (matched && !crmSeen.has(idx)) { totals.crm++; crmSeen.add(idx); }
     });
   }
-  if (badge) badge.textContent = totals.enrolled + ' enrolled from ' + totals.meta + ' leads';
+  if (badge) badge.textContent = totals.crioEnr + ' CRIO enrolled from ' + totals.meta + ' leads';
 
-  // Funnel KPI bar (no dollar amounts)
+  // Funnel KPI bar
   var html = '<div style="display:flex;gap:4px;padding:12px 16px;border-bottom:1px solid #f1f5f9;align-items:center;flex-wrap:wrap;">';
   var stages = [
     { label: 'Meta Leads', val: totals.meta, color: '#3b82f6' },
     { label: 'In CRM', val: totals.crm, color: '#6366f1' },
     { label: 'Pipeline', val: totals.pipeline, color: '#8b5cf6' },
-    { label: 'Screening', val: totals.screening, color: '#d97706' },
-    { label: 'Enrolled', val: totals.enrolled, color: '#059669' },
+    { label: 'CRIO Screening', val: totals.crioScr, color: '#d97706' },
+    { label: 'CRIO Enrolled', val: totals.crioEnr, color: '#059669' },
     { label: 'CTMS Visits', val: totals.visits, color: '#06b6d4' },
   ];
   stages.forEach(function(s, i) {
@@ -14194,17 +14248,17 @@ function renderMetaFunnel() {
   // Per-campaign funnel table
   html += '<div style="padding:4px 16px 0;font-size:9px;color:#94a3b8;">Approximate cross-reference (matched by campaign/study name) \u00B7 Meta API \u00B7 FB CRM Sheet \u00B7 ClickUp \u00B7 CRIO</div>';
   html += '<div style="overflow-x:auto;"><table class="fin-table" style="width:100%;font-size:10px;">';
-  html += '<thead><tr><th style="text-align:left;padding:6px 10px;">Campaign</th><th style="text-align:center;">Meta</th><th style="text-align:center;">CRM</th><th style="text-align:center;">Pipeline</th><th style="text-align:center;">Screening</th><th style="text-align:center;">Enrolled</th><th style="text-align:center;">Visits</th><th style="text-align:center;">Conv %</th></tr></thead><tbody>';
+  html += '<thead><tr><th style="text-align:left;padding:6px 10px;">Campaign</th><th style="text-align:center;">Meta Leads</th><th style="text-align:center;">CRM</th><th style="text-align:center;">Pipeline</th><th style="text-align:center;color:#d97706;">CRIO Scr</th><th style="text-align:center;color:#059669;">CRIO Enr</th><th style="text-align:center;">Visits</th><th style="text-align:center;">Conv %</th></tr></thead><tbody>';
   funnelRows.forEach(function(r) {
-    var conv = r.metaLeads > 0 ? Math.round(r.enrolled / r.metaLeads * 100) : 0;
+    var conv = r.metaLeads > 0 ? Math.round(r.crioEnrolled / r.metaLeads * 100) : 0;
     var convColor = conv >= 5 ? '#059669' : conv >= 2 ? '#d97706' : '#94a3b8';
     html += '<tr style="transition:background .1s" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'\'">';
     html += '<td style="padding:5px 10px;font-weight:600;">' + escapeHTML(r.campaign) + '<div style="font-size:8px;color:#94a3b8;">' + (r.studies.length > 0 ? r.studies.join(', ') : 'No study mapped') + '</div></td>';
     html += '<td style="text-align:center;font-weight:700;color:#3b82f6;">' + r.metaLeads + '</td>';
     html += '<td style="text-align:center;color:#6366f1;">' + r.crmLeads + '</td>';
     html += '<td style="text-align:center;color:#8b5cf6;">' + r.inPipeline + '</td>';
-    html += '<td style="text-align:center;color:#d97706;">' + r.screening + '</td>';
-    html += '<td style="text-align:center;font-weight:700;color:#059669;">' + r.enrolled + '</td>';
+    html += '<td style="text-align:center;color:#d97706;font-weight:' + (r.crioScreening > 0 ? '700' : '400') + ';">' + (r.crioScreening || '—') + '</td>';
+    html += '<td style="text-align:center;font-weight:700;color:#059669;">' + (r.crioEnrolled || '—') + '</td>';
     html += '<td style="text-align:center;color:#06b6d4;">' + r.ctmsVisits + '</td>';
     html += '<td style="text-align:center;font-weight:700;color:' + convColor + ';">' + conv + '%</td>';
     html += '</tr>';
