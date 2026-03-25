@@ -1910,6 +1910,8 @@ function switchTab(name, el) {
     showAuthModal(name);
     return;
   }
+  // Debug: log finance tab switch
+  if (FIN_TABS.includes(name)) _log('switchTab → ' + name + ' | finInit=' + finInitDone + ' | AGING=' + (AGING_INV||[]).length);
 
   // Hide ALL views
   document.querySelectorAll('.view, [id^="view-"]').forEach(v => {
@@ -1941,11 +1943,18 @@ function switchTab(name, el) {
   if (FIN_TABS.includes(name) && !finInitDone) {
     initFinanceDashboard();
   }
-  // Re-render specific sub-tab content (data may have loaded after first init)
-  if (name === 'fin-collections' && finInitDone) { try { renderCollections(); } catch(e){} }
-  if (name === 'fin-aging' && finInitDone) { try { renderAgingKPIs(); renderAgingTables(); } catch(e){} }
-  if (name === 'fin-revenue' && finInitDone) { try { renderRevenueTab(); } catch(e){} }
-  if (name === 'fin-qb' && finInitDone) { try { if(typeof renderQBView==='function') renderQBView(); } catch(e){} }
+  // Re-render specific sub-tab content
+  if (FIN_TABS.includes(name) && name !== 'fin-overview' && name !== 'fin-productivity' && name !== 'insights') {
+    // Ensure finance is initialized
+    if (!finInitDone) initFinanceDashboard();
+    // Re-render the specific tab
+    try {
+      if (name === 'fin-collections') { initColl(); renderCollections(); }
+      if (name === 'fin-aging') { renderAgingKPIs(); renderAgingTables(); }
+      if (name === 'fin-revenue') { renderRevenueTab(); }
+      if (name === 'fin-qb' && typeof renderQBView === 'function') { renderQBView(); }
+    } catch(e) { console.warn('Finance sub-tab render error:', e); }
+  }
 
   // Productivity tab — lazy load revenue per user
   if (name === 'fin-productivity' && !_rpuData) {
