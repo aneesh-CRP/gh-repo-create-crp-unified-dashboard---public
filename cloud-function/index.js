@@ -204,8 +204,7 @@ const FEEDS = {
       JOIN ${tbl('user')} u ON ua.user_key = u.user_key
       WHERE ua._fivetran_deleted = false AND su._fivetran_deleted = false
       QUALIFY ROW_NUMBER() OVER (PARTITION BY ua.calendar_appointment_key ORDER BY ua.date_created DESC) = 1) sp ON ca.calendar_appointment_key = sp.calendar_appointment_key
-    WHERE ca.subject_key IS NOT NULL AND st.is_active = 1 AND st.site_key NOT IN (5547)
-      AND ca.start >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 7 DAY)
+    WHERE ca.subject_key IS NOT NULL AND st.is_active = 1      AND ca.start >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 7 DAY)
       AND ca.start <= DATETIME_ADD(CURRENT_DATETIME(), INTERVAL 365 DAY)
       ${STUDY_FILTER_SQL}
     ORDER BY ca.start ASC`,
@@ -262,8 +261,7 @@ const FEEDS = {
       QUALIFY ROW_NUMBER() OVER (PARTITION BY ua.calendar_appointment_key ORDER BY ua.date_created DESC) = 1) sp ON aal.calendar_appointment_key = sp.calendar_appointment_key
     WHERE aal.change_type = 4
       AND aal.date_created >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 90 DAY)
-      AND st.is_active = 1 AND st.site_key NOT IN (5547)
-      ${STUDY_FILTER_SQL}
+      AND st.is_active = 1      ${STUDY_FILTER_SQL}
     ORDER BY aal.date_created DESC`,
     headers: {
       subject_full_name: 'Subject Full Name', study_name: 'Study Name', study_key: 'Study Key',
@@ -319,8 +317,7 @@ const FEEDS = {
     LEFT JOIN pi_leaders pi ON st.study_key = pi.study_key
     LEFT JOIN sub_counts sc ON st.study_key = sc.study_key
     LEFT JOIN ${tbl('study_finance')} sf ON st.study_key = sf.study_key
-    WHERE st._fivetran_deleted = false AND st.is_active = 1 AND st.site_key NOT IN (5547)
-      ${STUDY_FILTER_SQL}
+    WHERE st._fivetran_deleted = false AND st.is_active = 1      ${STUDY_FILTER_SQL}
     ORDER BY st.study_key`
   },
 
@@ -333,8 +330,7 @@ const FEEDS = {
       ${SUBJECT_STATUS_SQL} AS status
     FROM ${tbl('subject')} sub
     JOIN ${tbl('study')} st ON sub.study_key = st.study_key
-    WHERE sub._fivetran_deleted = false AND st.is_active = 1 AND st.site_key NOT IN (5547)
-    ORDER BY sub.study_key, sub.subject_key`
+    WHERE sub._fivetran_deleted = false AND st.is_active = 1    ORDER BY sub.study_key, sub.subject_key`
   },
 
   // ── 5. Study Status (milestones) ──
@@ -362,8 +358,7 @@ const FEEDS = {
     LEFT JOIN ${tbl('study_details')} sd ON st.study_key = sd.study_key
     LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
     LEFT JOIN ${tbl('clinical_trial')} ct ON st.clinical_trial_key = ct.clinical_trial_key
-    WHERE st._fivetran_deleted = false AND st.is_active = 1 AND st.site_key NOT IN (5547)
-      ${STUDY_FILTER_SQL}
+    WHERE st._fivetran_deleted = false AND st.is_active = 1      ${STUDY_FILTER_SQL}
     ORDER BY st.study_key`,
     headers: {
       study_key: 'Study Key (Back End)', study_name: 'Study Name', phase: 'Phase',
@@ -410,8 +405,7 @@ const FEEDS = {
     LEFT JOIN ${tbl('user')} by_u ON aal.by_user_key = by_u.user_key
     LEFT JOIN ${tbl('calendar_appointment')} ca ON aal.calendar_appointment_key = ca.calendar_appointment_key
     LEFT JOIN ${tbl('user')} coord ON ca.creator_key = coord.user_key
-    WHERE aal.date_created >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 90 DAY) AND st.is_active = 1 AND st.site_key NOT IN (5547)
-    ORDER BY aal.date_created DESC`,
+    WHERE aal.date_created >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 90 DAY) AND st.is_active = 1    ORDER BY aal.date_created DESC`,
     headers: {
       site_name: 'Site Name', study_key: 'Study Key (Back End)', study_name: 'Study Name',
       subject_key: 'Subject Key (Back End)', subject_full_name: 'Subject Full Name',
@@ -457,8 +451,7 @@ const FEEDS = {
       JOIN ${tbl('user')} u ON ua.user_key = u.user_key
       WHERE ua._fivetran_deleted = false AND su._fivetran_deleted = false
       QUALIFY ROW_NUMBER() OVER (PARTITION BY ua.calendar_appointment_key ORDER BY ua.date_created DESC) = 1) sp ON ca.calendar_appointment_key = sp.calendar_appointment_key
-    WHERE ca.subject_key IS NOT NULL AND st.is_active = 1 AND st.site_key NOT IN (5547)
-      AND ca.status != 0
+    WHERE ca.subject_key IS NOT NULL AND st.is_active = 1      AND ca.status != 0
       AND ca.start >= CURRENT_DATETIME()
       AND ca.start <= DATETIME_ADD(CURRENT_DATETIME(), INTERVAL 365 DAY)
       AND LOWER(CONCAT(COALESCE(st.nickname, ''), ' ', COALESCE(st.protocol_number, ''))) LIKE '%pre-screen%'
@@ -544,8 +537,7 @@ const FEEDS = {
     FROM ${tbl('subject')} sub
     JOIN ${tbl('study')} st ON sub.study_key = st.study_key
     LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
-    WHERE sub._fivetran_deleted = false AND st.is_active = 1 AND st.site_key NOT IN (5547)
-    GROUP BY sub.study_key, study_name
+    WHERE sub._fivetran_deleted = false AND st.is_active = 1    GROUP BY sub.study_key, study_name
     HAVING total_subjects > 0
     ORDER BY enrolled DESC`
   },
@@ -598,8 +590,7 @@ const FEEDS = {
       JOIN ${tbl('user')} u ON svs.coordinator_user_key = u.user_key
       WHERE svi.last_updated >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL ${days} DAY)
         AND svi._fivetran_deleted = false
-        AND st.is_active = 1 AND st.site_key NOT IN (5547)
-        ${STUDY_FILTER_SQL}
+        AND st.is_active = 1        ${STUDY_FILTER_SQL}
       GROUP BY coordinator
       HAVING visits_managed > 0
       ORDER BY visits_managed DESC`;
@@ -623,8 +614,7 @@ const FEEDS = {
     JOIN ${tbl('study')} st ON sv.study_key = st.study_key
     LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
     WHERE sv.subject_visit_appointment_end >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 90 DAY)
-      AND st.is_active = 1 AND st.site_key NOT IN (5547)
-    ORDER BY sv.subject_visit_appointment_end DESC`
+      AND st.is_active = 1    ORDER BY sv.subject_visit_appointment_end DESC`
   },
 
   // ═══════════════════════════════════════════════════════════
@@ -800,8 +790,7 @@ const FEEDS = {
     FROM ${tbl('study_finance')} sf
     JOIN ${tbl('study')} st ON sf.study_key = st.study_key
     LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
-    WHERE sf.total_revenue > 0 AND st.is_active = 1 AND st.site_key NOT IN (5547)
-    ORDER BY rev_per_subject DESC`
+    WHERE sf.total_revenue > 0 AND st.is_active = 1    ORDER BY rev_per_subject DESC`
   },
 
   // ── 20. System Health (for monitoring) ──
@@ -901,8 +890,7 @@ const FEEDS = {
     LEFT JOIN ${tbl('user')} cu ON vt.created_by_user_key = cu.user_key
     LEFT JOIN ${tbl('user')} comp_u ON vt.completed_by_user_key = comp_u.user_key
     LEFT JOIN ${tbl('subject')} sub ON vt.subject_key = sub.subject_key
-    WHERE vt._fivetran_deleted = false AND st.is_active = 1 AND st.site_key NOT IN (5547)
-      AND vt.status IN (2, 3, 4)
+    WHERE vt._fivetran_deleted = false AND st.is_active = 1      AND vt.status IN (2, 3, 4)
     ORDER BY CASE vt.status WHEN 4 THEN 0 WHEN 3 THEN 1 ELSE 2 END, vt.due_date ASC`
   },
 
@@ -1229,8 +1217,7 @@ const FEEDS = {
       WHERE su.role = 2 AND su._fivetran_deleted = false
         AND LOWER(CONCAT(u2.first_name, ' ', u2.last_name)) IN ('mario castellanos','stacey scott','ruby pereira','cady chilensky','angelina mcmullen','carly wood')
       QUALIFY ROW_NUMBER() OVER (PARTITION BY su.study_key ORDER BY su.date_created DESC) = 1) sc ON c.study_key = sc.study_key
-    WHERE c._fivetran_deleted = false AND st.is_active = 1 AND st.site_key NOT IN (5547)
-      AND c.is_resolved = 0
+    WHERE c._fivetran_deleted = false AND st.is_active = 1      AND c.is_resolved = 0
       AND c.date_created >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 90 DAY)
     ORDER BY c.date_created ASC`
   },
@@ -1292,8 +1279,7 @@ const FEEDS = {
     LEFT JOIN ${tbl('user')} owner ON sd.owner_user_key = owner.user_key
     LEFT JOIN ${tbl('user')} assigned ON sd.assigned_user_key = assigned.user_key
     LEFT JOIN ${tbl('user')} signer ON sd.signed_by_user_key = signer.user_key
-    WHERE sd._fivetran_deleted = false AND st.is_active = 1 AND st.site_key NOT IN (5547)
-      AND sd.status NOT IN (-1)
+    WHERE sd._fivetran_deleted = false AND st.is_active = 1      AND sd.status NOT IN (-1)
     ORDER BY sd.date_created DESC`
   },
 
@@ -1353,8 +1339,7 @@ const FEEDS = {
       LEFT JOIN ${tbl('study_visit')} sv ON svi.study_visit_key = sv.study_visit_key
       WHERE q.date_completed >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL ${days} DAY)
         AND q.answer IS NOT NULL AND q.answer != ''
-        AND st.is_active = 1 AND st.site_key NOT IN (5547)
-        AND q.first_name IS NOT NULL
+        AND st.is_active = 1        AND q.first_name IS NOT NULL
       GROUP BY q.study_key, study_name, q.subject_visit_key, visit_name, q.subject_key, answered_by
       ORDER BY questions_answered DESC`;
     }
@@ -1506,78 +1491,77 @@ const FEEDS = {
       const coordinators = "'Mario Castellanos','Stacey scott','Stacey Scott','Ruby Pereira','Cady Chilensky','Angelina McMullen','Ema Gunic','Vlado Draganic','Gabrijela Ateljevic','Ana Lambic','Jana Milankovic'";
       const investigators = "'Taher Modarressi','Eugene Andruczyk','Lolita Vaughan','Michael Tomeo','Joseph Heether','Jason Schoenfeld','Donna Gavarone','Lawrence Leventhal','Brian Shaffer','Hal Ganzman','Savita Singh','Christina Olney'";
       return `
-      WITH visit_revenue AS (
-        SELECT
-          svpr.subject_visit_key,
-          svpr.study_key,
-          svpr.subject_key,
-          svpr.site_key,
-          ROUND(SUM(CAST(svpr.revenue AS FLOAT64)), 2) AS visit_revenue,
-          ROUND(SUM(CAST(svpr.holdback AS FLOAT64)), 2) AS visit_holdback,
-          ROUND(SUM(CAST(svpr.receivable AS FLOAT64)), 2) AS visit_receivable,
-          COUNT(*) AS procedures_completed,
-          MIN(svpr.date_completed) AS earliest_completed,
-          MAX(svpr.date_completed) AS latest_completed
-        FROM ${tbl('subject_visit_procedure_revenue')} svpr
-        WHERE svpr.is_active = 1
-          AND svpr.date_completed >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL ${days} DAY)
-        GROUP BY svpr.subject_visit_key, svpr.study_key, svpr.subject_key, svpr.site_key
+      WITH procedure_revenue AS (
+        SELECT subject_visit_key,
+          ROUND(SUM(CAST(revenue AS FLOAT64)), 2) AS proc_revenue,
+          ROUND(SUM(CAST(holdback AS FLOAT64)), 2) AS proc_holdback,
+          COUNT(*) AS procedures_completed
+        FROM ${tbl('subject_visit_procedure_revenue')}
+        WHERE is_active = 1
+        GROUP BY subject_visit_key
       ),
       esource_all AS (
-        SELECT
-          q.subject_visit_key,
+        SELECT q.subject_visit_key,
           TRIM(CONCAT(COALESCE(q.first_name, ''), ' ', COALESCE(q.last_name, ''))) AS user_name,
           COUNT(*) AS questions_answered
         FROM ${tbl('fact_subject_visit_procedure_question')} q
-        WHERE q.answer IS NOT NULL AND q.answer != ''
-          AND q.first_name IS NOT NULL
+        WHERE q.answer IS NOT NULL AND q.answer != '' AND q.first_name IS NOT NULL
           AND q.date_completed >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL ${days} DAY)
         GROUP BY q.subject_visit_key, user_name
       ),
       esource_coordinator AS (
         SELECT subject_visit_key, user_name AS coordinator, questions_answered AS coord_questions
-        FROM esource_all
-        WHERE user_name IN (${coordinators})
+        FROM esource_all WHERE user_name IN (${coordinators})
         QUALIFY ROW_NUMBER() OVER (PARTITION BY subject_visit_key ORDER BY questions_answered DESC) = 1
       ),
       esource_investigator AS (
         SELECT subject_visit_key, user_name AS investigator, questions_answered AS inv_questions
-        FROM esource_all
-        WHERE user_name IN (${investigators})
+        FROM esource_all WHERE user_name IN (${investigators})
         QUALIFY ROW_NUMBER() OVER (PARTITION BY subject_visit_key ORDER BY questions_answered DESC) = 1
+      ),
+      completed_visits AS (
+        SELECT svi.subject_visit_key, svi.study_key, svi.subject_key,
+          st.site_key, svi.study_visit_key, svi.status AS visit_status_code,
+          svi.last_updated AS completed_date
+        FROM ${tbl('subject_visit')} svi
+        JOIN ${tbl('study')} st ON svi.study_key = st.study_key
+        WHERE svi.status IN (21, 22, 23) AND svi._fivetran_deleted = false
+          AND st.is_active = 1
+          AND svi.last_updated >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL ${days} DAY)
       )
       SELECT
         COALESCE(ec.coordinator, 'Unassigned') AS coordinator,
         COALESCE(ec.coord_questions, 0) AS coord_questions,
         COALESCE(ei.investigator, 'Unassigned') AS investigator,
         COALESCE(ei.inv_questions, 0) AS inv_questions,
-        CAST(vr.study_key AS STRING) AS study_key,
+        CAST(cv.study_key AS STRING) AS study_key,
         ${STUDY_NAME_SQL} AS study_name,
         COALESCE(sv.name, '') AS visit_name,
         ${SUBJECT_NAME_SQL} AS subject_name,
-        CASE svi.status
+        CASE cv.visit_status_code
           WHEN 22 THEN 'Complete' WHEN 23 THEN 'Outside CRIO'
-          WHEN 21 THEN 'Partial' WHEN 20 THEN 'Cancelled'
-          ELSE CAST(svi.status AS STRING) END AS visit_status,
-        vr.visit_revenue,
-        vr.visit_holdback,
-        vr.visit_receivable,
-        vr.procedures_completed,
-        FORMAT_DATETIME('%Y-%m-%d', vr.earliest_completed) AS date_completed,
-        FORMAT_DATETIME('%Y-%m', vr.earliest_completed) AS month_completed,
+          WHEN 21 THEN 'Partial' ELSE CAST(cv.visit_status_code AS STRING) END AS visit_status,
+        COALESCE(pr.proc_revenue, ROUND(CAST(svf.revenue_base AS FLOAT64), 2), 0) AS visit_revenue,
+        COALESCE(pr.proc_holdback, 0) AS visit_holdback,
+        COALESCE(pr.procedures_completed, 0) AS procedures_completed,
+        CASE WHEN pr.proc_revenue IS NOT NULL THEN 'Actual'
+          WHEN svf.revenue_base IS NOT NULL THEN 'Contracted'
+          ELSE 'Unknown' END AS revenue_type,
+        FORMAT_DATETIME('%Y-%m-%d', cv.completed_date) AS date_completed,
+        FORMAT_DATETIME('%Y-%m', cv.completed_date) AS month_completed,
         COALESCE(si.name, '') AS site_name
-      FROM visit_revenue vr
-      JOIN ${tbl('study')} st ON vr.study_key = st.study_key
+      FROM completed_visits cv
+      JOIN ${tbl('study')} st ON cv.study_key = st.study_key
       LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
-      LEFT JOIN ${tbl('subject')} sub ON vr.subject_key = sub.subject_key
-      LEFT JOIN ${tbl('subject_visit')} svi ON vr.subject_visit_key = svi.subject_visit_key
-      LEFT JOIN ${tbl('study_visit')} sv ON svi.study_visit_key = sv.study_visit_key
-      LEFT JOIN ${tbl('site')} si ON vr.site_key = si.site_key
-      LEFT JOIN esource_coordinator ec ON vr.subject_visit_key = ec.subject_visit_key
-      LEFT JOIN esource_investigator ei ON vr.subject_visit_key = ei.subject_visit_key
-      WHERE st.is_active = 1 AND st.site_key NOT IN (5547)
-        AND svi.status IN (21, 22, 23)
-      ORDER BY vr.visit_revenue DESC`;
+      LEFT JOIN ${tbl('subject')} sub ON cv.subject_key = sub.subject_key
+      LEFT JOIN ${tbl('study_visit')} sv ON cv.study_visit_key = sv.study_visit_key
+      LEFT JOIN ${tbl('site')} si ON cv.site_key = si.site_key
+      LEFT JOIN procedure_revenue pr ON cv.subject_visit_key = pr.subject_visit_key
+      LEFT JOIN ${tbl('study_visit_finance')} svf ON cv.study_visit_key = svf.study_visit_key
+      LEFT JOIN esource_coordinator ec ON cv.subject_visit_key = ec.subject_visit_key
+      LEFT JOIN esource_investigator ei ON cv.subject_visit_key = ei.subject_visit_key
+      WHERE (ec.coordinator IS NOT NULL OR ei.investigator IS NOT NULL)
+      ORDER BY visit_revenue DESC`;
     }
   },
 
@@ -1665,8 +1649,7 @@ const FEEDS = {
     LEFT JOIN ${tbl('user')} u ON rd.user_key = u.user_key
     LEFT JOIN ${tbl('site')} si ON rd.site_key = si.site_key
     WHERE rd.is_active = 1 AND rd.status IN (2, 3)
-      AND st.is_active = 1 AND st.site_key NOT IN (5547)
-      ${STUDY_FILTER_SQL}
+      AND st.is_active = 1      ${STUDY_FILTER_SQL}
     ORDER BY rd.date_created DESC`
   },
 
@@ -1693,8 +1676,7 @@ const FEEDS = {
     FROM ${tbl('subject_document')} sd
     JOIN ${tbl('study')} st ON sd.study_key = st.study_key
     LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
-    WHERE sd._fivetran_deleted = false AND st.is_active = 1 AND st.site_key NOT IN (5547)
-      AND sd.status != -1
+    WHERE sd._fivetran_deleted = false AND st.is_active = 1      AND sd.status != -1
     GROUP BY sd.study_key, study_name
     HAVING total_documents > 0
     ORDER BY total_documents DESC`
