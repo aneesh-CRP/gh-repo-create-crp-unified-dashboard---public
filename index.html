@@ -1550,6 +1550,26 @@ body {
     <div style="display:none" id="ref-fb-table"></div>
 
     <!-- ═══ SECTION 2: META AD PERFORMANCE ═══ -->
+    <!-- Monthly Trend by Source -->
+    <div class="card fade-in" style="margin-bottom:16px;">
+      <div class="card-header">
+        <span class="card-title">Monthly Referral Trend by Source</span>
+        <span class="badge badge-blue" id="ref-trend-badge">Loading...</span>
+      </div>
+      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Patient created date by month · top sources · CRIO recruiting data</div>
+      <div style="padding:0;" id="ref-monthly-trend"></div>
+    </div>
+
+    <!-- Conversion Velocity -->
+    <div class="card fade-in" style="margin-bottom:16px;">
+      <div class="card-header">
+        <span class="card-title">Conversion Velocity by Source</span>
+        <span class="badge badge-purple" id="ref-velocity-badge">Loading...</span>
+      </div>
+      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Days from patient created to Screening/Enrolled · by referral source</div>
+      <div style="padding:0;" id="ref-velocity-table"></div>
+    </div>
+
     <div class="section-title" style="margin-top:24px;margin-bottom:8px;">Meta Ad Performance (last 30 days)</div>
     <div style="font-size:10px;color:#94a3b8;margin-bottom:12px;">Meta Marketing API · impressions, clicks, leads · <span id="ref-meta-freshness">loading...</span></div>
 
@@ -6393,12 +6413,20 @@ function fetchActionRequiredData() {
           });
         }
       }
-      // Tier 4: Everything else → CRIO Database (internal DB screen, sponsor lists, legacy)
+      // Tier 4: Everything else → sub-categorize by study name pattern
       var _dbFill = 0;
+      function _inferDbSource(studyName) {
+        var sn = (studyName||'').toLowerCase();
+        if (sn.indexOf('pre-screen') !== -1) return 'Internal Pre-Screen';
+        if (/alzheimer|cardiology|migraine|diabetes|obesity|stress incontinence|lupus|arthritis|lichen|mash/.test(sn)) return 'Condition Screen';
+        if (/efc17559|efc17599|efc17600|efc18366|lts17367|aqua|estuary/.test(sn)) return 'Sanofi Database';
+        return 'Study Recruitment';
+      }
       window._recruitingData.forEach(function(r) {
         var name = (r.patient_name||'').toLowerCase().trim().replace(/\s+/g, ' ');
         if (!name || window._crioRefSourceMap.has(name)) return;
-        window._crioRefSourceMap.set(name, { source: 'CRIO Database', category: 'Internal', date: r.patient_created || r.status_changed || '', inferred: true });
+        var dbSrc = _inferDbSource(r.study_name);
+        window._crioRefSourceMap.set(name, { source: dbSrc, category: 'Internal', date: r.patient_created || r.status_changed || '', inferred: true });
         _dbFill++;
       });
       _log('CRP: Recruiting data loaded — ' + window._recruitingData.length + ' records, ' + _crioSourced + ' CRIO-sourced, ' + _inferred + ' inferred, ' + _dbFill + ' CRIO Database, ' + window._crioRefSourceMap.size + ' total mapped (' + Math.round(window._crioRefSourceMap.size/window._recruitingData.length*100) + '% coverage)');
@@ -11953,6 +11981,111 @@ function renderReferralDashboard() {
     }
 
     dnqEl.innerHTML = dh;
+  }
+
+  // ── Monthly Referral Trend by Source ──
+  var trendEl = el('ref-monthly-trend');
+  var trendBadge = el('ref-trend-badge');
+  if (trendEl && window._recruitingData && window._recruitingData.length > 0) {
+    var _srcMap2 = CRP_CONFIG.SOURCE_NAME_MAP || {};
+    var _monthData = {};
+    var _allMonths = new Set();
+    window._recruitingData.forEach(function(r) {
+      var created = r.patient_created || '';
+      if (!created) return;
+      var month = created.substring(0, 7); // YYYY-MM
+      _allMonths.add(month);
+      var raw = (r.referral_source||'').trim();
+      var norm = raw ? (_srcMap2[raw.toLowerCase()] || raw) : _inferDbSource(r.study_name);
+      if (!_monthData[norm]) _monthData[norm] = {};
+      _monthData[norm][month] = (_monthData[norm][month]||0) + 1;
+    });
+    var months = Array.from(_allMonths).sort().slice(-12); // last 12 months
+    var topSources = Object.entries(_monthData).sort(function(a,b) {
+      var ta = months.reduce(function(s,m){return s+(a[1][m]||0);},0);
+      var tb = months.reduce(function(s,m){return s+(b[1][m]||0);},0);
+      return tb - ta;
+    }).slice(0, 8).map(function(e){return e[0];});
+    if (trendBadge) trendBadge.textContent = months.length + ' months · top ' + topSources.length + ' sources';
+
+    var th = '<div style="overflow-x:auto;"><table class="fin-table" style="width:100%;font-size:10px;"><thead><tr>';
+    th += '<th style="text-align:left;padding:6px 8px;">Source</th>';
+    months.forEach(function(m) { var label = m.substring(5)+'/'+m.substring(2,4); th += '<th style="text-align:center;padding:4px 6px;">'+label+'</th>'; });
+    th += '<th style="text-align:center;padding:4px 8px;font-weight:700;">Total</th>';
+    th += '</tr></thead><tbody>';
+    var srcColors2 = ['#3b82f6','#059669','#d97706','#8b5cf6','#dc2626','#06b6d4','#f97316','#64748b'];
+    topSources.forEach(function(src, i) {
+      var total = months.reduce(function(s,m){return s+(_monthData[src][m]||0);},0);
+      th += '<tr style="border-bottom:1px solid #f1f5f9;">';
+      th += '<td style="padding:5px 8px;font-weight:600;color:'+srcColors2[i%srcColors2.length]+';">'+escapeHTML(src)+'</td>';
+      var maxMonth = Math.max.apply(null, months.map(function(m){return _monthData[src][m]||0;})) || 1;
+      months.forEach(function(m) {
+        var v = _monthData[src][m] || 0;
+        var bg = v > 0 ? 'background:'+srcColors2[i%srcColors2.length]+Math.round(v/maxMonth*40+10).toString(16)+';' : '';
+        th += '<td style="text-align:center;padding:4px 6px;font-weight:'+(v>0?'600':'400')+';color:'+(v>0?'#1e293b':'#cbd5e1')+';'+bg+'">'+v+'</td>';
+      });
+      th += '<td style="text-align:center;padding:4px 8px;font-weight:700;">'+total+'</td>';
+      th += '</tr>';
+    });
+    th += '</tbody></table></div>';
+    trendEl.innerHTML = th;
+  }
+
+  // ── Conversion Velocity by Source ──
+  var velEl = el('ref-velocity-table');
+  var velBadge = el('ref-velocity-badge');
+  if (velEl && window._recruitingData && window._recruitingData.length > 0) {
+    var _srcMap3 = CRP_CONFIG.SOURCE_NAME_MAP || {};
+    var _velBySource = {};
+    window._recruitingData.forEach(function(r) {
+      if (r.recruiting_status !== 'Success' && r.recruiting_status !== 'Screening') return;
+      var created = r.patient_created || '';
+      var changed = (r.status_changed || '').substring(0, 10);
+      if (!created || !changed) return;
+      var c = _parseDate(created), s = _parseDate(changed);
+      if (!c || !s) return;
+      var days = Math.round((s - c) / 86400000);
+      if (days < 0) days = 0;
+      var raw = (r.referral_source||'').trim();
+      var norm = raw ? (_srcMap3[raw.toLowerCase()] || raw) : _inferDbSource(r.study_name);
+      if (!_velBySource[norm]) _velBySource[norm] = { screening: [], enrolled: [] };
+      if (r.recruiting_status === 'Success') _velBySource[norm].enrolled.push(days);
+      else _velBySource[norm].screening.push(days);
+    });
+    var _velRows = Object.entries(_velBySource).map(function(e) {
+      var all = e[1].screening.concat(e[1].enrolled);
+      all.sort(function(a,b){return a-b;});
+      var med = all.length > 0 ? all[Math.floor(all.length/2)] : 0;
+      var avg = all.length > 0 ? Math.round(all.reduce(function(s,d){return s+d;},0)/all.length) : 0;
+      return { source: e[0], total: all.length, screening: e[1].screening.length, enrolled: e[1].enrolled.length, median: med, avg: avg };
+    }).filter(function(r){return r.total >= 2;}).sort(function(a,b){return a.median - b.median;});
+
+    if (velBadge) velBadge.textContent = _velRows.reduce(function(s,r){return s+r.total;},0) + ' conversions tracked';
+    var vh = '<div style="overflow-x:auto;"><table class="fin-table" style="width:100%;font-size:11px;"><thead><tr>';
+    vh += '<th style="text-align:left;padding:8px 12px;">Source</th>';
+    vh += '<th style="text-align:center;">Conversions</th>';
+    vh += '<th style="text-align:center;">Screening</th>';
+    vh += '<th style="text-align:center;color:#059669;">Enrolled</th>';
+    vh += '<th style="text-align:center;">Median Days</th>';
+    vh += '<th style="text-align:center;">Avg Days</th>';
+    vh += '<th style="text-align:center;min-width:100px;">Speed</th>';
+    vh += '</tr></thead><tbody>';
+    var maxAvg = _velRows.length > 0 ? Math.max.apply(null, _velRows.map(function(r){return r.avg;})) : 1;
+    _velRows.forEach(function(r) {
+      var speedColor = r.median <= 7 ? '#059669' : r.median <= 30 ? '#d97706' : r.median <= 90 ? '#f97316' : '#dc2626';
+      var barW = maxAvg > 0 ? Math.round(r.avg / maxAvg * 100) : 0;
+      vh += '<tr style="border-bottom:1px solid #f1f5f9;">';
+      vh += '<td style="padding:7px 12px;font-weight:600;">'+escapeHTML(r.source)+'</td>';
+      vh += '<td style="text-align:center;font-weight:700;">'+r.total+'</td>';
+      vh += '<td style="text-align:center;color:#8b5cf6;">'+r.screening+'</td>';
+      vh += '<td style="text-align:center;color:#059669;font-weight:700;">'+r.enrolled+'</td>';
+      vh += '<td style="text-align:center;font-weight:700;color:'+speedColor+';">'+r.median+'d</td>';
+      vh += '<td style="text-align:center;">'+r.avg+'d</td>';
+      vh += '<td style="padding:4px 8px;"><div style="background:#e2e8f0;border-radius:3px;height:14px;overflow:hidden;"><div style="width:'+barW+'%;background:'+speedColor+';height:100%;border-radius:3px;"></div></div></td>';
+      vh += '</tr>';
+    });
+    vh += '</tbody></table></div>';
+    velEl.innerHTML = vh;
   }
 
   // ── All Sources Conversion Performance ──
