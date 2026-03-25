@@ -489,7 +489,7 @@ const CRP_CONFIG = {
     'dr. taher - princeton cardiometabolic health': 'Dr. Modarressi',
     'dr. taher modarressi':                 'Dr. Modarressi',
     'dr. savita singh':                     'Dr. Savita Singh',
-    'princeton cardiometabolic':            'Princeton CardioMetabolic',
+    'princeton cardiometabolic':            'Dr. Modarressi',
     'connolly dermatology':                 'Connolly Dermatology',
     'center for primary care medicine':     'Center for Primary Care Medicine',
     'prohealth associates':                 'Prohealth Associates',
