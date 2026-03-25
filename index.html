@@ -6346,7 +6346,7 @@ function fetchActionRequiredData() {
   var _s = function(id, val) { var e = document.getElementById(id); if (e) e.textContent = val; };
 
   // Batch fetch feeds in one request (reduces HTTP overhead)
-  fetch(base + '?feed=batch&feeds=comments,documentSummary,visitTodos,regulatory,recruiterStats,demographics,eregPending,prescrVisits,recruiting&format=json')
+  fetch(base + '?feed=batch&feeds=comments,documentSummary,visitTodos,regulatory,recruiterStats,demographics,eregPending,prescrVisits,recruiting,subjectAudit&format=json')
   .then(function(r) { return r.json(); })
   .then(function(batch) {
     var results = batch.results || {};
@@ -6415,6 +6415,26 @@ function fetchActionRequiredData() {
         _dbFill++;
       });
       _log('CRP: Recruiting data loaded — ' + window._recruitingData.length + ' records, ' + _crioSourced + ' CRIO-sourced, ' + _inferred + ' inferred, ' + _dbFill + ' CRIO Database, ' + window._crioRefSourceMap.size + ' total mapped (' + Math.round(window._crioRefSourceMap.size/window._recruitingData.length*100) + '% coverage)');
+    }
+
+    // Subject audit trail — DNQ reasons
+    window._subjectAudit = (results.subjectAudit || {}).data || [];
+    if (window._subjectAudit.length > 0) {
+      // Build subject_name → referral source lookup for cross-referencing
+      window._dnqReasons = [];
+      var _dnqStatuses = {'Screen Fail':1,'Not Eligible':1,'Not Interested':1,'Discontinued':1};
+      window._subjectAudit.forEach(function(a) {
+        if (!_dnqStatuses[a.new_status]) return;
+        var name = (a.subject_name||'').toLowerCase().trim().replace(/\s+/g, ' ');
+        var srcObj = window._crioRefSourceMap ? window._crioRefSourceMap.get(name) : null;
+        var source = srcObj ? srcObj.source : 'Unknown';
+        window._dnqReasons.push({
+          name: a.subject_name, study: a.study_name, oldStatus: a.old_status,
+          newStatus: a.new_status, reason: (a.reason||'').trim(), comment: (a.comment||'').trim(),
+          date: a.transition_date, changedBy: a.changed_by, source: source
+        });
+      });
+      _log('CRP: Subject audit loaded — ' + window._subjectAudit.length + ' transitions, ' + window._dnqReasons.length + ' DNQ reasons');
     }
 
     // Pre-screening visits (display only in schedule table, not in metrics)
@@ -11843,6 +11863,69 @@ function renderReferralDashboard() {
       dh += '</tr>';
     });
     dh += '</tbody></table></div>';
+
+    // ── DNQ Reasons Detail (from subject audit trail) ──
+    if (window._dnqReasons && window._dnqReasons.length > 0) {
+      // Categorize reasons
+      function _catReason(reason) {
+        var r = (reason||'').toLowerCase();
+        if (!r || r === 'changed status via recruitment api') return 'No Reason Given';
+        if (r.indexOf('inclusion') !== -1 || r.indexOf('criteria') !== -1 || r.indexOf('exclusion') !== -1) return 'Inclusion/Exclusion Criteria';
+        if (r.indexOf('p-tau') !== -1) return 'P-Tau Ineligible';
+        if (r.indexOf('lab') !== -1) return 'Lab Results';
+        if (r.indexOf('bmi') !== -1) return 'BMI';
+        if (r.indexOf('age') !== -1) return 'Age';
+        if (r.indexOf('medication') !== -1 || r.indexOf('drug') !== -1 || r.indexOf('cosentyx') !== -1 || r.indexOf('dupixent') !== -1 || r.indexOf('jaki') !== -1) return 'Medications';
+        if (r.indexOf('withdrew') !== -1 || r.indexOf('consent') !== -1) return 'Withdrew Consent';
+        if (r.indexOf('no show') !== -1 || r.indexOf('no response') !== -1 || r.indexOf('unable to reach') !== -1 || r.indexOf('cannot be reached') !== -1) return 'Unable to Reach';
+        if (r.indexOf('not interested') !== -1 || r.indexOf('does not wish') !== -1 || r.indexOf('too far') !== -1 || r.indexOf('compensation') !== -1) return 'Patient Declined';
+        if (r.indexOf('another study') !== -1) return 'In Another Study';
+        if (r.indexOf('update') !== -1 || r.indexOf('data') !== -1) return 'Data Update';
+        if (r.indexOf('stroke') !== -1 || r.indexOf('heart attack') !== -1 || r.indexOf('medical') !== -1) return 'Medical History';
+        return 'Other';
+      }
+
+      // By status + reason category
+      var _byStatusReason = {};
+      window._dnqReasons.forEach(function(d) {
+        var cat = _catReason(d.reason);
+        var key = d.newStatus + '|' + cat;
+        if (!_byStatusReason[key]) _byStatusReason[key] = { status: d.newStatus, reason: cat, count: 0, sources: {} };
+        _byStatusReason[key].count++;
+        _byStatusReason[key].sources[d.source] = (_byStatusReason[key].sources[d.source]||0) + 1;
+      });
+      var _reasonRows = Object.values(_byStatusReason).sort(function(a,b) { return b.count - a.count; });
+      var _totalDnqReasons = _reasonRows.reduce(function(s,r){return s+r.count;},0);
+
+      dh += '<div style="border-top:2px solid #e2e8f0;margin-top:8px;padding-top:8px;">';
+      dh += '<div style="padding:4px 16px;font-size:12px;font-weight:700;color:#1e293b;">DNQ Reasons (from CRIO Subject Audit Trail — ' + _totalDnqReasons + ' transitions)</div>';
+      dh += '<div style="padding:0 16px 4px;font-size:10px;color:#94a3b8;">Why patients were Screen Failed, marked Not Eligible, or Not Interested — categorized from free-text reasons</div>';
+      dh += '<div style="overflow-x:auto;"><table class="fin-table" style="width:100%;font-size:11px;"><thead><tr>';
+      dh += '<th style="text-align:left;padding:6px 12px;">Status</th>';
+      dh += '<th style="text-align:left;">Reason Category</th>';
+      dh += '<th style="text-align:center;">Count</th>';
+      dh += '<th style="text-align:center;">% of DNQ</th>';
+      dh += '<th style="text-align:left;">Top Sources</th>';
+      dh += '<th style="text-align:center;min-width:100px;">Volume</th>';
+      dh += '</tr></thead><tbody>';
+      var _statusColors = {'Screen Fail':'#f97316','Not Eligible':'#dc2626','Not Interested':'#94a3b8','Discontinued':'#64748b'};
+      _reasonRows.forEach(function(r) {
+        var pct = _totalDnqReasons > 0 ? Math.round(r.count / _totalDnqReasons * 100) : 0;
+        var barW = Math.round(r.count / _reasonRows[0].count * 100);
+        var topSources = Object.entries(r.sources).sort(function(a,b){return b[1]-a[1];}).slice(0,3).map(function(e){return escapeHTML(e[0])+' ('+e[1]+')';}).join(', ');
+        var sc = _statusColors[r.status] || '#64748b';
+        dh += '<tr style="border-bottom:1px solid #f1f5f9;">';
+        dh += '<td style="padding:5px 12px;"><span style="font-size:10px;font-weight:600;padding:2px 6px;border-radius:3px;background:'+sc+'18;color:'+sc+';">'+escapeHTML(r.status)+'</span></td>';
+        dh += '<td style="padding:5px 8px;font-weight:600;">'+escapeHTML(r.reason)+'</td>';
+        dh += '<td style="text-align:center;font-weight:700;">'+r.count+'</td>';
+        dh += '<td style="text-align:center;">'+pct+'%</td>';
+        dh += '<td style="padding:5px 8px;font-size:10px;color:#64748b;">'+topSources+'</td>';
+        dh += '<td style="padding:4px 8px;"><div style="background:#e2e8f0;border-radius:3px;height:14px;overflow:hidden;"><div style="width:'+barW+'%;background:'+sc+';height:100%;border-radius:3px;"></div></div></td>';
+        dh += '</tr>';
+      });
+      dh += '</tbody></table></div></div>';
+    }
+
     dnqEl.innerHTML = dh;
   }
 
