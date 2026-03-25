@@ -1941,6 +1941,11 @@ function switchTab(name, el) {
   if (FIN_TABS.includes(name) && !finInitDone) {
     initFinanceDashboard();
   }
+  // Re-render specific sub-tab content (data may have loaded after first init)
+  if (name === 'fin-collections' && finInitDone) { try { renderCollections(); } catch(e){} }
+  if (name === 'fin-aging' && finInitDone) { try { renderAgingKPIs(); renderAgingTables(); } catch(e){} }
+  if (name === 'fin-revenue' && finInitDone) { try { renderRevenueTab(); } catch(e){} }
+  if (name === 'fin-qb' && finInitDone) { try { if(typeof renderQBView==='function') renderQBView(); } catch(e){} }
 
   // Productivity tab — lazy load revenue per user
   if (name === 'fin-productivity' && !_rpuData) {
