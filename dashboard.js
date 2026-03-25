@@ -2512,6 +2512,7 @@ function buildReasonChart() {
     }
   });
   const leg = document.getElementById('reason-legend');
+  if (!leg) return;
   leg.innerHTML = '';
   top6.forEach((d, i) => {
     const row = document.createElement('div');
