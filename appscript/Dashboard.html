@@ -1542,34 +1542,13 @@ body {
     <div style="display:none" id="contact-sequence-container"></div>
     <div style="display:none" id="ref-conversion-container"></div>
 
-    <!-- All Sources Conversion Performance -->
-    <div class="card fade-in" style="margin-bottom:16px;">
-      <div class="card-header">
-        <span class="card-title">📊 All Sources — Conversion Performance</span>
-        <span class="badge badge-purple" id="ref-allconv-badge">Loading...</span>
-      </div>
-      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Conversion rates across all referral sources · New → Screening → Enrolled · ranked by effectiveness</div>
-      <div style="padding:0;" id="ref-all-conversion"></div>
-    </div>
+    <!-- Hidden containers for removed sections -->
+    <div style="display:none" id="ref-all-conversion"></div>
+    <div style="display:none" id="ref-fb-table"></div>
 
-    <!-- ═══ SECTION 2: DIGITAL MARKETING PIPELINE ═══ -->
-    <div class="section-title" style="margin-top:24px;margin-bottom:8px;">Digital Marketing Pipeline</div>
-    <div style="font-size:10px;color:#94a3b8;margin-bottom:12px;">Meta/Facebook ad leads flow directly into CRIO · tracked via Meta Marketing API (last 30 days) + Facebook CRM sheet · <span id="ref-meta-freshness">loading...</span></div>
-
-    <!-- FB CRM Leads -->
-    <div class="card fade-in" style="margin-bottom:16px;">
-      <div class="card-header">
-        <span class="card-title">Facebook Lead Referrals</span>
-        <span class="badge badge-blue" id="ref-fb-badge">Loading...</span>
-      </div>
-      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Leads from Facebook forms · status distribution and campaign breakdown</div>
-      <div style="padding:0;" id="ref-fb-table">
-        <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Loading Facebook leads...</div>
-      </div>
-    </div>
-
-    <!-- Meta Campaign Performance -->
-    <div class="section-title" style="margin-top:16px;margin-bottom:8px;">Meta Ad Performance (last 30 days)</div>
+    <!-- ═══ SECTION 2: META AD PERFORMANCE ═══ -->
+    <div class="section-title" style="margin-top:24px;margin-bottom:8px;">Meta Ad Performance (last 30 days)</div>
+    <div style="font-size:10px;color:#94a3b8;margin-bottom:12px;">Meta Marketing API · impressions, clicks, leads · <span id="ref-meta-freshness">loading...</span></div>
 
     <div class="card fade-in" style="margin-bottom:16px;">
       <div class="card-header">
@@ -1589,14 +1568,7 @@ body {
       <div style="padding:0;" id="meta-funnel-container"></div>
     </div>
 
-    <div class="card fade-in" style="margin-bottom:16px;">
-      <div class="card-header">
-        <span class="card-title">🔗 Campaign ↔ Study Alignment</span>
-        <span class="badge badge-blue" id="meta-alignment-badge">—</span>
-      </div>
-      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Which campaigns map to which studies · enrolling studies with no campaign flagged</div>
-      <div id="meta-alignment-container" style="padding:12px 16px;"></div>
-    </div>
+    <div style="display:none" id="meta-alignment-container"></div>
 
     <div class="card fade-in" style="margin-bottom:16px;">
       <div class="card-header">

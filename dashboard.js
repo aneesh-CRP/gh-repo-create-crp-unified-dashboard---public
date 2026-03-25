@@ -9229,6 +9229,12 @@ function setRefTimeFilter(days, btn) {
   renderReferralDashboard();
 }
 
+function sortRefTable(col) {
+  if (window._refSortCol === col) { window._refSortDir = window._refSortDir === 'desc' ? 'asc' : 'desc'; }
+  else { window._refSortCol = col; window._refSortDir = 'desc'; }
+  renderReferralDashboard();
+}
+
 function renderReferralDashboard() {
   const CU = CRP_CONFIG.CLICKUP;
   const active = REFERRAL_DATA.filter(r => !r.is_closed);
@@ -9461,7 +9467,7 @@ function renderReferralDashboard() {
     const _advancedStages = new Set(['Pre-Screening','Screening','Screened','Enrolled']);
     const _needsEntry = tasks.filter(t => _advancedStages.has(t.stage) && matchCrioPatient(t.name, t.phone) === null).length;
     unifiedRows.push({
-      name: name, type: 'Provider', total: tasks.length,
+      name: name, type: 'Provider', vendor: 'Physician', total: tasks.length,
       newLead: sc['New Lead']||0, contacted: sc['Contacted']||0,
       screening: _screening, enrolled: _enrolled, dnq: _dnq,
       stale: _stale, inCrio: _inCrio, needsEntry: _needsEntry, clickId: name
@@ -9525,7 +9531,7 @@ function renderReferralDashboard() {
       newLead: c.new_referrals, contacted: c.first_contact, screening: _screening,
       enrolled: _enrolled, dnq: _dnq, lost: 0, stale: 0,
       inCrio: crioTotal || (crioEnr + crioScr), crioEnrolled: crioEnr, crioScreening: crioScr,
-      needsEntry: 0, clickId: null, isCampaign: true, url: c.url
+      needsEntry: 0, clickId: null, isCampaign: true, url: c.url, vendor: _prefix
     });
   });
 
@@ -9534,46 +9540,66 @@ function renderReferralDashboard() {
   var totalStale = unifiedRows.reduce(function(s,r){return s+r.stale;},0);
   if (_staleBadge2) _staleBadge2.textContent = totalStale > 0 ? totalStale + ' stale' : 'All active';
 
-  // Render unified table
-  var typeColors = {'Provider':'#072061','facebook':'#3b82f6','subjectwell':'#8b5cf6','study teams':'#059669','study max':'#d97706','studykik':'#f59e0b','iconnect':'#06b6d4','gardinia - clinlife':'#ec4899'};
+  // Store for sort/re-render
+  window._unifiedRefRows = unifiedRows;
+
+  // Render unified table with sort support
+  var _refSort = window._refSortCol || 'total';
+  var _refSortDir = window._refSortDir || 'desc';
+  function _sortRefRows(rows, col, dir) {
+    return rows.slice().sort(function(a,b) {
+      var va = a[col]||0, vb = b[col]||0;
+      if (typeof va === 'string') { va = va.toLowerCase(); vb = (vb||'').toLowerCase(); }
+      return dir === 'desc' ? (vb > va ? 1 : vb < va ? -1 : 0) : (va > vb ? 1 : va < vb ? -1 : 0);
+    });
+  }
+  var sortedRows = _sortRefRows(unifiedRows, _refSort, _refSortDir);
+
+  var vendorColors = {'Physician':'#072061','Meta':'#3b82f6','SW':'#8b5cf6','ST':'#059669','SM':'#d97706','SK':'#f59e0b','IC':'#06b6d4','CL':'#ec4899','Trial Partners':'#7c3aed'};
+  var _sortIcon = function(col) { return col === _refSort ? (_refSortDir === 'desc' ? ' ▼' : ' ▲') : ''; };
+  var _sortClick = function(col) { return 'onclick="sortRefTable(\''+col+'\')"'; };
   trackerEl.innerHTML = `<table class="fin-table" style="width:100%;font-size:11px;">
     <thead><tr>
-      <th style="text-align:left;padding:8px 12px;">Source</th>
-      <th style="text-align:center;">Type</th>
-      <th style="text-align:center;">Total</th>
+      <th style="text-align:left;padding:8px 12px;cursor:pointer;" ${_sortClick('name')}>Source${_sortIcon('name')}</th>
+      <th style="text-align:center;cursor:pointer;" ${_sortClick('vendor')}>Campaign${_sortIcon('vendor')}</th>
+      <th style="text-align:center;cursor:pointer;" ${_sortClick('total')}>Total${_sortIcon('total')}</th>
       <th style="text-align:center;">New</th>
       <th style="text-align:center;">Contacted</th>
-      <th style="text-align:center;">Screening</th>
-      <th style="text-align:center;color:#059669;">Enrolled</th>
+      <th style="text-align:center;cursor:pointer;" ${_sortClick('screening')}>Screening${_sortIcon('screening')}</th>
+      <th style="text-align:center;color:#059669;cursor:pointer;" ${_sortClick('enrolled')}>Enrolled${_sortIcon('enrolled')}</th>
       <th style="text-align:center;color:#dc2626;">DNQ/SF</th>
       <th style="text-align:center;color:#d97706;">Stale</th>
-      <th style="text-align:center;color:#8b5cf6;">In CRIO</th>
+      <th style="text-align:center;color:#8b5cf6;cursor:pointer;" ${_sortClick('inCrio')}>In CRIO${_sortIcon('inCrio')}</th>
       <th style="text-align:center;color:#dc2626;">Needs Entry</th>
+      <th style="text-align:center;cursor:pointer;" ${_sortClick('enrollRate')}>Conv%${_sortIcon('enrollRate')}</th>
     </tr></thead>
-    <tbody>${unifiedRows.map(r => {
-      const tc = typeColors[r.type.toLowerCase()] || typeColors[r.type] || '#64748b';
+    <tbody>${sortedRows.map(r => {
+      var enrollRate = r.total > 0 ? Math.round(r.enrolled / r.total * 100) : 0;
+      r.enrollRate = enrollRate;
+      const vc = vendorColors[r.vendor] || '#64748b';
       const tn = r.clickId ? jsAttr(r.clickId) : '';
       var _campSafe = r.isCampaign ? jsAttr(r.name) : '';
       function _td(count, label, style) {
         if (!count) return '<td style="text-align:center;color:#cbd5e1;">—</td>';
-        if (r.clickId) return '<td style="text-align:center;cursor:pointer;' + (style||'') + '" onclick="showTrackerStageDetail(\'' + tn + '\',\'' + (label||'all') + '\')">' + count + '</td>';
-        if (r.isCampaign) return '<td style="text-align:center;cursor:pointer;' + (style||'') + '" onclick="showCampaignStudyDetail(\'' + _campSafe + '\')">' + count + '</td>';
+        if (r.clickId) return '<td style="text-align:center;cursor:pointer;' + (style||'') + '" onclick="event.stopPropagation();showTrackerStageDetail(\'' + tn + '\',\'' + (label||'all') + '\')">' + count + '</td>';
+        if (r.isCampaign) return '<td style="text-align:center;cursor:pointer;' + (style||'') + '" onclick="event.stopPropagation();showCampaignStudyDetail(\'' + _campSafe + '\')">' + count + '</td>';
         return '<td style="text-align:center;' + (style||'') + '">' + count + '</td>';
       }
-      const nameHtml = r.url ? '<a href="'+escapeHTML(r.url)+'" target="_blank" style="color:#1e293b;text-decoration:none;font-weight:600;">'+escapeHTML(r.name)+'</a>' : '<span style="font-weight:600;">'+escapeHTML(r.name)+'</span>';
-      const crioDetail = r.crioEnrolled > 0 || r.crioScreening > 0 ? '<div style="font-size:9px;color:#8b5cf6;">'+r.crioScreening+'scr / '+r.crioEnrolled+'enr</div>' : '';
-      return `<tr style="border-bottom:1px solid #f1f5f9;${r.clickId?'cursor:pointer;':''}"${r.clickId ? ' onclick="showTrackerStageDetail(\''+tn+'\',\'all\')"' : ''}>
+      const nameHtml = r.url ? '<a href="'+escapeHTML(r.url)+'" target="_blank" style="color:#1e293b;text-decoration:none;font-weight:600;" onclick="event.stopPropagation()">'+escapeHTML(r.name)+'</a>' : '<span style="font-weight:600;">'+escapeHTML(r.name)+'</span>';
+      var erColor = enrollRate >= 15 ? '#059669' : enrollRate >= 5 ? '#d97706' : enrollRate > 0 ? '#dc2626' : '#cbd5e1';
+      return `<tr style="border-bottom:1px solid #f1f5f9;${r.clickId||r.isCampaign?'cursor:pointer;':''}"${r.clickId ? ' onclick="showTrackerStageDetail(\''+tn+'\',\'all\')"' : r.isCampaign ? ' onclick="showCampaignDetailModal(\''+_campSafe+'\')"' : ''}>
         <td style="padding:8px 12px;">${nameHtml}</td>
-        <td style="text-align:center;"><span style="font-size:9px;font-weight:600;padding:2px 6px;border-radius:4px;background:${tc}15;color:${tc};">${escapeHTML(r.type)}</span></td>
+        <td style="text-align:center;"><span style="font-size:9px;font-weight:600;padding:2px 6px;border-radius:4px;background:${vc}15;color:${vc};">${escapeHTML(r.vendor||r.type)}</span></td>
         <td style="text-align:center;font-weight:700;">${r.total}</td>
         ${_td(r.newLead,'New Lead')}
         ${_td(r.contacted,'Contacted')}
         ${_td(r.screening,'Screening')}
         ${_td(r.enrolled,'Enrolled','color:#059669;font-weight:700;')}
         ${_td(r.dnq,'DNQ/Lost','color:#dc2626;')}
-        <td style="text-align:center;color:${r.stale>0?'#d97706':'#cbd5e1'};font-weight:${r.stale>0?'700':'400'};${r.stale>0&&r.clickId?'cursor:pointer;':''}"${r.stale>0&&r.clickId?' onclick="showReferralDetailModal(function(rr){return rr.tracker===\''+tn+'\'&&!rr.is_closed&&rr.days_since_update>=7&&rr.days_since_update<=90;},\''+escapeHTML(r.name)+' — Stale Leads\')"':''}>${r.stale||'—'}</td>
-        <td style="text-align:center;color:${r.inCrio>0?'#8b5cf6':'#cbd5e1'};font-weight:${r.inCrio>0?'700':'400'};${r.inCrio>0&&r.clickId?'cursor:pointer;':''}"${r.inCrio>0&&r.clickId?' onclick="showReferralDetailModal(function(rr){return rr.tracker===\''+tn+'\'&&matchCrioPatient(rr.name,rr.phone)!==null;},\''+escapeHTML(r.name)+' — In CRIO\')"':''}>${r.inCrio||'—'}${crioDetail}</td>
-        <td style="text-align:center;color:${r.needsEntry>0?'#dc2626':'#cbd5e1'};font-weight:${r.needsEntry>0?'700':'400'};${r.needsEntry>0&&r.clickId?'cursor:pointer;':''}"${r.needsEntry>0&&r.clickId?' onclick="showReferralDetailModal(function(rr){var _as=new Set([\'Pre-Screening\',\'Screening\',\'Screened\',\'Enrolled\']);return rr.tracker===\''+tn+'\'&&_as.has(rr.stage)&&matchCrioPatient(rr.name,rr.phone)===null;},\''+escapeHTML(r.name)+' — Needs CRIO Entry\')"':''}>${r.needsEntry>0?'⚠ '+r.needsEntry:'—'}</td>
+        <td style="text-align:center;color:${r.stale>0?'#d97706':'#cbd5e1'};font-weight:${r.stale>0?'700':'400'};${r.stale>0&&r.clickId?'cursor:pointer;':''}"${r.stale>0&&r.clickId?' onclick="event.stopPropagation();showReferralDetailModal(function(rr){return rr.tracker===\''+tn+'\'&&!rr.is_closed&&rr.days_since_update>=7&&rr.days_since_update<=90;},\''+escapeHTML(r.name)+' — Stale Leads\')"':''}>${r.stale||'—'}</td>
+        <td style="text-align:center;color:${r.inCrio>0?'#8b5cf6':'#cbd5e1'};font-weight:${r.inCrio>0?'700':'400'};${r.inCrio>0&&r.clickId?'cursor:pointer;':''}"${r.inCrio>0&&r.clickId?' onclick="event.stopPropagation();showReferralDetailModal(function(rr){return rr.tracker===\''+tn+'\'&&matchCrioPatient(rr.name,rr.phone)!==null;},\''+escapeHTML(r.name)+' — In CRIO\')"':''}>${r.inCrio||'—'}</td>
+        <td style="text-align:center;color:${r.needsEntry>0?'#dc2626':'#cbd5e1'};font-weight:${r.needsEntry>0?'700':'400'};${r.needsEntry>0&&r.clickId?'cursor:pointer;':''}"${r.needsEntry>0&&r.clickId?' onclick="event.stopPropagation();showReferralDetailModal(function(rr){var _as=new Set([\'Pre-Screening\',\'Screening\',\'Screened\',\'Enrolled\']);return rr.tracker===\''+tn+'\'&&_as.has(rr.stage)&&matchCrioPatient(rr.name,rr.phone)===null;},\''+escapeHTML(r.name)+' — Needs CRIO Entry\')"':''}>${r.needsEntry>0?'⚠ '+r.needsEntry:'—'}</td>
+        <td style="text-align:center;font-weight:700;color:${erColor};">${enrollRate > 0 ? enrollRate+'%' : '—'}</td>
       </tr>`;
     }).join('')}
     <tr style="border-top:2px solid var(--border);background:var(--surface2);font-weight:700;">
@@ -9588,6 +9614,7 @@ function renderReferralDashboard() {
       <td style="text-align:center;color:#d97706;">${unifiedRows.reduce((s,r)=>s+r.stale,0)||'—'}</td>
       <td style="text-align:center;color:#8b5cf6;">${unifiedRows.reduce((s,r)=>s+r.inCrio,0)}</td>
       <td style="text-align:center;color:#dc2626;">${unifiedRows.reduce((s,r)=>s+(r.needsEntry||0),0)||'—'}</td>
+      <td style="text-align:center;">${unifiedRows.reduce((s,r)=>s+r.total,0) > 0 ? Math.round(unifiedRows.reduce((s,r)=>s+r.enrolled,0)/unifiedRows.reduce((s,r)=>s+r.total,0)*100)+'%' : '—'}</td>
     </tr>
     </tbody>
   </table>`;
