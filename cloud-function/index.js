@@ -442,6 +442,7 @@ const FEEDS = {
     FROM ${tbl('calendar_appointment')} ca
     LEFT JOIN ${tbl('subject')} sub ON ca.subject_key = sub.subject_key
     LEFT JOIN ${tbl('study')} st ON ca.study_key = st.study_key
+    LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
     LEFT JOIN ${tbl('site')} si ON ca.site_key = si.site_key
     LEFT JOIN ${tbl('study_visit')} sv ON ca.study_visit_key = sv.study_visit_key
     LEFT JOIN (SELECT ua.calendar_appointment_key, CONCAT(u.first_name, ' ', u.last_name) AS name
