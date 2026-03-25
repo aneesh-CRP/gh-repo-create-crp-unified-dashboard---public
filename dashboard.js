@@ -9454,7 +9454,7 @@ function renderReferralDashboard() {
   _kpiEl('ref-kpi-enrolled', _kpiEnr);
   _kpiEl('ref-kpi-qualified', _qualRate + '%');
   _kpiEl('ref-kpi-dnq', _dnqRate + '%');
-  _kpiEl('ref-kpi-sources', Object.keys(_crioSourceRows).length || unifiedRows.length);
+  _kpiEl('ref-kpi-sources', Object.keys(_crioSourceRows).length || '—');
   _kpiEl('ref-total-badge', _kpiTotal.toLocaleString() + ' records');
   // Freshness info
   var _refDatesAll = all.map(function(r){return r.date_created;}).filter(Boolean).sort();
