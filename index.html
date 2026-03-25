@@ -11868,20 +11868,31 @@ function renderReferralDashboard() {
     if (window._dnqReasons && window._dnqReasons.length > 0) {
       // Categorize reasons
       function _catReason(reason) {
-        var r = (reason||'').toLowerCase();
-        if (!r || r === 'changed status via recruitment api') return 'No Reason Given';
-        if (r.indexOf('inclusion') !== -1 || r.indexOf('criteria') !== -1 || r.indexOf('exclusion') !== -1) return 'Inclusion/Exclusion Criteria';
-        if (r.indexOf('p-tau') !== -1) return 'P-Tau Ineligible';
-        if (r.indexOf('lab') !== -1) return 'Lab Results';
-        if (r.indexOf('bmi') !== -1) return 'BMI';
-        if (r.indexOf('age') !== -1) return 'Age';
-        if (r.indexOf('medication') !== -1 || r.indexOf('drug') !== -1 || r.indexOf('cosentyx') !== -1 || r.indexOf('dupixent') !== -1 || r.indexOf('jaki') !== -1) return 'Medications';
-        if (r.indexOf('withdrew') !== -1 || r.indexOf('consent') !== -1) return 'Withdrew Consent';
-        if (r.indexOf('no show') !== -1 || r.indexOf('no response') !== -1 || r.indexOf('unable to reach') !== -1 || r.indexOf('cannot be reached') !== -1) return 'Unable to Reach';
-        if (r.indexOf('not interested') !== -1 || r.indexOf('does not wish') !== -1 || r.indexOf('too far') !== -1 || r.indexOf('compensation') !== -1) return 'Patient Declined';
-        if (r.indexOf('another study') !== -1) return 'In Another Study';
-        if (r.indexOf('update') !== -1 || r.indexOf('data') !== -1) return 'Data Update';
-        if (r.indexOf('stroke') !== -1 || r.indexOf('heart attack') !== -1 || r.indexOf('medical') !== -1) return 'Medical History';
+        var r = (reason||'').toLowerCase().trim();
+        if (!r || r === 'changed status via recruitment api' || r === 'sf' || r === 'screen fail' || r === 'not eligible') return 'No Detail Given';
+        // Data entry noise
+        if (/^(update[ds]?|data update[ds]?|new labs obtained|updated information)$/i.test(r)) return 'No Detail Given';
+        if (/upload.*error|enter.*error|error.*entry|test|mistake|not real/i.test(r)) return 'Data Entry Error';
+        // Specific clinical reasons (most specific first)
+        if (/vcte|lsm|kpa|liver scan|fibroscan/i.test(r)) return 'VCTE/FibroScan Results';
+        if (/lpa|lp\(a\)|lipoprotein/i.test(r)) return 'Lp(a) Lab Results';
+        if (/p-tau/i.test(r)) return 'P-Tau Biomarker';
+        if (/hba1c|a1c|glucose|insulin|blood sugar/i.test(r)) return 'HbA1c / Glucose';
+        if (/lab|hcg|lipase|elf|bili|ldl|cholesterol/i.test(r)) return 'Lab Results (Other)';
+        if (/bmi/i.test(r)) return 'BMI Out of Range';
+        if (/\bage\b|age group/i.test(r)) return 'Age Criteria';
+        if (/glp.?1|medication|drug|cosentyx|dupixent|jaki|incretin|exclusionary med/i.test(r)) return 'Excluded Medication';
+        if (/eye exam|pap|hpv|cancer|stent|stroke|heart attack|allergy|adverse/i.test(r)) return 'Medical History / Comorbidity';
+        // I/E criteria with numbers
+        if (/(?:inclusion|exclusion)\s*(?:criteria?\s*)?[#]?\s*\d/i.test(r)) return 'I/E Criteria (numbered)';
+        if (/inclusion|exclusion|criteria|does not meet|did not meet|does not qualify/i.test(r)) return 'I/E Criteria (unspecified)';
+        // Patient behavior
+        if (/withdrew|consent|withdraw|with drew|no longer wish/i.test(r)) return 'Withdrew Consent';
+        if (/no show|no response|unable to reach|cannot be reached|lost to follow|didn.t respond|never showed|never responded/i.test(r)) return 'No Show / Lost to Follow-up';
+        if (/not interested|does not wish|too far|too busy|compensation|cannot participate|not able to/i.test(r)) return 'Patient Declined';
+        if (/another study|another trial/i.test(r)) return 'In Another Study';
+        if (/diary|diaries|non.?compli/i.test(r)) return 'Non-Compliance';
+        if (/window|schedule|appointment|could not make/i.test(r)) return 'Scheduling / Visit Window';
         return 'Other';
       }
 
@@ -11890,9 +11901,11 @@ function renderReferralDashboard() {
       window._dnqReasons.forEach(function(d) {
         var cat = _catReason(d.reason);
         var key = d.newStatus + '|' + cat;
-        if (!_byStatusReason[key]) _byStatusReason[key] = { status: d.newStatus, reason: cat, count: 0, sources: {} };
+        if (!_byStatusReason[key]) _byStatusReason[key] = { status: d.newStatus, reason: cat, count: 0, sources: {}, studies: {} };
         _byStatusReason[key].count++;
         _byStatusReason[key].sources[d.source] = (_byStatusReason[key].sources[d.source]||0) + 1;
+        var _studyShort = d.study.indexOf(' - ') !== -1 ? d.study.split(' - ').pop() : d.study;
+        _byStatusReason[key].studies[_studyShort] = (_byStatusReason[key].studies[_studyShort]||0) + 1;
       });
       var _reasonRows = Object.values(_byStatusReason).sort(function(a,b) { return b.count - a.count; });
       var _totalDnqReasons = _reasonRows.reduce(function(s,r){return s+r.count;},0);
@@ -11905,20 +11918,24 @@ function renderReferralDashboard() {
       dh += '<th style="text-align:left;">Reason Category</th>';
       dh += '<th style="text-align:center;">Count</th>';
       dh += '<th style="text-align:center;">% of DNQ</th>';
+      dh += '<th style="text-align:left;">Top Studies</th>';
       dh += '<th style="text-align:left;">Top Sources</th>';
       dh += '<th style="text-align:center;min-width:100px;">Volume</th>';
       dh += '</tr></thead><tbody>';
       var _statusColors = {'Screen Fail':'#f97316','Not Eligible':'#dc2626','Not Interested':'#94a3b8','Discontinued':'#64748b'};
       _reasonRows.forEach(function(r) {
+        if (r.reason === 'Data Entry Error') return; // skip noise
         var pct = _totalDnqReasons > 0 ? Math.round(r.count / _totalDnqReasons * 100) : 0;
         var barW = Math.round(r.count / _reasonRows[0].count * 100);
-        var topSources = Object.entries(r.sources).sort(function(a,b){return b[1]-a[1];}).slice(0,3).map(function(e){return escapeHTML(e[0])+' ('+e[1]+')';}).join(', ');
+        var topStudies = Object.entries(r.studies).sort(function(a,b){return b[1]-a[1];}).slice(0,2).map(function(e){return escapeHTML(e[0])+' ('+e[1]+')';}).join(', ');
+        var topSources = Object.entries(r.sources).sort(function(a,b){return b[1]-a[1];}).slice(0,2).map(function(e){return escapeHTML(e[0])+' ('+e[1]+')';}).join(', ');
         var sc = _statusColors[r.status] || '#64748b';
         dh += '<tr style="border-bottom:1px solid #f1f5f9;">';
         dh += '<td style="padding:5px 12px;"><span style="font-size:10px;font-weight:600;padding:2px 6px;border-radius:3px;background:'+sc+'18;color:'+sc+';">'+escapeHTML(r.status)+'</span></td>';
         dh += '<td style="padding:5px 8px;font-weight:600;">'+escapeHTML(r.reason)+'</td>';
         dh += '<td style="text-align:center;font-weight:700;">'+r.count+'</td>';
         dh += '<td style="text-align:center;">'+pct+'%</td>';
+        dh += '<td style="padding:5px 8px;font-size:10px;color:#475569;">'+topStudies+'</td>';
         dh += '<td style="padding:5px 8px;font-size:10px;color:#64748b;">'+topSources+'</td>';
         dh += '<td style="padding:4px 8px;"><div style="background:#e2e8f0;border-radius:3px;height:14px;overflow:hidden;"><div style="width:'+barW+'%;background:'+sc+';height:100%;border-radius:3px;"></div></div></td>';
         dh += '</tr>';
