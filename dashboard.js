@@ -9537,6 +9537,29 @@ function renderReferralDashboard() {
   const campBadge = el('ref-camp-badge');
   _crioSubjectMap = null; // Reset CRIO cache
 
+  // ── Build CRIO-sourced rows from BQ recruiting data (28k+ records, 100% coverage) ──
+  var _crioSourceRows = {};
+  if (window._recruitingData && window._recruitingData.length > 0 && window._crioRefSourceMap) {
+    var _srcNameMap = CRP_CONFIG.SOURCE_NAME_MAP || {};
+    var _statusCol = {
+      'Prospect':'new','Contacting':'contacted','Interested':'screening','Screening':'screening',
+      'Success':'enrolled','Screen Fail':'sf','Not Eligible':'not_eligible',
+      'Not Interested':'not_interested','In Another Study':'other','Give Up':'other',
+      'Do Not Solicit':'other','Bad Contact Info':'other','Do Not Enroll':'other',
+      'Not Applicable':'other','Deceased':'other'
+    };
+    window._recruitingData.forEach(function(rec) {
+      var raw = (rec.referral_source||'').trim();
+      var norm = raw ? (_srcNameMap[raw.toLowerCase()] || raw) : 'CRIO Database';
+      // Apply time filter
+      if (_filterCutoff && (rec.patient_created||'') < _filterCutoff) return;
+      if (!_crioSourceRows[norm]) _crioSourceRows[norm] = {total:0,new:0,contacted:0,screening:0,enrolled:0,sf:0,not_eligible:0,not_interested:0,other:0};
+      var col = _statusCol[rec.recruiting_status] || 'other';
+      _crioSourceRows[norm].total++;
+      _crioSourceRows[norm][col]++;
+    });
+  }
+
   // Build provider tracker rows (skip referrals with blank tracker name)
   const trackerMap = {};
   all.forEach(r => {
@@ -9553,26 +9576,33 @@ function renderReferralDashboard() {
     (c.first_contact > 0 || c.new_referrals > 0)
   );
 
-  // Unified rows array
+  // Unified rows array — built from CRIO recruiting data when available, ClickUp as supplement
   var unifiedRows = [];
+  var _crioUsed = new Set(); // track which CRIO sources were consumed by ClickUp/campaign rows
 
-  // Add provider trackers
+  // Add provider trackers (ClickUp data + CRIO overlay)
   Object.entries(trackerMap).sort((a,b) => b[1].length - a[1].length).forEach(([name, tasks]) => {
     const sc = {};
     tasks.forEach(t => { sc[t.stage] = (sc[t.stage] || 0) + 1; });
-    const _enrolled = (sc['Enrolled']||0) + (sc['Screened']||0);
-    const _dnq = (sc['DNQ']||0) + (sc['Screen Fail']||0);
-    const _screening = (sc['Pre-Screening']||0) + (sc['Screening']||0);
     const _stale = tasks.filter(t => !t.is_closed && t.days_since_update >= 7 && t.days_since_update <= 90 && t.date_created && new Date(t.date_created).getTime() >= _ninetyDaysAgoT).length;
     const _inCrio = tasks.filter(t => matchCrioPatient(t.name, t.phone) !== null).length;
-    // Needs Entry: patients at Pre-Screening+ stage but NOT in CRIO
     const _advancedStages = new Set(['Pre-Screening','Screening','Screened','Enrolled']);
     const _needsEntry = tasks.filter(t => _advancedStages.has(t.stage) && matchCrioPatient(t.name, t.phone) === null).length;
+    // Use CRIO data for screening/enrolled/sf if available (more accurate)
+    var crio = _crioSourceRows[name];
+    if (crio) _crioUsed.add(name);
+    var _screening = crio ? crio.screening : (sc['Pre-Screening']||0) + (sc['Screening']||0);
+    var _enrolled = crio ? crio.enrolled : (sc['Enrolled']||0) + (sc['Screened']||0);
+    var _dnq = crio ? (crio.sf + crio.not_eligible + crio.not_interested) : (sc['DNQ']||0) + (sc['Screen Fail']||0);
+    var _total = crio ? crio.total : tasks.length;
+    var _new = crio ? crio.new : (sc['New Lead']||0);
+    var _contacted = crio ? crio.contacted : (sc['Contacted']||0);
     unifiedRows.push({
-      name: name, type: 'Provider', vendor: 'Physician', total: tasks.length,
-      newLead: sc['New Lead']||0, contacted: sc['Contacted']||0,
+      name: name, type: 'Provider', vendor: 'Physician', total: _total,
+      newLead: _new, contacted: _contacted,
       screening: _screening, enrolled: _enrolled, dnq: _dnq,
-      stale: _stale, inCrio: _inCrio, needsEntry: _needsEntry, clickId: name
+      stale: _stale, inCrio: _inCrio, needsEntry: _needsEntry, clickId: name,
+      crioData: crio || null
     });
   });
 
@@ -9628,6 +9658,9 @@ function renderReferralDashboard() {
     var _vendorPrefix = {'facebook':'Meta','subjectwell':'SW','study teams':'ST','study max':'SM','studykik':'SK','iconnect':'IC','gardinia - clinlife':'CL'};
     var _prefix = _vendorPrefix[(c.vendor||'').toLowerCase()] || c.vendor;
     var _campName = _prefix + ': ' + c.study;
+    // Mark vendor CRIO source as consumed
+    var _normVendor = (CRP_CONFIG.SOURCE_NAME_MAP || {})[_vendorLower] || c.vendor;
+    if (_crioSourceRows[_normVendor]) _crioUsed.add(_normVendor);
     unifiedRows.push({
       name: _campName, type: 'Campaign', total: c.first_contact + c.second_contact + c.third_contact,
       newLead: c.new_referrals, contacted: c.first_contact, screening: _screening,
@@ -9637,7 +9670,21 @@ function renderReferralDashboard() {
     });
   });
 
-  if (campBadge) campBadge.textContent = unifiedRows.length + ' sources';
+  // ── Add remaining CRIO sources not covered by ClickUp trackers or campaigns ──
+  Object.keys(_crioSourceRows).forEach(function(srcName) {
+    if (_crioUsed.has(srcName)) return;
+    var crio = _crioSourceRows[srcName];
+    if (crio.total < 1) return;
+    var _type = srcName === 'CRIO Database' ? 'Database' : 'CRIO';
+    unifiedRows.push({
+      name: srcName, type: _type, vendor: srcName, total: crio.total,
+      newLead: crio.new, contacted: crio.contacted, screening: crio.screening,
+      enrolled: crio.enrolled, dnq: crio.sf + crio.not_eligible + crio.not_interested,
+      stale: 0, inCrio: crio.total, needsEntry: 0, clickId: null, crioData: crio
+    });
+  });
+
+  if (campBadge) campBadge.textContent = unifiedRows.length + ' sources (' + (window._recruitingData ? window._recruitingData.length.toLocaleString() + ' CRIO records' : 'ClickUp only') + ')';
   var _staleBadge2 = el('ref-stale-badge');
   var totalStale = unifiedRows.reduce(function(s,r){return s+r.stale;},0);
   if (_staleBadge2) _staleBadge2.textContent = totalStale > 0 ? totalStale + ' stale' : 'All active';
