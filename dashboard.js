@@ -1689,7 +1689,8 @@ function renderRevenuePerUser() {
   var avg = totalVisits > 0 ? Math.round(totalRev / totalVisits) : 0;
   var _kpi = function(id,v){var e=el(id);if(e)e.textContent=v;};
   _kpi('rpu-kpi-revenue', '$' + Math.round(totalRev/1000).toLocaleString() + 'K');
-  _kpi('rpu-kpi-revenue-sub', _rpuData.filter(function(r){return r.revenue_type==='Actual';}).length + ' actual + ' + _rpuData.filter(function(r){return r.revenue_type==='Contracted';}).length + ' contracted');
+  var _noRate = _rpuData.filter(function(r){return r.revenue_type==='No Rate';}).length;
+  _kpi('rpu-kpi-revenue-sub', _rpuData.filter(function(r){return r.revenue_type==='Actual';}).length + ' actual + ' + _rpuData.filter(function(r){return r.revenue_type==='Contracted';}).length + ' contracted' + (_noRate > 0 ? ' + ' + _noRate + ' no rate' : ''));
   _kpi('rpu-kpi-visits', totalVisits.toLocaleString());
   _kpi('rpu-kpi-avg', '$' + avg.toLocaleString());
   _kpi('rpu-kpi-sites', sites.size);

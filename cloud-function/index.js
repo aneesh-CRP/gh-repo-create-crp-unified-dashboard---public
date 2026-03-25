@@ -1546,7 +1546,7 @@ const FEEDS = {
         COALESCE(pr.procedures_completed, 0) AS procedures_completed,
         CASE WHEN pr.proc_revenue IS NOT NULL THEN 'Actual'
           WHEN svf.revenue_base IS NOT NULL THEN 'Contracted'
-          ELSE 'Unknown' END AS revenue_type,
+          ELSE 'No Rate' END AS revenue_type,
         FORMAT_DATETIME('%Y-%m-%d', cv.completed_date) AS date_completed,
         FORMAT_DATETIME('%Y-%m', cv.completed_date) AS month_completed,
         COALESCE(si.name, '') AS site_name
