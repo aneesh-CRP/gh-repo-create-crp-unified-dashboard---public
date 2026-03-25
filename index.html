@@ -11186,10 +11186,18 @@ async function refreshReferrals() {
     // Fetch referral + campaign data — Cloud Function (ClickUp API) or Sheets fallback
     var _refUrl = _cfUrl('referrals') || CRP_CONFIG.DATA_FEEDS.REFERRALS_CSV;
     var _campUrl = _cfUrl('campaigns') || CRP_CONFIG.DATA_FEEDS.CAMPAIGNS_CSV;
-    const [refRows, campRows] = await Promise.all([
-      fetchCSV(_refUrl).catch(function() { return fetchCSV(CRP_CONFIG.DATA_FEEDS.REFERRALS_CSV); }),
-      fetchCSV(_campUrl).catch(function() { return fetchCSV(CRP_CONFIG.DATA_FEEDS.CAMPAIGNS_CSV); }),
+    var [refRows, campRows] = await Promise.all([
+      fetchCSV(_refUrl).catch(function() { return []; }),
+      fetchCSV(_campUrl).catch(function() { return []; }),
     ]);
+    // Fallback to Sheets CSV if cloud function returned empty (ClickUp API timeout)
+    if (refRows.length === 0 && CRP_CONFIG.DATA_FEEDS.REFERRALS_CSV) {
+      _log('CRP Referrals: Cloud function returned 0 rows, falling back to Sheets CSV');
+      try { refRows = await fetchCSV(CRP_CONFIG.DATA_FEEDS.REFERRALS_CSV); } catch(e2) { _log('CSV fallback failed: ' + e2.message); }
+    }
+    if (campRows.length === 0 && CRP_CONFIG.DATA_FEEDS.CAMPAIGNS_CSV) {
+      try { campRows = await fetchCSV(CRP_CONFIG.DATA_FEEDS.CAMPAIGNS_CSV); } catch(e2) { _log('CSV fallback failed: ' + e2.message); }
+    }
 
     // Normalize stage values — CSV may have case variants ("dnq" vs "DNQ") or blanks
     const STAGE_NORM = { 'dnq':'DNQ', 'screen fail':'Screen Fail', 'new lead':'New Lead',
@@ -11256,9 +11264,9 @@ async function refreshReferrals() {
     if (badge) badge.textContent = `✅ ${REFERRAL_DATA.length} referrals · ${new Date().toLocaleTimeString()}`;
     setHealthChip('dh-referrals', REFERRAL_DATA.length > 0 ? 'ok' : 'warn', 'Referrals (' + REFERRAL_DATA.length + ')');
     setHealthChip('dh-campaigns', CAMPAIGN_DATA.length > 0 ? 'ok' : 'warn', 'Campaigns (' + CAMPAIGN_DATA.length + ')');
-    _log(`CRP Referrals: Loaded ${REFERRAL_DATA.length} referrals, ${CAMPAIGN_DATA.length} campaigns from Google Sheets`);
+    _log(`CRP Referrals: Loaded ${REFERRAL_DATA.length} referrals, ${CAMPAIGN_DATA.length} campaigns`);
 
-    renderReferralDashboard();
+    try { renderReferralDashboard(); } catch(e) { _log('renderReferralDashboard error: ' + e.message); console.error(e); }
 
     // Refresh cross-source KPIs now that referral data is loaded
     safe(buildRecruitmentKPIs, 'buildRecruitmentKPIs');
