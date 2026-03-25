@@ -2477,22 +2477,40 @@ const CRP_CONFIG = {
   INVESTIGATORS: ['Taher Modarressi','Eugene Andruczyk','Lolita Vaughan','Michael Tomeo','Joseph Heether','Jason Schoenfeld','Donna Gavarone','Lawrence Leventhal'],
   // CRIO referral_source → canonical provider name (normalizes inconsistent CRIO naming)
   SOURCE_NAME_MAP: {
+    // Dr. Modarressi practice
     'dr. taher modarressit':                'Dr. Modarressi',
     'dr. taher - princeton cardiometabolic health': 'Dr. Modarressi',
     'dr. taher modarressi':                 'Dr. Modarressi',
-    'dr. savita singh':                     'Dr. Savita Singh',
     'princeton cardiometabolic':            'Dr. Modarressi',
+    // Dr. Brian Shaffer / CPCM (same practice)
+    'dr brian shaffer':                     'Dr. Brian Shaffer / CPCM',
+    'center for primary care medicine':     'Dr. Brian Shaffer / CPCM',
+    // Other providers
+    'dr gavarone':                          'Dr. Gavarone',
+    'dr. savita singh':                     'Dr. Savita Singh',
     'connolly dermatology':                 'Connolly Dermatology',
-    'center for primary care medicine':     'Center for Primary Care Medicine',
     'prohealth associates':                 'Prohealth Associates',
     'parkwood medical practice':            'Parkwood',
     'parkwood':                             'Parkwood',
     'aura derm':                            'Aura Derm',
     'princeton derm':                       'Princeton Dermatology',
-    'dr gavarone':                          'Dr. Modarressi',
-    'dr brian shaffer':                     'Dr. Modarressi',
-    'delfa':                                'Meta (DELFA)',
-    'facebook':                             'Meta (DELFA)',
+    'dr.elliott frank':                     'Dr. Elliott Frank',
+    'dr. devi patel':                       'Dr. Devi Patel',
+    'dr tiffany tsang':                     'Dr. Tiffany Tsang',
+    'anthony santoro, md':                  'Anthony Santoro, MD',
+    'oxford circle family medicine':        'Oxford Circle Family Medicine',
+    'ashton family medicine':               'Ashton Family Medicine',
+    'brian stein internal medicine':         'Brian Stein Internal Medicine',
+    'frankford avenue family practice':     'Frankford Avenue Family Practice',
+    'burstein medical associates':          'Burstein Medical Associates',
+    'woodhaven family medicine':            'Woodhaven Family Medicine',
+    'hunterdon gastroenterology associates':'Hunterdon Gastroenterology',
+    'stoltz & hahn medical associates':     'Stoltz & Hahn Medical',
+    'tri-county rheumatology':              'Tri-County Rheumatology',
+    'murray brand & associates':            'Murray Brand & Associates',
+    // Digital marketing / vendors
+    'delfa':                                'DELFA',
+    'facebook':                             'DELFA',
     'study team':                           'Study Team',
     'study teams':                          'Study Team',
     'study max':                            'Study Max',
@@ -2504,6 +2522,11 @@ const CRP_CONFIG = {
     'acurian':                              'Acurian',
     'tristar':                              'Tristar',
     'iconnect':                             'iConnect',
+    'x-factor smart':                       'X-Factor SMART',
+    'us recruitment':                       'US Recruitment',
+    // Other
+    'senior expo':                          'Senior Expo',
+    'refer a friend':                       'Refer a Friend',
   },
   // Default PI for each study (fallback when audit log doesn't resolve investigator)
   STUDY_INVESTIGATORS: {
@@ -6367,7 +6390,7 @@ function fetchActionRequiredData() {
             var name = (r.patient_name||'').toLowerCase().trim().replace(/\s+/g, ' ');
             if (!name || window._crioRefSourceMap.has(name)) return;
             if (_fbNames.has(name)) {
-              window._crioRefSourceMap.set(name, { source: 'Meta (DELFA)', category: 'Advertisement', date: r.patient_created || r.status_changed || '', inferred: true });
+              window._crioRefSourceMap.set(name, { source: 'DELFA', category: 'Advertisement', date: r.patient_created || r.status_changed || '', inferred: true });
               _inferred++;
             }
           });
