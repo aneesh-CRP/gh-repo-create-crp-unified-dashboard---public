@@ -1791,7 +1791,7 @@ function renderRevenuePerUser() {
 function initFinanceDashboard(forceRefresh) {
   if (finInitDone && !forceRefresh) return;
   // Guard: ensure finance globals have data before rendering
-  if (!AGING_INV || !AGING_INV.length) { _log('CRP Finance: No aging data yet — skipping init'); return; }
+  if ((!AGING_INV || !AGING_INV.length) && (!UNPAID_INVOICES || !UNPAID_INVOICES.length) && (!TOP_AR_STUDIES || !TOP_AR_STUDIES.length)) { _log('CRP Finance: No data at all — skipping init'); return; }
   finInitDone = true;
   // Update all overview KPIs dynamically
   try { updateFinanceOverviewKPIs(); } catch(e) { _log('updateFinanceOverviewKPIs: ' + e.message); }
@@ -5519,17 +5519,17 @@ async function fetchFinanceBQ() {
     var sumB = function(r) { return r.current + r.d30_60 + r.d61_90 + r.d91_120 + r.d121_150 + r.d150plus; };
     var newTotalInvAR = Math.round(newAgingInv.reduce(function(s, r) { return s + sumB(r); }, 0) * 100) / 100;
 
-    // ── Assign to globals ──
-    AGING_INV = newAgingInv;
+    // ── Assign to globals (only overwrite if BQ returned data) ──
+    if (newAgingInv.length > 0) AGING_INV = newAgingInv;
     // Preserve existing AP/uninvoiced data — BQ doesn't have these yet, Sheets fills them later
     if (!AGING_AP || !AGING_AP.length) AGING_AP = [];
-    UNPAID_INVOICES = newUnpaidInv;
+    if (newUnpaidInv.length > 0) UNPAID_INVOICES = newUnpaidInv;
     if (!UNPAID_AP || !UNPAID_AP.length) UNPAID_AP = [];
     if (!UNINVOICED || !UNINVOICED.length) UNINVOICED = [];
-    MONTHLY_REVENUE = newRevenue;
-    MONTHLY_PAYMENTS = newPayments;
-    TOP_AR_STUDIES = newTopAR;
-    totalInvAR = newTotalInvAR;
+    if (newRevenue.length > 0) MONTHLY_REVENUE = newRevenue;
+    if (newPayments.length > 0) MONTHLY_PAYMENTS = newPayments;
+    if (newTopAR.length > 0) TOP_AR_STUDIES = newTopAR;
+    if (newTotalInvAR > 0) totalInvAR = newTotalInvAR;
     // Don't reset totalApAR to 0 — Sheets fill this later. Preserve existing value.
     if (totalApAR === undefined) totalApAR = 0;
 
