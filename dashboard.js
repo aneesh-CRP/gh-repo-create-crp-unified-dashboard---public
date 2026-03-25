@@ -4404,22 +4404,15 @@ function fetchActionRequiredData() {
           });
         }
       }
-      // Tier 4: Everything else → sub-categorize by study name pattern
+      // Tier 4: Everything else → CRIO Database
       var _dbFill = 0;
-      function _inferDbSource(studyName) {
-        var sn = (studyName||'').toLowerCase();
-        if (sn.indexOf('pre-screen') !== -1) return 'Internal Pre-Screen';
-        if (/alzheimer|cardiology|migraine|diabetes|obesity|stress incontinence|lupus|arthritis|lichen|mash/.test(sn)) return 'Condition Screen';
-        if (/efc17559|efc17599|efc17600|efc18366|lts17367|aqua|estuary/.test(sn)) return 'Sanofi Database';
-        return 'Study Recruitment';
-      }
       window._recruitingData.forEach(function(r) {
         var name = (r.patient_name||'').toLowerCase().trim().replace(/\s+/g, ' ');
         if (!name || window._crioRefSourceMap.has(name)) return;
-        var dbSrc = _inferDbSource(r.study_name);
-        window._crioRefSourceMap.set(name, { source: dbSrc, category: 'Internal', date: r.patient_created || r.status_changed || '', inferred: true });
+        window._crioRefSourceMap.set(name, { source: 'CRIO Database', category: 'Internal', date: r.patient_created || r.status_changed || '', inferred: true });
         _dbFill++;
       });
+      function _inferDbSource() { return 'CRIO Database'; }
       _log('CRP: Recruiting data loaded — ' + window._recruitingData.length + ' records, ' + _crioSourced + ' CRIO-sourced, ' + _inferred + ' inferred, ' + _dbFill + ' CRIO Database, ' + window._crioRefSourceMap.size + ' total mapped (' + Math.round(window._crioRefSourceMap.size/window._recruitingData.length*100) + '% coverage)');
     }
 
