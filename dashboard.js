@@ -9245,7 +9245,7 @@ async function refreshReferrals() {
     setHealthChip('dh-campaigns', CAMPAIGN_DATA.length > 0 ? 'ok' : 'warn', 'Campaigns (' + CAMPAIGN_DATA.length + ')');
     _log(`CRP Referrals: Loaded ${REFERRAL_DATA.length} referrals, ${CAMPAIGN_DATA.length} campaigns`);
 
-    try { renderReferralDashboard(); } catch(e) { _log('renderReferralDashboard error: ' + e.message); console.error(e); }
+    try { renderReferralDashboard(); } catch(e) { console.error('renderReferralDashboard error:', e); showToast('Referral render error: ' + e.message, 'error', 10000); var _refEl = document.getElementById('ref-tracker-detail'); if (_refEl) _refEl.innerHTML = '<div style="padding:20px;color:#dc2626;font-size:12px;">Render error: ' + e.message + '<br>' + (e.stack||'').split('\\n').slice(0,3).join('<br>') + '</div>'; }
 
     // Refresh cross-source KPIs now that referral data is loaded
     safe(buildRecruitmentKPIs, 'buildRecruitmentKPIs');

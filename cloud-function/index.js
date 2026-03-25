@@ -1497,6 +1497,89 @@ const FEEDS = {
     ORDER BY so.date_created DESC`
   },
 
+  // ── 48. Revenue Per User (eSource attribution + procedure revenue) ──
+  revenuePerUser: {
+    query: (params) => {
+      const days = parseInt(params.days) || 365;
+      // Coordinator list and investigator list for role classification
+      const coordinators = "'Mario Castellanos','Stacey scott','Stacey Scott','Ruby Pereira','Cady Chilensky','Angelina McMullen','Ema Gunic','Vlado Draganic','Gabrijela Ateljevic','Ana Lambic','Jana Milankovic'";
+      const investigators = "'Taher Modarressi','Eugene Andruczyk','Lolita Vaughan','Michael Tomeo','Joseph Heether','Jason Schoenfeld','Donna Gavarone','Lawrence Leventhal','Brian Shaffer','Hal Ganzman','Savita Singh','Christina Olney'";
+      return `
+      WITH visit_revenue AS (
+        SELECT
+          svpr.subject_visit_key,
+          svpr.study_key,
+          svpr.subject_key,
+          svpr.site_key,
+          ROUND(SUM(CAST(svpr.revenue AS FLOAT64)), 2) AS visit_revenue,
+          ROUND(SUM(CAST(svpr.holdback AS FLOAT64)), 2) AS visit_holdback,
+          ROUND(SUM(CAST(svpr.receivable AS FLOAT64)), 2) AS visit_receivable,
+          COUNT(*) AS procedures_completed,
+          MIN(svpr.date_completed) AS earliest_completed,
+          MAX(svpr.date_completed) AS latest_completed
+        FROM ${tbl('subject_visit_procedure_revenue')} svpr
+        WHERE svpr.is_active = 1
+          AND svpr.date_completed >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL ${days} DAY)
+        GROUP BY svpr.subject_visit_key, svpr.study_key, svpr.subject_key, svpr.site_key
+      ),
+      esource_all AS (
+        SELECT
+          q.subject_visit_key,
+          TRIM(CONCAT(COALESCE(q.first_name, ''), ' ', COALESCE(q.last_name, ''))) AS user_name,
+          COUNT(*) AS questions_answered
+        FROM ${tbl('fact_subject_visit_procedure_question')} q
+        WHERE q.answer IS NOT NULL AND q.answer != ''
+          AND q.first_name IS NOT NULL
+          AND q.date_completed >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL ${days} DAY)
+        GROUP BY q.subject_visit_key, user_name
+      ),
+      esource_coordinator AS (
+        SELECT subject_visit_key, user_name AS coordinator, questions_answered AS coord_questions
+        FROM esource_all
+        WHERE user_name IN (${coordinators})
+        QUALIFY ROW_NUMBER() OVER (PARTITION BY subject_visit_key ORDER BY questions_answered DESC) = 1
+      ),
+      esource_investigator AS (
+        SELECT subject_visit_key, user_name AS investigator, questions_answered AS inv_questions
+        FROM esource_all
+        WHERE user_name IN (${investigators})
+        QUALIFY ROW_NUMBER() OVER (PARTITION BY subject_visit_key ORDER BY questions_answered DESC) = 1
+      )
+      SELECT
+        COALESCE(ec.coordinator, 'Unassigned') AS coordinator,
+        COALESCE(ec.coord_questions, 0) AS coord_questions,
+        COALESCE(ei.investigator, 'Unassigned') AS investigator,
+        COALESCE(ei.inv_questions, 0) AS inv_questions,
+        CAST(vr.study_key AS STRING) AS study_key,
+        ${STUDY_NAME_SQL} AS study_name,
+        COALESCE(sv.name, '') AS visit_name,
+        ${SUBJECT_NAME_SQL} AS subject_name,
+        CASE svi.status
+          WHEN 22 THEN 'Complete' WHEN 23 THEN 'Outside CRIO'
+          WHEN 21 THEN 'Partial' WHEN 20 THEN 'Cancelled'
+          ELSE CAST(svi.status AS STRING) END AS visit_status,
+        vr.visit_revenue,
+        vr.visit_holdback,
+        vr.visit_receivable,
+        vr.procedures_completed,
+        FORMAT_DATETIME('%Y-%m-%d', vr.earliest_completed) AS date_completed,
+        FORMAT_DATETIME('%Y-%m', vr.earliest_completed) AS month_completed,
+        COALESCE(si.name, '') AS site_name
+      FROM visit_revenue vr
+      JOIN ${tbl('study')} st ON vr.study_key = st.study_key
+      LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
+      LEFT JOIN ${tbl('subject')} sub ON vr.subject_key = sub.subject_key
+      LEFT JOIN ${tbl('subject_visit')} svi ON vr.subject_visit_key = svi.subject_visit_key
+      LEFT JOIN ${tbl('study_visit')} sv ON svi.study_visit_key = sv.study_visit_key
+      LEFT JOIN ${tbl('site')} si ON vr.site_key = si.site_key
+      LEFT JOIN esource_coordinator ec ON vr.subject_visit_key = ec.subject_visit_key
+      LEFT JOIN esource_investigator ei ON vr.subject_visit_key = ei.subject_visit_key
+      WHERE st.is_active = 1 AND st.site_key NOT IN (5547)
+        AND svi.status IN (21, 22, 23)
+      ORDER BY vr.visit_revenue DESC`;
+    }
+  },
+
   // ── 45. Subject Audit Trail (status changes with reasons) ──
   subjectAudit: {
     query: () => `SELECT
