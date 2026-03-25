@@ -6373,7 +6373,15 @@ function fetchActionRequiredData() {
           });
         }
       }
-      _log('CRP: Recruiting data loaded — ' + window._recruitingData.length + ' records, ' + _crioSourced + ' CRIO-sourced, ' + _inferred + ' inferred, ' + window._crioRefSourceMap.size + ' total mapped');
+      // Tier 4: Everything else → CRIO Database (internal DB screen, sponsor lists, legacy)
+      var _dbFill = 0;
+      window._recruitingData.forEach(function(r) {
+        var name = (r.patient_name||'').toLowerCase().trim().replace(/\s+/g, ' ');
+        if (!name || window._crioRefSourceMap.has(name)) return;
+        window._crioRefSourceMap.set(name, { source: 'CRIO Database', category: 'Internal', date: r.patient_created || r.status_changed || '', inferred: true });
+        _dbFill++;
+      });
+      _log('CRP: Recruiting data loaded — ' + window._recruitingData.length + ' records, ' + _crioSourced + ' CRIO-sourced, ' + _inferred + ' inferred, ' + _dbFill + ' CRIO Database, ' + window._crioRefSourceMap.size + ' total mapped (' + Math.round(window._crioRefSourceMap.size/window._recruitingData.length*100) + '% coverage)');
     }
 
     // Pre-screening visits (display only in schedule table, not in metrics)
