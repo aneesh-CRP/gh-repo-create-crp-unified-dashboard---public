@@ -1060,6 +1060,7 @@ body {
     <span class="nav-tab fin-tab" onclick="switchTab('fin-aging',this)">🔒 Aging</span>
     <span class="nav-tab fin-tab" onclick="switchTab('fin-revenue',this)">🔒 Billing</span>
     <span class="nav-tab fin-tab" onclick="switchTab('fin-qb',this)">🔒 QB</span>
+    <span class="nav-tab fin-tab" onclick="switchTab('fin-productivity',this)">🔒 Productivity</span>
     <span style="width:1px;background:#CBD5E0;margin:8px 2px"></span>
     <span class="nav-tab fin-tab" onclick="switchTab('insights',this)" role="tab">🔒 Insights</span>
   </div>
@@ -2584,7 +2585,7 @@ const CRP_CONFIG = {
   // Tab registry — add new tabs here
   TABS: {
     PERFORMANCE: ['overview', 'studies', 'schedule', 'referrals', 'admin'],
-    FINANCE: ['fin-overview', 'fin-collections', 'fin-aging', 'fin-revenue', 'fin-qb', 'insights'],
+    FINANCE: ['fin-overview', 'fin-collections', 'fin-aging', 'fin-revenue', 'fin-qb', 'fin-productivity', 'insights'],
     CROSS: ['insights'],
   },
 
@@ -3641,6 +3642,172 @@ function togglePHIMask() {
 }
 
 let finInitDone = false;
+// ═══ REVENUE PER USER (Productivity Tab) ═══
+var _rpuData = null;
+var _rpuDays = 365;
+
+async function loadRevenuePerUser(days, btn) {
+  if (days) _rpuDays = days;
+  if (btn) {
+    btn.closest('div').querySelectorAll('.filter-btn').forEach(function(b){b.classList.remove('active');});
+    btn.classList.add('active');
+  }
+  var badge = document.getElementById('rpu-badge');
+  if (badge) badge.textContent = 'Loading...';
+  try {
+    var url = (CRP_CONFIG.USE_CLOUD_FUNCTION && CRP_CONFIG.CF_BASE) ? CRP_CONFIG.CF_BASE + '?feed=revenuePerUser&format=json&days=' + _rpuDays : null;
+    if (!url) { if (badge) badge.textContent = 'No cloud function'; return; }
+    var resp = await fetch(url);
+    var json = await resp.json();
+    _rpuData = json.data || [];
+    if (badge) badge.textContent = _rpuData.length + ' visits · $' + Math.round(_rpuData.reduce(function(s,r){return s+parseFloat(r.visit_revenue||0);},0)/1000) + 'K';
+    renderRevenuePerUser();
+  } catch(e) {
+    console.error('loadRevenuePerUser:', e);
+    if (badge) badge.textContent = 'Failed: ' + e.message;
+  }
+}
+
+function renderRevenuePerUser() {
+  if (!_rpuData || _rpuData.length === 0) return;
+  var el = function(id) { return document.getElementById(id); };
+  var totalRev = 0, totalVisits = _rpuData.length;
+  var byCoord = {}, byInv = {}, byMonth = {};
+  var sites = new Set();
+
+  _rpuData.forEach(function(r) {
+    var rev = parseFloat(r.visit_revenue || 0);
+    totalRev += rev;
+    sites.add(r.site_name);
+    var month = r.month_completed || '';
+
+    // Coordinator aggregation
+    var c = r.coordinator || 'Unassigned';
+    if (!byCoord[c]) byCoord[c] = {visits:0,revenue:0,questions:0,studies:{},site:{}};
+    byCoord[c].visits++;
+    byCoord[c].revenue += rev;
+    byCoord[c].questions += parseInt(r.coord_questions||0);
+    var studyShort = r.study_name.indexOf(' - ') !== -1 ? r.study_name.split(' - ').pop() : r.study_name;
+    byCoord[c].studies[studyShort] = (byCoord[c].studies[studyShort]||0) + rev;
+    byCoord[c].site[r.site_name] = (byCoord[c].site[r.site_name]||0) + rev;
+
+    // Investigator aggregation
+    var inv = r.investigator || 'Unassigned';
+    if (!byInv[inv]) byInv[inv] = {visits:0,revenue:0,questions:0,studies:{}};
+    byInv[inv].visits++;
+    byInv[inv].revenue += rev;
+    byInv[inv].questions += parseInt(r.inv_questions||0);
+    byInv[inv].studies[studyShort] = (byInv[inv].studies[studyShort]||0) + rev;
+
+    // Monthly trend
+    if (month) {
+      if (!byMonth[month]) byMonth[month] = {};
+      byMonth[month][c] = (byMonth[month][c]||0) + rev;
+    }
+  });
+
+  // KPIs
+  var avg = totalVisits > 0 ? Math.round(totalRev / totalVisits) : 0;
+  var _kpi = function(id,v){var e=el(id);if(e)e.textContent=v;};
+  _kpi('rpu-kpi-revenue', '$' + Math.round(totalRev/1000).toLocaleString() + 'K');
+  _kpi('rpu-kpi-revenue-sub', _rpuData.filter(function(r){return r.revenue_type==='Actual';}).length + ' actual + ' + _rpuData.filter(function(r){return r.revenue_type==='Contracted';}).length + ' contracted');
+  _kpi('rpu-kpi-visits', totalVisits.toLocaleString());
+  _kpi('rpu-kpi-avg', '$' + avg.toLocaleString());
+  _kpi('rpu-kpi-sites', sites.size);
+
+  // Helper: build user table
+  function buildUserTable(data, labelBadgeId, label) {
+    var rows = Object.entries(data).filter(function(e){return e[0]!=='Unassigned';}).sort(function(a,b){return b[1].revenue-a[1].revenue;});
+    var unassigned = data['Unassigned'];
+    var maxRev = rows.length > 0 ? rows[0][1].revenue : 1;
+    var badge = el(labelBadgeId);
+    if (badge) badge.textContent = rows.length + ' ' + label + 's · $' + Math.round(rows.reduce(function(s,r){return s+r[1].revenue;},0)/1000) + 'K';
+
+    var h = '<table class="fin-table" style="width:100%;font-size:11px;"><thead><tr>';
+    h += '<th style="text-align:left;padding:8px 12px;">' + escapeHTML(label) + '</th>';
+    h += '<th style="text-align:center;">Visits</th>';
+    h += '<th style="text-align:center;">Revenue</th>';
+    h += '<th style="text-align:center;">Avg/Visit</th>';
+    h += '<th style="text-align:center;">eSource Q</th>';
+    h += '<th style="text-align:left;">Top Study</th>';
+    h += '<th style="text-align:center;min-width:120px;">Revenue</th>';
+    h += '</tr></thead><tbody>';
+    rows.forEach(function(e) {
+      var name = e[0], d = e[1];
+      var avgV = d.visits > 0 ? Math.round(d.revenue / d.visits) : 0;
+      var barW = maxRev > 0 ? Math.round(d.revenue / maxRev * 100) : 0;
+      var topStudy = Object.entries(d.studies).sort(function(a,b){return b[1]-a[1];})[0];
+      var siteInfo = d.site ? Object.entries(d.site).map(function(s){return s[0].replace(', PA','').replace(', NJ','')+'($'+Math.round(s[1]/1000)+'K)';}).join(' ') : '';
+      h += '<tr style="border-bottom:1px solid #f1f5f9;">';
+      h += '<td style="padding:7px 12px;"><span style="font-weight:600;">'+escapeHTML(name)+'</span>';
+      if (siteInfo) h += '<div style="font-size:9px;color:#94a3b8;">'+escapeHTML(siteInfo)+'</div>';
+      h += '</td>';
+      h += '<td style="text-align:center;font-weight:700;">'+d.visits+'</td>';
+      h += '<td style="text-align:center;font-weight:700;color:#059669;">$'+Math.round(d.revenue).toLocaleString()+'</td>';
+      h += '<td style="text-align:center;">$'+avgV.toLocaleString()+'</td>';
+      h += '<td style="text-align:center;color:#8b5cf6;">'+d.questions.toLocaleString()+'</td>';
+      h += '<td style="padding:5px 8px;font-size:10px;">'+escapeHTML(topStudy ? topStudy[0] : '—')+'<div style="font-size:9px;color:#94a3b8;">$'+Math.round((topStudy?topStudy[1]:0)/1000)+'K</div></td>';
+      h += '<td style="padding:4px 8px;"><div style="background:#e2e8f0;border-radius:4px;height:18px;position:relative;overflow:hidden;">';
+      h += '<div style="width:'+barW+'%;background:linear-gradient(90deg,#3b82f6,#059669);height:100%;border-radius:4px;"></div>';
+      h += '<span style="position:absolute;left:6px;top:0;font-size:10px;font-weight:700;color:'+(barW>30?'#fff':'#374151')+';line-height:18px;">$'+Math.round(d.revenue/1000)+'K</span></div></td>';
+      h += '</tr>';
+    });
+    if (unassigned && unassigned.visits > 0) {
+      h += '<tr style="border-bottom:1px solid #f1f5f9;color:#94a3b8;">';
+      h += '<td style="padding:7px 12px;font-style:italic;">Unassigned (no eSource)</td>';
+      h += '<td style="text-align:center;">'+unassigned.visits+'</td>';
+      h += '<td style="text-align:center;">$'+Math.round(unassigned.revenue).toLocaleString()+'</td>';
+      h += '<td colspan="4"></td></tr>';
+    }
+    // Total
+    var totRev = Object.values(data).reduce(function(s,d){return s+d.revenue;},0);
+    var totVis = Object.values(data).reduce(function(s,d){return s+d.visits;},0);
+    h += '<tr style="border-top:2px solid var(--border);background:var(--surface2);font-weight:700;">';
+    h += '<td style="padding:8px 12px;">TOTAL</td>';
+    h += '<td style="text-align:center;">'+totVis+'</td>';
+    h += '<td style="text-align:center;color:#059669;">$'+Math.round(totRev).toLocaleString()+'</td>';
+    h += '<td style="text-align:center;">$'+(totVis>0?Math.round(totRev/totVis):0).toLocaleString()+'</td>';
+    h += '<td colspan="3"></td></tr>';
+    h += '</tbody></table>';
+    return h;
+  }
+
+  // Render coordinator table
+  var coordEl = el('rpu-coord-table');
+  if (coordEl) coordEl.innerHTML = buildUserTable(byCoord, 'rpu-coord-badge', 'Coordinator');
+
+  // Render investigator table
+  var invEl = el('rpu-inv-table');
+  if (invEl) invEl.innerHTML = buildUserTable(byInv, 'rpu-inv-badge', 'Investigator');
+
+  // Monthly trend heatmap
+  var trendEl = el('rpu-monthly-trend');
+  var trendBadge = el('rpu-trend-badge');
+  if (trendEl) {
+    var months = Object.keys(byMonth).sort().slice(-12);
+    var topUsers = Object.entries(byCoord).filter(function(e){return e[0]!=='Unassigned';}).sort(function(a,b){return b[1].revenue-a[1].revenue;}).slice(0,5).map(function(e){return e[0];});
+    if (trendBadge) trendBadge.textContent = months.length + ' months · top ' + topUsers.length;
+    var th = '<div style="overflow-x:auto;"><table class="fin-table" style="width:100%;font-size:10px;"><thead><tr>';
+    th += '<th style="text-align:left;padding:6px 8px;">Coordinator</th>';
+    months.forEach(function(m){th+='<th style="text-align:center;padding:4px 6px;">'+m.substring(5)+'/'+m.substring(2,4)+'</th>';});
+    th += '<th style="text-align:center;padding:4px 8px;font-weight:700;">Total</th></tr></thead><tbody>';
+    var colors = ['#3b82f6','#059669','#d97706','#8b5cf6','#06b6d4'];
+    topUsers.forEach(function(user, i) {
+      var total = months.reduce(function(s,m){return s+(byMonth[m]&&byMonth[m][user]||0);},0);
+      var maxM = Math.max.apply(null, months.map(function(m){return byMonth[m]&&byMonth[m][user]||0;}))||1;
+      th += '<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:5px 8px;font-weight:600;color:'+colors[i%5]+';">'+escapeHTML(user.split(' ')[0])+'</td>';
+      months.forEach(function(m) {
+        var v = byMonth[m]&&byMonth[m][user]||0;
+        var bg = v > 0 ? 'background:'+colors[i%5]+Math.round(v/maxM*40+10).toString(16)+';' : '';
+        th += '<td style="text-align:center;padding:4px 6px;font-weight:'+(v>0?'600':'400')+';color:'+(v>0?'#1e293b':'#cbd5e1')+';'+bg+'">'+( v > 0 ? '$'+Math.round(v/1000)+'K' : '—')+'</td>';
+      });
+      th += '<td style="text-align:center;padding:4px 8px;font-weight:700;color:'+colors[i%5]+';">$'+Math.round(total/1000)+'K</td></tr>';
+    });
+    th += '</tbody></table></div>';
+    trendEl.innerHTML = th;
+  }
+}
+
 function initFinanceDashboard(forceRefresh) {
   if (finInitDone && !forceRefresh) return;
   // Guard: ensure finance globals have data before rendering
@@ -3793,6 +3960,11 @@ function switchTab(name, el) {
   // Finance init on first access
   if (FIN_TABS.includes(name) && !finInitDone) {
     initFinanceDashboard();
+  }
+
+  // Productivity tab — lazy load revenue per user
+  if (name === 'fin-productivity' && !_rpuData) {
+    loadRevenuePerUser(_rpuDays);
   }
 
   // Insights rendering
@@ -16622,7 +16794,7 @@ async function _crpInit() {
   if (location.hash) {
     var _hashTab = location.hash.replace('#', '');
     if (_hashTab === 'schedule') _hashTab = 'overview'; // Schedule merged into Overview
-    var _allTabs = ['overview','studies','referrals','actions','admin','fin-overview','fin-collections','fin-aging','fin-revenue','fin-qb','insights'];
+    var _allTabs = ['overview','studies','referrals','actions','admin','fin-overview','fin-collections','fin-aging','fin-revenue','fin-qb','fin-productivity','insights'];
     if (_allTabs.indexOf(_hashTab) !== -1) _initTab = _hashTab;
   }
   var _initTabEl = document.querySelector(".nav-tab[onclick*='" + _initTab + "']");
@@ -17322,6 +17494,78 @@ if (typeof window !== 'undefined') {
 
 
 
+
+<!-- ═══════════ PRODUCTIVITY ═══════════ -->
+<div id="view-fin-productivity" class="view">
+  <div class="section-label" style="margin-top:0">Revenue Per User</div>
+
+  <!-- Time Filter -->
+  <div style="display:flex;gap:4px;margin-bottom:12px;align-items:center;">
+    <span style="font-size:11px;color:#94a3b8;margin-right:4px;">Period:</span>
+    <button class="filter-btn" onclick="loadRevenuePerUser(90,this)">90d</button>
+    <button class="filter-btn" onclick="loadRevenuePerUser(180,this)">180d</button>
+    <button class="filter-btn active" onclick="loadRevenuePerUser(365,this)">1 Year</button>
+    <button class="filter-btn" onclick="loadRevenuePerUser(730,this)">All</button>
+    <span class="badge badge-gray" id="rpu-badge" style="margin-left:8px;">Loading...</span>
+  </div>
+
+  <!-- KPI Banner -->
+  <div class="time-banner fade-in" style="margin-bottom:16px;">
+    <div class="tb-section">
+      <div class="tb-label">Total Revenue</div>
+      <div class="tb-value blue" id="rpu-kpi-revenue">—</div>
+      <div class="tb-sub" id="rpu-kpi-revenue-sub">Loading...</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section">
+      <div class="tb-label">Completed Visits</div>
+      <div class="tb-value" style="color:#8b5cf6" id="rpu-kpi-visits">—</div>
+      <div class="tb-sub">With eSource data</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section">
+      <div class="tb-label">Avg Revenue/Visit</div>
+      <div class="tb-value green" id="rpu-kpi-avg">—</div>
+      <div class="tb-sub">Across all users</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section">
+      <div class="tb-label">Sites</div>
+      <div class="tb-value" style="color:#64748b" id="rpu-kpi-sites">—</div>
+      <div class="tb-sub">PHL + NJ</div>
+    </div>
+  </div>
+
+  <!-- Coordinator Revenue -->
+  <div class="card fade-in" style="margin-bottom:16px;">
+    <div class="card-header">
+      <span class="card-title">Coordinator Revenue</span>
+      <span class="badge badge-blue" id="rpu-coord-badge">—</span>
+    </div>
+    <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Attribution: coordinator who answered the most eSource questions per visit</div>
+    <div style="padding:0;" id="rpu-coord-table"></div>
+  </div>
+
+  <!-- Investigator Revenue -->
+  <div class="card fade-in" style="margin-bottom:16px;">
+    <div class="card-header">
+      <span class="card-title">Investigator Revenue</span>
+      <span class="badge badge-purple" id="rpu-inv-badge">—</span>
+    </div>
+    <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Attribution: investigator who answered the most eSource questions per visit</div>
+    <div style="padding:0;" id="rpu-inv-table"></div>
+  </div>
+
+  <!-- Monthly Revenue Trend -->
+  <div class="card fade-in" style="margin-bottom:16px;">
+    <div class="card-header">
+      <span class="card-title">Monthly Revenue by User</span>
+      <span class="badge badge-gray" id="rpu-trend-badge">—</span>
+    </div>
+    <div style="padding:0;" id="rpu-monthly-trend"></div>
+  </div>
+
+</div>
 
 <!-- ═══════════ INSIGHTS ═══════════ -->
 

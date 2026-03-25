@@ -1060,6 +1060,7 @@ body {
     <span class="nav-tab fin-tab" onclick="switchTab('fin-aging',this)">🔒 Aging</span>
     <span class="nav-tab fin-tab" onclick="switchTab('fin-revenue',this)">🔒 Billing</span>
     <span class="nav-tab fin-tab" onclick="switchTab('fin-qb',this)">🔒 QB</span>
+    <span class="nav-tab fin-tab" onclick="switchTab('fin-productivity',this)">🔒 Productivity</span>
     <span style="width:1px;background:#CBD5E0;margin:8px 2px"></span>
     <span class="nav-tab fin-tab" onclick="switchTab('insights',this)" role="tab">🔒 Insights</span>
   </div>
@@ -2496,6 +2497,78 @@ body {
 
 
 
+
+<!-- ═══════════ PRODUCTIVITY ═══════════ -->
+<div id="view-fin-productivity" class="view">
+  <div class="section-label" style="margin-top:0">Revenue Per User</div>
+
+  <!-- Time Filter -->
+  <div style="display:flex;gap:4px;margin-bottom:12px;align-items:center;">
+    <span style="font-size:11px;color:#94a3b8;margin-right:4px;">Period:</span>
+    <button class="filter-btn" onclick="loadRevenuePerUser(90,this)">90d</button>
+    <button class="filter-btn" onclick="loadRevenuePerUser(180,this)">180d</button>
+    <button class="filter-btn active" onclick="loadRevenuePerUser(365,this)">1 Year</button>
+    <button class="filter-btn" onclick="loadRevenuePerUser(730,this)">All</button>
+    <span class="badge badge-gray" id="rpu-badge" style="margin-left:8px;">Loading...</span>
+  </div>
+
+  <!-- KPI Banner -->
+  <div class="time-banner fade-in" style="margin-bottom:16px;">
+    <div class="tb-section">
+      <div class="tb-label">Total Revenue</div>
+      <div class="tb-value blue" id="rpu-kpi-revenue">—</div>
+      <div class="tb-sub" id="rpu-kpi-revenue-sub">Loading...</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section">
+      <div class="tb-label">Completed Visits</div>
+      <div class="tb-value" style="color:#8b5cf6" id="rpu-kpi-visits">—</div>
+      <div class="tb-sub">With eSource data</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section">
+      <div class="tb-label">Avg Revenue/Visit</div>
+      <div class="tb-value green" id="rpu-kpi-avg">—</div>
+      <div class="tb-sub">Across all users</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section">
+      <div class="tb-label">Sites</div>
+      <div class="tb-value" style="color:#64748b" id="rpu-kpi-sites">—</div>
+      <div class="tb-sub">PHL + NJ</div>
+    </div>
+  </div>
+
+  <!-- Coordinator Revenue -->
+  <div class="card fade-in" style="margin-bottom:16px;">
+    <div class="card-header">
+      <span class="card-title">Coordinator Revenue</span>
+      <span class="badge badge-blue" id="rpu-coord-badge">—</span>
+    </div>
+    <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Attribution: coordinator who answered the most eSource questions per visit</div>
+    <div style="padding:0;" id="rpu-coord-table"></div>
+  </div>
+
+  <!-- Investigator Revenue -->
+  <div class="card fade-in" style="margin-bottom:16px;">
+    <div class="card-header">
+      <span class="card-title">Investigator Revenue</span>
+      <span class="badge badge-purple" id="rpu-inv-badge">—</span>
+    </div>
+    <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Attribution: investigator who answered the most eSource questions per visit</div>
+    <div style="padding:0;" id="rpu-inv-table"></div>
+  </div>
+
+  <!-- Monthly Revenue Trend -->
+  <div class="card fade-in" style="margin-bottom:16px;">
+    <div class="card-header">
+      <span class="card-title">Monthly Revenue by User</span>
+      <span class="badge badge-gray" id="rpu-trend-badge">—</span>
+    </div>
+    <div style="padding:0;" id="rpu-monthly-trend"></div>
+  </div>
+
+</div>
 
 <!-- ═══════════ INSIGHTS ═══════════ -->
 
