@@ -1881,6 +1881,7 @@ function updateFinanceOverviewKPIs() {
 
 // ═══ UNIFIED TAB SWITCHER (wraps perf switchView + finance gating) ═══
 function switchTab(name, el) {
+  console.log('switchTab CALLED:', name, 'auth:', isFinanceUnlocked());
   // Audit log
   if (typeof logAudit === 'function') logAudit('tab_view', name);
   // Deep-link: update URL hash
