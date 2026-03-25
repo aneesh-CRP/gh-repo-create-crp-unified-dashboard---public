@@ -11427,6 +11427,29 @@ function renderReferralDashboard() {
 
   const el = id => document.getElementById(id);
   var _kpiEl = function(id,v){ var e=document.getElementById(id); if(e) e.textContent=v; };
+
+  // ── Build CRIO-sourced rows FIRST (needed by KPIs and unified table) ──
+  var _crioSourceRows = {};
+  if (window._recruitingData && window._recruitingData.length > 0 && window._crioRefSourceMap) {
+    var _srcNameMap = CRP_CONFIG.SOURCE_NAME_MAP || {};
+    var _statusCol = {
+      'Prospect':'new','Contacting':'contacted','Interested':'screening','Screening':'screening',
+      'Success':'enrolled','Screen Fail':'sf','Not Eligible':'not_eligible',
+      'Not Interested':'not_interested','In Another Study':'other','Give Up':'other',
+      'Do Not Solicit':'other','Bad Contact Info':'other','Do Not Enroll':'other',
+      'Not Applicable':'other','Deceased':'other'
+    };
+    window._recruitingData.forEach(function(rec) {
+      var raw = (rec.referral_source||'').trim();
+      var norm = raw ? (_srcNameMap[raw.toLowerCase()] || raw) : 'CRIO Database';
+      if (_filterCutoff && (rec.patient_created||'') < _filterCutoff) return;
+      if (!_crioSourceRows[norm]) _crioSourceRows[norm] = {total:0,new:0,contacted:0,screening:0,enrolled:0,sf:0,not_eligible:0,not_interested:0,other:0};
+      var col = _statusCol[rec.recruiting_status] || 'other';
+      _crioSourceRows[norm].total++;
+      _crioSourceRows[norm][col]++;
+    });
+  }
+
   // KPIs — use CRIO recruiting data when available, ClickUp as fallback
   var _crioTotal = window._recruitingData ? window._recruitingData.length : 0;
   var _crioScreening = 0, _crioEnrolled = 0, _crioDnq = 0;
@@ -11469,28 +11492,7 @@ function renderReferralDashboard() {
   const campBadge = el('ref-camp-badge');
   _crioSubjectMap = null; // Reset CRIO cache
 
-  // ── Build CRIO-sourced rows from BQ recruiting data (28k+ records, 100% coverage) ──
-  var _crioSourceRows = {};
-  if (window._recruitingData && window._recruitingData.length > 0 && window._crioRefSourceMap) {
-    var _srcNameMap = CRP_CONFIG.SOURCE_NAME_MAP || {};
-    var _statusCol = {
-      'Prospect':'new','Contacting':'contacted','Interested':'screening','Screening':'screening',
-      'Success':'enrolled','Screen Fail':'sf','Not Eligible':'not_eligible',
-      'Not Interested':'not_interested','In Another Study':'other','Give Up':'other',
-      'Do Not Solicit':'other','Bad Contact Info':'other','Do Not Enroll':'other',
-      'Not Applicable':'other','Deceased':'other'
-    };
-    window._recruitingData.forEach(function(rec) {
-      var raw = (rec.referral_source||'').trim();
-      var norm = raw ? (_srcNameMap[raw.toLowerCase()] || raw) : 'CRIO Database';
-      // Apply time filter
-      if (_filterCutoff && (rec.patient_created||'') < _filterCutoff) return;
-      if (!_crioSourceRows[norm]) _crioSourceRows[norm] = {total:0,new:0,contacted:0,screening:0,enrolled:0,sf:0,not_eligible:0,not_interested:0,other:0};
-      var col = _statusCol[rec.recruiting_status] || 'other';
-      _crioSourceRows[norm].total++;
-      _crioSourceRows[norm][col]++;
-    });
-  }
+  // (_crioSourceRows already built above, before KPIs)
 
   // Build provider tracker rows (skip referrals with blank tracker name)
   const trackerMap = {};
