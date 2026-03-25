@@ -1719,9 +1719,12 @@ function parseCustomFields(fields) {
 // ── ClickUp Feed Handlers ──
 
 async function fetchReferrals() {
+  // Fetch all 10 provider lists in parallel (was sequential — 15s → ~3s)
+  const listResults = await Promise.all(
+    REFERRAL_LISTS.map(list => fetchAllClickUpTasks(list.id).then(tasks => ({ list, tasks })).catch(e => { console.warn('ClickUp list', list.name, 'failed:', e.message); return { list, tasks: [] }; }))
+  );
   const rows = [];
-  for (const list of REFERRAL_LISTS) {
-    const tasks = await fetchAllClickUpTasks(list.id);
+  for (const { list, tasks } of listResults) {
     for (const t of tasks) {
       const f = parseCustomFields(t.custom_fields);
       const statusRaw = ((t.status || {}).status || '').toLowerCase();
@@ -1897,8 +1900,11 @@ const PROVIDER_TRACKER_LISTS = [
 ];
 async function fetchProviderTrackers() {
   const allRows = [];
-  for (const list of PROVIDER_TRACKER_LISTS) {
-    const tasks = await fetchAllClickUpTasks(list.id);
+  // Fetch all 10 lists in parallel
+  const listResults = await Promise.all(
+    PROVIDER_TRACKER_LISTS.map(list => fetchAllClickUpTasks(list.id).then(tasks => ({ list, tasks })).catch(e => { console.warn('ClickUp provider', list.name, 'failed:', e.message); return { list, tasks: [] }; }))
+  );
+  for (const { list, tasks } of listResults) {
     tasks.forEach(t => {
       const f = parseCustomFields(t.custom_fields);
       const statusRaw = ((t.status||{}).status||'').toLowerCase();
