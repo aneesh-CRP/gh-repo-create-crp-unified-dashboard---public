@@ -934,13 +934,16 @@ const FEEDS = {
       FORMAT_DATETIME('%Y-%m-%d', srp.callback_date) AS callback_date,
       FORMAT_DATETIME('%Y-%m-%d', srp.status_date) AS status_changed,
       CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) AS recruiter,
-      COALESCE(prs.name, '') AS referral_source
+      COALESCE(prs.name, '') AS referral_source,
+      COALESCE(prsc.name, '') AS referral_source_category,
+      FORMAT_DATETIME('%Y-%m-%d', p.date_created) AS patient_created
     FROM ${tbl('study_recruiting_patient')} srp
     JOIN ${tbl('study')} st ON srp.study_key = st.study_key
     LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
     LEFT JOIN ${tbl('patient')} p ON srp.patient_key = p.patient_key
     LEFT JOIN ${tbl('user')} u ON srp.user_key = u.user_key
     LEFT JOIN ${tbl('patient_referral_source')} prs ON srp.referral_source_key = prs.patient_referral_source_key
+    LEFT JOIN ${tbl('patient_referral_source_category')} prsc ON prs.patient_referral_source_category_key = prsc.patient_referral_source_category_key
     WHERE st.is_active = 1 AND srp._fivetran_deleted = false
     ORDER BY srp.status_date DESC`
   },

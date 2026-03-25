@@ -2481,7 +2481,7 @@ const CRP_CONFIG = {
     'dr. taher - princeton cardiometabolic health': 'Dr. Modarressi',
     'dr. taher modarressi':                 'Dr. Modarressi',
     'dr. savita singh':                     'Dr. Savita Singh',
-    'princeton cardiometabolic':            'Dr. Savita Singh',
+    'princeton cardiometabolic':            'Princeton CardioMetabolic',
     'connolly dermatology':                 'Connolly Dermatology',
     'center for primary care medicine':     'Center for Primary Care Medicine',
     'prohealth associates':                 'Prohealth Associates',
@@ -6326,16 +6326,54 @@ function fetchActionRequiredData() {
     // CRIO recruiting data — referral source per patient
     window._recruitingData = (results.recruiting || {}).data || [];
     if (window._recruitingData.length > 0) {
-      // Build referral_source lookup: patient name (lower) → referral_source
+      var _srcMap = CRP_CONFIG.SOURCE_NAME_MAP || {};
+      // Build referral_source lookup: patient name (lower) → { source, category, patient_created, inferred }
       window._crioRefSourceMap = new Map();
+      var _crioSourced = 0, _inferred = 0;
       window._recruitingData.forEach(function(r) {
         var name = (r.patient_name||'').toLowerCase().trim().replace(/\s+/g, ' ');
-        if (name && r.referral_source) {
-          var _srcNorm = (CRP_CONFIG.SOURCE_NAME_MAP || {})[r.referral_source.toLowerCase().trim()] || r.referral_source;
-          window._crioRefSourceMap.set(name, _srcNorm);
+        if (!name) return;
+        var rawSrc = (r.referral_source||'').trim();
+        var cat = (r.referral_source_category||'').trim();
+        var created = r.patient_created || r.status_changed || '';
+        if (rawSrc) {
+          // Tier 1: CRIO has a source — normalize and use it
+          var norm = _srcMap[rawSrc.toLowerCase()] || rawSrc;
+          window._crioRefSourceMap.set(name, { source: norm, category: cat, date: created, inferred: false });
+          _crioSourced++;
         }
       });
-      _log('CRP: Recruiting data loaded — ' + window._recruitingData.length + ' records, ' + window._crioRefSourceMap.size + ' with referral source');
+      // Tier 2: Infer from ClickUp tracker match (patient in provider list)
+      if (REFERRAL_DATA && REFERRAL_DATA.length > 0) {
+        window._recruitingData.forEach(function(r) {
+          var name = (r.patient_name||'').toLowerCase().trim().replace(/\s+/g, ' ');
+          if (!name || window._crioRefSourceMap.has(name)) return;
+          // Find in ClickUp referral data by name match
+          var cuMatch = REFERRAL_DATA.find(function(ref) {
+            return ref.tracker && ref.name.toLowerCase().trim() === name;
+          });
+          if (cuMatch) {
+            window._crioRefSourceMap.set(name, { source: cuMatch.tracker, category: 'Physician', date: r.patient_created || r.status_changed || '', inferred: true });
+            _inferred++;
+          }
+        });
+      }
+      // Tier 3: Infer from FB CRM data (patient in Facebook lead sheet = Meta/DELFA)
+      if (typeof FB_CRM_DATA !== 'undefined' && FB_CRM_DATA && FB_CRM_DATA.length > 0) {
+        var _fbNameCol = Object.keys(FB_CRM_DATA[0]||{}).find(function(k) { return /name|full.?name/i.test(k); });
+        if (_fbNameCol) {
+          var _fbNames = new Set(FB_CRM_DATA.map(function(f) { return (f[_fbNameCol]||'').toLowerCase().trim(); }).filter(Boolean));
+          window._recruitingData.forEach(function(r) {
+            var name = (r.patient_name||'').toLowerCase().trim().replace(/\s+/g, ' ');
+            if (!name || window._crioRefSourceMap.has(name)) return;
+            if (_fbNames.has(name)) {
+              window._crioRefSourceMap.set(name, { source: 'Meta (DELFA)', category: 'Advertisement', date: r.patient_created || r.status_changed || '', inferred: true });
+              _inferred++;
+            }
+          });
+        }
+      }
+      _log('CRP: Recruiting data loaded — ' + window._recruitingData.length + ' records, ' + _crioSourced + ' CRIO-sourced, ' + _inferred + ' inferred, ' + window._crioRefSourceMap.size + ' total mapped');
     }
 
     // Pre-screening visits (display only in schedule table, not in metrics)
@@ -12178,7 +12216,8 @@ function showReferralDetailModal(filterFn, title, subtitle) {
   _displayRefs.forEach(function(r) {
     if (!r.tracker) return; // only audit provider tracker referrals
     _srcTotal++;
-    var crioSrc = window._crioRefSourceMap ? window._crioRefSourceMap.get(r.name.toLowerCase().trim()) : null;
+    var crioSrcObj = window._crioRefSourceMap ? window._crioRefSourceMap.get(r.name.toLowerCase().trim()) : null;
+    var crioSrc = crioSrcObj ? crioSrcObj.source : null;
     if (!crioSrc) { _srcMissing++; }
     else if (crioSrc.toLowerCase().indexOf(r.tracker.toLowerCase()) === -1 && r.tracker.toLowerCase().indexOf(crioSrc.toLowerCase()) === -1) { _srcMismatches++; }
   });
@@ -12204,18 +12243,20 @@ function showReferralDetailModal(filterFn, title, subtitle) {
     const _nameUrl = _crioMatch && _crioMatch.crio_url ? _crioMatch.crio_url : r.url;
     const _nameStyle = _crioMatch && _crioMatch.crio_url ? 'font-weight:600;color:#8b5cf6;text-decoration:none;' : 'font-weight:600;color:#1e293b;text-decoration:none;';
     // Source comparison: ClickUp tracker (authoritative) vs CRIO referral_source
-    const _crioSrc = window._crioRefSourceMap ? window._crioRefSourceMap.get(nameKey) : null;
+    const _crioSrcObj = window._crioRefSourceMap ? window._crioRefSourceMap.get(nameKey) : null;
+    const _crioSrc = _crioSrcObj ? _crioSrcObj.source : null;
     const _cuSrc = r.tracker || r.source || '';
+    const _isInferred = _crioSrcObj ? _crioSrcObj.inferred : false;
     var _srcCell = '';
     if (_crioSrc && _cuSrc) {
       var _match = _crioSrc.toLowerCase().indexOf(_cuSrc.toLowerCase()) !== -1 || _cuSrc.toLowerCase().indexOf(_crioSrc.toLowerCase()) !== -1;
       if (_match) {
-        _srcCell = '<span style="color:#059669;" title="CRIO matches ClickUp">' + escapeHTML(_crioSrc) + '</span>';
+        _srcCell = '<span style="color:#059669;" title="' + (_isInferred ? 'Inferred from ClickUp' : 'CRIO matches ClickUp') + '">' + escapeHTML(_crioSrc) + (_isInferred ? ' <em style="font-size:8px;">~</em>' : '') + '</span>';
       } else {
         _srcCell = '<span style="color:#dc2626;font-weight:600;" title="CRIO source does not match provider tracker">' + escapeHTML(_crioSrc) + '</span><div style="font-size:9px;color:#94a3b8;">CU: ' + escapeHTML(_cuSrc) + '</div>';
       }
     } else if (_crioSrc) {
-      _srcCell = '<span style="color:#8b5cf6;">' + escapeHTML(_crioSrc) + '</span>';
+      _srcCell = '<span style="color:#8b5cf6;">' + escapeHTML(_crioSrc) + (_isInferred ? ' <em style="font-size:8px;">~</em>' : '') + '</span>';
     } else if (_cuSrc) {
       _srcCell = '<span style="color:#d97706;" title="No CRIO source — needs update">' + escapeHTML(_cuSrc) + ' <em style="font-size:9px;">⚠ not in CRIO</em></span>';
     } else {
