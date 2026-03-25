@@ -1519,8 +1519,9 @@ body {
           <button class="filter-btn" onclick="setRefTimeFilter('90',this)">90d</button>
         </div>
         <span class="badge badge-blue" id="ref-camp-badge">Loading...</span>
+        <button onclick="exportRefTable()" style="font-size:10px;padding:3px 10px;border:1px solid #e2e8f0;border-radius:4px;background:#fff;color:#475569;cursor:pointer;">Export CSV</button>
       </div>
-      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Providers + campaigns · sortable by column · click numbers for detail · CRIO-verified conversions</div>
+      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">CRIO-verified · sortable · click any number for detail</div>
       <div style="padding:0;" id="ref-tracker-detail">
         <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Loading referral sources...</div>
       </div>
@@ -1568,6 +1569,16 @@ body {
       </div>
       <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Days from patient created to Screening/Enrolled · by referral source</div>
       <div style="padding:0;" id="ref-velocity-table"></div>
+    </div>
+
+    <!-- Study-level Source Breakdown -->
+    <div class="card fade-in" style="margin-bottom:16px;">
+      <div class="card-header">
+        <span class="card-title">Source Performance by Study</span>
+        <span class="badge badge-gray" id="ref-study-source-badge">Loading...</span>
+      </div>
+      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">For each study, which referral sources produce the best conversion rates</div>
+      <div style="padding:0;" id="ref-study-source-table"></div>
     </div>
 
     <div class="section-title" style="margin-top:24px;margin-bottom:8px;">Meta Ad Performance (last 30 days)</div>

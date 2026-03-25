@@ -1519,8 +1519,9 @@ body {
           <button class="filter-btn" onclick="setRefTimeFilter('90',this)">90d</button>
         </div>
         <span class="badge badge-blue" id="ref-camp-badge">Loading...</span>
+        <button onclick="exportRefTable()" style="font-size:10px;padding:3px 10px;border:1px solid #e2e8f0;border-radius:4px;background:#fff;color:#475569;cursor:pointer;">Export CSV</button>
       </div>
-      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Providers + campaigns · sortable by column · click numbers for detail · CRIO-verified conversions</div>
+      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">CRIO-verified · sortable · click any number for detail</div>
       <div style="padding:0;" id="ref-tracker-detail">
         <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Loading referral sources...</div>
       </div>
@@ -1568,6 +1569,16 @@ body {
       </div>
       <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Days from patient created to Screening/Enrolled · by referral source</div>
       <div style="padding:0;" id="ref-velocity-table"></div>
+    </div>
+
+    <!-- Study-level Source Breakdown -->
+    <div class="card fade-in" style="margin-bottom:16px;">
+      <div class="card-header">
+        <span class="card-title">Source Performance by Study</span>
+        <span class="badge badge-gray" id="ref-study-source-badge">Loading...</span>
+      </div>
+      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">For each study, which referral sources produce the best conversion rates</div>
+      <div style="padding:0;" id="ref-study-source-table"></div>
     </div>
 
     <div class="section-title" style="margin-top:24px;margin-bottom:8px;">Meta Ad Performance (last 30 days)</div>
@@ -11361,6 +11372,23 @@ function setRefTimeFilter(days, btn) {
   renderReferralDashboard();
 }
 
+function exportRefTable() {
+  var rows = window._unifiedRefRows;
+  if (!rows || rows.length === 0) { showToast('No data to export', 'warning'); return; }
+  var csv = 'Source,Campaign,Total,New,Contacted,Screening,Enrolled,Screen Fail,Not Eligible,Not Interested,DNQ Total,Stale,Conv%\n';
+  rows.forEach(function(r) {
+    var dnq = (r.sf||0) + (r.notEligible||0) + (r.notInterested||0);
+    var conv = r.total > 0 ? Math.round(r.enrolled / r.total * 100) : 0;
+    csv += '"' + (r.name||'').replace(/"/g,'""') + '","' + (r.vendor||r.type||'') + '",' + r.total + ',' + (r.newLead||0) + ',' + (r.contacted||0) + ',' + (r.screening||0) + ',' + (r.enrolled||0) + ',' + (r.sf||0) + ',' + (r.notEligible||0) + ',' + (r.notInterested||0) + ',' + dnq + ',' + (r.stale||0) + ',' + conv + '%\n';
+  });
+  var blob = new Blob([csv], {type: 'text/csv'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'referral-sources-' + new Date().toISOString().split('T')[0] + '.csv';
+  a.click();
+  showToast('Exported ' + rows.length + ' sources', 'success');
+}
+
 function sortRefTable(col) {
   if (window._refSortCol === col) { window._refSortDir = window._refSortDir === 'desc' ? 'asc' : 'desc'; }
   else { window._refSortCol = col; window._refSortDir = 'desc'; }
@@ -11425,161 +11453,7 @@ function renderReferralDashboard() {
     _freshEl.textContent = 'Data: ' + _refDatesAll[0] + ' — ' + _refDatesAll[_refDatesAll.length-1] + ' · Last updated: ' + newest + ' · Pulled ' + new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
   }
 
-  // ── Pipeline Funnel ──
-  const funnelEl = el('ref-funnel-chart');
-  const maxCount = Math.max(...CU.PIPELINE_ORDER.map(s => stageCounts[s] || 0), 1);
-
-  let funnelHtml = CU.PIPELINE_ORDER.map(stage => {
-    const count = stageCounts[stage] || 0;
-    const pct = maxCount ? Math.max(count / maxCount * 100, 4) : 4;
-    const color = STAGE_COLORS[stage] || '#94a3b8';
-    return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;cursor:pointer;" onclick="showReferralDetailModal(r=>r.stage==='${jsAttr(stage)}','${escapeHTML(stage)} Referrals','${count} referrals in this stage')">
-      <div style="width:100px;font-size:11px;font-weight:600;color:#475569;text-align:right;">${escapeHTML(stage)}</div>
-      <div style="flex:1;background:#f1f5f9;border-radius:4px;height:28px;position:relative;overflow:hidden;">
-        <div style="width:${pct}%;background:${color};height:100%;border-radius:4px;transition:width 0.5s;display:flex;align-items:center;justify-content:center;">
-          <span style="font-size:11px;font-weight:700;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,0.3);">${count}</span>
-        </div>
-      </div>
-    </div>`;
-  }).join('');
-
-  // Add closed stages as smaller bars below
-  const closedHtml = CU.CLOSED_STAGES.filter(s => stageCounts[s] > 0).map(stage => {
-    const count = stageCounts[stage] || 0;
-    const pct = maxCount ? Math.max(count / maxCount * 100, 4) : 4;
-    const color = STAGE_COLORS[stage] || '#94a3b8';
-    return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;cursor:pointer;" onclick="showReferralDetailModal(r=>r.stage==='${jsAttr(stage)}','${escapeHTML(stage)} Referrals','${count} referrals in this stage')">
-      <div style="width:100px;font-size:10px;color:#94a3b8;text-align:right;">${escapeHTML(stage)}</div>
-      <div style="flex:1;background:#f8fafc;border-radius:3px;height:20px;position:relative;overflow:hidden;">
-        <div style="width:${pct}%;background:${color};height:100%;border-radius:3px;display:flex;align-items:center;justify-content:center;">
-          <span style="font-size:10px;font-weight:600;color:#fff;">${count}</span>
-        </div>
-      </div>
-    </div>`;
-  }).join('');
-
-  // Date range + timestamp
-  var _refDates = all.map(function(r){return r.date_created;}).filter(Boolean).sort();
-  var _refRange = _refDates.length > 0 ? _refDates[0] + ' — ' + _refDates[_refDates.length-1] : '';
-  var _refTimestamp = '<div style="font-size:9px;color:#94a3b8;margin-top:10px;text-align:right;">Data: ' + all.length + ' referrals · ' + _refRange + ' · Pulled ' + new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}) + '</div>';
-
-  // DNQ breakdown — aggregate from CRIO (primary) + ClickUp
-  var _dnqCategories = {'Not Eligible':0,'Not Interested':0,'Screen Fail':0,'No Show/Cancelled V1':0};
-  // CRIO subjects (authoritative for DNQ reasons)
-  if (CRIO_SUBJECTS_DATA && CRIO_SUBJECTS_DATA.length > 0) {
-    CRIO_SUBJECTS_DATA.forEach(function(s) {
-      if (_dnqCategories.hasOwnProperty(s.status)) _dnqCategories[s.status]++;
-    });
-  }
-  // Add ClickUp DNQ/SF that aren't in CRIO categories
-  var _clickupDnq = all.filter(function(r){return r.stage==='DNQ';}).length;
-  var _clickupSF = all.filter(function(r){return r.stage==='Screen Fail';}).length;
-
-  var _dnqEntries = Object.entries(_dnqCategories).filter(function(e){return e[1]>0;}).sort(function(a,b){return b[1]-a[1];});
-  var _dnqMax = _dnqEntries.length > 0 ? _dnqEntries[0][1] : 1;
-  var _dnqTotal = _dnqEntries.reduce(function(s,e){return s+e[1];},0);
-  var _dnqColors = {'Not Eligible':'#dc2626','Not Interested':'#d97706','Screen Fail':'#8b5cf6','No Show/Cancelled V1':'#f97316'};
-  var dnqHtml = _dnqEntries.length > 0 ? '<div style="margin-top:14px;padding-top:10px;border-top:1px solid #f1f5f9;"><div style="font-size:11px;font-weight:700;color:#dc2626;margin-bottom:6px;">DNQ Reasons from CRIO ('+_dnqTotal.toLocaleString()+' subjects) · ClickUp: '+_clickupDnq+' DNQ, '+_clickupSF+' SF</div>' +
-    _dnqEntries.map(function(e) {
-      var pct = Math.round(e[1]/_dnqMax*100);
-      var color = _dnqColors[e[0]] || '#dc2626';
-      return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;"><div style="width:130px;font-size:10px;text-align:right;color:#64748b;">'+escapeHTML(e[0])+'</div><div style="flex:1;background:#fef2f2;border-radius:3px;height:18px;overflow:hidden;"><div style="width:'+pct+'%;background:'+color+';height:100%;border-radius:3px;display:flex;align-items:center;"><span style="font-size:9px;font-weight:700;color:#fff;padding-left:6px;">'+e[1].toLocaleString()+'</span></div></div></div>';
-    }).join('') + '</div>' : '';
-
-  funnelEl.innerHTML = funnelHtml + (closedHtml ? '<div style="margin-top:10px;padding-top:8px;border-top:1px solid #f1f5f9;"><div style="font-size:10px;color:#94a3b8;margin-bottom:4px;text-align:right;width:100px;display:inline-block;">Closed</div></div>' + closedHtml : '') + dnqHtml + _refTimestamp;
-
-  // ── Source Breakdown ──
-  const sourceEl = el('ref-source-chart');
-  const sourceCounts = {};
-  all.forEach(r => { const s = r.source || 'Unknown'; sourceCounts[s] = (sourceCounts[s] || 0) + 1; });
-  const sources = Object.entries(sourceCounts).sort((a,b) => b[1] - a[1]);
-  const srcColors = ['#3b82f6','#f59e0b','#10b981','#8b5cf6','#ef4444','#06b6d4','#f97316','#ec4899'];
-  sourceEl.innerHTML = sources.map(([name,count], i) => {
-    const pct = Math.round(count / all.length * 100);
-    const color = srcColors[i % srcColors.length];
-    return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
-      <div style="width:8px;height:8px;border-radius:50%;background:${color};flex-shrink:0;"></div>
-      <div style="width:120px;font-size:12px;font-weight:600;color:#334155;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHTML(name)}">${escapeHTML(name)}</div>
-      <div style="flex:1;background:#f1f5f9;border-radius:3px;height:20px;overflow:hidden;">
-        <div style="width:${Math.max(pct,3)}%;background:${color};height:100%;border-radius:3px;"></div>
-      </div>
-      <div style="font-size:12px;font-weight:700;color:#1e293b;min-width:40px;text-align:right;">${count} <span style="font-size:10px;color:#94a3b8;">(${pct}%)</span></div>
-    </div>`;
-  }).join('') || '<div style="color:#94a3b8;text-align:center;padding:20px;">No source data</div>';
-
-  // ── Pipeline by Study ──
-  const studyEl = el('ref-study-table');
-  const studyMap = {};
-  all.forEach(r => {
-    const s = r.study || 'Unassigned';
-    if (!studyMap[s]) studyMap[s] = { total: 0, active: 0, enrolled: 0, dnq: 0, stages: {} };
-    studyMap[s].total++;
-    if (!r.is_closed) studyMap[s].active++;
-    if (SG.ENROLLED && SG.ENROLLED.has(r.stage)) studyMap[s].enrolled++;
-    if (SG.CLOSED && SG.CLOSED.has(r.stage)) studyMap[s].dnq++;
-    studyMap[s].stages[r.stage] = (studyMap[s].stages[r.stage] || 0) + 1;
-  });
-  const studyRows = Object.entries(studyMap).sort((a,b) => b[1].total - a[1].total);
-  studyEl.innerHTML = `<table class="fin-table" style="width:100%;font-size:12px;">
-    <thead><tr>
-      <th style="text-align:left;padding:10px 12px;">Study</th>
-      <th style="text-align:center;">Total</th>
-      <th style="text-align:center;">Active</th>
-      <th style="text-align:center;">Enrolled</th>
-      <th style="text-align:center;">DNQ/SF</th>
-      <th style="text-align:center;">Conv %</th>
-    </tr></thead>
-    <tbody>${studyRows.map(([name, d]) => {
-      const conv = d.total ? Math.round(d.enrolled / d.total * 100) : 0;
-      const convColor = conv >= 30 ? '#059669' : conv >= 15 ? '#d97706' : '#dc2626';
-      return `<tr style="cursor:pointer;transition:background .1s" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''" data-action="pipelineModal" data-study="${escapeHTML(name)}">
-        <td style="padding:8px 12px;font-weight:600;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHTML(name)}">${escapeHTML(name)}</td>
-        <td style="text-align:center;font-weight:700;">${d.total}</td>
-        <td style="text-align:center;color:#3b82f6;">${d.active}</td>
-        <td style="text-align:center;color:#059669;font-weight:700;">${d.enrolled}</td>
-        <td style="text-align:center;color:#dc2626;">${d.dnq}</td>
-        <td style="text-align:center;font-weight:700;color:${convColor};">${conv}%</td>
-      </tr>`;
-    }).join('')}</tbody>
-  </table>`;
-  // Event delegation for pipeline study table
-  if (!studyEl._delegated) {
-    studyEl._delegated = true;
-    studyEl.addEventListener('click', function(e) {
-      var tr = e.target.closest('tr[data-action="pipelineModal"]');
-      if (tr) showStudyPipelineModal(tr.dataset.study);
-    });
-  }
-
-  // ── Stale Leads (active, not updated in 7+ days, created within last 60 days) ──
-  const staleEl = el('ref-stale-list');
-  const staleBadge = el('ref-stale-badge');
-  const _sixtyDaysAgo = Date.now() - 90 * 86400000;
-  const staleLeads = active.filter(r => {
-    if (r.days_since_update < 7) return false;
-    // Only include leads created within last 60 days — older leads are unlikely to still be in play
-    if (r.date_created) { var cd = new Date(r.date_created).getTime(); if (cd && cd < _sixtyDaysAgo) return false; }
-    return true;
-  }).sort((a,b) => b.days_since_update - a.days_since_update);
-  if (staleBadge) staleBadge.textContent = staleLeads.length + ' stale';
-
-  if (staleLeads.length === 0) {
-    staleEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">🟢 No stale leads — all active referrals updated within 7 days (showing last 60 days only)</div>';
-  } else {
-    staleEl.innerHTML = staleLeads.slice(0, 15).map(r => {
-      const urgency = r.days_since_update >= 14 ? '#dc2626' : '#d97706';
-      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f1f5f9;">
-        <div>
-          <a href="${escapeHTML(r.url)}" target="_blank" style="font-size:12px;font-weight:600;color:#1e293b;text-decoration:none;">${maskPHI(r.name)}</a>
-          <div style="font-size:10px;color:#94a3b8;">${escapeHTML(r.study || 'No study')} · ${escapeHTML(r.tracker)} · ${escapeHTML(r.stage)}</div>
-        </div>
-        <div style="display:flex;gap:8px;align-items:center;">
-          ${crioStatusBadge(r.name, r.phone)}
-          <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:${urgency}22;color:${urgency};">${r.days_since_update}d ago</span>
-        </div>
-      </div>`;
-    }).join('') + (staleLeads.length > 15 ? `<div style="text-align:center;padding:8px;font-size:11px;color:#94a3b8;">+${staleLeads.length - 15} more</div>` : '');
-  }
+  // (Pipeline funnel, source breakdown, study table, stale leads — removed)
 
   // ── All Referral Sources (providers + campaigns unified) ──
   const trackerEl = el('ref-tracker-detail');
@@ -11767,17 +11641,14 @@ function renderReferralDashboard() {
       <th style="text-align:center;">Contacted</th>
       <th style="text-align:center;cursor:pointer;" ${_sortClick('screening')}>Screening${_sortIcon('screening')}</th>
       <th style="text-align:center;color:#059669;cursor:pointer;" ${_sortClick('enrolled')}>Enrolled${_sortIcon('enrolled')}</th>
-      <th style="text-align:center;color:#f97316;cursor:pointer;" ${_sortClick('sf')}>Screen Fail${_sortIcon('sf')}</th>
-      <th style="text-align:center;color:#dc2626;cursor:pointer;" ${_sortClick('notEligible')}>Not Eligible${_sortIcon('notEligible')}</th>
-      <th style="text-align:center;color:#94a3b8;cursor:pointer;" ${_sortClick('notInterested')}>Not Interested${_sortIcon('notInterested')}</th>
+      <th style="text-align:center;color:#dc2626;cursor:pointer;" ${_sortClick('dnqTotal')}>DNQ${_sortIcon('dnqTotal')}</th>
       <th style="text-align:center;color:#d97706;">Stale</th>
-      <th style="text-align:center;color:#8b5cf6;cursor:pointer;" ${_sortClick('inCrio')}>In CRIO${_sortIcon('inCrio')}</th>
-      <th style="text-align:center;color:#dc2626;">Needs Entry</th>
       <th style="text-align:center;cursor:pointer;" ${_sortClick('enrollRate')}>Conv%${_sortIcon('enrollRate')}</th>
     </tr></thead>
     <tbody>${sortedRows.map(r => {
       var enrollRate = r.total > 0 ? Math.round(r.enrolled / r.total * 100) : 0;
       r.enrollRate = enrollRate;
+      r.dnqTotal = (r.sf||0) + (r.notEligible||0) + (r.notInterested||0);
       const vc = vendorColors[r.vendor] || '#64748b';
       const tn = r.clickId ? jsAttr(r.clickId) : '';
       var _campSafe = r.isCampaign ? jsAttr(r.name) : '';
@@ -11800,12 +11671,8 @@ function renderReferralDashboard() {
         ${_td(r.contacted,'Contacted')}
         ${_td(r.screening,'Screening')}
         ${_td(r.enrolled,'Enrolled','color:#059669;font-weight:700;')}
-        ${_td(r.sf,'Screen Fail','color:#f97316;')}
-        ${_td(r.notEligible,'Not Eligible','color:#dc2626;')}
-        ${_td(r.notInterested,'Not Interested','color:#94a3b8;')}
-        <td style="text-align:center;${_isCrioOnly?'color:#cbd5e1;':'color:'+(r.stale>0?'#d97706':'#cbd5e1')+';font-weight:'+(r.stale>0?'700':'400')+';'+(r.stale>0&&r.clickId?'cursor:pointer;':'')}"${!_isCrioOnly&&r.stale>0&&r.clickId?' onclick="event.stopPropagation();showReferralDetailModal(function(rr){return rr.tracker===\''+tn+'\'&&!rr.is_closed&&rr.days_since_update>=7&&rr.days_since_update<=90;},\''+escapeHTML(r.name)+' — Stale Leads\')"':''}>${_isCrioOnly?'—':(r.stale||'—')}</td>
-        <td style="text-align:center;${_isCrioOnly?'color:#cbd5e1;':'color:'+(r.inCrio>0?'#8b5cf6':'#cbd5e1')+';font-weight:'+(r.inCrio>0?'700':'400')+';'+(r.inCrio>0&&r.clickId?'cursor:pointer;':'')}"${!_isCrioOnly&&r.inCrio>0&&r.clickId?' onclick="event.stopPropagation();showReferralDetailModal(function(rr){return rr.tracker===\''+tn+'\'&&matchCrioPatient(rr.name,rr.phone)!==null;},\''+escapeHTML(r.name)+' — In CRIO\')"':''}>${_isCrioOnly?'—':(r.inCrio||'—')}</td>
-        <td style="text-align:center;${_isCrioOnly?'color:#cbd5e1;':'color:'+(r.needsEntry>0?'#dc2626':'#cbd5e1')+';font-weight:'+(r.needsEntry>0?'700':'400')+';'+(r.needsEntry>0&&r.clickId?'cursor:pointer;':'')}"${!_isCrioOnly&&r.needsEntry>0&&r.clickId?' onclick="event.stopPropagation();showReferralDetailModal(function(rr){var _as=new Set([\'Pre-Screening\',\'Screening\',\'Screened\',\'Enrolled\']);return rr.tracker===\''+tn+'\'&&_as.has(rr.stage)&&matchCrioPatient(rr.name,rr.phone)===null;},\''+escapeHTML(r.name)+' — Needs CRIO Entry\')"':''}>${_isCrioOnly?'—':(r.needsEntry>0?'⚠ '+r.needsEntry:'—')}</td>
+        ${_td((r.sf||0)+(r.notEligible||0)+(r.notInterested||0),'DNQ','color:#dc2626;')}
+        <td style="text-align:center;color:${!_isCrioOnly&&r.stale>0?'#d97706':'#cbd5e1'};font-weight:${!_isCrioOnly&&r.stale>0?'700':'400'};">${_isCrioOnly?'—':(r.stale||'—')}</td>
         <td style="text-align:center;font-weight:700;color:${erColor};">${enrollRate > 0 ? enrollRate+'%' : '—'}</td>
       </tr>`;
     }).join('')}
@@ -11817,12 +11684,8 @@ function renderReferralDashboard() {
       <td style="text-align:center;">${unifiedRows.reduce((s,r)=>s+r.contacted,0)}</td>
       <td style="text-align:center;">${unifiedRows.reduce((s,r)=>s+r.screening,0)}</td>
       <td style="text-align:center;color:#059669;">${unifiedRows.reduce((s,r)=>s+r.enrolled,0)}</td>
-      <td style="text-align:center;color:#f97316;">${unifiedRows.reduce((s,r)=>s+(r.sf||0),0)}</td>
-      <td style="text-align:center;color:#dc2626;">${unifiedRows.reduce((s,r)=>s+(r.notEligible||0),0)}</td>
-      <td style="text-align:center;color:#94a3b8;">${unifiedRows.reduce((s,r)=>s+(r.notInterested||0),0)}</td>
+      <td style="text-align:center;color:#dc2626;">${unifiedRows.reduce((s,r)=>s+(r.sf||0)+(r.notEligible||0)+(r.notInterested||0),0)}</td>
       <td style="text-align:center;color:#d97706;">${unifiedRows.reduce((s,r)=>s+r.stale,0)||'—'}</td>
-      <td style="text-align:center;color:#8b5cf6;">${unifiedRows.reduce((s,r)=>s+r.inCrio,0)}</td>
-      <td style="text-align:center;color:#dc2626;">${unifiedRows.reduce((s,r)=>s+(r.needsEntry||0),0)||'—'}</td>
       <td style="text-align:center;">${unifiedRows.reduce((s,r)=>s+r.total,0) > 0 ? Math.round(unifiedRows.reduce((s,r)=>s+r.enrolled,0)/unifiedRows.reduce((s,r)=>s+r.total,0)*100)+'%' : '—'}</td>
     </tr>
     </tbody>
@@ -12081,181 +11944,55 @@ function renderReferralDashboard() {
     velEl.innerHTML = vh;
   }
 
-  // ── All Sources Conversion Performance ──
-  var convEl = el('ref-all-conversion');
-  var convBadge = el('ref-allconv-badge');
-  if (convEl && unifiedRows.length > 0) {
-    // Calculate conversion metrics for each source
-    var convRows = unifiedRows.filter(function(r) { return r.total > 0; }).map(function(r) {
-      var screenRate = r.total > 0 ? Math.round((r.screening + r.enrolled) / r.total * 100) : 0;
-      var enrollRate = r.total > 0 ? Math.round(r.enrolled / r.total * 100) : 0;
-      var dnqRate = r.total > 0 ? Math.round(r.dnq / r.total * 100) : 0;
-      var crioRate = r.total > 0 ? Math.round(r.inCrio / r.total * 100) : 0;
-      return { name: r.name, type: r.type, total: r.total, screening: r.screening, enrolled: r.enrolled, dnq: r.dnq, inCrio: r.inCrio, screenRate: screenRate, enrollRate: enrollRate, dnqRate: dnqRate, crioRate: crioRate, needsEntry: r.needsEntry||0 };
-    }).sort(function(a, b) { return b.enrollRate - a.enrollRate || b.screenRate - a.screenRate; });
-
-    var totAll = convRows.reduce(function(s,r){return s+r.total;},0);
-    var totEnr = convRows.reduce(function(s,r){return s+r.enrolled;},0);
-    var totScr = convRows.reduce(function(s,r){return s+r.screening;},0);
-    var totDnq = convRows.reduce(function(s,r){return s+r.dnq;},0);
-    var totCrio = convRows.reduce(function(s,r){return s+r.inCrio;},0);
-    var overallEnroll = totAll > 0 ? Math.round(totEnr/totAll*100) : 0;
-    var overallScreen = totAll > 0 ? Math.round((totScr+totEnr)/totAll*100) : 0;
-
-    if (convBadge) convBadge.textContent = overallEnroll + '% enroll rate · ' + convRows.length + ' sources';
-
-    var ch = '<div style="display:flex;gap:16px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid #f1f5f9;">';
-    ch += '<div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#3b82f6;">'+totAll+'</div><div style="font-size:10px;color:#94a3b8;">Total Referrals</div></div>';
-    ch += '<div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#8b5cf6;">'+overallScreen+'%</div><div style="font-size:10px;color:#94a3b8;">Screen Rate</div></div>';
-    ch += '<div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#059669;">'+overallEnroll+'%</div><div style="font-size:10px;color:#94a3b8;">Enroll Rate</div></div>';
-    ch += '<div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#dc2626;">'+Math.round(totDnq/Math.max(totAll,1)*100)+'%</div><div style="font-size:10px;color:#94a3b8;">DNQ Rate</div></div>';
-    ch += '<div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#6366f1;">'+Math.round(totCrio/Math.max(totAll,1)*100)+'%</div><div style="font-size:10px;color:#94a3b8;">CRIO Match</div></div>';
-    ch += '</div>';
-
-    ch += '<div style="overflow-x:auto;"><table class="fin-table" style="width:100%;font-size:11px;"><thead><tr>';
-    ch += '<th style="text-align:left;padding:8px 12px;">Source</th>';
-    ch += '<th style="text-align:center;">Type</th>';
-    ch += '<th style="text-align:center;">Total</th>';
-    ch += '<th style="text-align:center;">Screen Rate</th>';
-    ch += '<th style="text-align:center;">Enroll Rate</th>';
-    ch += '<th style="text-align:center;">DNQ Rate</th>';
-    ch += '<th style="text-align:center;">CRIO Match</th>';
-    ch += '<th style="text-align:center;min-width:120px;">Conversion Funnel</th>';
-    ch += '</tr></thead><tbody>';
-    convRows.forEach(function(r) {
-      var erColor = r.enrollRate >= 15 ? '#059669' : r.enrollRate >= 5 ? '#d97706' : '#dc2626';
-      var srColor = r.screenRate >= 30 ? '#059669' : r.screenRate >= 15 ? '#d97706' : '#dc2626';
-      var funnelW1 = 100, funnelW2 = r.screenRate, funnelW3 = r.enrollRate;
-      ch += '<tr style="border-bottom:1px solid #f1f5f9;">';
-      ch += '<td style="padding:7px 12px;font-weight:600;">'+escapeHTML(r.name)+'</td>';
-      ch += '<td style="text-align:center;"><span style="font-size:9px;font-weight:600;padding:2px 6px;border-radius:4px;background:'+(r.type==='Provider'?'#07206115':'#3b82f615')+';color:'+(r.type==='Provider'?'#072061':'#3b82f6')+';">'+escapeHTML(r.type)+'</span></td>';
-      ch += '<td style="text-align:center;font-weight:700;">'+r.total+'</td>';
-      ch += '<td style="text-align:center;font-weight:600;color:'+srColor+';">'+r.screenRate+'%</td>';
-      ch += '<td style="text-align:center;font-weight:700;color:'+erColor+';">'+r.enrollRate+'%</td>';
-      ch += '<td style="text-align:center;color:'+(r.dnqRate>30?'#dc2626':'#94a3b8')+';">'+r.dnqRate+'%</td>';
-      ch += '<td style="text-align:center;color:'+(r.crioRate>50?'#8b5cf6':'#94a3b8')+';">'+r.crioRate+'%</td>';
-      // Mini horizontal funnel bar
-      ch += '<td style="padding:4px 8px;"><div style="display:flex;gap:1px;height:14px;border-radius:3px;overflow:hidden;">';
-      ch += '<div style="width:'+Math.max(funnelW1-funnelW2,1)+'%;background:#cbd5e1;" title="Not progressed"></div>';
-      ch += '<div style="width:'+Math.max(funnelW2-funnelW3,0)+'%;background:#8b5cf6;" title="Screening"></div>';
-      ch += '<div style="width:'+funnelW3+'%;background:#059669;" title="Enrolled"></div>';
-      ch += '</div></td>';
-      ch += '</tr>';
+  // ── Study-level Source Breakdown ──
+  var studySrcEl = el('ref-study-source-table');
+  var studySrcBadge = el('ref-study-source-badge');
+  if (studySrcEl && window._recruitingData && window._recruitingData.length > 0) {
+    var _srcMap4 = CRP_CONFIG.SOURCE_NAME_MAP || {};
+    var _byStudy = {};
+    window._recruitingData.forEach(function(r) {
+      if (_filterCutoff && (r.patient_created||'') < _filterCutoff) return;
+      var study = r.study_name.indexOf(' - ') !== -1 ? r.study_name.split(' - ').pop() : r.study_name;
+      var raw = (r.referral_source||'').trim();
+      var src = raw ? (_srcMap4[raw.toLowerCase()] || raw) : 'CRIO Database';
+      if (!_byStudy[study]) _byStudy[study] = { total: 0, screening: 0, enrolled: 0, dnq: 0, sources: {} };
+      _byStudy[study].total++;
+      var st = r.recruiting_status;
+      if (st === 'Screening' || st === 'Interested') _byStudy[study].screening++;
+      if (st === 'Success') _byStudy[study].enrolled++;
+      if (st === 'Screen Fail' || st === 'Not Eligible' || st === 'Not Interested') _byStudy[study].dnq++;
+      if (!_byStudy[study].sources[src]) _byStudy[study].sources[src] = { total: 0, enrolled: 0, screening: 0 };
+      _byStudy[study].sources[src].total++;
+      if (st === 'Success') _byStudy[study].sources[src].enrolled++;
+      if (st === 'Screening' || st === 'Interested') _byStudy[study].sources[src].screening++;
     });
-    ch += '</tbody></table></div>';
-    convEl.innerHTML = ch;
-  }
-
-  // ── Old campaigns section (now merged into unified table above) ──
-  if (false) {
-    const campaigns = CAMPAIGN_DATA.filter(c => c.first_contact > 0 || c.new_referrals > 0)
-      .sort((a,b) => b.first_contact - a.first_contact);
-    const enriched = campaigns.map(c => {
-      const sn = c.study.toLowerCase().trim();
-      const referrals = REFERRAL_DATA.filter(r => {
-        const rs = (r.study||'').toLowerCase().trim();
-        return rs === sn || rs.includes(sn) || sn.includes(rs);
-      });
-      const upcoming = (DATA.allVisitDetail || []).filter(v =>
-        v.study.toLowerCase().includes(sn) || sn.includes(v.study.toLowerCase())
-      );
-      // Count scheduled from referral pipeline (Pre-Screening + Screening + Screened stages) OR from ClickUp field
-      const pipelineScheduled = referrals.filter(r =>
-        SG.SCHEDULED && SG.SCHEDULED.has(r.stage)
-      ).length;
-      const scheduledCount = c.scheduled > 0 ? c.scheduled : pipelineScheduled;
-      const convRate = c.new_referrals > 0 ? Math.round(scheduledCount / c.new_referrals * 100) : (scheduledCount > 0 ? 100 : 0);
-      let flagged = 0;
-      referrals.forEach(r => {
-        const dbMatch = PATIENT_DB_MAP.get(r.name.toLowerCase().trim());
-        if (dbMatch && dbMatch.status !== 'Available') flagged++;
-      });
-      // CRIO subject cross-reference: match study name to get real enrollment numbers
-      var crioScreening = 0, crioEnrolled = 0, crioSF = 0, crioDNQ = 0, crioCompleted = 0;
-      if (CRIO_SUBJECTS_DATA && CRIO_SUBJECTS_DATA.length > 0 && CRIO_STUDIES_DATA && CRIO_STUDIES_DATA.length > 0) {
-        // Find matching CRIO study by fuzzy protocol match
-        var crioStudy = CRIO_STUDIES_DATA.find(function(cs) {
-          var pn = (cs.protocol_number||'').toLowerCase();
-          return pn.length >= 4 && (pn.indexOf(sn) !== -1 || sn.indexOf(pn) !== -1);
-        });
-        if (crioStudy) {
-          CRIO_SUBJECTS_DATA.forEach(function(sub) {
-            if (String(sub.study_key) !== String(crioStudy.study_key)) return;
-            var st = (sub.status||'').toUpperCase();
-            if (st === 'SCREENING' || st === 'SCHEDULED_V1') crioScreening++;
-            else if (st === 'ENROLLED') crioEnrolled++;
-            else if (st === 'SCREEN_FAIL') crioSF++;
-            else if (st === 'NOT_ELIGIBLE' || st === 'NOT_INTERESTED') crioDNQ++;
-            else if (st === 'COMPLETED') crioCompleted++;
-          });
-        }
-      }
-      return { ...c, scheduledCount, convRate, pipeline: referrals.length, active: referrals.filter(r=>!r.is_closed).length, upcomingVisits: upcoming.length, flagged, crioScreening, crioEnrolled, crioSF, crioDNQ, crioCompleted };
+    var _studyRows = Object.entries(_byStudy).filter(function(e){return e[1].total >= 10;}).sort(function(a,b){return b[1].total - a[1].total;}).slice(0, 15);
+    if (studySrcBadge) studySrcBadge.textContent = _studyRows.length + ' studies';
+    var sh = '<div style="overflow-x:auto;"><table class="fin-table" style="width:100%;font-size:11px;"><thead><tr>';
+    sh += '<th style="text-align:left;padding:8px 12px;">Study</th>';
+    sh += '<th style="text-align:center;">Total</th>';
+    sh += '<th style="text-align:center;color:#059669;">Enrolled</th>';
+    sh += '<th style="text-align:center;">Conv%</th>';
+    sh += '<th style="text-align:left;">Top Sources (with conversions)</th>';
+    sh += '</tr></thead><tbody>';
+    _studyRows.forEach(function(e) {
+      var name = e[0], d = e[1];
+      var conv = d.total > 0 ? Math.round(d.enrolled / d.total * 100) : 0;
+      var convColor = conv >= 5 ? '#059669' : conv > 0 ? '#d97706' : '#cbd5e1';
+      var topSrcs = Object.entries(d.sources).sort(function(a,b){return b[1].total-a[1].total;}).slice(0,4).map(function(s) {
+        var srcConv = s[1].enrolled > 0 ? ' <span style="color:#059669;font-weight:700;">'+s[1].enrolled+'enr</span>' : s[1].screening > 0 ? ' <span style="color:#8b5cf6;">'+s[1].screening+'scr</span>' : '';
+        return '<span style="font-size:10px;">'+escapeHTML(s[0])+' ('+s[1].total+')'+srcConv+'</span>';
+      }).join(' · ');
+      sh += '<tr style="border-bottom:1px solid #f1f5f9;">';
+      sh += '<td style="padding:7px 12px;font-weight:600;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+escapeHTML(name)+'">'+escapeHTML(name)+'</td>';
+      sh += '<td style="text-align:center;font-weight:700;">'+d.total+'</td>';
+      sh += '<td style="text-align:center;color:#059669;font-weight:700;">'+d.enrolled+'</td>';
+      sh += '<td style="text-align:center;font-weight:700;color:'+convColor+';">'+conv+'%</td>';
+      sh += '<td style="padding:5px 8px;">'+topSrcs+'</td>';
+      sh += '</tr>';
     });
-
-    // KPI summary bar
-    const totalContacts = enriched.reduce((s,c) => s + c.first_contact, 0);
-    const totalReferrals = enriched.reduce((s,c) => s + c.new_referrals, 0);
-    const totalScheduled = enriched.reduce((s,c) => s + c.scheduledCount, 0);
-    const totalPipeline = enriched.reduce((s,c) => s + c.pipeline, 0);
-    const totalUpcoming = enriched.reduce((s,c) => s + c.upcomingVisits, 0);
-    const overallConv = totalReferrals > 0 ? Math.round(totalScheduled / totalReferrals * 100) : 0;
-
-    let campHtml = `<div style="padding:6px 16px 0;"><div style="font-size:9px;color:#94a3b8;">Data: Campaigns CSV (ClickUp sync) · cross-ref: Referral Pipeline, CRIO Visits, Patient DB</div></div>
-    <div style="display:flex;gap:12px;flex-wrap:wrap;padding:10px 16px;border-bottom:1px solid #f1f5f9;">
-      <div style="text-align:center;min-width:70px;"><div style="font-size:18px;font-weight:800;color:#3b82f6;">${totalContacts.toLocaleString()}</div><div style="font-size:10px;color:#94a3b8;">Total Contacts</div></div>
-      <div style="text-align:center;min-width:70px;cursor:pointer;" onclick="showReferralDetailModal(function(){return true;},'All Referrals from Campaigns','${totalReferrals} referrals')"><div style="font-size:18px;font-weight:800;color:#059669;">${totalReferrals}</div><div style="font-size:10px;color:#94a3b8;">New Referrals</div></div>
-      <div style="text-align:center;min-width:70px;cursor:pointer;" onclick="showReferralDetailModal(function(r){var SG=((CRP_CONFIG.CLICKUP||{}).STAGE_GROUPS||{});return SG.SCHEDULED&&SG.SCHEDULED.has(r.stage);},'Scheduled Referrals')"><div style="font-size:18px;font-weight:800;color:#8b5cf6;">${totalScheduled}</div><div style="font-size:10px;color:#94a3b8;">Scheduled</div></div>
-      <div style="text-align:center;min-width:70px;"><div style="font-size:18px;font-weight:800;color:${overallConv>=20?'#059669':overallConv>=10?'#d97706':'#dc2626'};">${overallConv}%</div><div style="font-size:10px;color:#94a3b8;">Conv. Rate</div></div>
-      <div style="text-align:center;min-width:70px;cursor:pointer;" onclick="showReferralDetailModal(function(r){return !r.is_closed;},'Active Pipeline')"><div style="font-size:18px;font-weight:800;color:#1843ad;">${totalPipeline}</div><div style="font-size:10px;color:#94a3b8;">In Pipeline</div></div>
-      <div style="text-align:center;min-width:70px;"><div style="font-size:18px;font-weight:800;color:#8b5cf6;">${enriched.reduce((s,c)=>s+c.crioScreening,0)}</div><div style="font-size:10px;color:#94a3b8;">CRIO Screening</div></div>
-      <div style="text-align:center;min-width:70px;"><div style="font-size:18px;font-weight:800;color:#059669;">${enriched.reduce((s,c)=>s+c.crioEnrolled,0)}</div><div style="font-size:10px;color:#94a3b8;">CRIO Enrolled</div></div>
-    </div>`;
-
-    campHtml += `<div style="overflow-x:auto;"><table class="fin-table" style="width:100%;font-size:11px;">
-      <thead><tr>
-        <th style="text-align:left;padding:8px 12px;">Campaign / Study</th>
-        <th style="text-align:center;">Vendor</th>
-        <th style="text-align:center;">1st Contact</th>
-        <th style="text-align:center;">2nd</th>
-        <th style="text-align:center;">3rd</th>
-        <th style="text-align:center;">Referrals</th>
-        <th style="text-align:center;">Scheduled</th>
-        <th style="text-align:center;">Conv %</th>
-        <th style="text-align:center;">Pipeline</th>
-        <th style="text-align:center;color:#8b5cf6;">CRIO Screen</th>
-        <th style="text-align:center;color:#059669;">CRIO Enrolled</th>
-        <th style="text-align:center;color:#dc2626;">CRIO SF</th>
-      </tr></thead>
-      <tbody>${enriched.map(c => {
-        const crColor = c.convRate >= 20 ? '#059669' : c.convRate >= 10 ? '#d97706' : '#dc2626';
-        return `<tr style="cursor:pointer;transition:background .1s" onmouseover="this.style.background='#f8fafc'" onmouseout="this.style.background=''" data-action="campaignDetail" data-study="${escapeHTML(c.study)}">
-          <td style="padding:7px 12px;font-weight:600;"><a href="${escapeHTML(c.url)}" target="_blank" onclick="event.stopPropagation()" style="color:#1e293b;text-decoration:none;">${escapeHTML(c.study)}</a></td>
-          <td style="text-align:center;"><span style="font-size:10px;padding:2px 6px;border-radius:4px;background:#e8eeff;color:#1843ad;font-weight:600;">${escapeHTML(c.vendor)}</span></td>
-          <td style="text-align:center;font-weight:700;">${c.first_contact.toLocaleString()}</td>
-          <td style="text-align:center;">${c.second_contact.toLocaleString()}</td>
-          <td style="text-align:center;">${c.third_contact.toLocaleString()}</td>
-          <td style="text-align:center;color:#059669;font-weight:700;">${c.new_referrals}</td>
-          <td style="text-align:center;color:#8b5cf6;font-weight:700;">${c.scheduledCount}</td>
-          <td style="text-align:center;font-weight:700;color:${crColor};">${c.convRate}%</td>
-          <td style="text-align:center;color:#1843ad;">${c.pipeline > 0 ? c.active+'/'+c.pipeline : '—'}</td>
-          <td style="text-align:center;color:#8b5cf6;font-weight:${c.crioScreening>0?'700':'400'};">${c.crioScreening||'—'}</td>
-          <td style="text-align:center;color:#059669;font-weight:${c.crioEnrolled>0?'700':'400'};">${c.crioEnrolled||'—'}</td>
-          <td style="text-align:center;color:#dc2626;font-weight:${c.crioSF>0?'700':'400'};">${c.crioSF||'—'}</td>
-        </tr>`;
-      }).join('')}</tbody>
-    </table></div>`;
-
-    campEl.innerHTML = campHtml;
-    // Event delegation for campaign table
-    if (!campEl._delegated) {
-      campEl._delegated = true;
-      campEl.addEventListener('click', function(e) {
-        if (e.target.closest('a')) return;
-        var tr = e.target.closest('tr[data-action="campaignDetail"]');
-        if (tr) showCampaignDetailModal(tr.dataset.study);
-      });
-    }
+    sh += '</tbody></table></div>';
+    studySrcEl.innerHTML = sh;
   }
 
   // Participant Status section removed (duplicative with Schedule tab)
@@ -12609,7 +12346,7 @@ function showCrioSourceDetail(sourceName, statusFilter) {
   var recs = window._recruitingData.filter(function(r) {
     var raw = (r.referral_source||'').trim();
     var norm = raw ? (_srcMap[raw.toLowerCase()] || raw) : 'CRIO Database';
-    if (norm !== sourceName) return false;
+    if (sourceName !== 'all' && norm !== sourceName) return false;
     if (statusFilter && statusFilter !== 'all') {
       var statusMap = {'screening':'Screening,Interested','enrolled':'Success','sf':'Screen Fail','not_eligible':'Not Eligible','not_interested':'Not Interested','new':'Prospect','contacted':'Contacting'};
       var allowed = (statusMap[statusFilter]||statusFilter).split(',');
