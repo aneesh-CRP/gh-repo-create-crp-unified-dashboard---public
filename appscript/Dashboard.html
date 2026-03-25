@@ -1056,14 +1056,14 @@ body {
     <span class="nav-tab" onclick="switchTab('actions', this)" role="tab">Actions</span>
     <span class="nav-tab" onclick="switchTab('admin', this)" role="tab">🔒 Admin</span>
     <span style="width:1px;background:#CBD5E0;margin:8px 2px"></span>
-    <span class="nav-tab fin-tab" onclick="switchTab('fin-overview',this)" role="tab">🔒 Finance</span>
-    <span class="nav-tab fin-tab" onclick="console.log('CLICK:fin-collections');switchTab('fin-collections',this)">🔒 Collect</span>
-    <span class="nav-tab fin-tab" onclick="console.log('CLICK:fin-aging');switchTab('fin-aging',this)">🔒 Aging</span>
-    <span class="nav-tab fin-tab" onclick="console.log('CLICK:fin-revenue');switchTab('fin-revenue',this)">🔒 Billing</span>
-    <span class="nav-tab fin-tab" onclick="console.log('CLICK:fin-qb');switchTab('fin-qb',this)">🔒 QB</span>
-    <span class="nav-tab fin-tab" onclick="switchTab('fin-productivity',this)">🔒 Productivity</span>
+    <span class="nav-tab fin-tab" data-tab="fin-overview" role="tab">🔒 Finance</span>
+    <span class="nav-tab fin-tab" data-tab="fin-collections">🔒 Collect</span>
+    <span class="nav-tab fin-tab" data-tab="fin-aging">🔒 Aging</span>
+    <span class="nav-tab fin-tab" data-tab="fin-revenue">🔒 Billing</span>
+    <span class="nav-tab fin-tab" data-tab="fin-qb">🔒 QB</span>
+    <span class="nav-tab fin-tab" data-tab="fin-productivity">🔒 Productivity</span>
     <span style="width:1px;background:#CBD5E0;margin:8px 2px"></span>
-    <span class="nav-tab fin-tab" onclick="switchTab('insights',this)" role="tab">🔒 Insights</span>
+    <span class="nav-tab fin-tab" data-tab="insights" role="tab">🔒 Insights</span>
   </div>
   <div class="nav-right" style="margin-left:auto;gap:4px;">
     <span class="data-badge" id="last-refresh-badge" style="font-size:10px;padding:2px 6px;">Loading...</span>

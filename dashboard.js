@@ -15059,3 +15059,12 @@ if (typeof window !== 'undefined') {
     _crpInit();
   }
 }
+
+// Event delegation for finance tabs (inline onclick was unreliable)
+document.addEventListener('click', function(e) {
+  var tab = e.target.closest('[data-tab]');
+  if (tab) {
+    e.stopPropagation();
+    switchTab(tab.dataset.tab, tab);
+  }
+});
