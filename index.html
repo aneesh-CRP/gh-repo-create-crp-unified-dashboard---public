@@ -1539,6 +1539,16 @@ body {
       </div>
     </div>
 
+    <!-- DNQ / Outcome Analysis by Source -->
+    <div class="card fade-in" style="margin-bottom:16px;">
+      <div class="card-header">
+        <span class="card-title">DNQ & Outcome Analysis by Source</span>
+        <span class="badge badge-red" id="dnq-analysis-badge">Loading...</span>
+      </div>
+      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Screen Fail, Not Eligible, Not Interested rates per source — identifies which channels produce the most qualified referrals</div>
+      <div style="padding:0;" id="dnq-analysis-table"></div>
+    </div>
+
     <!-- Hidden compat containers -->
     <div style="display:none" id="ref-campaigns-table"></div>
     <div style="display:none" id="ref-source-chart"></div>
@@ -11585,14 +11595,16 @@ function renderReferralDashboard() {
     if (crio) _crioUsed.add(name);
     var _screening = crio ? crio.screening : (sc['Pre-Screening']||0) + (sc['Screening']||0);
     var _enrolled = crio ? crio.enrolled : (sc['Enrolled']||0) + (sc['Screened']||0);
-    var _dnq = crio ? (crio.sf + crio.not_eligible + crio.not_interested) : (sc['DNQ']||0) + (sc['Screen Fail']||0);
+    var _sf = crio ? crio.sf : (sc['Screen Fail']||0);
+    var _notEligible = crio ? crio.not_eligible : 0;
+    var _notInterested = crio ? crio.not_interested : 0;
     var _total = crio ? crio.total : tasks.length;
     var _new = crio ? crio.new : (sc['New Lead']||0);
     var _contacted = crio ? crio.contacted : (sc['Contacted']||0);
     unifiedRows.push({
       name: name, type: 'Provider', vendor: 'Physician', total: _total,
       newLead: _new, contacted: _contacted,
-      screening: _screening, enrolled: _enrolled, dnq: _dnq,
+      screening: _screening, enrolled: _enrolled, sf: _sf, notEligible: _notEligible, notInterested: _notInterested,
       stale: _stale, inCrio: _inCrio, needsEntry: _needsEntry, clickId: name,
       crioData: crio || null
     });
@@ -11656,7 +11668,7 @@ function renderReferralDashboard() {
     unifiedRows.push({
       name: _campName, type: 'Campaign', total: c.first_contact + c.second_contact + c.third_contact,
       newLead: c.new_referrals, contacted: c.first_contact, screening: _screening,
-      enrolled: _enrolled, dnq: _dnq, lost: 0, stale: 0,
+      enrolled: _enrolled, sf: 0, notEligible: 0, notInterested: 0, stale: 0,
       inCrio: crioTotal || (crioEnr + crioScr), crioEnrolled: crioEnr, crioScreening: crioScr,
       needsEntry: 0, clickId: null, isCampaign: true, url: c.url, vendor: _prefix
     });
@@ -11671,7 +11683,7 @@ function renderReferralDashboard() {
     unifiedRows.push({
       name: srcName, type: _type, vendor: srcName, total: crio.total,
       newLead: crio.new, contacted: crio.contacted, screening: crio.screening,
-      enrolled: crio.enrolled, dnq: crio.sf + crio.not_eligible + crio.not_interested,
+      enrolled: crio.enrolled, sf: crio.sf, notEligible: crio.not_eligible, notInterested: crio.not_interested,
       stale: 0, inCrio: crio.total, needsEntry: 0, clickId: null, crioData: crio
     });
   });
@@ -11708,7 +11720,9 @@ function renderReferralDashboard() {
       <th style="text-align:center;">Contacted</th>
       <th style="text-align:center;cursor:pointer;" ${_sortClick('screening')}>Screening${_sortIcon('screening')}</th>
       <th style="text-align:center;color:#059669;cursor:pointer;" ${_sortClick('enrolled')}>Enrolled${_sortIcon('enrolled')}</th>
-      <th style="text-align:center;color:#dc2626;">DNQ/SF</th>
+      <th style="text-align:center;color:#f97316;cursor:pointer;" ${_sortClick('sf')}>Screen Fail${_sortIcon('sf')}</th>
+      <th style="text-align:center;color:#dc2626;cursor:pointer;" ${_sortClick('notEligible')}>Not Eligible${_sortIcon('notEligible')}</th>
+      <th style="text-align:center;color:#94a3b8;cursor:pointer;" ${_sortClick('notInterested')}>Not Interested${_sortIcon('notInterested')}</th>
       <th style="text-align:center;color:#d97706;">Stale</th>
       <th style="text-align:center;color:#8b5cf6;cursor:pointer;" ${_sortClick('inCrio')}>In CRIO${_sortIcon('inCrio')}</th>
       <th style="text-align:center;color:#dc2626;">Needs Entry</th>
@@ -11736,7 +11750,9 @@ function renderReferralDashboard() {
         ${_td(r.contacted,'Contacted')}
         ${_td(r.screening,'Screening')}
         ${_td(r.enrolled,'Enrolled','color:#059669;font-weight:700;')}
-        ${_td(r.dnq,'DNQ/Lost','color:#dc2626;')}
+        ${_td(r.sf,'Screen Fail','color:#f97316;')}
+        ${_td(r.notEligible,'Not Eligible','color:#dc2626;')}
+        ${_td(r.notInterested,'Not Interested','color:#94a3b8;')}
         <td style="text-align:center;color:${r.stale>0?'#d97706':'#cbd5e1'};font-weight:${r.stale>0?'700':'400'};${r.stale>0&&r.clickId?'cursor:pointer;':''}"${r.stale>0&&r.clickId?' onclick="event.stopPropagation();showReferralDetailModal(function(rr){return rr.tracker===\''+tn+'\'&&!rr.is_closed&&rr.days_since_update>=7&&rr.days_since_update<=90;},\''+escapeHTML(r.name)+' — Stale Leads\')"':''}>${r.stale||'—'}</td>
         <td style="text-align:center;color:${r.inCrio>0?'#8b5cf6':'#cbd5e1'};font-weight:${r.inCrio>0?'700':'400'};${r.inCrio>0&&r.clickId?'cursor:pointer;':''}"${r.inCrio>0&&r.clickId?' onclick="event.stopPropagation();showReferralDetailModal(function(rr){return rr.tracker===\''+tn+'\'&&matchCrioPatient(rr.name,rr.phone)!==null;},\''+escapeHTML(r.name)+' — In CRIO\')"':''}>${r.inCrio||'—'}</td>
         <td style="text-align:center;color:${r.needsEntry>0?'#dc2626':'#cbd5e1'};font-weight:${r.needsEntry>0?'700':'400'};${r.needsEntry>0&&r.clickId?'cursor:pointer;':''}"${r.needsEntry>0&&r.clickId?' onclick="event.stopPropagation();showReferralDetailModal(function(rr){var _as=new Set([\'Pre-Screening\',\'Screening\',\'Screened\',\'Enrolled\']);return rr.tracker===\''+tn+'\'&&_as.has(rr.stage)&&matchCrioPatient(rr.name,rr.phone)===null;},\''+escapeHTML(r.name)+' — Needs CRIO Entry\')"':''}>${r.needsEntry>0?'⚠ '+r.needsEntry:'—'}</td>
@@ -11751,7 +11767,9 @@ function renderReferralDashboard() {
       <td style="text-align:center;">${unifiedRows.reduce((s,r)=>s+r.contacted,0)}</td>
       <td style="text-align:center;">${unifiedRows.reduce((s,r)=>s+r.screening,0)}</td>
       <td style="text-align:center;color:#059669;">${unifiedRows.reduce((s,r)=>s+r.enrolled,0)}</td>
-      <td style="text-align:center;color:#dc2626;">${unifiedRows.reduce((s,r)=>s+r.dnq,0)}</td>
+      <td style="text-align:center;color:#f97316;">${unifiedRows.reduce((s,r)=>s+(r.sf||0),0)}</td>
+      <td style="text-align:center;color:#dc2626;">${unifiedRows.reduce((s,r)=>s+(r.notEligible||0),0)}</td>
+      <td style="text-align:center;color:#94a3b8;">${unifiedRows.reduce((s,r)=>s+(r.notInterested||0),0)}</td>
       <td style="text-align:center;color:#d97706;">${unifiedRows.reduce((s,r)=>s+r.stale,0)||'—'}</td>
       <td style="text-align:center;color:#8b5cf6;">${unifiedRows.reduce((s,r)=>s+r.inCrio,0)}</td>
       <td style="text-align:center;color:#dc2626;">${unifiedRows.reduce((s,r)=>s+(r.needsEntry||0),0)||'—'}</td>
@@ -11759,6 +11777,74 @@ function renderReferralDashboard() {
     </tr>
     </tbody>
   </table>`;
+
+  // ── DNQ & Outcome Analysis by Source ──
+  var dnqEl = el('dnq-analysis-table');
+  var dnqBadge = el('dnq-analysis-badge');
+  if (dnqEl && unifiedRows.length > 0) {
+    var dnqRows = unifiedRows.filter(function(r) { return r.total >= 3; }).map(function(r) {
+      var totalDnq = (r.sf||0) + (r.notEligible||0) + (r.notInterested||0);
+      var sfRate = r.total > 0 ? Math.round((r.sf||0) / r.total * 100) : 0;
+      var neRate = r.total > 0 ? Math.round((r.notEligible||0) / r.total * 100) : 0;
+      var niRate = r.total > 0 ? Math.round((r.notInterested||0) / r.total * 100) : 0;
+      var dnqRate = r.total > 0 ? Math.round(totalDnq / r.total * 100) : 0;
+      var qualRate = r.total > 0 ? Math.round((r.screening + r.enrolled) / r.total * 100) : 0;
+      return { name: r.name, vendor: r.vendor||r.type, total: r.total, sf: r.sf||0, notEligible: r.notEligible||0, notInterested: r.notInterested||0, totalDnq: totalDnq, sfRate: sfRate, neRate: neRate, niRate: niRate, dnqRate: dnqRate, qualRate: qualRate, enrolled: r.enrolled, screening: r.screening };
+    }).sort(function(a, b) { return b.qualRate - a.qualRate; });
+
+    var _totAll = dnqRows.reduce(function(s,r){return s+r.total;},0);
+    var _totSF = dnqRows.reduce(function(s,r){return s+r.sf;},0);
+    var _totNE = dnqRows.reduce(function(s,r){return s+r.notEligible;},0);
+    var _totNI = dnqRows.reduce(function(s,r){return s+r.notInterested;},0);
+    var _totDnq = _totSF + _totNE + _totNI;
+    var _totEnr = dnqRows.reduce(function(s,r){return s+r.enrolled;},0);
+    var _totScr = dnqRows.reduce(function(s,r){return s+r.screening;},0);
+    if (dnqBadge) dnqBadge.textContent = Math.round(_totDnq/_totAll*100) + '% DNQ rate · ' + Math.round((_totScr+_totEnr)/_totAll*100) + '% qualified';
+
+    // KPI banner
+    var dh = '<div style="display:flex;gap:16px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid #f1f5f9;">';
+    dh += '<div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#f97316;">'+_totSF+'</div><div style="font-size:10px;color:#94a3b8;">Screen Fail ('+Math.round(_totSF/_totAll*100)+'%)</div></div>';
+    dh += '<div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#dc2626;">'+_totNE.toLocaleString()+'</div><div style="font-size:10px;color:#94a3b8;">Not Eligible ('+Math.round(_totNE/_totAll*100)+'%)</div></div>';
+    dh += '<div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#94a3b8;">'+_totNI.toLocaleString()+'</div><div style="font-size:10px;color:#94a3b8;">Not Interested ('+Math.round(_totNI/_totAll*100)+'%)</div></div>';
+    dh += '<div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#059669;">'+Math.round((_totScr+_totEnr)/_totAll*100)+'%</div><div style="font-size:10px;color:#94a3b8;">Qualified Rate</div></div>';
+    dh += '</div>';
+
+    // Table sorted by qualification rate (best sources first)
+    dh += '<div style="overflow-x:auto;"><table class="fin-table" style="width:100%;font-size:11px;"><thead><tr>';
+    dh += '<th style="text-align:left;padding:8px 12px;">Source</th>';
+    dh += '<th style="text-align:center;">Total</th>';
+    dh += '<th style="text-align:center;color:#059669;">Qualified %</th>';
+    dh += '<th style="text-align:center;color:#f97316;">SF %</th>';
+    dh += '<th style="text-align:center;color:#dc2626;">Not Elig %</th>';
+    dh += '<th style="text-align:center;color:#94a3b8;">Not Int %</th>';
+    dh += '<th style="text-align:center;">Total DNQ %</th>';
+    dh += '<th style="text-align:center;min-width:150px;">Outcome Breakdown</th>';
+    dh += '</tr></thead><tbody>';
+    dnqRows.forEach(function(r) {
+      var qColor = r.qualRate >= 20 ? '#059669' : r.qualRate >= 10 ? '#d97706' : '#dc2626';
+      var dnqColor = r.dnqRate >= 60 ? '#dc2626' : r.dnqRate >= 40 ? '#d97706' : '#059669';
+      // Stacked bar: qualified (green) | SF (orange) | NE (red) | NI (gray) | other (light)
+      var otherPct = 100 - r.qualRate - r.sfRate - r.neRate - r.niRate;
+      dh += '<tr style="border-bottom:1px solid #f1f5f9;">';
+      dh += '<td style="padding:7px 12px;font-weight:600;">'+escapeHTML(r.name)+'</td>';
+      dh += '<td style="text-align:center;font-weight:700;">'+r.total+'</td>';
+      dh += '<td style="text-align:center;font-weight:700;color:'+qColor+';">'+r.qualRate+'%</td>';
+      dh += '<td style="text-align:center;color:#f97316;font-weight:'+(r.sfRate>5?'700':'400')+';">'+r.sfRate+'%</td>';
+      dh += '<td style="text-align:center;color:#dc2626;font-weight:'+(r.neRate>30?'700':'400')+';">'+r.neRate+'%</td>';
+      dh += '<td style="text-align:center;color:#94a3b8;">'+r.niRate+'%</td>';
+      dh += '<td style="text-align:center;font-weight:700;color:'+dnqColor+';">'+r.dnqRate+'%</td>';
+      dh += '<td style="padding:4px 8px;"><div style="display:flex;gap:1px;height:14px;border-radius:3px;overflow:hidden;">';
+      if (r.qualRate > 0) dh += '<div style="width:'+r.qualRate+'%;background:#059669;" title="Qualified '+r.qualRate+'%"></div>';
+      if (r.sfRate > 0) dh += '<div style="width:'+r.sfRate+'%;background:#f97316;" title="Screen Fail '+r.sfRate+'%"></div>';
+      if (r.neRate > 0) dh += '<div style="width:'+r.neRate+'%;background:#dc2626;" title="Not Eligible '+r.neRate+'%"></div>';
+      if (r.niRate > 0) dh += '<div style="width:'+r.niRate+'%;background:#94a3b8;" title="Not Interested '+r.niRate+'%"></div>';
+      if (otherPct > 0) dh += '<div style="width:'+Math.max(otherPct,0)+'%;background:#e2e8f0;" title="Other/New"></div>';
+      dh += '</div></td>';
+      dh += '</tr>';
+    });
+    dh += '</tbody></table></div>';
+    dnqEl.innerHTML = dh;
+  }
 
   // ── All Sources Conversion Performance ──
   var convEl = el('ref-all-conversion');
