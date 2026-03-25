@@ -1462,64 +1462,51 @@ body {
     </div>
 
     <!-- ═══ SECTION 1: PROVIDER REFERRAL PIPELINE ═══ -->
-    <div class="section-title" style="margin-top:0;margin-bottom:8px;">Provider Referral Pipeline</div>
-    <div style="font-size:10px;color:#94a3b8;margin-bottom:12px;">Physician referrals + recruitment campaigns tracked in ClickUp · patients manually entered into CRIO after contact · <span id="ref-pipeline-freshness">loading...</span></div>
+    <div class="section-title" style="margin-top:0;margin-bottom:8px;">Referral Intelligence</div>
+    <div style="font-size:10px;color:#94a3b8;margin-bottom:12px;">CRIO-verified recruiting data · all sources · 100% attribution · <span id="ref-pipeline-freshness">loading...</span></div>
 
-    <!-- Pipeline KPIs -->
+    <!-- Pipeline KPIs (CRIO-sourced) -->
     <div class="time-banner fade-in" style="margin-bottom:16px;">
-      <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showReferralDetailModal(function(){return true;},'All Referrals')">
-        <div class="tb-label">Total</div>
+      <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showCrioSourceDetail('all','all')">
+        <div class="tb-label">Total Pipeline</div>
         <div class="tb-value blue" id="ref-kpi-total">—</div>
-        <div class="tb-sub">All referrals</div>
+        <div class="tb-sub" id="ref-kpi-total-sub">CRIO recruiting</div>
       </div>
       <div class="tb-divider"></div>
-      <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showReferralDetailModal(r=>r.stage==='New Lead','New Leads')">
-        <div class="tb-label">New Leads</div>
-        <div class="tb-value" style="color:#3b82f6" id="ref-kpi-leads">—</div>
-        <div class="tb-sub">Pending outreach</div>
-      </div>
-      <div class="tb-divider"></div>
-      <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showReferralDetailModal(r=>r.stage==='Contacted','Contacted')">
-        <div class="tb-label">Contacted</div>
-        <div class="tb-value" style="color:#d97706" id="ref-kpi-contact">—</div>
-        <div class="tb-sub">In contact</div>
-      </div>
-      <div class="tb-divider"></div>
-      <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showReferralDetailModal(r=>CRP_CONFIG.CLICKUP.STAGE_GROUPS.SCREENING.has(r.stage),'Screening')">
+      <div class="tb-section">
         <div class="tb-label">Screening</div>
         <div class="tb-value green" id="ref-kpi-screening">—</div>
-        <div class="tb-sub">Pre-screen + screening</div>
+        <div class="tb-sub">Interested + Screening</div>
       </div>
       <div class="tb-divider"></div>
-      <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showReferralDetailModal(r=>CRP_CONFIG.CLICKUP.STAGE_GROUPS.ENROLLED.has(r.stage),'Enrolled')">
+      <div class="tb-section">
         <div class="tb-label">Enrolled</div>
         <div class="tb-value" style="color:#059669" id="ref-kpi-enrolled">—</div>
-        <div class="tb-sub">Screened + enrolled</div>
+        <div class="tb-sub">Success in CRIO</div>
       </div>
       <div class="tb-divider"></div>
-      <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showReferralDetailModal(r=>r.stage==='DNQ'||r.stage==='Screen Fail','DNQ / Screen Fail')">
-        <div class="tb-label">DNQ/SF</div>
+      <div class="tb-section">
+        <div class="tb-label">Qualified %</div>
+        <div class="tb-value" style="color:#8b5cf6" id="ref-kpi-qualified">—</div>
+        <div class="tb-sub">Screening + Enrolled / Total</div>
+      </div>
+      <div class="tb-divider"></div>
+      <div class="tb-section">
+        <div class="tb-label">DNQ Rate</div>
         <div class="tb-value" style="color:#dc2626" id="ref-kpi-dnq">—</div>
-        <div class="tb-sub">Did not qualify</div>
+        <div class="tb-sub">SF + Not Eligible + Not Interested</div>
+      </div>
+      <div class="tb-divider"></div>
+      <div class="tb-section">
+        <div class="tb-label">Sources</div>
+        <div class="tb-value" style="color:#64748b" id="ref-kpi-sources">—</div>
+        <div class="tb-sub">Distinct referral sources</div>
       </div>
     </div>
 
-    <!-- Pipeline Funnel + DNQ Breakdown -->
-    <div class="card fade-in" style="margin-bottom:16px;">
-      <div class="card-header" style="flex-wrap:wrap;gap:8px;">
-        <span class="card-title">Pipeline Funnel</span>
-        <div style="display:flex;gap:4px;align-items:center;">
-          <span class="badge badge-blue" id="ref-total-badge">—</span>
-          <button class="filter-btn active" onclick="setRefTimeFilter('all',this)" style="font-size:10px;padding:2px 8px;">All Time</button>
-          <button class="filter-btn" onclick="setRefTimeFilter('90',this)" style="font-size:10px;padding:2px 8px;">90 Days</button>
-          <button class="filter-btn" onclick="setRefTimeFilter('30',this)" style="font-size:10px;padding:2px 8px;">30 Days</button>
-          <button class="filter-btn" onclick="setRefTimeFilter('7',this)" style="font-size:10px;padding:2px 8px;">This Week</button>
-        </div>
-      </div>
-      <div style="padding:12px 16px;" id="ref-funnel-chart">
-        <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Loading pipeline...</div>
-      </div>
-    </div>
+    <!-- Hidden: old pipeline funnel replaced by main table -->
+    <div style="display:none" id="ref-funnel-chart"></div>
+    <div style="display:none" id="ref-total-badge"></div>
 
     <!-- All Referral Sources -->
     <div class="card fade-in" style="margin-bottom:16px;">

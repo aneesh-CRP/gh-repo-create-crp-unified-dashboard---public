@@ -9380,13 +9380,32 @@ function renderReferralDashboard() {
 
   const el = id => document.getElementById(id);
   var _kpiEl = function(id,v){ var e=document.getElementById(id); if(e) e.textContent=v; };
-  _kpiEl('ref-kpi-total', all.length);
-  _kpiEl('ref-kpi-leads', stageCounts['New Lead'] || 0);
-  _kpiEl('ref-kpi-contact', stageCounts['Contacted'] || 0);
-  _kpiEl('ref-kpi-screening', sgCount(SG.SCREENING));
-  _kpiEl('ref-kpi-enrolled', sgCount(SG.ENROLLED));
-  _kpiEl('ref-kpi-dnq', (stageCounts['DNQ']||0) + (stageCounts['Screen Fail']||0));
-  _kpiEl('ref-total-badge', all.length + ' referrals');
+  // KPIs — use CRIO recruiting data when available, ClickUp as fallback
+  var _crioTotal = window._recruitingData ? window._recruitingData.length : 0;
+  var _crioScreening = 0, _crioEnrolled = 0, _crioDnq = 0;
+  if (window._recruitingData) {
+    window._recruitingData.forEach(function(r) {
+      if (_filterCutoff && (r.patient_created||'') < _filterCutoff) return;
+      var st = r.recruiting_status;
+      if (st === 'Screening' || st === 'Interested') _crioScreening++;
+      if (st === 'Success') _crioEnrolled++;
+      if (st === 'Screen Fail' || st === 'Not Eligible' || st === 'Not Interested') _crioDnq++;
+    });
+    if (_filterCutoff) _crioTotal = window._recruitingData.filter(function(r){return (r.patient_created||'') >= _filterCutoff;}).length;
+  }
+  var _kpiTotal = _crioTotal || all.length;
+  var _kpiScr = _crioTotal ? _crioScreening : sgCount(SG.SCREENING);
+  var _kpiEnr = _crioTotal ? _crioEnrolled : sgCount(SG.ENROLLED);
+  var _qualRate = _kpiTotal > 0 ? Math.round((_kpiScr + _kpiEnr) / _kpiTotal * 100) : 0;
+  var _dnqRate = _kpiTotal > 0 ? Math.round(_crioDnq / _kpiTotal * 100) : 0;
+  _kpiEl('ref-kpi-total', _kpiTotal.toLocaleString());
+  _kpiEl('ref-kpi-total-sub', _crioTotal ? 'CRIO recruiting records' : 'ClickUp referrals');
+  _kpiEl('ref-kpi-screening', _kpiScr);
+  _kpiEl('ref-kpi-enrolled', _kpiEnr);
+  _kpiEl('ref-kpi-qualified', _qualRate + '%');
+  _kpiEl('ref-kpi-dnq', _dnqRate + '%');
+  _kpiEl('ref-kpi-sources', Object.keys(_crioSourceRows).length || unifiedRows.length);
+  _kpiEl('ref-total-badge', _kpiTotal.toLocaleString() + ' records');
   // Freshness info
   var _refDatesAll = all.map(function(r){return r.date_created;}).filter(Boolean).sort();
   var _refUpdates = all.map(function(r){return r.date_updated;}).filter(Boolean).sort();
@@ -9752,15 +9771,18 @@ function renderReferralDashboard() {
       const vc = vendorColors[r.vendor] || '#64748b';
       const tn = r.clickId ? jsAttr(r.clickId) : '';
       var _campSafe = r.isCampaign ? jsAttr(r.name) : '';
+      var _isCrioOnly = !r.clickId && !r.isCampaign && r.crioData;
+      var _crioSrcSafe = _isCrioOnly ? jsAttr(r.name) : '';
       function _td(count, label, style) {
         if (!count) return '<td style="text-align:center;color:#cbd5e1;">—</td>';
         if (r.clickId) return '<td style="text-align:center;cursor:pointer;' + (style||'') + '" onclick="event.stopPropagation();showTrackerStageDetail(\'' + tn + '\',\'' + (label||'all') + '\')">' + count + '</td>';
         if (r.isCampaign) return '<td style="text-align:center;cursor:pointer;' + (style||'') + '" onclick="event.stopPropagation();showCampaignStudyDetail(\'' + _campSafe + '\')">' + count + '</td>';
+        if (_isCrioOnly) return '<td style="text-align:center;cursor:pointer;' + (style||'') + '" onclick="event.stopPropagation();showCrioSourceDetail(\'' + _crioSrcSafe + '\',\'' + (label||'all').toLowerCase().replace(/[^a-z_]/g,'_') + '\')">' + count + '</td>';
         return '<td style="text-align:center;' + (style||'') + '">' + count + '</td>';
       }
       const nameHtml = r.url ? '<a href="'+escapeHTML(r.url)+'" target="_blank" style="color:#1e293b;text-decoration:none;font-weight:600;" onclick="event.stopPropagation()">'+escapeHTML(r.name)+'</a>' : '<span style="font-weight:600;">'+escapeHTML(r.name)+'</span>';
       var erColor = enrollRate >= 15 ? '#059669' : enrollRate >= 5 ? '#d97706' : enrollRate > 0 ? '#dc2626' : '#cbd5e1';
-      return `<tr style="border-bottom:1px solid #f1f5f9;${r.clickId||r.isCampaign?'cursor:pointer;':''}"${r.clickId ? ' onclick="showTrackerStageDetail(\''+tn+'\',\'all\')"' : r.isCampaign ? ' onclick="showCampaignDetailModal(\''+_campSafe+'\')"' : ''}>
+      return `<tr style="border-bottom:1px solid #f1f5f9;${r.clickId||r.isCampaign||_isCrioOnly?'cursor:pointer;':''}"${r.clickId ? ' onclick="showTrackerStageDetail(\''+tn+'\',\'all\')"' : r.isCampaign ? ' onclick="showCampaignDetailModal(\''+_campSafe+'\')"' : _isCrioOnly ? ' onclick="showCrioSourceDetail(\''+_crioSrcSafe+'\',\'all\')"' : ''}>
         <td style="padding:8px 12px;">${nameHtml}</td>
         <td style="text-align:center;"><span style="font-size:9px;font-weight:600;padding:2px 6px;border-radius:4px;background:${vc}15;color:${vc};">${escapeHTML(r.vendor||r.type)}</span></td>
         <td style="text-align:center;font-weight:700;">${r.total}</td>
@@ -9771,9 +9793,9 @@ function renderReferralDashboard() {
         ${_td(r.sf,'Screen Fail','color:#f97316;')}
         ${_td(r.notEligible,'Not Eligible','color:#dc2626;')}
         ${_td(r.notInterested,'Not Interested','color:#94a3b8;')}
-        <td style="text-align:center;color:${r.stale>0?'#d97706':'#cbd5e1'};font-weight:${r.stale>0?'700':'400'};${r.stale>0&&r.clickId?'cursor:pointer;':''}"${r.stale>0&&r.clickId?' onclick="event.stopPropagation();showReferralDetailModal(function(rr){return rr.tracker===\''+tn+'\'&&!rr.is_closed&&rr.days_since_update>=7&&rr.days_since_update<=90;},\''+escapeHTML(r.name)+' — Stale Leads\')"':''}>${r.stale||'—'}</td>
-        <td style="text-align:center;color:${r.inCrio>0?'#8b5cf6':'#cbd5e1'};font-weight:${r.inCrio>0?'700':'400'};${r.inCrio>0&&r.clickId?'cursor:pointer;':''}"${r.inCrio>0&&r.clickId?' onclick="event.stopPropagation();showReferralDetailModal(function(rr){return rr.tracker===\''+tn+'\'&&matchCrioPatient(rr.name,rr.phone)!==null;},\''+escapeHTML(r.name)+' — In CRIO\')"':''}>${r.inCrio||'—'}</td>
-        <td style="text-align:center;color:${r.needsEntry>0?'#dc2626':'#cbd5e1'};font-weight:${r.needsEntry>0?'700':'400'};${r.needsEntry>0&&r.clickId?'cursor:pointer;':''}"${r.needsEntry>0&&r.clickId?' onclick="event.stopPropagation();showReferralDetailModal(function(rr){var _as=new Set([\'Pre-Screening\',\'Screening\',\'Screened\',\'Enrolled\']);return rr.tracker===\''+tn+'\'&&_as.has(rr.stage)&&matchCrioPatient(rr.name,rr.phone)===null;},\''+escapeHTML(r.name)+' — Needs CRIO Entry\')"':''}>${r.needsEntry>0?'⚠ '+r.needsEntry:'—'}</td>
+        <td style="text-align:center;${_isCrioOnly?'color:#cbd5e1;':'color:'+(r.stale>0?'#d97706':'#cbd5e1')+';font-weight:'+(r.stale>0?'700':'400')+';'+(r.stale>0&&r.clickId?'cursor:pointer;':'')}"${!_isCrioOnly&&r.stale>0&&r.clickId?' onclick="event.stopPropagation();showReferralDetailModal(function(rr){return rr.tracker===\''+tn+'\'&&!rr.is_closed&&rr.days_since_update>=7&&rr.days_since_update<=90;},\''+escapeHTML(r.name)+' — Stale Leads\')"':''}>${_isCrioOnly?'—':(r.stale||'—')}</td>
+        <td style="text-align:center;${_isCrioOnly?'color:#cbd5e1;':'color:'+(r.inCrio>0?'#8b5cf6':'#cbd5e1')+';font-weight:'+(r.inCrio>0?'700':'400')+';'+(r.inCrio>0&&r.clickId?'cursor:pointer;':'')}"${!_isCrioOnly&&r.inCrio>0&&r.clickId?' onclick="event.stopPropagation();showReferralDetailModal(function(rr){return rr.tracker===\''+tn+'\'&&matchCrioPatient(rr.name,rr.phone)!==null;},\''+escapeHTML(r.name)+' — In CRIO\')"':''}>${_isCrioOnly?'—':(r.inCrio||'—')}</td>
+        <td style="text-align:center;${_isCrioOnly?'color:#cbd5e1;':'color:'+(r.needsEntry>0?'#dc2626':'#cbd5e1')+';font-weight:'+(r.needsEntry>0?'700':'400')+';'+(r.needsEntry>0&&r.clickId?'cursor:pointer;':'')}"${!_isCrioOnly&&r.needsEntry>0&&r.clickId?' onclick="event.stopPropagation();showReferralDetailModal(function(rr){var _as=new Set([\'Pre-Screening\',\'Screening\',\'Screened\',\'Enrolled\']);return rr.tracker===\''+tn+'\'&&_as.has(rr.stage)&&matchCrioPatient(rr.name,rr.phone)===null;},\''+escapeHTML(r.name)+' — Needs CRIO Entry\')"':''}>${_isCrioOnly?'—':(r.needsEntry>0?'⚠ '+r.needsEntry:'—')}</td>
         <td style="text-align:center;font-weight:700;color:${erColor};">${enrollRate > 0 ? enrollRate+'%' : '—'}</td>
       </tr>`;
     }).join('')}
@@ -10462,6 +10484,60 @@ function showTrackerStageDetail(tracker, stageLabel) {
 }
 
 // ── Referral detail modal (click from funnel, tracker rows, stale leads) ──
+// ── CRIO Source Detail popup (for sources not in ClickUp — DELFA, Study Team, etc.) ──
+function showCrioSourceDetail(sourceName, statusFilter) {
+  if (!window._recruitingData || window._recruitingData.length === 0) {
+    openModal(sourceName, 'Loading...', '<div style="text-align:center;padding:30px;color:#94a3b8;">CRIO recruiting data not loaded yet.</div>');
+    return;
+  }
+  var _srcMap = CRP_CONFIG.SOURCE_NAME_MAP || {};
+  var recs = window._recruitingData.filter(function(r) {
+    var raw = (r.referral_source||'').trim();
+    var norm = raw ? (_srcMap[raw.toLowerCase()] || raw) : 'CRIO Database';
+    if (norm !== sourceName) return false;
+    if (statusFilter && statusFilter !== 'all') {
+      var statusMap = {'screening':'Screening,Interested','enrolled':'Success','sf':'Screen Fail','not_eligible':'Not Eligible','not_interested':'Not Interested','new':'Prospect','contacted':'Contacting'};
+      var allowed = (statusMap[statusFilter]||statusFilter).split(',');
+      return allowed.indexOf(r.recruiting_status) !== -1;
+    }
+    return true;
+  });
+
+  var html = '';
+  // KPI summary
+  var byStatus = {};
+  recs.forEach(function(r) { byStatus[r.recruiting_status] = (byStatus[r.recruiting_status]||0)+1; });
+  var statusOrder = ['Prospect','Contacting','Interested','Screening','Success','Screen Fail','Not Eligible','Not Interested','In Another Study','Give Up','Do Not Solicit','Bad Contact Info','Discontinued','Deceased'];
+  var statusColors = {'Prospect':'#64748b','Contacting':'#3b82f6','Interested':'#8b5cf6','Screening':'#d97706','Success':'#059669','Screen Fail':'#f97316','Not Eligible':'#dc2626','Not Interested':'#94a3b8','In Another Study':'#06b6d4','Give Up':'#64748b','Do Not Solicit':'#dc2626','Bad Contact Info':'#94a3b8'};
+  html += '<div style="display:flex;gap:8px;flex-wrap:wrap;padding:12px 0;border-bottom:1px solid #f1f5f9;">';
+  statusOrder.forEach(function(st) {
+    if (!byStatus[st]) return;
+    html += '<div style="text-align:center;min-width:55px;"><div style="font-size:16px;font-weight:800;color:'+(statusColors[st]||'#64748b')+';">'+byStatus[st]+'</div><div style="font-size:9px;color:#94a3b8;">'+escapeHTML(st)+'</div></div>';
+  });
+  html += '</div>';
+
+  // Patient table
+  html += '<table class="detail-table" style="width:100%;font-size:11px;margin-top:8px;"><thead><tr>';
+  html += '<th>Patient</th><th>Study</th><th>Status</th><th>Recruiter</th><th>Created</th><th>Last Changed</th>';
+  html += '</tr></thead><tbody>';
+  recs.sort(function(a,b) { return (b.status_changed||'') > (a.status_changed||'') ? 1 : -1; }).slice(0, 100).forEach(function(r) {
+    var sc = statusColors[r.recruiting_status] || '#64748b';
+    var studyShort = r.study_name.indexOf(' - ') !== -1 ? r.study_name.split(' - ').pop() : r.study_name;
+    html += '<tr style="border-bottom:1px solid #f1f5f9;">';
+    html += '<td style="padding:5px 8px;font-weight:600;">'+escapeHTML(r.patient_name)+'</td>';
+    html += '<td style="padding:5px 8px;font-size:10px;">'+escapeHTML(studyShort)+'</td>';
+    html += '<td style="padding:5px 8px;"><span style="font-size:10px;font-weight:600;padding:2px 6px;border-radius:3px;background:'+sc+'18;color:'+sc+';">'+escapeHTML(r.recruiting_status)+'</span></td>';
+    html += '<td style="padding:5px 8px;font-size:10px;color:#64748b;">'+escapeHTML(r.recruiter||'—')+'</td>';
+    html += '<td style="padding:5px 8px;font-size:10px;color:#64748b;">'+escapeHTML(r.patient_created||'—')+'</td>';
+    html += '<td style="padding:5px 8px;font-size:10px;color:#64748b;">'+escapeHTML(r.status_changed||'—')+'</td>';
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  if (recs.length > 100) html += '<div style="text-align:center;padding:8px;font-size:11px;color:#94a3b8;">Showing 100 of '+recs.length+'</div>';
+  if (recs.length === 0) html = '<div style="text-align:center;padding:30px;color:#94a3b8;">No patients found for this source'+(statusFilter && statusFilter !== 'all' ? ' with status "'+statusFilter+'"' : '')+'</div>';
+  openModal(sourceName, recs.length+' patients'+(statusFilter && statusFilter !== 'all' ? ' ('+statusFilter+')' : ''), html);
+}
+
 function showReferralDetailModal(filterFn, title, subtitle) {
   if (!REFERRAL_DATA || REFERRAL_DATA.length === 0) {
     openModal(title, 'Data loading...', '<div style="text-align:center;padding:30px;color:#94a3b8;">Referral data is still loading. Please try again in a few seconds.</div>');
