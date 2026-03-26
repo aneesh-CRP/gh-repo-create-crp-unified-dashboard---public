@@ -1459,10 +1459,17 @@ async function verifyPin() {
     sessionStorage.setItem(CRP_CONFIG.AUTH_STORAGE_KEY, 'true');
     if (typeof logAudit === 'function') logAudit('finance_unlock', 'Finance/Admin access granted');
     closeAuthModal();
-    initFinanceDashboard();
+    console.log('[PIN] Auth OK. Calling initFinanceDashboard...');
+    try { initFinanceDashboard(); } catch(e) { console.error('[PIN] initFinanceDashboard FAILED:', e); }
     const pending = document.getElementById('authModal').dataset.pending;
+    console.log('[PIN] pending tab:', pending);
     if (pending === 'admin') { switchView('admin', document.querySelector(".nav-tab[onclick*='admin']")); }
-    else if (pending) switchTab(pending, document.querySelector(".nav-tab[data-tab='" + pending + "']"));
+    else if (pending) {
+      var tabEl = document.querySelector(".nav-tab[data-tab='" + pending + "']") || document.querySelector(".nav-tab[onclick*='" + pending + "']");
+      console.log('[PIN] switchTab →', pending, 'el:', tabEl);
+      switchTab(pending, tabEl);
+      console.log('[PIN] view display:', document.getElementById('view-' + pending)?.style.display);
+    }
   } else {
     _authAttempts++;
     if (typeof logAudit === 'function') logAudit('finance_auth_fail', 'Failed PIN attempt #' + _authAttempts);

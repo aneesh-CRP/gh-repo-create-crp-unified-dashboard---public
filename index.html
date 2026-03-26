@@ -1056,14 +1056,14 @@ body {
     <span class="nav-tab" onclick="switchTab('actions', this)" role="tab">Actions</span>
     <span class="nav-tab" onclick="switchTab('admin', this)" role="tab">🔒 Admin</span>
     <span style="width:1px;background:#CBD5E0;margin:8px 2px"></span>
-    <span class="nav-tab fin-tab" onclick="switchTab('fin-overview', this)" role="tab">🔒 Finance</span>
-    <span class="nav-tab fin-tab" onclick="switchTab('fin-collections', this)">🔒 Collect</span>
-    <span class="nav-tab fin-tab" onclick="switchTab('fin-aging', this)">🔒 Aging</span>
-    <span class="nav-tab fin-tab" onclick="switchTab('fin-revenue', this)">🔒 Billing</span>
-    <span class="nav-tab fin-tab" onclick="switchTab('fin-qb', this)">🔒 QB</span>
-    <span class="nav-tab fin-tab" onclick="switchTab('fin-productivity', this)">🔒 Productivity</span>
+    <span class="nav-tab fin-tab" data-tab="fin-overview" onclick="switchTab('fin-overview', this)" role="tab">🔒 Finance</span>
+    <span class="nav-tab fin-tab" data-tab="fin-collections" onclick="switchTab('fin-collections', this)">🔒 Collect</span>
+    <span class="nav-tab fin-tab" data-tab="fin-aging" onclick="switchTab('fin-aging', this)">🔒 Aging</span>
+    <span class="nav-tab fin-tab" data-tab="fin-revenue" onclick="switchTab('fin-revenue', this)">🔒 Billing</span>
+    <span class="nav-tab fin-tab" data-tab="fin-qb" onclick="switchTab('fin-qb', this)">🔒 QB</span>
+    <span class="nav-tab fin-tab" data-tab="fin-productivity" onclick="switchTab('fin-productivity', this)">🔒 Productivity</span>
     <span style="width:1px;background:#CBD5E0;margin:8px 2px"></span>
-    <span class="nav-tab fin-tab" onclick="switchTab('insights', this)" role="tab">🔒 Insights</span>
+    <span class="nav-tab fin-tab" data-tab="insights" onclick="switchTab('insights', this)" role="tab">🔒 Insights</span>
   </div>
   <div class="nav-right" style="margin-left:auto;gap:4px;">
     <span class="data-badge" id="last-refresh-badge" style="font-size:10px;padding:2px 6px;">Loading...</span>
@@ -3481,10 +3481,17 @@ async function verifyPin() {
     sessionStorage.setItem(CRP_CONFIG.AUTH_STORAGE_KEY, 'true');
     if (typeof logAudit === 'function') logAudit('finance_unlock', 'Finance/Admin access granted');
     closeAuthModal();
-    initFinanceDashboard();
+    console.log('[PIN] Auth OK. Calling initFinanceDashboard...');
+    try { initFinanceDashboard(); } catch(e) { console.error('[PIN] initFinanceDashboard FAILED:', e); }
     const pending = document.getElementById('authModal').dataset.pending;
+    console.log('[PIN] pending tab:', pending);
     if (pending === 'admin') { switchView('admin', document.querySelector(".nav-tab[onclick*='admin']")); }
-    else if (pending) switchTab(pending, document.querySelector(".nav-tab[data-tab='" + pending + "']"));
+    else if (pending) {
+      var tabEl = document.querySelector(".nav-tab[data-tab='" + pending + "']") || document.querySelector(".nav-tab[onclick*='" + pending + "']");
+      console.log('[PIN] switchTab →', pending, 'el:', tabEl);
+      switchTab(pending, tabEl);
+      console.log('[PIN] view display:', document.getElementById('view-' + pending)?.style.display);
+    }
   } else {
     _authAttempts++;
     if (typeof logAudit === 'function') logAudit('finance_auth_fail', 'Failed PIN attempt #' + _authAttempts);
