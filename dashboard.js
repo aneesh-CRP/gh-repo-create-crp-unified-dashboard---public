@@ -5054,15 +5054,43 @@ function switchView(name, el) {
     showAuthModal('admin');
     return;
   }
-  // Trends tab: show charts if data already loaded
+  // Render deferred tab content if dirty
   if (name === 'studies') {
     setTimeout(() => buildStudiesView(), 50);
   }
   if (name === 'admin') {
-    setTimeout(() => switchAdmin('trends', document.querySelector('#admin-filter-bar .sched-filter')), 50);
+    if (_tabDirty.admin) {
+      setTimeout(() => {
+        safe(renderCoordinatorGoals, 'renderCoordinatorGoals');
+        safe(renderCoordWorkloadBalance, 'renderCoordWorkloadBalance');
+        safe(renderCoordCancelTypeChart, 'renderCoordCancelTypeChart');
+        safe(renderInvCapacity, 'renderInvCapacity');
+        safe(renderRecruiterPerformance, 'renderRecruiterPerformance');
+        safe(renderTrendsCharts, 'renderTrendsCharts');
+        _tabDirty.admin = false;
+      }, 50);
+    }
+    setTimeout(() => switchAdmin('trends', document.querySelector('#admin-filter-bar .sched-filter')), 60);
   }
   if (name === 'referrals') {
     setTimeout(() => initReferrals(), 50);
+    if (_tabDirty.referrals) {
+      setTimeout(() => {
+        safe(buildRecruitmentKPIs, 'buildRecruitmentKPIs');
+        safe(buildPatientPipelineBySite, 'buildPatientPipelineBySite');
+        safe(buildMedRecAlerts, 'buildMedRecAlerts');
+        safe(renderPIApprovalTracker, 'renderPIApprovalTracker');
+        safe(renderMedRecPortalFilter, 'renderMedRecPortalFilter');
+        _tabDirty.referrals = false;
+      }, 60);
+    }
+  }
+  if (name === 'actions' && _tabDirty.actions) {
+    setTimeout(() => {
+      safe(buildActionSteps, 'buildActionSteps');
+      safe(buildInsights, 'buildInsights');
+      _tabDirty.actions = false;
+    }, 50);
   }
   if (name === 'trends' && typeof LONGITUDINAL !== 'undefined' && LONGITUDINAL) {
     setTimeout(() => renderTrendsCharts(), 50);
@@ -8115,6 +8143,21 @@ function safe(fn, name) {
   }
 }
 
+// Debounced render: coalesces rapid back-to-back renderAll() calls into one
+var _renderTimer = null;
+function scheduleRender() {
+  if (_renderTimer) clearTimeout(_renderTimer);
+  _renderTimer = setTimeout(function() { _renderTimer = null; renderAll(); }, 60);
+}
+
+// Track which tabs need re-render when switched to
+var _tabDirty = { overview: true, studies: true, referrals: true, actions: true, admin: true };
+function _activeTab() {
+  var active = document.querySelector('.view.active');
+  if (!active) return 'overview';
+  return (active.id || '').replace('view-', '');
+}
+
 // ══════════════════════════════════════════════════════════════
 // PATIENT PIPELINE BY SITE (PHL vs PNJ)
 // ══════════════════════════════════════════════════════════════
@@ -8595,17 +8638,15 @@ function buildMedRecAlerts() {
 }
 
 function renderAll() {
-  var _kpiC = document.getElementById('kpi-cancels');
-  if (_kpiC) _kpiC.textContent = DATA.cancelTotal || 0;
-  // Split KPI counters
-  var _nsEl = document.getElementById('kpi-noshow');
-  if (_nsEl) _nsEl.textContent = DATA.noShowTotal || 0;
-  var _wdEl = document.getElementById('kpi-withdrew');
-  if (_wdEl) _wdEl.textContent = DATA.withdrewTotal || 0;
-  var _sfEl = document.getElementById('kpi-screenfail');
-  if (_sfEl) _sfEl.textContent = DATA.screenFailTotal || 0;
-  var _dcEl = document.getElementById('kpi-discontinued');
-  if (_dcEl) _dcEl.textContent = DATA.discontinuedTotal || 0;
+  var activeTab = _activeTab();
+
+  // ── Always render: Overview KPIs (lightweight text updates) ──
+  var _sk = function(id,v){ var e=document.getElementById(id); if(e) e.textContent=v; };
+  _sk('kpi-cancels', DATA.cancelTotal || 0);
+  _sk('kpi-noshow', DATA.noShowTotal || 0);
+  _sk('kpi-withdrew', DATA.withdrewTotal || 0);
+  _sk('kpi-screenfail', DATA.screenFailTotal || 0);
+  _sk('kpi-discontinued', DATA.discontinuedTotal || 0);
   var reschEl = document.getElementById('kpi-rescheduled');
   if (reschEl) reschEl.textContent = (DATA.rescheduledVisits||[]).length;
   var reschSub = reschEl ? reschEl.parentElement.querySelector('.tb-sub') : null;
@@ -8613,14 +8654,12 @@ function renderAll() {
     var pending = (DATA.pendingReschedules||[]).length;
     reschSub.textContent = pending ? pending + ' pending' : 'Rebooked';
   }
-  var _sk = function(id,v){ var e=document.getElementById(id); if(e) e.textContent=v; };
   _sk('kpi-upcoming', DATA.upcomingTotal || 0);
   _sk('kpi-next14', DATA.next14 || 0);
   _sk('kpi-risk', (DATA.riskFlags||[]).length);
-  const _studiesEl = document.getElementById('kpi-studies');
+  var _studiesEl = document.getElementById('kpi-studies');
   if (_studiesEl) _studiesEl.textContent = DATA.activeStudies || (DATA.riskMatrix||[]).length || 0;
-  if (document.getElementById('sched-count'))
-    document.getElementById('sched-count').textContent = (DATA.upcomingTotal||0) + ' visits';
+  _sk('sched-count', (DATA.upcomingTotal||0) + ' visits');
 
   // Dynamic KPI date subtitles
   (function updateKpiDates() {
@@ -8634,27 +8673,18 @@ function renderAll() {
     if (upRange) upRange.textContent = 'Through ' + fmt(future);
   })();
 
+  // Mark all tabs as dirty (need re-render when visited)
+  _tabDirty.overview = true; _tabDirty.studies = true;
+  _tabDirty.referrals = true; _tabDirty.actions = true; _tabDirty.admin = true;
+
+  // ── Overview tab (always render — it's the default view) ──
   safe(buildHorizon,         'buildHorizon');
   safe(buildReasonChart,     'buildReasonChart');
   safe(buildSiteChart,       'buildSiteChart');
   safe(buildCancelStudyBars, 'buildCancelStudyBars');
   safe(buildReasonBreakdown, 'buildReasonBreakdown');
   safe(buildSiteStackedBars, 'buildSiteStackedBars');
-  safe(renderCoordinatorGoals, 'renderCoordinatorGoals');
-  safe(renderCoordWorkloadBalance, 'renderCoordWorkloadBalance');
-  safe(renderCoordCancelTypeChart, 'renderCoordCancelTypeChart');
-  safe(renderInvCapacity, 'renderInvCapacity');
-  safe(renderRecruiterPerformance, 'renderRecruiterPerformance');
-  safe(buildActionSteps,     'buildActionSteps');
-  safe(buildInsights,        'buildInsights');
-  safe(buildRecruitmentKPIs, 'buildRecruitmentKPIs');
-  safe(buildPatientPipelineBySite, 'buildPatientPipelineBySite');
-  safe(buildMedRecAlerts,    'buildMedRecAlerts');
-  safe(renderPIApprovalTracker, 'renderPIApprovalTracker');
-  safe(renderMedRecPortalFilter, 'renderMedRecPortalFilter');
-  // Note: buildRiskTable/buildStudyCards removed — Studies tab now uses buildStudiesView (lazy-loaded on tab click)
-  if (typeof buildRiskFlagCards === 'function')     safe(buildRiskFlagCards,     'buildRiskFlagCards');
-  // Pre-build schedule so it's ready when tab is clicked
+  if (typeof buildRiskFlagCards === 'function') safe(buildRiskFlagCards, 'buildRiskFlagCards');
   safe(buildScheduleTable,       'buildScheduleTable');
   safe(buildSchedStudyBars,      'buildSchedStudyBars');
   safe(backfillInvestigators, 'backfillInvestigators');
@@ -8662,7 +8692,35 @@ function renderAll() {
   safe(injectVisitConfirmButtons, 'injectVisitConfirmButtons');
   if (MED_RECORDS_DATA && MED_RECORDS_DATA.length > 0) safe(injectScheduleMedRecords, 'injectScheduleMedRecords');
   safe(() => filterSchedTable('all', null), 'schedFilter');
-  safe(renderTrendsCharts,       'renderTrendsCharts');
+  _tabDirty.overview = false;
+
+  // ── Actions tab (render if active, defer otherwise) ──
+  if (activeTab === 'actions') {
+    safe(buildActionSteps,     'buildActionSteps');
+    safe(buildInsights,        'buildInsights');
+    _tabDirty.actions = false;
+  }
+
+  // ── Admin tab: coordinator/investigator charts + trends ──
+  if (activeTab === 'admin') {
+    safe(renderCoordinatorGoals, 'renderCoordinatorGoals');
+    safe(renderCoordWorkloadBalance, 'renderCoordWorkloadBalance');
+    safe(renderCoordCancelTypeChart, 'renderCoordCancelTypeChart');
+    safe(renderInvCapacity, 'renderInvCapacity');
+    safe(renderRecruiterPerformance, 'renderRecruiterPerformance');
+    safe(renderTrendsCharts,       'renderTrendsCharts');
+    _tabDirty.admin = false;
+  }
+
+  // ── Referrals tab ──
+  if (activeTab === 'referrals') {
+    safe(buildRecruitmentKPIs, 'buildRecruitmentKPIs');
+    safe(buildPatientPipelineBySite, 'buildPatientPipelineBySite');
+    safe(buildMedRecAlerts,    'buildMedRecAlerts');
+    safe(renderPIApprovalTracker, 'renderPIApprovalTracker');
+    safe(renderMedRecPortalFilter, 'renderMedRecPortalFilter');
+    _tabDirty.referrals = false;
+  }
 }
 
 function closeSetup() {
@@ -14976,7 +15034,7 @@ async function _crpInit() {
         if (srcBadge) srcBadge.textContent = '🔗 Live Google Sheets';
         if (badge) { badge.textContent = 'Updated: ' + new Date().toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'}); badge.style.color = ''; }
         var fb0=document.getElementById('fallback-banner'); if(fb0) fb0.style.display='none';
-        renderAll();
+        scheduleRender();
         _lastDataLoadTimestamp = Date.now();
         _log('CRP: Phase 1 complete — upcoming:', rows1.length, 'audit:', auditRows.length);
         crioOk = true;
@@ -15008,7 +15066,7 @@ async function _crpInit() {
           DATA = retryData;
           if (srcBadge) srcBadge.textContent = '🔗 Live Google Sheets';
           if (badge) { badge.textContent = 'Updated: ' + new Date().toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'}); badge.style.color = ''; }
-          renderAll();
+          scheduleRender();
           _lastDataLoadTimestamp = Date.now();
           showToast('Live data loaded successfully', 'success');
           _log('CRP: Phase 1 retry succeeded — upcoming:', rows1b.length);
@@ -15137,7 +15195,7 @@ async function _crpInit() {
         console.warn('CRP Auto-Refresh: new data looks empty (' + (newData.upcomingTotal||0) + ' upcoming) — keeping previous data');
       } else {
         DATA = newData;
-        renderAll();
+        scheduleRender();
         _updateHealthButton();
         _log('CRP Auto-Refresh: CRIO refreshed — upcoming:', rows1.length, 'audit:', auditRows.length);
       }
