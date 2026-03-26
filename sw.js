@@ -1,5 +1,5 @@
 // CRP Dashboard Service Worker — Offline Support + Smart Caching
-const CACHE_NAME = 'crp-dashboard-v12';
+const CACHE_NAME = 'crp-dashboard-v13';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -53,6 +53,14 @@ self.addEventListener('activate', function(event) {
 // Fetch strategy
 self.addEventListener('fetch', function(event) {
   var url = event.request.url;
+
+  // Cloud Function (BQ feeds): network-first with timeout, cache fallback
+  if (url.includes('cloudfunctions.net/crp-bq-feeds')) {
+    event.respondWith(
+      networkFirstWithTimeout(event.request, 10000)
+    );
+    return;
+  }
 
   // Google Sheets data URLs: network-first with timeout, cache fallback
   if (url.includes('docs.google.com/spreadsheets')) {
