@@ -3673,7 +3673,7 @@ function renderRevenuePerUser() {
   if (!_rpuData || _rpuData.length === 0) return;
   var el = function(id) { return document.getElementById(id); };
   var totalRev = 0, totalVisits = _rpuData.length;
-  var byCoord = {}, byInv = {}, byMonth = {};
+  var byCoord = {}, byInv = {}, byRecruiter = {}, byMonth = {};
   var sites = new Set();
 
   _rpuData.forEach(function(r) {
@@ -3681,6 +3681,7 @@ function renderRevenuePerUser() {
     totalRev += rev;
     sites.add(r.site_name);
     var month = r.month_completed || '';
+    var studyShort = r.study_name.indexOf(' - ') !== -1 ? r.study_name.split(' - ').pop() : r.study_name;
 
     // Coordinator aggregation
     var c = r.coordinator || 'Unassigned';
@@ -3688,7 +3689,6 @@ function renderRevenuePerUser() {
     byCoord[c].visits++;
     byCoord[c].revenue += rev;
     byCoord[c].questions += parseInt(r.coord_questions||0);
-    var studyShort = r.study_name.indexOf(' - ') !== -1 ? r.study_name.split(' - ').pop() : r.study_name;
     byCoord[c].studies[studyShort] = (byCoord[c].studies[studyShort]||0) + rev;
     byCoord[c].site[r.site_name] = (byCoord[c].site[r.site_name]||0) + rev;
 
@@ -3699,6 +3699,14 @@ function renderRevenuePerUser() {
     byInv[inv].revenue += rev;
     byInv[inv].questions += parseInt(r.inv_questions||0);
     byInv[inv].studies[studyShort] = (byInv[inv].studies[studyShort]||0) + rev;
+
+    // Recruiter aggregation (first person who scheduled the visit)
+    var rec = r.recruiter || 'Unassigned';
+    if (!byRecruiter[rec]) byRecruiter[rec] = {visits:0,revenue:0,questions:0,studies:{},site:{}};
+    byRecruiter[rec].visits++;
+    byRecruiter[rec].revenue += rev;
+    byRecruiter[rec].studies[studyShort] = (byRecruiter[rec].studies[studyShort]||0) + rev;
+    byRecruiter[rec].site[r.site_name] = (byRecruiter[rec].site[r.site_name]||0) + rev;
 
     // Monthly trend
     if (month) {
@@ -3782,6 +3790,10 @@ function renderRevenuePerUser() {
   var invEl = el('rpu-inv-table');
   if (invEl) invEl.innerHTML = buildUserTable(byInv, 'rpu-inv-badge', 'Investigator');
 
+  // Render recruiter table
+  var recEl = el('rpu-rec-table');
+  if (recEl) recEl.innerHTML = buildUserTable(byRecruiter, 'rpu-rec-badge', 'Recruiter');
+
   // Make KPI sections clickable
   var kpiSections = document.querySelectorAll('#view-fin-productivity .tb-section');
   if (kpiSections[0]) { kpiSections[0].style.cursor = 'pointer'; kpiSections[0].onclick = function(){ showRPUBreakdownModal('revenue'); }; }
@@ -3820,7 +3832,7 @@ function renderRevenuePerUser() {
 // ═══ RPU CLICK-THROUGH MODALS ═══
 function showRPUUserModal(userName, role) {
   if (!_rpuData) return;
-  var field = role === 'Coordinator' ? 'coordinator' : 'investigator';
+  var field = role === 'Coordinator' ? 'coordinator' : role === 'Recruiter' ? 'recruiter' : 'investigator';
   var visits = _rpuData.filter(function(r) { return r[field] === userName; });
   var totalRev = visits.reduce(function(s,r){ return s + parseFloat(r.visit_revenue||0); }, 0);
 
@@ -17690,6 +17702,16 @@ document.addEventListener('click', function(e) {
     </div>
     <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Attribution: coordinator who answered the most eSource questions per visit</div>
     <div style="padding:0;" id="rpu-coord-table"></div>
+  </div>
+
+  <!-- Recruiter Revenue -->
+  <div class="card fade-in" style="margin-bottom:16px;">
+    <div class="card-header">
+      <span class="card-title">Recruiter Revenue</span>
+      <span class="badge badge-green" id="rpu-rec-badge">—</span>
+    </div>
+    <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Attribution: first person who scheduled the visit (from appointment audit log)</div>
+    <div style="padding:0;" id="rpu-rec-table"></div>
   </div>
 
   <!-- Investigator Revenue -->

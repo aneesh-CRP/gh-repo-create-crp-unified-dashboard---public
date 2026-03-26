@@ -1528,12 +1528,25 @@ const FEEDS = {
         WHERE svi.status IN (21, 22, 23) AND svi._fivetran_deleted = false
           AND st.is_active = 1
           AND svi.last_updated >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL ${days} DAY)
+      ),
+      first_scheduler AS (
+        SELECT aal.subject_key, aal.study_visit_key, aal.study_key,
+          TRIM(CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, ''))) AS scheduler_name
+        FROM ${tbl('appointment_audit_log')} aal
+        JOIN ${tbl('user')} u ON aal.by_user_key = u.user_key
+        WHERE aal.change_type = 0
+          AND aal._fivetran_deleted = false
+        QUALIFY ROW_NUMBER() OVER (
+          PARTITION BY aal.subject_key, aal.study_visit_key, aal.study_key
+          ORDER BY aal.date_created ASC
+        ) = 1
       )
       SELECT
         COALESCE(ec.coordinator, 'Unassigned') AS coordinator,
         COALESCE(ec.coord_questions, 0) AS coord_questions,
         COALESCE(ei.investigator, 'Unassigned') AS investigator,
         COALESCE(ei.inv_questions, 0) AS inv_questions,
+        COALESCE(fs.scheduler_name, 'Unassigned') AS recruiter,
         CAST(cv.study_key AS STRING) AS study_key,
         ${STUDY_NAME_SQL} AS study_name,
         COALESCE(sv.name, '') AS visit_name,
@@ -1560,7 +1573,9 @@ const FEEDS = {
       LEFT JOIN ${tbl('study_visit_finance')} svf ON cv.study_visit_key = svf.study_visit_key
       LEFT JOIN esource_coordinator ec ON cv.subject_visit_key = ec.subject_visit_key
       LEFT JOIN esource_investigator ei ON cv.subject_visit_key = ei.subject_visit_key
-      WHERE (ec.coordinator IS NOT NULL OR ei.investigator IS NOT NULL)
+      LEFT JOIN first_scheduler fs ON cv.subject_key = fs.subject_key
+        AND cv.study_visit_key = fs.study_visit_key AND cv.study_key = fs.study_key
+      WHERE (ec.coordinator IS NOT NULL OR ei.investigator IS NOT NULL OR fs.scheduler_name IS NOT NULL)
       ORDER BY visit_revenue DESC`;
     }
   },
