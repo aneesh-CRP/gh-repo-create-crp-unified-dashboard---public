@@ -1718,7 +1718,7 @@ function renderRevenuePerUser() {
       var barW = maxRev > 0 ? Math.round(d.revenue / maxRev * 100) : 0;
       var topStudy = Object.entries(d.studies).sort(function(a,b){return b[1]-a[1];})[0];
       var siteInfo = d.site ? Object.entries(d.site).map(function(s){return s[0].replace(', PA','').replace(', NJ','')+'($'+Math.round(s[1]/1000)+'K)';}).join(' ') : '';
-      h += '<tr style="border-bottom:1px solid #f1f5f9;">';
+      h += '<tr class="clickable" style="border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showRPUUserModal(\''+jsAttr(name)+'\',\''+jsAttr(label)+'\')">';
       h += '<td style="padding:7px 12px;"><span style="font-weight:600;">'+escapeHTML(name)+'</span>';
       if (siteInfo) h += '<div style="font-size:9px;color:#94a3b8;">'+escapeHTML(siteInfo)+'</div>';
       h += '</td>';
@@ -1760,6 +1760,13 @@ function renderRevenuePerUser() {
   var invEl = el('rpu-inv-table');
   if (invEl) invEl.innerHTML = buildUserTable(byInv, 'rpu-inv-badge', 'Investigator');
 
+  // Make KPI sections clickable
+  var kpiSections = document.querySelectorAll('#view-fin-productivity .tb-section');
+  if (kpiSections[0]) { kpiSections[0].style.cursor = 'pointer'; kpiSections[0].onclick = function(){ showRPUBreakdownModal('revenue'); }; }
+  if (kpiSections[1]) { kpiSections[1].style.cursor = 'pointer'; kpiSections[1].onclick = function(){ showRPUBreakdownModal('visits'); }; }
+  if (kpiSections[2]) { kpiSections[2].style.cursor = 'pointer'; kpiSections[2].onclick = function(){ showRPUBreakdownModal('revenue'); }; }
+  if (kpiSections[3]) { kpiSections[3].style.cursor = 'pointer'; kpiSections[3].onclick = function(){ showRPUBreakdownModal('sites'); }; }
+
   // Monthly trend heatmap
   var trendEl = el('rpu-monthly-trend');
   var trendBadge = el('rpu-trend-badge');
@@ -1779,13 +1786,126 @@ function renderRevenuePerUser() {
       months.forEach(function(m) {
         var v = byMonth[m]&&byMonth[m][user]||0;
         var bg = v > 0 ? 'background:'+colors[i%5]+Math.round(v/maxM*40+10).toString(16)+';' : '';
-        th += '<td style="text-align:center;padding:4px 6px;font-weight:'+(v>0?'600':'400')+';color:'+(v>0?'#1e293b':'#cbd5e1')+';'+bg+'">'+( v > 0 ? '$'+Math.round(v/1000)+'K' : '—')+'</td>';
+        th += '<td style="text-align:center;padding:4px 6px;font-weight:'+(v>0?'600':'400')+';color:'+(v>0?'#1e293b':'#cbd5e1')+';'+bg+(v>0?'cursor:pointer;':'')+'\"'+(v>0?' onclick="showRPUMonthModal(\''+jsAttr(user)+'\',\''+m+'\')\"':'')+'>'+(v > 0 ? '$'+Math.round(v/1000)+'K' : '—')+'</td>';
       });
       th += '<td style="text-align:center;padding:4px 8px;font-weight:700;color:'+colors[i%5]+';">$'+Math.round(total/1000)+'K</td></tr>';
     });
     th += '</tbody></table></div>';
     trendEl.innerHTML = th;
   }
+}
+
+// ═══ RPU CLICK-THROUGH MODALS ═══
+function showRPUUserModal(userName, role) {
+  if (!_rpuData) return;
+  var field = role === 'Coordinator' ? 'coordinator' : 'investigator';
+  var visits = _rpuData.filter(function(r) { return r[field] === userName; });
+  var totalRev = visits.reduce(function(s,r){ return s + parseFloat(r.visit_revenue||0); }, 0);
+
+  // Group by study
+  var byStudy = {};
+  visits.forEach(function(r) {
+    var sn = r.study_name || 'Unknown';
+    if (!byStudy[sn]) byStudy[sn] = { visits: 0, revenue: 0, actual: 0, contracted: 0, noRate: 0 };
+    byStudy[sn].visits++;
+    byStudy[sn].revenue += parseFloat(r.visit_revenue||0);
+    if (r.revenue_type === 'Actual') byStudy[sn].actual++;
+    else if (r.revenue_type === 'Contracted') byStudy[sn].contracted++;
+    else byStudy[sn].noRate++;
+  });
+
+  var h = '<div style="margin-bottom:12px;font-size:12px;color:#64748b;">' + visits.length + ' visits · $' + Math.round(totalRev).toLocaleString() + ' total revenue · ' + _rpuDays + '-day period</div>';
+
+  // Study summary table
+  h += '<table class="detail-table"><thead><tr><th>Study</th><th class="r">Visits</th><th class="r">Revenue</th><th class="r">Actual</th><th class="r">Contracted</th><th class="r">No Rate</th></tr></thead><tbody>';
+  Object.entries(byStudy).sort(function(a,b){return b[1].revenue-a[1].revenue;}).forEach(function(e) {
+    var s = e[0], d = e[1];
+    h += '<tr><td>'+slink(s)+'</td><td class="r">'+d.visits+'</td><td class="r">'+fmt(d.revenue)+'</td><td class="r">'+d.actual+'</td><td class="r">'+d.contracted+'</td><td class="r">'+(d.noRate||'')+'</td></tr>';
+  });
+  h += '<tr class="total-row"><td>TOTAL</td><td class="r">'+visits.length+'</td><td class="r">'+fmt(totalRev)+'</td><td class="r">'+visits.filter(function(r){return r.revenue_type==='Actual';}).length+'</td><td class="r">'+visits.filter(function(r){return r.revenue_type==='Contracted';}).length+'</td><td class="r">'+visits.filter(function(r){return r.revenue_type==='No Rate';}).length+'</td></tr>';
+  h += '</tbody></table>';
+
+  // Visit detail table
+  h += '<div style="margin-top:16px;font-size:12px;font-weight:700;color:#1e293b;">Visit Detail</div>';
+  h += '<table class="detail-table" style="margin-top:4px;"><thead><tr><th>Date</th><th>Study</th><th>Visit</th><th>Subject</th><th>Status</th><th class="r">Revenue</th><th>Type</th></tr></thead><tbody>';
+  visits.sort(function(a,b){return (b.date_completed||'').localeCompare(a.date_completed||'');}).forEach(function(r) {
+    var rev = parseFloat(r.visit_revenue||0);
+    var typeColor = r.revenue_type === 'Actual' ? '#059669' : r.revenue_type === 'Contracted' ? '#3b82f6' : '#94a3b8';
+    h += '<tr><td>'+escapeHTML(r.date_completed||'—')+'</td><td>'+slink(r.study_name||'')+'</td><td>'+escapeHTML(r.visit_name||'—')+'</td><td>'+escapeHTML(r.subject_name||'—')+'</td><td>'+escapeHTML(r.visit_status||'—')+'</td><td class="r" style="font-weight:600;">'+fmt(rev)+'</td><td style="color:'+typeColor+';font-weight:600;">'+escapeHTML(r.revenue_type||'—')+'</td></tr>';
+  });
+  h += '</tbody></table>';
+
+  openModal(escapeHTML(userName) + ' — ' + role + ' Revenue', visits.length + ' visits · $' + Math.round(totalRev).toLocaleString(), h);
+}
+
+function showRPUBreakdownModal(mode) {
+  if (!_rpuData) return;
+  if (mode === 'sites') {
+    var bySite = {};
+    _rpuData.forEach(function(r) {
+      var s = r.site_name || 'Unknown';
+      if (!bySite[s]) bySite[s] = { visits: 0, revenue: 0 };
+      bySite[s].visits++;
+      bySite[s].revenue += parseFloat(r.visit_revenue||0);
+    });
+    var h = '<table class="detail-table"><thead><tr><th>Site</th><th class="r">Visits</th><th class="r">Revenue</th><th class="r">Avg/Visit</th></tr></thead><tbody>';
+    var totRev = 0, totVis = 0;
+    Object.entries(bySite).sort(function(a,b){return b[1].revenue-a[1].revenue;}).forEach(function(e) {
+      var d = e[1]; totRev += d.revenue; totVis += d.visits;
+      h += '<tr><td>'+escapeHTML(e[0])+'</td><td class="r">'+d.visits+'</td><td class="r">'+fmt(d.revenue)+'</td><td class="r">'+fmt(d.visits>0?d.revenue/d.visits:0)+'</td></tr>';
+    });
+    h += '<tr class="total-row"><td>TOTAL</td><td class="r">'+totVis+'</td><td class="r">'+fmt(totRev)+'</td><td class="r">'+fmt(totVis>0?totRev/totVis:0)+'</td></tr></tbody></table>';
+    openModal('Revenue by Site', Object.keys(bySite).length + ' sites · $' + Math.round(totRev).toLocaleString(), h);
+    return;
+  }
+  // Revenue / visits breakdown
+  var byType = { Actual: { visits: 0, revenue: 0 }, Contracted: { visits: 0, revenue: 0 }, 'No Rate': { visits: 0, revenue: 0 } };
+  _rpuData.forEach(function(r) {
+    var t = r.revenue_type || 'No Rate';
+    if (!byType[t]) byType[t] = { visits: 0, revenue: 0 };
+    byType[t].visits++;
+    byType[t].revenue += parseFloat(r.visit_revenue||0);
+  });
+  var totRev = _rpuData.reduce(function(s,r){return s+parseFloat(r.visit_revenue||0);},0);
+  var h = '<table class="detail-table"><thead><tr><th>Revenue Type</th><th class="r">Visits</th><th class="r">Revenue</th><th class="r">% of Total</th><th class="r">Avg/Visit</th></tr></thead><tbody>';
+  Object.entries(byType).forEach(function(e) {
+    var d = e[1]; if (d.visits === 0) return;
+    var pct = totRev > 0 ? Math.round(d.revenue/totRev*100) : 0;
+    h += '<tr><td>'+escapeHTML(e[0])+'</td><td class="r">'+d.visits+'</td><td class="r">'+fmt(d.revenue)+'</td><td class="r">'+pct+'%</td><td class="r">'+fmt(d.visits>0?d.revenue/d.visits:0)+'</td></tr>';
+  });
+  h += '<tr class="total-row"><td>TOTAL</td><td class="r">'+_rpuData.length+'</td><td class="r">'+fmt(totRev)+'</td><td class="r">100%</td><td class="r">'+fmt(_rpuData.length>0?totRev/_rpuData.length:0)+'</td></tr></tbody></table>';
+
+  // By study
+  var byStudy = {};
+  _rpuData.forEach(function(r) {
+    var s = r.study_name || 'Unknown';
+    if (!byStudy[s]) byStudy[s] = { visits: 0, revenue: 0 };
+    byStudy[s].visits++;
+    byStudy[s].revenue += parseFloat(r.visit_revenue||0);
+  });
+  h += '<div style="margin-top:16px;font-size:12px;font-weight:700;color:#1e293b;">By Study</div>';
+  h += '<table class="detail-table" style="margin-top:4px;"><thead><tr><th>Study</th><th class="r">Visits</th><th class="r">Revenue</th><th class="r">Avg/Visit</th></tr></thead><tbody>';
+  Object.entries(byStudy).sort(function(a,b){return b[1].revenue-a[1].revenue;}).forEach(function(e) {
+    var d = e[1];
+    h += '<tr><td>'+slink(e[0])+'</td><td class="r">'+d.visits+'</td><td class="r">'+fmt(d.revenue)+'</td><td class="r">'+fmt(d.visits>0?d.revenue/d.visits:0)+'</td></tr>';
+  });
+  h += '</tbody></table>';
+  openModal('Revenue Breakdown', _rpuData.length + ' visits · $' + Math.round(totRev).toLocaleString() + ' · ' + _rpuDays + '-day period', h);
+}
+
+function showRPUMonthModal(userName, month) {
+  if (!_rpuData) return;
+  var visits = _rpuData.filter(function(r) { return r.coordinator === userName && r.month_completed === month; });
+  var totalRev = visits.reduce(function(s,r){ return s + parseFloat(r.visit_revenue||0); }, 0);
+  var monthLabel = month.substring(5) + '/' + month.substring(0,4);
+  var h = '<table class="detail-table"><thead><tr><th>Date</th><th>Study</th><th>Visit</th><th>Subject</th><th class="r">Revenue</th><th>Type</th></tr></thead><tbody>';
+  visits.sort(function(a,b){return (b.date_completed||'').localeCompare(a.date_completed||'');}).forEach(function(r) {
+    var rev = parseFloat(r.visit_revenue||0);
+    var typeColor = r.revenue_type === 'Actual' ? '#059669' : r.revenue_type === 'Contracted' ? '#3b82f6' : '#94a3b8';
+    h += '<tr><td>'+escapeHTML(r.date_completed||'—')+'</td><td>'+slink(r.study_name||'')+'</td><td>'+escapeHTML(r.visit_name||'—')+'</td><td>'+escapeHTML(r.subject_name||'—')+'</td><td class="r" style="font-weight:600;">'+fmt(rev)+'</td><td style="color:'+typeColor+';font-weight:600;">'+escapeHTML(r.revenue_type||'—')+'</td></tr>';
+  });
+  h += '<tr class="total-row"><td colspan="4">TOTAL</td><td class="r">'+fmt(totalRev)+'</td><td></td></tr></tbody></table>';
+  openModal(escapeHTML(userName) + ' — ' + monthLabel, visits.length + ' visits · $' + Math.round(totalRev).toLocaleString(), h);
 }
 
 function initFinanceDashboard(forceRefresh) {
