@@ -1462,7 +1462,7 @@ async function verifyPin() {
     initFinanceDashboard();
     const pending = document.getElementById('authModal').dataset.pending;
     if (pending === 'admin') { switchView('admin', document.querySelector(".nav-tab[onclick*='admin']")); }
-    else if (pending) switchTab(pending);
+    else if (pending) switchTab(pending, document.querySelector(".nav-tab[data-tab='" + pending + "']"));
   } else {
     _authAttempts++;
     if (typeof logAudit === 'function') logAudit('finance_auth_fail', 'Failed PIN attempt #' + _authAttempts);
@@ -1881,7 +1881,7 @@ function updateFinanceOverviewKPIs() {
 
 // ═══ UNIFIED TAB SWITCHER (wraps perf switchView + finance gating) ═══
 function switchTab(name, el) {
-  console.log('switchTab CALLED:', name, 'auth:', isFinanceUnlocked());
+  _log('switchTab: ' + name);
   // Audit log
   if (typeof logAudit === 'function') logAudit('tab_view', name);
   // Deep-link: update URL hash
@@ -14573,7 +14573,7 @@ function toggleDarkMode() {
     if (!item) return;
     e.preventDefault();
     var tab = item.getAttribute('data-tab');
-    var tabEl = document.querySelector(".nav-tab[onclick*='" + tab + "']");
+    var tabEl = document.querySelector(".nav-tab[onclick*='" + tab + "'], .nav-tab[data-tab='" + tab + "']");
     switchTab(tab, tabEl || null);
     searchResults.style.display = 'none';
     searchInput.value = '';
@@ -14684,7 +14684,7 @@ window.addEventListener('hashchange', function() {
   var hash = location.hash.replace('#', '');
   if (!hash) return;
   if (hash === 'schedule') hash = 'overview'; // Schedule tab merged into Overview
-  var tab = document.querySelector(".nav-tab[onclick*='" + hash + "']");
+  var tab = document.querySelector(".nav-tab[onclick*='" + hash + "'], .nav-tab[data-tab='" + hash + "']");
   switchTab(hash, tab || null);
 });
 
@@ -14792,7 +14792,7 @@ async function _crpInit() {
     var _allTabs = ['overview','studies','referrals','actions','admin','fin-overview','fin-collections','fin-aging','fin-revenue','fin-qb','fin-productivity','insights'];
     if (_allTabs.indexOf(_hashTab) !== -1) _initTab = _hashTab;
   }
-  var _initTabEl = document.querySelector(".nav-tab[onclick*='" + _initTab + "']");
+  var _initTabEl = document.querySelector(".nav-tab[onclick*='" + _initTab + "'], .nav-tab[data-tab='" + _initTab + "']");
   switchTab(_initTab, _initTabEl || null);
   CRP.emit('init', { version: CRP_CONFIG.VERSION, timestamp: new Date() });
   _log(`CRP Dashboard v${CRP_CONFIG.VERSION} initialized`);

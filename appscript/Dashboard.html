@@ -2169,11 +2169,11 @@ body {
 
   <!-- ── CHARTS: Compact overview linking to detail tab ── -->
   <div class="charts-row">
-    <div class="panel" style="cursor:pointer" onclick="switchTab('fin-revenue',document.querySelector('.nav-tab[onclick*=fin-revenue]'))">
+    <div class="panel" style="cursor:pointer" onclick="switchTab('fin-revenue',document.querySelector('.nav-tab[data-tab=fin-revenue]'))">
       <div class="panel-head">Revenue Trend <span style="font-size:10px;color:var(--muted);font-weight:400">→ click for detail</span></div>
       <div class="chart-wrap"><svg id="revChart" viewBox="0 0 1000 310" style="width:100%;height:200px"></svg></div>
     </div>
-    <div class="panel" style="cursor:pointer" onclick="switchTab('fin-revenue',document.querySelector('.nav-tab[onclick*=fin-revenue]'))">
+    <div class="panel" style="cursor:pointer" onclick="switchTab('fin-revenue',document.querySelector('.nav-tab[data-tab=fin-revenue]'))">
       <div class="panel-head">Payments Collected <span style="font-size:10px;color:var(--muted);font-weight:400">→ click for detail</span></div>
       <div class="chart-wrap"><svg id="payChartOverview" viewBox="0 0 1000 310" style="width:100%;height:200px"></svg></div>
     </div>
