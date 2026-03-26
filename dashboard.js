@@ -2066,7 +2066,13 @@ function switchTab(name, el) {
   const view = document.getElementById(viewId);
   if (view) {
     view.style.display = 'block';
+    view.style.width = '100%';
+    view.style.minHeight = '200px';
+    view.style.contentVisibility = 'visible';
     view.classList.add('active');
+    window.scrollTo(0, 0);
+    // Force browser reflow so the view actually paints
+    void view.offsetHeight;
   } else {
     console.warn('switchTab: view not found:', viewId);
   }
@@ -5070,7 +5076,10 @@ function switchView(name, el) {
   const targetView = document.getElementById('view-' + name);
   if (targetView) {
     targetView.style.display = 'block';
+    targetView.style.width = '100%';
+    targetView.style.contentVisibility = 'visible';
     targetView.classList.add('active');
+    void targetView.offsetHeight;
   }
   if (el) el.classList.add('active');
 
