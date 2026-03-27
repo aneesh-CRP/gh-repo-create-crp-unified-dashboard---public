@@ -7076,6 +7076,9 @@ function processLiveData(allRows, legacyCancels, auditLog) {
     if (isNaN(sk) || isNaN(pk)) return null;
     return `${BASE}/${siteSlug(sk, siteName)}/study/${sk}/subject/${pk}`;
   }
+  // Expose globally for modals that need CRIO links
+  window._crioPatientUrl = patientUrl;
+  window._crioStudyUrl = studyUrl;
 
   function parseDate(s) {
     if (!s) return null;
@@ -9025,12 +9028,13 @@ function showUnscheduledModal(studyFilter) {
   h += '<table class="detail-table"><thead><tr><th>Study</th><th>Patient</th><th>Status</th><th>Last Visit</th><th>Last Visit Date</th><th>Site</th></tr></thead><tbody>';
   Object.entries(byStudy).sort(function(a,b){return b[1].length-a[1].length;}).forEach(function(e) {
     e[1].forEach(function(r,i) {
+      var pUrl = typeof window._crioPatientUrl === 'function' ? window._crioPatientUrl(r.study_key, r.subject_key, r.site_name) : null;
       h += '<tr><td>' + (i===0 ? '<strong>'+escapeHTML(e[0])+'</strong> <span style="color:#94a3b8;font-size:10px;">('+e[1].length+')</span>' : '') + '</td>';
-      h += '<td style="font-weight:600;">'+escapeHTML(r.subject_name||'—')+'</td>';
-      h += '<td><span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:'+(r.subject_status==='Enrolled'?'#05966920':'#d9770620')+';color:'+(r.subject_status==='Enrolled'?'#059669':'#d97706')+'">'+escapeHTML(r.subject_status||'—')+'</span></td>';
-      h += '<td>'+escapeHTML(r.last_visit_name||'—')+'</td>';
-      h += '<td>'+escapeHTML(r.last_visit_date||'—')+'</td>';
-      h += '<td>'+escapeHTML(r.site_name||'—')+'</td></tr>';
+      h += '<td>' + patientLink(r.subject_name||'—', pUrl) + '</td>';
+      h += '<td>' + statusBadge(r.subject_status) + '</td>';
+      h += '<td style="font-size:11px">'+escapeHTML(r.last_visit_name||'—')+'</td>';
+      h += '<td style="font-size:11px;color:#64748b">'+escapeHTML(r.last_visit_date||'—')+'</td>';
+      h += '<td>' + siteBadge(r.site_name) + '</td></tr>';
     });
   });
   h += '</tbody></table>';
@@ -14312,7 +14316,8 @@ function renderStudiesTable() {
         var list = (DATA[dataKey] || []).filter(function(r){ return (r.study||'').trim() === study; });
         var h = '<table class="detail-table"><thead><tr><th>Patient</th><th>Date</th><th>Visit</th><th>Reason</th></tr></thead><tbody>';
         list.forEach(function(r) {
-          h += '<tr><td>'+escapeHTML(r.name||'—')+'</td><td>'+escapeHTML(r.cancel_date||r.date||'—')+'</td><td>'+escapeHTML(r.visit||'—')+'</td><td>'+escapeHTML(r.reason||r.category||'—')+'</td></tr>';
+          var pUrl = r.url || (typeof window._crioPatientUrl === 'function' ? window._crioPatientUrl(r.study_key, r.subject_key, r.site) : null);
+          h += '<tr><td>'+patientLink(r.name||'—', pUrl)+'</td><td>'+escapeHTML(r.cancel_date||r.date||'—')+'</td><td>'+escapeHTML(r.visit||'—')+'</td><td>'+escapeHTML(r.reason||r.category||'—')+'</td></tr>';
         });
         h += '</tbody></table>';
         openModal(study + ' — ' + (catLabels[cat]||cat), list.length + ' records', h);
