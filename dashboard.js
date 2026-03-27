@@ -15459,18 +15459,23 @@ setTimeout(checkSystemHealth, 10000);
 setInterval(checkSystemHealth, 1800000);
 
 // ═══ DARK MODE TOGGLE ═══
+function _updateThemeIcon(isDark) {
+  var sun = document.getElementById('theme-icon-sun');
+  var moon = document.getElementById('theme-icon-moon');
+  if (sun) sun.style.display = isDark ? 'none' : '';
+  if (moon) moon.style.display = isDark ? '' : 'none';
+}
 function toggleDarkMode() {
   var html = document.documentElement;
   var isDark = html.getAttribute('data-theme') === 'dark';
   if (isDark) {
     html.removeAttribute('data-theme');
     localStorage.setItem('crp_theme', 'light');
-    document.getElementById('theme-toggle-btn').textContent = '';
   } else {
     html.setAttribute('data-theme', 'dark');
     localStorage.setItem('crp_theme', 'dark');
-    document.getElementById('theme-toggle-btn').textContent = '';
   }
+  _updateThemeIcon(!isDark);
   // Update Chart.js defaults for new theme
   if (typeof Chart !== 'undefined') {
     var textColor = getComputedStyle(document.documentElement).getPropertyValue('--text').trim() || '#072061';
@@ -15486,8 +15491,7 @@ function toggleDarkMode() {
   var saved = localStorage.getItem('crp_theme');
   if (saved === 'dark') {
     document.documentElement.setAttribute('data-theme', 'dark');
-    var btn = document.getElementById('theme-toggle-btn');
-    if (btn) btn.textContent = '';
+    _updateThemeIcon(true);
   }
 })();
 
