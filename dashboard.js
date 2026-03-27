@@ -4006,7 +4006,6 @@ function renderCoordinatorGoals() {
       <td style="padding:8px 8px;text-align:center;color:#6B7280;font-size:11px">${workDaysElapsed} days tracked</td>
     </tr>`;
   }).join('');
-  }
 }
 
 
