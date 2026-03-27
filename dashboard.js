@@ -10349,7 +10349,72 @@ function renderReferralDashboard() {
     </tbody>
   </table>`;
 
-  // ── DNQ & Outcome Analysis by Source ──
+  // ── Split into 3 separate tables: Provider Trackers, Campaigns, Meta ──
+  function _buildRefSubTable(targetId, badgeId, rows, label) {
+    var tEl = document.getElementById(targetId);
+    var bEl = document.getElementById(badgeId);
+    if (!tEl) return;
+    if (rows.length === 0) { tEl.innerHTML = '<div style="text-align:center;padding:20px;color:#94a3b8;font-size:12px;">No '+label+' data</div>'; if (bEl) bEl.textContent = '0'; return; }
+    if (bEl) bEl.textContent = rows.length + ' sources · ' + rows.reduce(function(s,r){return s+r.total;},0) + ' total';
+    var sorted = _sortRefRows(rows, _refSort, _refSortDir);
+    var h = '<table class="fin-table" style="width:100%;font-size:11px;"><thead><tr>';
+    h += '<th style="text-align:left;padding:8px 12px;cursor:pointer;" '+_sortClick('name')+'>Source'+_sortIcon('name')+'</th>';
+    h += '<th style="text-align:center;cursor:pointer;" '+_sortClick('total')+'>Total'+_sortIcon('total')+'</th>';
+    h += '<th style="text-align:center;">New</th>';
+    h += '<th style="text-align:center;">Contacted</th>';
+    h += '<th style="text-align:center;cursor:pointer;" '+_sortClick('screening')+'>Screening'+_sortIcon('screening')+'</th>';
+    h += '<th style="text-align:center;color:#059669;cursor:pointer;" '+_sortClick('enrolled')+'>Enrolled'+_sortIcon('enrolled')+'</th>';
+    h += '<th style="text-align:center;color:#dc2626;">DNQ</th>';
+    h += '<th style="text-align:center;cursor:pointer;" '+_sortClick('enrollRate')+'>Conv%'+_sortIcon('enrollRate')+'</th>';
+    h += '</tr></thead><tbody>';
+    sorted.forEach(function(r) {
+      var enrollRate = r.total > 0 ? Math.round(r.enrolled / r.total * 100) : 0;
+      r.enrollRate = enrollRate;
+      var dnqT = (r.sf||0)+(r.notEligible||0)+(r.notInterested||0);
+      var erColor = enrollRate >= 15 ? '#059669' : enrollRate >= 5 ? '#d97706' : enrollRate > 0 ? '#dc2626' : '#cbd5e1';
+      var tn = r.clickId ? jsAttr(r.clickId) : '';
+      var _campSafe = r.isCampaign ? jsAttr(r.name) : '';
+      var _isCrioOnly = !r.clickId && !r.isCampaign && r.crioData;
+      var _crioSrcSafe = _isCrioOnly ? jsAttr(r.name) : '';
+      var rowClick = r.clickId ? ' onclick="showTrackerStageDetail(\''+tn+'\',\'all\')"' : r.isCampaign ? ' onclick="showCampaignDetailModal(\''+_campSafe+'\')"' : _isCrioOnly ? ' onclick="showCrioSourceDetail(\''+_crioSrcSafe+'\',\'all\')"' : '';
+      var nameHtml = r.url ? '<a href="'+escapeHTML(r.url)+'" target="_blank" style="color:#1e293b;text-decoration:none;font-weight:600;" onclick="event.stopPropagation()">'+escapeHTML(r.name)+'</a>' : '<span style="font-weight:600;">'+escapeHTML(r.name)+'</span>';
+      h += '<tr style="border-bottom:1px solid #f1f5f9;cursor:pointer;"'+rowClick+'>';
+      h += '<td style="padding:8px 12px;">'+nameHtml+'</td>';
+      h += '<td style="text-align:center;font-weight:700;">'+r.total+'</td>';
+      h += '<td style="text-align:center;color:'+(r.newLead?'#374151':'#cbd5e1')+';">'+(r.newLead||'—')+'</td>';
+      h += '<td style="text-align:center;color:'+(r.contacted?'#374151':'#cbd5e1')+';">'+(r.contacted||'—')+'</td>';
+      h += '<td style="text-align:center;color:'+(r.screening?'#374151':'#cbd5e1')+';">'+(r.screening||'—')+'</td>';
+      h += '<td style="text-align:center;color:#059669;font-weight:700;">'+(r.enrolled||'—')+'</td>';
+      h += '<td style="text-align:center;color:'+(dnqT?'#dc2626':'#cbd5e1')+';">'+(dnqT||'—')+'</td>';
+      h += '<td style="text-align:center;font-weight:700;color:'+erColor+';">'+(enrollRate>0?enrollRate+'%':'—')+'</td>';
+      h += '</tr>';
+    });
+    // Total row
+    var totT = rows.reduce(function(s,r){return s+r.total;},0);
+    var totE = rows.reduce(function(s,r){return s+r.enrolled;},0);
+    var totS = rows.reduce(function(s,r){return s+r.screening;},0);
+    h += '<tr style="border-top:2px solid var(--border);background:var(--surface2);font-weight:700;">';
+    h += '<td style="padding:8px 12px;">TOTAL</td>';
+    h += '<td style="text-align:center;">'+totT+'</td>';
+    h += '<td style="text-align:center;">'+rows.reduce(function(s,r){return s+r.newLead;},0)+'</td>';
+    h += '<td style="text-align:center;">'+rows.reduce(function(s,r){return s+r.contacted;},0)+'</td>';
+    h += '<td style="text-align:center;">'+totS+'</td>';
+    h += '<td style="text-align:center;color:#059669;">'+totE+'</td>';
+    h += '<td style="text-align:center;color:#dc2626;">'+rows.reduce(function(s,r){return s+(r.sf||0)+(r.notEligible||0)+(r.notInterested||0);},0)+'</td>';
+    h += '<td style="text-align:center;">'+(totT>0?Math.round(totE/totT*100)+'%':'—')+'</td>';
+    h += '</tr></tbody></table>';
+    tEl.innerHTML = h;
+  }
+
+  var providerRows = unifiedRows.filter(function(r) { return r.vendor === 'Physician' || r.type === 'Provider'; });
+  var metaRows = unifiedRows.filter(function(r) { return r.vendor === 'Meta' || (r.vendor||'').toLowerCase() === 'facebook'; });
+  var campaignRows = unifiedRows.filter(function(r) { return r.vendor !== 'Physician' && r.vendor !== 'Meta' && (r.vendor||'').toLowerCase() !== 'facebook' && r.type !== 'Provider'; });
+
+  _buildRefSubTable('ref-provider-table', 'ref-provider-badge', providerRows, 'provider tracker');
+  _buildRefSubTable('ref-campaign-table', 'ref-campaign-badge', campaignRows, 'campaign');
+  _buildRefSubTable('ref-meta-table', 'ref-meta-badge', metaRows, 'Meta');
+
+  // ── DNQ & Outcome Analysis by Source (hidden) ──
   var dnqEl = el('dnq-analysis-table');
   var dnqBadge = el('dnq-analysis-badge');
   if (dnqEl && unifiedRows.length > 0) {

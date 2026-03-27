@@ -1524,35 +1524,50 @@ body {
     <div style="display:none" id="ref-total-badge"></div>
 
     <!-- All Referral Sources -->
-    <div class="card fade-in" style="margin-bottom:16px;">
-      <div class="card-header" style="flex-wrap:wrap;gap:8px;">
-        <span class="card-title">Referral Sources</span>
-        <div style="display:flex;gap:4px;align-items:center;">
-          <button class="filter-btn active" onclick="setRefTimeFilter('all',this)">All</button>
-          <button class="filter-btn" onclick="setRefTimeFilter('30',this)">30d</button>
-          <button class="filter-btn" onclick="setRefTimeFilter('60',this)">60d</button>
-          <button class="filter-btn" onclick="setRefTimeFilter('90',this)">90d</button>
-        </div>
-        <span class="badge badge-blue" id="ref-camp-badge">Loading...</span>
-        <button onclick="exportRefTable()" style="font-size:10px;padding:3px 10px;border:1px solid #e2e8f0;border-radius:4px;background:#fff;color:#475569;cursor:pointer;">Export CSV</button>
-      </div>
-      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">CRIO-verified · sortable · click any number for detail</div>
-      <div style="padding:0;" id="ref-tracker-detail">
-        <div style="text-align:center;padding:30px;color:var(--muted);font-size:13px;">Loading referral sources...</div>
-      </div>
+    <!-- Time filter for all referral sections -->
+    <div style="display:flex;gap:4px;align-items:center;margin-bottom:12px;flex-wrap:wrap;">
+      <span style="font-size:11px;color:#94a3b8;margin-right:4px;">Period:</span>
+      <button class="filter-btn active" onclick="setRefTimeFilter('all',this)">All</button>
+      <button class="filter-btn" onclick="setRefTimeFilter('30',this)">30d</button>
+      <button class="filter-btn" onclick="setRefTimeFilter('60',this)">60d</button>
+      <button class="filter-btn" onclick="setRefTimeFilter('90',this)">90d</button>
+      <span class="badge badge-blue" id="ref-camp-badge" style="margin-left:8px">Loading...</span>
+      <button onclick="exportRefTable()" style="font-size:10px;padding:3px 10px;border:1px solid #e2e8f0;border-radius:4px;background:#fff;color:#475569;cursor:pointer;margin-left:auto;">Export CSV</button>
     </div>
 
-    <!-- DNQ / Outcome Analysis by Source -->
+    <!-- Provider Trackers -->
     <div class="card fade-in" style="margin-bottom:16px;">
       <div class="card-header">
-        <span class="card-title">DNQ & Outcome Analysis by Source</span>
-        <span class="badge badge-red" id="dnq-analysis-badge">Loading...</span>
+        <span class="card-title">Provider Trackers</span>
+        <span class="badge badge-gray" id="ref-provider-badge">—</span>
       </div>
-      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Screen Fail, Not Eligible, Not Interested rates per source — identifies which channels produce the most qualified referrals</div>
-      <div style="padding:0;" id="dnq-analysis-table"></div>
+      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Physician referral networks · CRIO-verified · click for detail</div>
+      <div style="padding:0;" id="ref-provider-table"></div>
     </div>
 
-    <!-- Hidden compat containers -->
+    <!-- Central Campaigns -->
+    <div class="card fade-in" style="margin-bottom:16px;">
+      <div class="card-header">
+        <span class="card-title">Central Campaigns</span>
+        <span class="badge badge-blue" id="ref-campaign-badge">—</span>
+      </div>
+      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Study Teams, SubjectWell, DELFA and other campaign sources</div>
+      <div style="padding:0;" id="ref-campaign-table"></div>
+    </div>
+
+    <!-- Meta / Facebook Leads -->
+    <div class="card fade-in" style="margin-bottom:16px;">
+      <div class="card-header">
+        <span class="card-title">Meta / Facebook Leads</span>
+        <span class="badge badge-purple" id="ref-meta-badge">—</span>
+      </div>
+      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Meta advertising campaigns · lead gen forms · CRM integration</div>
+      <div style="padding:0;" id="ref-meta-table"></div>
+    </div>
+
+    <!-- Keep legacy container for render function compatibility -->
+    <div style="display:none" id="ref-tracker-detail"></div>
+    <div style="display:none" id="dnq-analysis-table"></div>
     <div style="display:none" id="ref-campaigns-table"></div>
     <div style="display:none" id="ref-source-chart"></div>
     <div style="display:none" id="ref-study-table"></div>
@@ -1560,13 +1575,12 @@ body {
     <div style="display:none" id="vendor-analytics-container"></div>
     <div style="display:none" id="contact-sequence-container"></div>
     <div style="display:none" id="ref-conversion-container"></div>
-
-    <!-- Hidden containers for removed sections -->
     <div style="display:none" id="ref-all-conversion"></div>
     <div style="display:none" id="ref-fb-table"></div>
+    <div style="display:none" id="ref-velocity-table"></div>
+    <div style="display:none" id="ref-study-source-table"></div>
 
-    <!-- ═══ SECTION 2: META AD PERFORMANCE ═══ -->
-    <!-- Monthly Trend by Source -->
+    <!-- Monthly Referral Trend by Source -->
     <div class="card fade-in" style="margin-bottom:16px;">
       <div class="card-header">
         <span class="card-title">Monthly Referral Trend by Source</span>
@@ -1574,26 +1588,6 @@ body {
       </div>
       <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Patient created date by month · top sources · CRIO recruiting data</div>
       <div style="padding:0;" id="ref-monthly-trend"></div>
-    </div>
-
-    <!-- Conversion Velocity -->
-    <div class="card fade-in" style="margin-bottom:16px;">
-      <div class="card-header">
-        <span class="card-title">Conversion Velocity by Source</span>
-        <span class="badge badge-purple" id="ref-velocity-badge">Loading...</span>
-      </div>
-      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Days from patient created to Screening/Enrolled · by referral source</div>
-      <div style="padding:0;" id="ref-velocity-table"></div>
-    </div>
-
-    <!-- Study-level Source Breakdown -->
-    <div class="card fade-in" style="margin-bottom:16px;">
-      <div class="card-header">
-        <span class="card-title">Source Performance by Study</span>
-        <span class="badge badge-gray" id="ref-study-source-badge">Loading...</span>
-      </div>
-      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">For each study, which referral sources produce the best conversion rates</div>
-      <div style="padding:0;" id="ref-study-source-table"></div>
     </div>
 
     <div class="section-title" style="margin-top:24px;margin-bottom:8px;">Meta Ad Performance (last 30 days)</div>
