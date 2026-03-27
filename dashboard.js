@@ -8162,10 +8162,13 @@ function renderFollowUpTable() {
   addRows(_filterRecovered(DATA.noShows), 'noshow', 'No Show', '#f97316');
   addRows(_filterRecovered(DATA.withdrawals), 'withdrew', 'Withdrew', '#8b5cf6');
   addRows(_filterRecovered(DATA.screenFails), 'screenfail', 'Screen Fail', '#6366f1');
-  // Unscheduled
+  // Unscheduled — exclude pre-screening studies (no sponsor prefix or name contains "pre-screen")
   (window._unscheduledVisits || []).forEach(function(r) {
+    var fullStudy = (r.study_name || '');
+    var isPrescreen = !fullStudy.includes(' - ') || fullStudy.toLowerCase().includes('pre-screen') || fullStudy.toLowerCase().includes('prescreening');
+    if (isPrescreen) return;
     var name = (r.subject_name || '').trim();
-    var study = (r.study_name || '').split(' - ').pop().trim();
+    var study = displayStudyName(fullStudy);
     var key = (name+'|'+study+'|unsched').toLowerCase();
     if (seen.has(key) || !name) return;
     seen.add(key);
