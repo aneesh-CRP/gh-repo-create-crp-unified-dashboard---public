@@ -1716,7 +1716,7 @@ const FEEDS = {
       next_unscheduled AS (
         SELECT svi.subject_key, svi.study_key, svi.study_visit_key,
           sv.name AS visit_name,
-          ROW_NUMBER() OVER (PARTITION BY svi.subject_key, svi.study_key ORDER BY sv.sort_order, sv.study_visit_key) AS rn
+          ROW_NUMBER() OVER (PARTITION BY svi.subject_key, svi.study_key ORDER BY sv.study_visit_key) AS rn
         FROM ${tbl('subject_visit')} svi
         LEFT JOIN ${tbl('study_visit')} sv ON svi.study_visit_key = sv.study_visit_key
         WHERE svi.status = 0
