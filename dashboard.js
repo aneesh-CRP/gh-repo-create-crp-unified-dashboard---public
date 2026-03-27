@@ -9114,7 +9114,7 @@ function showPrescrModal(studyName) {
 
 function showProviderLeadsModal(studyName) {
   var ref = typeof getStudyReferralPipeline === 'function' ? getStudyReferralPipeline(studyName) : null;
-  var provLeads = ref ? ref.matches.filter(function(r){ return r.tracker && r.tracker.length > 0; }) : [];
+  var provLeads = ref ? ref.referrals.filter(function(r){ return r.tracker && r.tracker.length > 0; }) : [];
   var byTracker = {};
   provLeads.forEach(function(r) {
     if (!byTracker[r.tracker]) byTracker[r.tracker] = [];
@@ -14514,7 +14514,7 @@ function renderStudiesTable() {
       <td style="padding:10px 8px;text-align:center">${siteTags}</td>
       <td style="padding:10px 6px;text-align:center">${(() => {
         var ref = typeof getStudyReferralPipeline === 'function' ? getStudyReferralPipeline(s.study) : null;
-        var provLeads = ref ? ref.matches.filter(function(r){ return r.tracker && r.tracker.length > 0; }) : [];
+        var provLeads = ref ? ref.referrals.filter(function(r){ return r.tracker && r.tracker.length > 0; }) : [];
         if (provLeads.length === 0) return '<span style="font-size:11px;color:#cbd5e1">0</span>';
         return '<span style="font-size:12px;font-weight:700;color:#7c3aed;cursor:pointer" onclick="showProviderLeadsModal(\''+jsAttr(s.study)+'\')">'+provLeads.length+'</span>';
       })()}</td>
