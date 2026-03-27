@@ -6038,7 +6038,7 @@ function renderCoordWorkloadBalance() {
   var c60ago = new Date(today); c60ago.setDate(c60ago.getDate() - 60);
   var recentCancels = (DATA.allCancels || []).filter(function(c) {
     var d = _parseDate(c.cancel_date);
-    return d && d >= c60ago;
+    return d && d >= c60ago && !_patientRecovered(c.name, c.study);
   });
 
   var coordStats = COORDS.map(function(name) {
@@ -6880,7 +6880,19 @@ function fetchActionRequiredData() {
           date: a.transition_date, changedBy: a.changed_by, source: source
         });
       });
-      _log('CRP: Subject audit loaded — ' + window._subjectAudit.length + ' transitions, ' + window._dnqReasons.length + ' DNQ reasons');
+      // Build latest status per patient+study (truth from audit trail)
+      // Used to filter out recovered patients from cancel/SF/no-show counts
+      window._latestSubjectStatus = {};
+      window._subjectAudit.forEach(function(a) {
+        var nameKey = (a.subject_name||'').toLowerCase().trim().replace(/\s+/g,' ');
+        var studyKey = (a.study_name||'').split(' - ').pop().trim().toLowerCase();
+        var key = nameKey + '|' + studyKey;
+        var date = a.transition_date || '';
+        if (!window._latestSubjectStatus[key] || date > window._latestSubjectStatus[key].date) {
+          window._latestSubjectStatus[key] = { status: a.new_status, date: date, name: a.subject_name, study: studyKey };
+        }
+      });
+      _log('CRP: Subject audit loaded — ' + window._subjectAudit.length + ' transitions, ' + window._dnqReasons.length + ' DNQ reasons, ' + Object.keys(window._latestSubjectStatus).length + ' latest statuses');
     }
 
     // Pre-screening visits + FibroScans (display in schedule, separate from visit metrics)
@@ -10016,6 +10028,28 @@ function undismissItem(itemKey) {
   buildActionSteps();
 }
 
+// ═══ PATIENT STATUS TRUTH (from audit trail) ═══
+// Terminal statuses = patient needs follow-up
+var _TERMINAL_STATUSES = {'Screen Fail':1,'Not Interested':1,'Not Eligible':1,'Discontinued':1,'No Show/Cancelled V1':1};
+// Active statuses = patient has re-engaged, no longer needs follow-up for that event
+var _ACTIVE_STATUSES = {'Screening':1,'Enrolled':1,'Scheduled V1':1,'Interested':1,'Prequalified':1,'Completed':1};
+
+// Check if a patient has recovered from a terminal status (don't count them as SF/cancel/etc)
+function _patientRecovered(name, study) {
+  if (!window._latestSubjectStatus) return false;
+  var key = (name||'').toLowerCase().trim().replace(/\s+/g,' ') + '|' + (study||'').toLowerCase().trim();
+  var latest = window._latestSubjectStatus[key];
+  if (!latest) return false;
+  return !!_ACTIVE_STATUSES[latest.status];
+}
+
+// Get latest status for a patient+study
+function _getLatestStatus(name, study) {
+  if (!window._latestSubjectStatus) return null;
+  var key = (name||'').toLowerCase().trim().replace(/\s+/g,' ') + '|' + (study||'').toLowerCase().trim();
+  return window._latestSubjectStatus[key] || null;
+}
+
 // ═══ UNIFIED FOLLOW-UP TABLE ═══
 var _fuFilter = 'all';
 var _fuActions = {}; // key → {action, notes, ts}
@@ -10107,10 +10141,17 @@ function renderFollowUpTable() {
     });
   }
 
-  addRows(DATA.allCancels, 'cancel', 'Cancel', '#dc2626');
-  addRows(DATA.noShows, 'noshow', 'No Show', '#f97316');
-  addRows(DATA.withdrawals, 'withdrew', 'Withdrew', '#8b5cf6');
-  addRows(DATA.screenFails, 'screenfail', 'Screen Fail', '#6366f1');
+  // Filter out patients who have recovered (re-engaged) per audit trail
+  function _filterRecovered(list) {
+    if (!window._latestSubjectStatus) return list || [];
+    return (list || []).filter(function(r) {
+      return !_patientRecovered(r.name || r.patient, r.study);
+    });
+  }
+  addRows(_filterRecovered(DATA.allCancels), 'cancel', 'Cancel', '#dc2626');
+  addRows(_filterRecovered(DATA.noShows), 'noshow', 'No Show', '#f97316');
+  addRows(_filterRecovered(DATA.withdrawals), 'withdrew', 'Withdrew', '#8b5cf6');
+  addRows(_filterRecovered(DATA.screenFails), 'screenfail', 'Screen Fail', '#6366f1');
   // Unscheduled
   (window._unscheduledVisits || []).forEach(function(r) {
     var name = (r.subject_name || '').trim();
@@ -11049,10 +11090,15 @@ function renderAll() {
 
   // ── Always render: Overview KPIs (lightweight text updates) ──
   var _sk = function(id,v){ var e=document.getElementById(id); if(e) e.textContent=v; };
-  _sk('kpi-cancels', DATA.cancelTotal || 0);
-  _sk('kpi-noshow', DATA.noShowTotal || 0);
-  _sk('kpi-withdrew', DATA.withdrewTotal || 0);
-  _sk('kpi-screenfail', DATA.screenFailTotal || 0);
+  // Adjust counts by excluding patients who have since recovered (per audit trail)
+  var _adjCancel = (DATA.allCancels||[]).filter(function(r){return !_patientRecovered(r.name,r.study);}).length;
+  var _adjNoShow = (DATA.noShows||[]).filter(function(r){return !_patientRecovered(r.name,r.study);}).length;
+  var _adjWithdrew = (DATA.withdrawals||[]).filter(function(r){return !_patientRecovered(r.name,r.study);}).length;
+  var _adjSF = (DATA.screenFails||[]).filter(function(r){return !_patientRecovered(r.name,r.study);}).length;
+  _sk('kpi-cancels', _adjCancel);
+  _sk('kpi-noshow', _adjNoShow);
+  _sk('kpi-withdrew', _adjWithdrew);
+  _sk('kpi-screenfail', _adjSF);
   _sk('kpi-discontinued', DATA.discontinuedTotal || 0);
   var reschEl = document.getElementById('kpi-rescheduled');
   if (reschEl) reschEl.textContent = (DATA.rescheduledVisits||[]).length;
@@ -16564,6 +16610,8 @@ function renderStudiesTable() {
     (list || []).forEach(function(r) {
       var s = (r.study || '').trim();
       if (!s) return;
+      // Skip patients who have recovered (re-engaged) per audit trail
+      if (_patientRecovered(r.name || r.patient, s)) return;
       // Study-wide total
       if (!_studyBreakdown[s]) _studyBreakdown[s] = {cancels:0, noShows:0, withdrew:0, screenFails:0, rescheduled:0};
       _studyBreakdown[s][field]++;
