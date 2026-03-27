@@ -4871,11 +4871,17 @@ function fetchActionRequiredData() {
     if (unschedRows.length > 0) {
       _log('Unscheduled visits: ' + unschedRows.length + ' active subjects need scheduling');
       // Build per-study counts
-      window._unschedByStudy = {};
+      window._unschedByStudy = {};   // keyed by short study name
+      window._unschedByStudyKey = {}; // keyed by study_key (reliable)
       unschedRows.forEach(function(r) {
         var s = (r.study_name || '').split(' - ').pop().trim();
         if (!window._unschedByStudy[s]) window._unschedByStudy[s] = [];
         window._unschedByStudy[s].push(r);
+        var sk = r.study_key || '';
+        if (sk) {
+          if (!window._unschedByStudyKey[sk]) window._unschedByStudyKey[sk] = [];
+          window._unschedByStudyKey[sk].push(r);
+        }
       });
       // Update overview KPI
       var kpiEl = document.getElementById('kpi-unsched');
@@ -14149,7 +14155,22 @@ function renderStudiesTable() {
   _incBreakdown(DATA.screenFails, 'screenFails');
   _incBreakdown(DATA.rescheduledVisits, 'rescheduled');
 
+  // Populate therapeutic area dropdown
+  var taSelect = document.getElementById('ta-filter');
+  if (taSelect && taSelect.options.length <= 1) {
+    var taSet = new Set();
+    (DATA.mergedStudies || []).forEach(function(s) { if (s.therapeutic_area) taSet.add(s.therapeutic_area); });
+    [...taSet].sort().forEach(function(ta) {
+      var opt = document.createElement('option');
+      opt.value = ta; opt.textContent = ta;
+      taSelect.appendChild(opt);
+    });
+  }
+  var _taFilter = taSelect ? taSelect.value : '';
+
   const studies = (DATA.mergedStudies || []).filter(s => {
+    // Therapeutic area filter (applied on top of status filter)
+    if (_taFilter && s.therapeutic_area !== _taFilter) return false;
     if (_studyFilter === 'all') return true;
     if (_studyFilter === 'critical') return s.risk_level === 'critical';
     if (_studyFilter === 'high') return s.risk_level === 'high';
@@ -14301,20 +14322,28 @@ function renderStudiesTable() {
     // Total leads — only relevant for enrolling studies
     const totalCell = isEnrolling ? buildTotalLeadsCell(s.study, safeStudy) : '<span style="color:#cbd5e1">—</span>';
 
-    return `<tr style="border-bottom:1px solid var(--border);transition:background .1s" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
+    // Combined cancel + withdrawal count
+    var _cancelWd = _bd.cancels + _bd.withdrew;
+
+    // Unscheduled lookup
+    var _unschedList = (window._unschedByStudyKey || {})[s.crio_study_key] || (window._unschedByStudy || {})[s.study] || [];
+    var _unschedCell = _unschedList.length > 0
+      ? '<span style="font-size:12px;font-weight:700;color:#c2410c;cursor:pointer" onclick="showUnscheduledModal(\''+jsAttr(s.study)+'\')">' + _unschedList.length + '</span>'
+      : '<span style="font-size:11px;color:#cbd5e1">0</span>';
+
+    return `<tr style="border-bottom:1px solid var(--border);transition:background .1s" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''" data-ta="${escapeHTML(s.therapeutic_area||'')}">
       <td style="padding:10px 12px;min-width:160px">${studyCell}${diversityBadge}${alertTags}</td>
       <td style="padding:10px 8px;text-align:center"><span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:${_sbBg};color:${_sbFg}">${_sb||'—'}</span></td>
       <td style="padding:10px 8px;text-align:center">${riskScoreCell}</td>
-      <td style="padding:10px 6px;text-align:center">${_countCell(_bd.cancels, '#dc2626', 'cancel')}</td>
+      <td style="padding:10px 6px;text-align:center">${_cancelWd > 0 ? '<span style="font-size:12px;font-weight:700;color:#dc2626;cursor:pointer" data-action="studyCategoryClick" data-study="'+escapeHTML(s.study)+'" data-cat="cancel">'+_cancelWd+'</span>' : '<span style="font-size:11px;color:#cbd5e1">0</span>'}</td>
       <td style="padding:10px 6px;text-align:center">${_countCell(_bd.noShows, '#f97316', 'noshow')}</td>
-      <td style="padding:10px 6px;text-align:center">${_countCell(_bd.withdrew, '#8b5cf6', 'withdrew')}</td>
       <td style="padding:10px 6px;text-align:center">${_countCell(_bd.screenFails, '#ef4444', 'screenfail')}</td>
       <td style="padding:10px 6px;text-align:center">${_countCell(_bd.rescheduled, '#06b6d4', 'rescheduled')}</td>
       <td style="padding:10px 8px;text-align:center">${upcomingCell}</td>
+      <td style="padding:10px 6px;text-align:center">${_unschedCell}</td>
       <td style="padding:10px 8px;min-width:140px">${enrollCell}</td>
       <td style="padding:10px 8px;text-align:center;font-size:11px;color:var(--muted)">${s.screened||0}</td>
       <td style="padding:10px 8px;text-align:center;font-size:11px;color:${s.screening>0?'#7c3aed':'var(--muted)'};font-weight:${s.screening>0?'700':'400'}">${s.screening||0}</td>
-      <td style="padding:10px 6px;text-align:center">${(() => { var u = (window._unschedByStudy || {})[s.study] || []; return u.length > 0 ? '<span style="font-size:12px;font-weight:700;color:#c2410c;cursor:pointer" onclick="showUnscheduledModal(\''+jsAttr(s.study)+'\')">' + u.length + '</span>' : '<span style="font-size:11px;color:#cbd5e1">0</span>'; })()}</td>
       <td style="padding:10px 8px;text-align:center">${siteTags}</td>
       <td style="padding:10px 8px;text-align:center">${totalCell}</td>
     </tr>`;
@@ -14334,10 +14363,15 @@ function renderStudiesTable() {
       else if (action === 'studyUpcoming') showUpcoming(function(r){ return r.study === study; }, study + ' — Upcoming Visits');
       else if (action === 'studyCategoryClick') {
         var cat = el.dataset.cat;
-        var catLabels = {cancel:'Cancellations', noshow:'No-Shows', withdrew:'Withdrawals', screenfail:'Screen Fails', rescheduled:'Rescheduled'};
+        var catLabels = {cancel:'Cancellations & Withdrawals', noshow:'No-Shows', withdrew:'Withdrawals', screenfail:'Screen Fails', rescheduled:'Rescheduled'};
         var catDataMap = {cancel:'allCancels', noshow:'noShows', withdrew:'withdrawals', screenfail:'screenFails', rescheduled:'rescheduledVisits'};
         var dataKey = catDataMap[cat] || 'allCancels';
         var list = (DATA[dataKey] || []).filter(function(r){ return (r.study||'').trim() === study; });
+        // For cancel column, also include withdrawals
+        if (cat === 'cancel') {
+          var wdList = (DATA.withdrawals || []).filter(function(r){ return (r.study||'').trim() === study; });
+          list = list.concat(wdList);
+        }
         var h = '<table class="detail-table"><thead><tr><th>Patient</th><th>Date</th><th>Visit</th><th>Reason</th></tr></thead><tbody>';
         list.forEach(function(r) {
           var pUrl = r.url || (typeof window._crioPatientUrl === 'function' ? window._crioPatientUrl(r.study_key, r.subject_key, r.site) : null);

@@ -1400,6 +1400,9 @@ body {
       <button data-filter="behind" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Behind Goal</button>
       <button data-filter="phl" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">PHL</button>
       <button data-filter="pnj" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">PNJ</button>
+      <select id="ta-filter" onchange="filterStudiesFromKPI(_studyFilter)" style="padding:4px 8px;border-radius:6px;font-size:11px;border:1px solid var(--border);color:var(--muted);background:var(--surface);cursor:pointer">
+        <option value="">All Therapeutic Areas</option>
+      </select>
   </div>
 
   <!-- Studies table -->
@@ -1411,16 +1414,15 @@ body {
             <th style="padding:10px 12px;text-align:left;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;" onclick="sortMergedTable(this,0)">Study ↕</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;" onclick="sortMergedTable(this,1)">Status ↕</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;" onclick="sortMergedTable(this,2)">Risk ↕</th>
-            <th style="padding:10px 6px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;font-size:11px" onclick="sortMergedTable(this,3)">Cancel ↕</th>
+            <th style="padding:10px 6px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;font-size:11px" onclick="sortMergedTable(this,3)">Cancel/WD ↕</th>
             <th style="padding:10px 6px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;font-size:11px">No-Show</th>
-            <th style="padding:10px 6px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;font-size:11px">Withdrew</th>
             <th style="padding:10px 6px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;font-size:11px">SF</th>
             <th style="padding:10px 6px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;font-size:11px">Resched</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;" onclick="sortMergedTable(this,4)">Upcoming ↕</th>
+            <th style="padding:10px 6px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;font-size:11px">Not Sched</th>
             <th style="padding:10px 8px;text-align:left;font-weight:700;color:var(--text);white-space:nowrap;">Enrollment</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;" onclick="sortMergedTable(this,6)">Screened ↕</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;" onclick="sortMergedTable(this,7)">In Screen ↕</th>
-            <th style="padding:10px 6px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;font-size:11px">Not Sched</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Site</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Leads</th>
           </tr>
