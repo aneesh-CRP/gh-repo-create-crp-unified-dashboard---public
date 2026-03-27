@@ -1775,7 +1775,7 @@ const REFERRAL_LISTS = [
   { id: '901414585313', name: 'SkinSmart Dermatology', source_type: 'physician' },
   { id: '901414585319', name: 'Princeton Dermatology', source_type: 'physician' },
   { id: '901414585325', name: 'Aura Derm', source_type: 'physician' },
-  { id: '901413613356', name: 'Connolly Dermatology', source_type: 'physician' },
+  { id: '901414926366', name: 'Tri-County Rheumatology', source_type: 'physician' },
 ];
 const CAMPAIGN_LIST_ID = '901407896291';
 const MED_RECORDS_FOLDER_ID = '90147290121';
@@ -2132,7 +2132,7 @@ const PROVIDER_TRACKER_LISTS = [
   { id: '901414585313', name: 'SkinSmart Dermatology' },
   { id: '901414585319', name: 'Princeton Dermatology' },
   { id: '901414585325', name: 'Aura Derm' },
-  { id: '901413613356', name: 'Connolly Dermatology' },
+  { id: '901414926366', name: 'Tri-County Rheumatology' },
 ];
 async function fetchProviderTrackers() {
   const allRows = [];
