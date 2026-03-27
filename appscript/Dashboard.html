@@ -1069,7 +1069,7 @@ body {
   </div>
   <div class="nav-right" style="margin-left:auto;gap:4px;">
     <span class="data-badge" id="last-refresh-badge" style="font-size:10px;padding:2px 6px;">Loading...</span>
-    <button id="theme-toggle-btn" onclick="toggleDarkMode()" title="Toggle dark mode" style="padding:2px 6px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;font-size:12px;cursor:pointer;line-height:1;">🌙</button>
+    <button id="theme-toggle-btn" onclick="toggleDarkMode()" title="Toggle dark mode" style="padding:2px 6px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;font-size:12px;cursor:pointer;line-height:1;"></button>
     <button id="phi-toggle-btn" onclick="togglePHIMask()" title="Click to reveal patient names" style="padding:2px 6px;background:#059669;color:white;border:none;border-radius:4px;font-size:9px;font-weight:600;cursor:pointer;">&#x1f512; PHI</button>
     <button id="dh-toggle-btn" onclick="toggleHealthStrip()" title="Data health status" style="padding:2px 6px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;font-size:9px;font-weight:600;cursor:pointer;color:var(--muted);display:none;">Health</button>
     <button class="refresh-btn" id="refresh-btn" onclick="manualRefresh()" style="padding:2px 8px;font-size:10px;">↻</button>
@@ -1133,7 +1133,7 @@ body {
     </div>
     <div class="tb-divider"></div>
     <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showUpcoming(r=>!r.site.includes('Penn'),'Philadelphia Visits')">
-      <div class="tb-label">🏙 Philadelphia</div>
+      <div class="tb-label">Philadelphia</div>
       <div class="tb-value blue" id="sched-kpi-philly">0</div>
       <div class="tb-sub">PHL visits</div>
     </div>
@@ -1145,13 +1145,13 @@ body {
     </div>
     <div class="tb-divider"></div>
     <div class="tb-section kpi-clickable" style="cursor:pointer" id="sched-kpi-month1-section" onclick="showUpcoming(r=>r.date_iso&&r.date_iso.startsWith(window._schedMonth1Prefix||''),'This Month Visits')">
-      <div class="tb-label" id="sched-kpi-month1-label">📅 Month</div>
+      <div class="tb-label" id="sched-kpi-month1-label">Month</div>
       <div class="tb-value" style="color:var(--purple)" id="sched-kpi-march">0</div>
       <div class="tb-sub">Visits this month</div>
     </div>
     <div class="tb-divider"></div>
     <div class="tb-section kpi-clickable" style="cursor:pointer" id="sched-kpi-month2-section" onclick="showUpcoming(r=>r.date_iso&&r.date_iso.startsWith(window._schedMonth2Prefix||''),'Next Month Visits')">
-      <div class="tb-label" id="sched-kpi-month2-label">📅 Month</div>
+      <div class="tb-label" id="sched-kpi-month2-label">Month</div>
       <div class="tb-value" style="color:var(--yellow)" id="sched-kpi-april">0</div>
       <div class="tb-sub">Visits next month</div>
     </div>
@@ -1632,7 +1632,7 @@ body {
   </div>
 
   <!-- 1. URGENT: At-Risk Patients -->
-  <div class="section-title" style="margin-bottom:10px;">🚨 At-Risk Patients — Immediate Action Required</div>
+  <div class="section-title" style="margin-bottom:10px;">At-Risk Patients — Immediate Action Required</div>
   <div class="time-banner fade-in" style="margin-bottom:16px;">
     <div class="tb-section">
       <div class="tb-label">At-Risk Patients</div>
@@ -1661,7 +1661,7 @@ body {
   </div>
 
   <!-- 2. CRIO RECRUITMENT INTELLIGENCE -->
-  <div class="section-title" style="margin-top:16px;margin-bottom:10px;">🔬 CRIO Recruitment Intelligence</div>
+  <div class="section-title" style="margin-top:16px;margin-bottom:10px;">CRIO Recruitment Intelligence</div>
   <div class="card fade-in" style="margin-bottom:16px;">
     <div class="card-header">
       <span class="card-title">Win-Backs, Scheduling Gaps & Enrollment Alerts</span>
@@ -1674,7 +1674,7 @@ body {
   </div>
 
   <!-- 3. OPERATIONAL FLAGS -->
-  <div class="section-title" style="margin-top:16px;margin-bottom:10px;">🔍 Operational Flags</div>
+  <div class="section-title" style="margin-top:16px;margin-bottom:10px;">Operational Flags</div>
   <div class="grid-2 mb16 fade-in">
     <div class="card">
       <div class="card-header"><span class="card-title">Flags Requiring Action</span></div>
@@ -1696,7 +1696,7 @@ body {
     </div>
     <div>
       <div class="card">
-        <div class="card-header"><span class="card-title">🚫 Studies Needing Attention</span></div>
+        <div class="card-header"><span class="card-title">Studies Needing Attention</span></div>
         <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Studies with no upcoming visits or stalled enrollment</div>
         <div id="dormant-list"></div>
       </div>
@@ -1814,13 +1814,13 @@ body {
   <!-- Header banner -->
   <div class="time-banner fade-in" style="margin-bottom:16px;">
     <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showTrendsSummary()" title="Click to see trends summary">
-      <div class="tb-label">📅 Data Snapshots</div>
+      <div class="tb-label">Data Snapshots</div>
       <div class="tb-value blue" id="trends-snapshot-count">—</div>
       <div class="tb-sub">Weeks of data</div>
     </div>
     <div class="tb-divider"></div>
     <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showCancels(null,'All Recent Cancellations')" title="Click to see cancel rate details">
-      <div class="tb-label">📉 Cancel Rate Trend</div>
+      <div class="tb-label">Cancel Rate Trend</div>
       <div class="tb-value" id="trends-rate-dir" style="color:var(--green)">—</div>
       <div class="tb-sub" id="trends-rate-sub">vs. 4 weeks ago</div>
     </div>
@@ -1847,7 +1847,7 @@ body {
 
   <!-- No data message (shown before live data loads) -->
   <div id="trends-no-data-msg" class="card fade-in" style="text-align:center;padding:40px 24px;">
-    <div style="font-size:36px;margin-bottom:12px;">📈</div>
+    <div style="font-size:36px;margin-bottom:12px;"></div>
     <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px;">Loading trends data...</div>
     <div style="font-size:13px;color:var(--muted);max-width:500px;margin:0 auto 20px;">
       Trends will appear automatically once live data loads from Google Sheets.
@@ -1862,7 +1862,7 @@ body {
     <div class="grid-2 mb16 fade-in">
       <div class="card">
         <div class="card-header">
-          <span class="card-title">📉 Cancellations & Rate</span>
+          <span class="card-title">Cancellations & Rate</span>
           <span class="badge badge-gray">Bars = volume · Line = rate %</span>
         </div>
         <div class="chart-wrap h220">
@@ -1960,7 +1960,7 @@ body {
     </div>
     <div class="connect-form">
       <input class="connect-input" id="url1-connect" value="https://docs.google.com/spreadsheets/d/e/2PACX-1vRUXJxTDsr5IRByMfuLF0P3hVq_QuEw6M1MPNDwd1CaV2UZ9tnFflUwsmUKAd3xeX3_esn0c4YlrV0q/pub?gid=0&single=true&output=csv" placeholder="Upcoming Appointments — Published CSV URL">
-      <input class="connect-input" id="url2-connect" value="https://docs.google.com/spreadsheets/d/e/2PACX-1vRUXJxTDsr5IRByMfuLF0P3hVq_QuEw6M1MPNDwd1CaV2UZ9tnFflUwsmUKAd3xeX3_esn0c4YlrV0q/pub?gid=1487298034&single=true&output=csv" placeholder="🚫 No-Show & Canceled — Published CSV URL">
+      <input class="connect-input" id="url2-connect" value="https://docs.google.com/spreadsheets/d/e/2PACX-1vRUXJxTDsr5IRByMfuLF0P3hVq_QuEw6M1MPNDwd1CaV2UZ9tnFflUwsmUKAd3xeX3_esn0c4YlrV0q/pub?gid=1487298034&single=true&output=csv" placeholder="No-Show & Canceled — Published CSV URL">
       <button class="btn btn-primary" style="padding: 10px 20px;" onclick="connectFromGuide()">Connect Now</button>
     </div>
   </div>
@@ -1970,21 +1970,21 @@ body {
       <div class="card-header"><span class="card-title">How Auto-Refresh Works</span></div>
       <div class="insight-list">
         <div class="insight-item info">
-          <span class="insight-icon">📅</span>
+          <span class="insight-icon"></span>
           <div>
             <div class="insight-title">Daily at 6am: CTMS → Google Sheets</div>
             <div class="insight-body">Your Apps Script trigger re-pulls the latest data from your CTMS into the Google Sheet. New appointments and cancellations from the previous day will appear.</div>
           </div>
         </div>
         <div class="insight-item info">
-          <span class="insight-icon">🌐</span>
+          <span class="insight-icon"></span>
           <div>
             <div class="insight-title">When You Open This Dashboard: Sheets → Dashboard</div>
             <div class="insight-body">Every time you open this HTML file in your browser, it fetches the latest CSV from Google Sheets automatically. No manual steps needed.</div>
           </div>
         </div>
         <div class="insight-item positive">
-          <span class="insight-icon">✅</span>
+          <span class="insight-icon"></span>
           <div>
             <div class="insight-title">Zero Maintenance Once Connected</div>
             <div class="insight-body">After the initial setup (~10 minutes), the entire pipeline is automatic. Open the dashboard each morning and you'll see yesterday's data already loaded.</div>
@@ -1996,14 +1996,14 @@ body {
       <div class="card-header"><span class="card-title">Troubleshooting</span></div>
       <div class="insight-list">
         <div class="insight-item warning">
-          <span class="insight-icon">⚠️</span>
+          <span class="insight-icon"></span>
           <div>
             <div class="insight-title">"Failed to load data" error</div>
             <div class="insight-body">Make sure you used <strong>File → Share → Publish to web</strong> (not just "Share link"). The sheet must be publicly published for the CSV URL to work.</div>
           </div>
         </div>
         <div class="insight-item warning">
-          <span class="insight-icon">⚠️</span>
+          <span class="insight-icon"></span>
           <div>
             <div class="insight-title">Data looks outdated</div>
             <div class="insight-body">Check that the Google Sheet is still being updated. The BQ Cloud Function refreshes every time it's called, but the Sheets CSV feed depends on the Apps Script sync running on schedule.</div>

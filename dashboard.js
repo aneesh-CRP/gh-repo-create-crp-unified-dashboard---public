@@ -1239,7 +1239,7 @@ function renderUnpaidApAging() {
   let warningHtml = '';
   if (pct121 >= 80) {
     warningHtml = '<div style="background:#FEF3C7;border:1px solid #F59E0B;border-radius:8px;padding:12px 16px;margin-bottom:12px;display:flex;align-items:center;gap:10px;">' +
-      '<span style="font-size:18px;">⚠️</span>' +
+      '<span style="font-size:18px;"></span>' +
       '<div><div style="font-weight:700;font-size:12px;color:#92400E;">Data Quality Flag: ' + pct121 + '% of unpaid autopay is in the 121+ day bucket</div>' +
       '<div style="font-size:11px;color:#B45309;margin-top:2px;">This may indicate stale data or a batch processing delay. Verify autopay payment records are current in the Master Sheet.</div></div></div>';
   }
@@ -2201,7 +2201,7 @@ function renderInsights() {
 
     const PLAYBOOK = {
       'No Show': {
-        icon: '🚫', color: '#DC2626', bg: '#FEF2F2', border: '#FECACA',
+        icon: '', color: '#DC2626', bg: '#FEF2F2', border: '#FECACA',
         impact: 'Lost visit revenue, wasted coordinator time, disrupts study timelines',
         nextSteps: [
           'Call patient within 2 hours of missed appointment — document attempt in CRIO',
@@ -2212,7 +2212,7 @@ function renderInsights() {
         ]
       },
       'Screen Fail / DNQ': {
-        icon: '🔍', color: '#C2410C', bg: '#FFF7ED', border: '#FED7AA',
+        icon: '', color: '#C2410C', bg: '#FFF7ED', border: '#FED7AA',
         impact: 'Wasted screening resources, indicates pre-screening gaps',
         nextSteps: [
           'Review the pre-screening checklist for each study with screen fails',
@@ -2223,7 +2223,7 @@ function renderInsights() {
         ]
       },
       'Screen Fail/DNQ': {
-        icon: '🔍', color: '#C2410C', bg: '#FFF7ED', border: '#FED7AA',
+        icon: '', color: '#C2410C', bg: '#FFF7ED', border: '#FED7AA',
         impact: 'Wasted screening resources, indicates pre-screening gaps',
         nextSteps: [
           'Review the pre-screening checklist for each study with screen fails',
@@ -2234,7 +2234,7 @@ function renderInsights() {
         ]
       },
       'Patient Withdrew': {
-        icon: '🚪', color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE',
+        icon: '', color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE',
         impact: 'Permanent loss of enrolled patient, impacts enrollment targets',
         nextSteps: [
           'Conduct exit interview within 48hrs — understand root cause (comfort, travel, compensation)',
@@ -2245,7 +2245,7 @@ function renderInsights() {
         ]
       },
       'Weather': {
-        icon: '🌧️', color: '#0369A1', bg: '#F0F9FF', border: '#BAE6FD',
+        icon: '', color: '#0369A1', bg: '#F0F9FF', border: '#BAE6FD',
         impact: 'Temporary disruption, patients generally willing to reschedule',
         nextSteps: [
           'Proactively reschedule within 48hrs of weather event',
@@ -2255,7 +2255,7 @@ function renderInsights() {
         ]
       },
       'Not Documented': {
-        icon: '📝', color: '#92400E', bg: '#FEF3C7', border: '#FDE68A',
+        icon: '', color: '#92400E', bg: '#FEF3C7', border: '#FDE68A',
         impact: 'Cannot analyze root cause, skews all reporting and risk scoring',
         nextSteps: [
           'URGENT: Each coordinator must log into CRIO and add the cancellation reason today',
@@ -2265,7 +2265,7 @@ function renderInsights() {
         ]
       },
       'Other': {
-        icon: '📋', color: '#475569', bg: '#F8FAFC', border: '#E2E8F0',
+        icon: '', color: '#475569', bg: '#F8FAFC', border: '#E2E8F0',
         impact: 'Unclassified — may contain patterns worth isolating',
         nextSteps: [
           'Review all "Other" cancellations monthly to identify emerging patterns',
@@ -2275,7 +2275,7 @@ function renderInsights() {
         ]
       },
       'Discontinued': {
-        icon: '⏹️', color: '#991B1B', bg: '#FEF2F2', border: '#FECACA',
+        icon: '⏹', color: '#991B1B', bg: '#FEF2F2', border: '#FECACA',
         impact: 'Patient permanently removed from study per protocol or medical decision',
         nextSteps: [
           'Verify discontinuation was per protocol criteria and properly documented',
@@ -2285,7 +2285,7 @@ function renderInsights() {
         ]
       },
       'No Response': {
-        icon: '📵', color: '#B45309', bg: '#FFFBEB', border: '#FDE68A',
+        icon: '', color: '#B45309', bg: '#FFFBEB', border: '#FDE68A',
         impact: 'Patient engagement lost — at risk of becoming a no-show or withdrawal',
         nextSteps: [
           'Attempt contact via all available channels (phone, text, email, alternate contact)',
@@ -2456,7 +2456,7 @@ function renderInsights() {
     if (zeroCollStudies.length) {
       actions.push({
         priority: 1,
-        html: '<div style="display:flex;gap:12px;align-items:flex-start;padding:14px;background:#FEF2F2;border-radius:10px;border-left:4px solid #EF4444">'+icon('🚨','#FEE2E2')+'<div><div style="font-weight:700;font-size:13px;color:#991B1B">URGENT: '+zeroCollStudies.length+' studies with $0 collections</div><div style="font-size:12px;color:#6B7280;margin-top:4px">'+zeroCollStudies.map(s=>'<span style="cursor:pointer;text-decoration:underline" onclick="showStudyModal(\''+jsAttr(s.study)+'\')">'+escapeHTML(s.study.split(' - ').pop())+'</span>').join(', ')+'</div><div style="font-size:12px;font-weight:600;color:#DC2626;margin-top:6px">→ Contact sponsor billing for each study this week. Verify invoice delivery.</div></div></div>'
+        html: '<div style="display:flex;gap:12px;align-items:flex-start;padding:14px;background:#FEF2F2;border-radius:10px;border-left:4px solid #EF4444">'+icon('','#FEE2E2')+'<div><div style="font-weight:700;font-size:13px;color:#991B1B">URGENT: '+zeroCollStudies.length+' studies with $0 collections</div><div style="font-size:12px;color:#6B7280;margin-top:4px">'+zeroCollStudies.map(s=>'<span style="cursor:pointer;text-decoration:underline" onclick="showStudyModal(\''+jsAttr(s.study)+'\')">'+escapeHTML(s.study.split(' - ').pop())+'</span>').join(', ')+'</div><div style="font-size:12px;font-weight:600;color:#DC2626;margin-top:6px">→ Contact sponsor billing for each study this week. Verify invoice delivery.</div></div></div>'
       });
     }
 
@@ -2480,7 +2480,7 @@ function renderInsights() {
       if (urgent.length) {
         actions.push({
           priority: 1,
-          html: '<div style="display:flex;gap:12px;align-items:flex-start;padding:14px;background:#FEF2F2;border-radius:10px;border-left:4px solid #EF4444">'+icon('📞','#FEE2E2')+'<div><div style="font-weight:700;font-size:13px;color:#991B1B">'+urgent.length+' at-risk patients with visits in next 14 days</div><div style="font-size:12px;color:#6B7280;margin-top:4px">'+urgent.map(r=>escapeHTML(r.patient||'Patient')).join(', ')+'</div><div style="font-size:12px;font-weight:600;color:#DC2626;margin-top:6px">→ Personal calls within 48 hours. Confirm attendance and address concerns. Document in CTMS.</div></div></div>'
+          html: '<div style="display:flex;gap:12px;align-items:flex-start;padding:14px;background:#FEF2F2;border-radius:10px;border-left:4px solid #EF4444">'+icon('','#FEE2E2')+'<div><div style="font-weight:700;font-size:13px;color:#991B1B">'+urgent.length+' at-risk patients with visits in next 14 days</div><div style="font-size:12px;color:#6B7280;margin-top:4px">'+urgent.map(r=>escapeHTML(r.patient||'Patient')).join(', ')+'</div><div style="font-size:12px;font-weight:600;color:#DC2626;margin-top:6px">→ Personal calls within 48 hours. Confirm attendance and address concerns. Document in CTMS.</div></div></div>'
         });
       }
     }
@@ -2490,7 +2490,7 @@ function renderInsights() {
     if (highCancel.length) {
       actions.push({
         priority: 3,
-        html: '<div style="display:flex;gap:12px;align-items:flex-start;padding:14px;background:#EFF6FF;border-radius:10px;border-left:4px solid #3B82F6">'+icon('📊','#DBEAFE')+'<div><div style="font-weight:700;font-size:13px;color:#1E40AF">'+highCancel.length+' studies with 10+ cancellations need retention review</div><div style="font-size:12px;color:#6B7280;margin-top:4px">'+highCancel.slice(0,5).map(s=>s.code+' ('+s.cancels+' cancels)').join(', ')+'</div><div style="font-size:12px;font-weight:600;color:#2563EB;margin-top:6px">→ Schedule root cause analysis meeting. Review coordinator assignments and patient communication protocols.</div></div></div>'
+        html: '<div style="display:flex;gap:12px;align-items:flex-start;padding:14px;background:#EFF6FF;border-radius:10px;border-left:4px solid #3B82F6">'+icon('','#DBEAFE')+'<div><div style="font-weight:700;font-size:13px;color:#1E40AF">'+highCancel.length+' studies with 10+ cancellations need retention review</div><div style="font-size:12px;color:#6B7280;margin-top:4px">'+highCancel.slice(0,5).map(s=>s.code+' ('+s.cancels+' cancels)').join(', ')+'</div><div style="font-size:12px;font-weight:600;color:#2563EB;margin-top:6px">→ Schedule root cause analysis meeting. Review coordinator assignments and patient communication protocols.</div></div></div>'
       });
     }
 
@@ -2498,7 +2498,7 @@ function renderInsights() {
     if (parseInt(efficiency) < 70) {
       actions.push({
         priority: 2,
-        html: '<div style="display:flex;gap:12px;align-items:flex-start;padding:14px;background:#FEF3C7;border-radius:10px;border-left:4px solid #F59E0B">'+icon('💰','#FEF3C7')+'<div><div style="font-weight:700;font-size:13px;color:#92400E">Collection efficiency at '+efficiency+'% — below 70% target</div><div style="font-size:12px;color:#6B7280;margin-top:4px">Gap: $'+fmt(totalBilled * 0.7 - totalCollected)+' needed to reach target</div><div style="font-size:12px;font-weight:600;color:#D97706;margin-top:6px">→ Prioritize top 5 studies by AR balance. Send payment reminders for invoices 60+ days.</div></div></div>'
+        html: '<div style="display:flex;gap:12px;align-items:flex-start;padding:14px;background:#FEF3C7;border-radius:10px;border-left:4px solid #F59E0B">'+icon('','#FEF3C7')+'<div><div style="font-weight:700;font-size:13px;color:#92400E">Collection efficiency at '+efficiency+'% — below 70% target</div><div style="font-size:12px;color:#6B7280;margin-top:4px">Gap: $'+fmt(totalBilled * 0.7 - totalCollected)+' needed to reach target</div><div style="font-size:12px;font-weight:600;color:#D97706;margin-top:6px">→ Prioritize top 5 studies by AR balance. Send payment reminders for invoices 60+ days.</div></div></div>'
       });
     }
 
@@ -2507,7 +2507,7 @@ function renderInsights() {
     if (enrolling.length >= 10) {
       actions.push({
         priority: 5,
-        html: '<div style="display:flex;gap:12px;align-items:flex-start;padding:14px;background:#F0FDF4;border-radius:10px;border-left:4px solid #10B981">'+icon('✅','#D1FAE5')+'<div><div style="font-weight:700;font-size:13px;color:#065F46">'+enrolling.length+' studies actively enrolling — strong pipeline</div><div style="font-size:12px;color:#6B7280;margin-top:4px">Total enrolled: '+enrolling.reduce((s,r)=>s+r.enrolled,0)+' patients across active studies</div><div style="font-size:12px;font-weight:600;color:#059669;margin-top:6px">→ Maintain momentum. Ensure coordinator capacity matches enrollment demand.</div></div></div>'
+        html: '<div style="display:flex;gap:12px;align-items:flex-start;padding:14px;background:#F0FDF4;border-radius:10px;border-left:4px solid #10B981">'+icon('','#D1FAE5')+'<div><div style="font-weight:700;font-size:13px;color:#065F46">'+enrolling.length+' studies actively enrolling — strong pipeline</div><div style="font-size:12px;color:#6B7280;margin-top:4px">Total enrolled: '+enrolling.reduce((s,r)=>s+r.enrolled,0)+' patients across active studies</div><div style="font-size:12px;font-weight:600;color:#059669;margin-top:6px">→ Maintain momentum. Ensure coordinator capacity matches enrollment demand.</div></div></div>'
       });
     }
 
@@ -4988,7 +4988,7 @@ function showActionModal(type) {
           '<td><span style="font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px;background:' + (r.status==='Assigned'?'#fef2f2':'#fffbeb') + ';color:' + (r.status==='Assigned'?'#dc2626':'#d97706') + '">' + escapeHTML(r.status||'') + '</span></td>' +
           '<td style="font-size:11px">' + escapeHTML(r.version||'') + '</td>' +
           '<td style="font-size:11px">' + escapeHTML(r.effective_date||'—') + '</td>' +
-          '<td style="font-size:11px;color:' + (isExpired?'#dc2626':'') + '">' + escapeHTML(r.expiration_date||'—') + (isExpired?' ⚠':'') + '</td>' +
+          '<td style="font-size:11px;color:' + (isExpired?'#dc2626':'') + '">' + escapeHTML(r.expiration_date||'—') + (isExpired?' ':'') + '</td>' +
           '<td style="font-size:11px">' + escapeHTML(r.uploaded_by||'') + '</td></tr>';
       }).join('') + '</tbody></table>';
   }
@@ -5012,7 +5012,7 @@ function buildInsights() {
   if (flags.length > 0) {
     const sevDetail = [critical ? critical + ' critical' : '', high ? high + ' high' : ''].filter(Boolean).join(', ');
     flagItems.push({ urgent: critical > 0, html: `<div class="insight-item ${critical > 0 ? 'danger' : 'warning'}" style="cursor:pointer" onclick="switchTab('actions')">
-      <span class="insight-icon">${critical > 0 ? '🔴' : '⚠️'}</span><div>
+      <span class="insight-icon">${critical > 0 ? '' : ''}</span><div>
         <div class="insight-title">${flags.length} at-risk patient${flags.length>1?'s':''} with upcoming visits${sevDetail ? ' — ' + sevDetail : ''}</div>
         <div class="insight-desc">View details in <strong>Actions tab</strong></div>
       </div></div>` });
@@ -5022,7 +5022,7 @@ function buildInsights() {
   const highCancelStudies = cancels.filter(c => c.count >= 15);
   if (highCancelStudies.length > 0) {
     flagItems.push({ urgent: false, html: `<div class="insight-item warning">
-      <span class="insight-icon">📉</span><div>
+      <span class="insight-icon"></span><div>
         <div class="insight-title">${highCancelStudies.length} stud${highCancelStudies.length>1?'ies':'y'} with high cancellation volume</div>
         <div class="insight-desc">${highCancelStudies.slice(0,3).map(c => '<strong>' + escapeHTML(c.name) + '</strong> (' + c.count + ')').join(', ')}${highCancelStudies.length > 3 ? ' +' + (highCancelStudies.length-3) + ' more' : ''}</div>
       </div></div>` });
@@ -5036,7 +5036,7 @@ function buildInsights() {
   const totalActions = undocCount + nsCount + rpCount;
   if (totalActions > 0) {
     flagItems.push({ urgent: false, html: `<div class="insight-item warning" style="cursor:pointer" onclick="switchTab('actions')">
-      <span class="insight-icon">📋</span><div>
+      <span class="insight-icon"></span><div>
         <div class="insight-title">${totalActions} open action items in the pipeline</div>
         <div class="insight-desc">${[undocCount?undocCount+' undocumented':'', nsCount?nsCount+' no-show follow-ups':'', rpCount?rpCount+' pending reschedules':''].filter(Boolean).join(' · ')} — see <strong>Actions tab</strong></div>
       </div></div>` });
@@ -5048,7 +5048,7 @@ function buildInsights() {
   if (refsNoMR.length > 0 || readyNV.length > 0) {
     const parts = [refsNoMR.length ? refsNoMR.length + ' referrals missing records' : '', readyNV.length ? readyNV.length + ' ready but unscheduled' : ''].filter(Boolean);
     flagItems.push({ urgent: readyNV.length >= 3, html: `<div class="insight-item ${readyNV.length >= 3 ? 'danger' : 'warning'}" style="cursor:pointer" onclick="switchTab('actions')">
-      <span class="insight-icon">📋</span><div>
+      <span class="insight-icon"></span><div>
         <div class="insight-title">Medical records pipeline needs attention</div>
         <div class="insight-desc">${parts.join(' · ')} — see <strong>Actions tab</strong></div>
       </div></div>` });
@@ -5080,7 +5080,7 @@ function buildInsights() {
     var breakdown = statusEntries.slice(0,4).map(function(e) {
       return '<span style="font-size:10px;display:inline-block;margin-right:8px;"><b>' + e.count + '</b> ' + e.status + ' (' + Math.round(e.count/totalCx*100) + '%)</span>';
     }).join('');
-    flagItems.push({ urgent: false, html: `<div class="insight-item info"><span class="insight-icon">📊</span><div>
+    flagItems.push({ urgent: false, html: `<div class="insight-item info"><span class="insight-icon"></span><div>
       <div class="insight-title">Cancellation breakdown by enrollment stage</div>
       <div class="insight-desc">${breakdown}</div>
     </div></div>` });
@@ -5088,7 +5088,7 @@ function buildInsights() {
 
   flagItems.sort((a, b) => (b.urgent ? 1 : 0) - (a.urgent ? 1 : 0));
   flagEl.innerHTML = flagItems.length > 0 ? flagItems.map(f => f.html).join('') :
-    '<div class="insight-item positive"><span class="insight-icon">✅</span><div><div class="insight-title">No critical flags — all systems healthy</div></div></div>';
+    '<div class="insight-item positive"><span class="insight-icon"></span><div><div class="insight-title">No critical flags — all systems healthy</div></div></div>';
 
   // ── Positives ──
   const posEl = document.getElementById('perf-insight-positive');
@@ -5097,7 +5097,7 @@ function buildInsights() {
   const posItems = [];
   const cancelRate = Math.round(DATA.cancelTotal / (DATA.cancelTotal + DATA.upcomingTotal) * 100);
   if (cancelRate < 30) {
-    posItems.push(`<div class="insight-item positive"><span class="insight-icon">📈</span><div>
+    posItems.push(`<div class="insight-item positive"><span class="insight-icon"></span><div>
       <div class="insight-title">Cancel rate at ${cancelRate}% — within target range</div>
       <div class="insight-desc">Retention tracking well across active studies</div>
     </div></div>`);
@@ -5106,7 +5106,7 @@ function buildInsights() {
   const pnjStudies = upcoming.filter(s => (s.site||'').includes('Penn'));
   if (pnjStudies.length > 0) {
     const pnjTotal = pnjStudies.reduce((a,b) => a + b.count, 0);
-    posItems.push(`<div class="insight-item positive"><span class="insight-icon">🏥</span><div>
+    posItems.push(`<div class="insight-item positive"><span class="insight-icon"></span><div>
       <div class="insight-title">Pennington pipeline — ${pnjTotal} upcoming visits</div>
       <div class="insight-desc">${pnjStudies.length} active studies at PNJ</div>
     </div></div>`);
@@ -5124,14 +5124,14 @@ function buildInsights() {
   var _sgE = (CRP_CONFIG.CLICKUP||{}).STAGE_GROUPS||{};
   var enrolledRefs = REFERRAL_DATA ? REFERRAL_DATA.filter(function(r){ return _sgE.ENROLLED && _sgE.ENROLLED.has(r.stage); }).length : 0;
   if (enrolledRefs > 0) {
-    posItems.push(`<div class="insight-item positive"><span class="insight-icon">🎯</span><div>
+    posItems.push(`<div class="insight-item positive"><span class="insight-icon"></span><div>
       <div class="insight-title">${enrolledRefs} enrolled via referral pipeline</div>
       <div class="insight-desc">${REFERRAL_DATA.length > 0 ? Math.round(enrolledRefs/REFERRAL_DATA.length*100) : 0}% conversion from ${REFERRAL_DATA.length} referrals</div>
     </div></div>`);
   }
 
   posEl.innerHTML = posItems.length > 0 ? posItems.join('') :
-    '<div class="insight-item"><span class="insight-icon">📊</span><div><div class="insight-title">Connect live data to see trend insights</div></div></div>';
+    '<div class="insight-item"><span class="insight-icon"></span><div><div class="insight-title">Connect live data to see trend insights</div></div></div>';
 }
 
 // ═══════════════════════════════════════════════════
@@ -6708,7 +6708,7 @@ function renderContactAlerts() {
     const isRed = a.severity === 'red';
     const border = isRed ? '#dc2626' : '#d97706';
     const bg = isRed ? '#fef2f2' : '#fffbeb';
-    const icon = isRed ? '🔴' : '🟡';
+    const icon = isRed ? '' : '';
     const typeLabel = a.alert_type;
     const typeBg = isRed ? '#dc2626' : '#d97706';
     const pLink = a.patient_url
@@ -6731,7 +6731,7 @@ function renderContactAlerts() {
       <div style="font-size:12px;color:#475569;margin-bottom:6px;">${a.detail}</div>
       <div style="font-size:11px;color:#94a3b8;display:flex;gap:12px;flex-wrap:wrap;">
         ${contactLine.map(c => `<span>${c}</span>`).join('')}
-        ${a.has_upcoming ? '<span style="color:#dc2626;font-weight:600;">📅 Has upcoming visits</span>' : ''}
+        ${a.has_upcoming ? '<span style="color:#dc2626;font-weight:600;">Has upcoming visits</span>' : ''}
       </div>
     </div>`;
   }
@@ -7971,7 +7971,7 @@ function buildActionSteps() {
     const esc = jsAttr(itemKey);
     const chk = itemKey ? (isDone
       ? `<button onclick="event.stopPropagation();undismissItem('${esc}')" style="background:none;border:none;cursor:pointer;font-size:12px;padding:0;color:#16a34a;line-height:1;" title="Undo">↩</button>`
-      : `<button onclick="event.stopPropagation();dismissItem('${esc}','done')" style="background:none;border:1px solid #d1d5db;border-radius:3px;width:18px;height:18px;cursor:pointer;font-size:11px;padding:0;color:#d1d5db;line-height:1;transition:all .15s;display:flex;align-items:center;justify-content:center;" onmouseover="this.style.color='#16a34a';this.style.borderColor='#16a34a'" onmouseout="this.style.color='#d1d5db';this.style.borderColor='#d1d5db'" title="Mark done">✓</button>`)
+      : `<button onclick="event.stopPropagation();dismissItem('${esc}','done')" style="background:none;border:1px solid #d1d5db;border-radius:3px;width:18px;height:18px;cursor:pointer;font-size:11px;padding:0;color:#d1d5db;line-height:1;transition:all .15s;display:flex;align-items:center;justify-content:center;" onmouseover="this.style.color='#16a34a';this.style.borderColor='#16a34a'" onmouseout="this.style.color='#d1d5db';this.style.borderColor='#d1d5db'" title="Mark done"></button>`)
       : '';
     return `<div style="display:grid;grid-template-columns:${itemKey?'22px ':''}160px 120px auto;gap:4px 8px;align-items:center;padding:5px 0;border-bottom:1px solid #f8fafc;font-size:12px;${dimStyle}">
       ${chk?`<div>${chk}</div>`:''}
@@ -8026,7 +8026,7 @@ function buildActionSteps() {
   // ═══ 2. UNDOCUMENTED ════════════════════════════════
   const undoc=ad.undocumented||[];
   if(undoc.length>0){
-    steps.push({pri:2,id:'undoc-'+undoc.length,icon:'📝',tag:'DOCUMENTATION REQUIRED',tagBg:'#fef3c7',tagColor:'#92400e',
+    steps.push({pri:2,id:'undoc-'+undoc.length,icon:'',tag:'DOCUMENTATION REQUIRED',tagBg:'#fef3c7',tagColor:'#92400e',
       title:`${undoc.length} cancellations missing a reason — CRIO records incomplete`,
       body:`<div style="margin-top:8px;">${undocTable(undoc)}</div>`,
       action:'Each coordinator must log into CRIO and add the cancellation reason for their patients above. Undocumented visits skew all reporting and risk scoring.'
@@ -8041,7 +8041,7 @@ function buildActionSteps() {
     steps.push({pri:3,id:sid,icon:'',tag:'PRE-SCREENER UPDATE',tagBg:'#fef3c7',tagColor:'#b45309',
       title:`Protocol criteria changed · ${sLink(study,v.study_url)}`,
       body:`<div style="padding:8px 10px;background:#fef3c7;border-radius:6px;border-left:3px solid #f59e0b;font-size:11px;margin:6px 0;">
-        ➤ Revise pre-screening script to reflect updated inclusion/exclusion criteria before booking new patients
+        Revise pre-screening script to reflect updated inclusion/exclusion criteria before booking new patients
       </div><div style="margin-top:4px;">${pts.map(p=>patRow(p,true,sid)).join('')}</div>`,
       action:''
     });
@@ -8065,9 +8065,9 @@ function buildActionSteps() {
     if(subs.includes('consent'))       fixes.push('Confirm willingness to sign consent before scheduling');
     if(subs.includes('condition'))     fixes.push('Add targeted medical history questions for this study\'s key exclusion conditions');
     if(subs.includes('generic'))       fixes.push('Review full eligibility checklist — multiple DNQs suggest a pre-screening gap');
-    const fixHTML=fixes.length?`<div style="padding:8px 10px;background:#fff7ed;border-radius:6px;border-left:3px solid #f97316;font-size:11px;line-height:1.9;margin:6px 0;">${fixes.map(f=>'➤ '+f).join('<br>')}</div>`:'';
+    const fixHTML=fixes.length?`<div style="padding:8px 10px;background:#fff7ed;border-radius:6px;border-left:3px solid #f97316;font-size:11px;line-height:1.9;margin:6px 0;">${fixes.map(f=>''+f).join('<br>')}</div>`:'';
     const sid='sf-'+study.replace(/\s+/g,'-').toLowerCase();
-    steps.push({pri:4,id:sid,icon:'🔍',tag:'SCREEN FAIL',tagBg:'#fff7ed',tagColor:'#c2410c',
+    steps.push({pri:4,id:sid,icon:'',tag:'SCREEN FAIL',tagBg:'#fff7ed',tagColor:'#c2410c',
       title:`${allPts.length} screen fail${allPts.length>1?'s':''} · ${sLink(study,data.url)}`,
       body:fixHTML+`<div style="margin-top:4px;">${allPts.map(p=>patRow(p,true,sid)).join('')}</div>`,
       action:''
@@ -8076,7 +8076,7 @@ function buildActionSteps() {
 
   // ═══ 5. RESCHEDULE PROMISES (enrolling studies only) ═══
   const rp=(ad.open_reschedule_promises||[]).filter(p=>_isEnrolling(p.study));
-  if(rp.length>0){ const sid='followup-'+rp.length; steps.push({pri:5,id:sid,icon:'📅',tag:'FOLLOW UP',tagBg:'#eff6ff',tagColor:'#1843ad',
+  if(rp.length>0){ const sid='followup-'+rp.length; steps.push({pri:5,id:sid,icon:'',tag:'FOLLOW UP',tagBg:'#eff6ff',tagColor:'#1843ad',
     title:`${rp.length} patient${rp.length>1?'s':''} said they'd call back — no confirmed date yet`,
     body:`<div style="margin-top:6px;">${rp.map(p=>patRow(p,true,sid)).join('')}</div>`,
     action:'Do not wait for them to call. Reach out today — patients who say they\'ll call back rarely do without a prompt.'
@@ -8084,7 +8084,7 @@ function buildActionSteps() {
 
   // ═══ 6. UNREACHABLE ═════════════════════════════════
   const nsu=ad.no_show_unreachable||[];
-  if(nsu.length>0){ const sid='unreach-'+nsu.length; steps.push({pri:6,id:sid,icon:'🔇',tag:'UNREACHABLE',tagBg:'#fef2f2',tagColor:'#dc2626',
+  if(nsu.length>0){ const sid='unreach-'+nsu.length; steps.push({pri:6,id:sid,icon:'',tag:'UNREACHABLE',tagBg:'#fef2f2',tagColor:'#dc2626',
     title:`${nsu.length} patient${nsu.length>1?'s':''} — voicemail full or no response to multiple attempts`,
     body:`<div style="margin-top:6px;">${nsu.map(p=>patRow(p,true,sid)).join('')}</div>`,
     action:'Try one alternate contact method (email, alternate number). If still no response in 5 business days: document as Lost to Follow-Up in CRIO and remove from active pipeline.'
@@ -8094,7 +8094,7 @@ function buildActionSteps() {
   const ns=(ad.reschedule_needed||[]).filter(p=>_isEnrolling(p.study));
   const nsWithUpcoming=ns.filter(p=>p.still_upcoming);
   const nsNoUpcoming=ns.filter(p=>!p.still_upcoming);
-  if(nsWithUpcoming.length>0){ const sid='ns-upcoming-'+nsWithUpcoming.length; steps.push({pri:7,id:sid,icon:'📱',tag:'NO SHOW — UPCOMING VISIT',tagBg:'#fdf4ff',tagColor:'#7e22ce',
+  if(nsWithUpcoming.length>0){ const sid='ns-upcoming-'+nsWithUpcoming.length; steps.push({pri:7,id:sid,icon:'',tag:'NO SHOW — UPCOMING VISIT',tagBg:'#fdf4ff',tagColor:'#7e22ce',
     title:`${nsWithUpcoming.length} patients no-showed but still have visits on the books`,
     body:`<div style="padding:6px 10px;background:#fdf4ff;border-radius:6px;border-left:3px solid #a855f7;font-size:11px;margin:6px 0;">
       These patients did not show — but future visits are still scheduled. Confirm attendance now or reschedule.
@@ -8114,7 +8114,7 @@ function buildActionSteps() {
       :p.sub==='compensation'?'Patient withdrew over compensation — review how it is communicated during consent. May be a realistic expectation mismatch.'
       :'Follow up to understand the barrier and attempt recovery.';
     const sid='retain-'+(p.name||'').replace(/\s+/g,'-').toLowerCase();
-    steps.push({pri:9,id:sid,icon:'💬',tag:'RETENTION CALL',tagBg:'#f0fdf4',tagColor:'#15803d',
+    steps.push({pri:9,id:sid,icon:'',tag:'RETENTION CALL',tagBg:'#f0fdf4',tagColor:'#15803d',
       title:`Recovery call · ${pLink(p.name,p.url)} · ${sLink(p.study,p.study_url)}`,
       body:`<div style="margin-top:4px;">${patRow(p,true,sid)}</div>`,action
     });
@@ -8124,7 +8124,7 @@ function buildActionSteps() {
 
   // ═══ 10. ADMIN FIXES ════════════════════════════════
   const ae=ad.admin_fixes||[];
-  if(ae.length>0){ const sid='admin-'+ae.length; steps.push({pri:11,id:sid,icon:'🛠',tag:'ADMIN FIX',tagBg:'#f8fafc',tagColor:'#475569',
+  if(ae.length>0){ const sid='admin-'+ae.length; steps.push({pri:11,id:sid,icon:'',tag:'ADMIN FIX',tagBg:'#f8fafc',tagColor:'#475569',
     title:`${ae.length} scheduling error${ae.length>1?'s':''} — correct in CRIO`,
     body:`<div style="margin-top:6px;">${ae.map(p=>patRow(p,true,sid)).join('')}</div>`,
     action:'Entries logged in error, wrong study, or duplicate records. Fix now to keep downstream reporting clean.'
@@ -8132,7 +8132,7 @@ function buildActionSteps() {
 
   // ═══ 11. CLOSE RECORDS ══════════════════════════════
   const wf=ad.withdrew_final||[];
-  if(wf.length>0){ const sid='close-'+wf.length; steps.push({pri:12,id:sid,icon:'📁',tag:'CLOSE RECORDS',tagBg:'#f8fafc',tagColor:'#64748b',
+  if(wf.length>0){ const sid='close-'+wf.length; steps.push({pri:12,id:sid,icon:'',tag:'CLOSE RECORDS',tagBg:'#f8fafc',tagColor:'#64748b',
     title:`${wf.length} final withdrawal${wf.length>1?'s':''} — ensure CRIO updated`,
     body:`<div style="margin-top:6px;">${wf.map(p=>patRow(p,true,sid)).join('')}</div>`,
     action:'Update subject status to Withdrawn in CRIO. Add withdrawal reason if missing. Remove from active pipeline and close any future visits.'
@@ -8327,7 +8327,7 @@ function buildPatientPipelineBySite() {
   }
 
   var html = '<div style="display:flex;gap:24px;flex-wrap:wrap;">';
-  html += buildSitePipeline('📍 Philadelphia (PHL)', phl, phlTotal, '#1843ad');
+  html += buildSitePipeline('Philadelphia (PHL)', phl, phlTotal, '#1843ad');
   html += buildSitePipeline('Pennington (PNJ)', pnj, pnjTotal, '#059669');
   html += '</div>';
 
@@ -8600,7 +8600,7 @@ function buildMedRecAlerts() {
   // 1. Referrals with no medical records entry
   const refsNoMR = findReferralsWithoutMedRecords();
   if (refsNoMR.length > 0) {
-    alerts.push({ icon: '⚠️', color: '#d97706', bg: '#fffbeb',
+    alerts.push({ icon: '', color: '#d97706', bg: '#fffbeb',
       title: refsNoMR.length + ' active referral' + (refsNoMR.length>1?'s':'') + ' missing medical records entry',
       detail: refsNoMR.slice(0, 5).map(r => '<div style="font-size:11px;padding:2px 0;">' + maskPHI(r.name) + ' — ' + escapeHTML(r.study||'') + '</div>').join('') + (refsNoMR.length > 5 ? '<div style="font-size:10px;color:#94a3b8;">+' + (refsNoMR.length-5) + ' more</div>' : ''),
       action: 'Create medical records entries in ClickUp for these patients.'
@@ -8610,7 +8610,7 @@ function buildMedRecAlerts() {
   // 2. Patients ready to schedule with no upcoming visit
   const readyNoVisit = findReadyNoVisit();
   if (readyNoVisit.length > 0) {
-    alerts.push({ icon: '📅', color: '#dc2626', bg: '#fef2f2',
+    alerts.push({ icon: '', color: '#dc2626', bg: '#fef2f2',
       title: readyNoVisit.length + ' patient' + (readyNoVisit.length>1?'s':'') + ' ready to schedule but no upcoming visit',
       detail: readyNoVisit.slice(0, 5).map(r => '<div style="font-size:11px;padding:2px 0;">' + maskPHI(r.name) + ' — ' + escapeHTML(r.study||'') + '</div>').join(''),
       action: 'Schedule visits for these patients — they are cleared and waiting.'
@@ -8620,7 +8620,7 @@ function buildMedRecAlerts() {
   // 3. Pending medical releases (Step 1 bottleneck)
   if (releasePending > 0) {
     const relPendList = active.filter(r => r.medical_release === 'Pending');
-    alerts.push({ icon: '📝', color: '#f59e0b', bg: '#fffbeb',
+    alerts.push({ icon: '', color: '#f59e0b', bg: '#fffbeb',
       title: releasePending + ' patient' + (releasePending>1?'s':'') + ' awaiting medical release signature',
       detail: relPendList.slice(0, 5).map(r => '<div style="font-size:11px;padding:2px 0;">' + maskPHI(r.name) + ' — ' + escapeHTML(r.study||'') + '</div>').join('') + (releasePending > 5 ? '<div style="font-size:10px;color:#94a3b8;">+' + (releasePending-5) + ' more</div>' : ''),
       action: 'Send Jotform release links to these patients. Records cannot be requested without a signed release.'
@@ -8630,7 +8630,7 @@ function buildMedRecAlerts() {
   // 3b. Patients still being contacted for release
   if (releaseContact > 0) {
     const contactList = active.filter(r => (r.medical_release||'').indexOf('Contact') !== -1);
-    alerts.push({ icon: '📞', color: '#8b5cf6', bg: '#f5f3ff',
+    alerts.push({ icon: '', color: '#8b5cf6', bg: '#f5f3ff',
       title: releaseContact + ' patient' + (releaseContact>1?'s':'') + ' being contacted for release',
       detail: contactList.slice(0, 5).map(r => '<div style="font-size:11px;padding:2px 0;">' + maskPHI(r.name) + ' — ' + escapeHTML(r.medical_release) + ' — ' + escapeHTML(r.study||'') + '</div>').join(''),
       action: 'Continue outreach — these patients have been contacted but release not yet signed.'
@@ -8645,7 +8645,7 @@ function buildMedRecAlerts() {
     pendingByPortal[portal].push(r);
   });
   Object.entries(pendingByPortal).sort((a,b) => b[1].length - a[1].length).forEach(([portal, pts]) => {
-    alerts.push({ icon: '📄', color: '#f59e0b', bg: '#fffbeb',
+    alerts.push({ icon: '', color: '#f59e0b', bg: '#fffbeb',
       title: pts.length + ' pending record' + (pts.length>1?'s':'') + ' via ' + escapeHTML(portal),
       detail: pts.slice(0, 4).map(r => '<div style="font-size:11px;padding:2px 0;">' + maskPHI(r.name) + ' — ' + escapeHTML(r.study||'') + '</div>').join('') + (pts.length > 4 ? '<div style="font-size:10px;color:#94a3b8;">+' + (pts.length-4) + ' more</div>' : ''),
       action: 'Follow up with ' + escapeHTML(portal) + ' to obtain pending medical records.'
@@ -8655,7 +8655,7 @@ function buildMedRecAlerts() {
   // 5. Unavailable records
   const unavail = MED_RECORDS_DATA.filter(r => r.is_active && r.records_received === 'Unavailable');
   if (unavail.length > 0) {
-    alerts.push({ icon: '🚫', color: '#dc2626', bg: '#fef2f2',
+    alerts.push({ icon: '', color: '#dc2626', bg: '#fef2f2',
       title: unavail.length + ' patient' + (unavail.length>1?'s':'') + ' with unavailable records',
       detail: unavail.slice(0, 5).map(r => '<div style="font-size:11px;padding:2px 0;">' + maskPHI(r.name) + ' — ' + escapeHTML(r.study||'') + '</div>').join(''),
       action: 'Records marked unavailable — try alternate physicians or request patient to bring copies.'
@@ -8675,7 +8675,7 @@ function buildMedRecAlerts() {
   // 7. Pending investigator approval
   if (piPending > 0) {
     const piList = active.filter(r => r.investigator_approval && r.investigator_approval.indexOf('Confirmed') === -1 && r.investigator_approval !== 'Not Applicable' && r.investigator_approval !== '');
-    alerts.push({ icon: '📋', color: '#8b5cf6', bg: '#f5f3ff',
+    alerts.push({ icon: '', color: '#8b5cf6', bg: '#f5f3ff',
       title: piPending + ' patient' + (piPending>1?'s':'') + ' pending investigator approval',
       detail: piList.slice(0, 5).map(r => '<div style="font-size:11px;padding:2px 0;">' + maskPHI(r.name) + ' — ' + escapeHTML(r.investigator_approval) + ' — ' + escapeHTML(r.study||'') + '</div>').join(''),
       action: 'Follow up with PI to approve these patients for study enrollment.'
@@ -8690,7 +8690,7 @@ function buildMedRecAlerts() {
   });
   const neverContacted = active.filter(r => !r.last_contact_date);
   if (noContact.length > 0) {
-    alerts.push({ icon: '📱', color: '#1843AD', bg: '#e8eeff',
+    alerts.push({ icon: '', color: '#1843AD', bg: '#e8eeff',
       title: noContact.length + ' active patient' + (noContact.length>1?'s':'') + ' not contacted in 14+ days' + (neverContacted.length > 0 ? ' (' + neverContacted.length + ' never contacted)' : ''),
       detail: noContact.sort((a,b) => {
         var da = a.last_contact_date ? new Date(a.last_contact_date).getTime() : 0;
@@ -9390,8 +9390,8 @@ function showStudyUnifiedModal(studyName) {
         activePatients.slice(0,8).forEach(function(p) {
           var statusColors = {'Enrolled':'#059669','In Screening':'#8b5cf6','Visit Scheduled':'#06b6d4','Ready to Schedule':'#f59e0b','Pending Release':'#94a3b8','Under Review':'#64748b'};
           var sc = statusColors[p.status] || '#94a3b8';
-          var recBadge = p.records_received === 'Received' ? '<span style="color:#059669;font-weight:700;">✓</span>' : p.records_received === 'Pending' ? '<span style="color:#f59e0b;">⏳</span>' : '<span style="color:#94a3b8;">—</span>';
-          var appBadge = (p.investigator_approval||'').indexOf('Confirmed') !== -1 ? '<span style="color:#059669;">✓</span>' : (p.investigator_approval ? '<span style="color:#f59e0b;">' + escapeHTML(p.investigator_approval) + '</span>' : '—');
+          var recBadge = p.records_received === 'Received' ? '<span style="color:#059669;font-weight:700;"></span>' : p.records_received === 'Pending' ? '<span style="color:#f59e0b;">⏳</span>' : '<span style="color:#94a3b8;">—</span>';
+          var appBadge = (p.investigator_approval||'').indexOf('Confirmed') !== -1 ? '<span style="color:#059669;"></span>' : (p.investigator_approval ? '<span style="color:#f59e0b;">' + escapeHTML(p.investigator_approval) + '</span>' : '—');
           var staleColor = p.days_since_update > 14 ? '#dc2626' : p.days_since_update > 7 ? '#f59e0b' : '#64748b';
           body += '<tr><td><a href="' + escapeHTML(p.crio_link || p.url) + '" target="_blank" style="color:#1e293b;text-decoration:none;font-weight:600;">' + maskPHI(p.name) + '</a></td>';
           body += '<td><span style="font-size:10px;padding:2px 6px;border-radius:4px;background:' + sc + '22;color:' + sc + ';font-weight:600;">' + escapeHTML(p.status) + '</span></td>';
@@ -9444,7 +9444,7 @@ function showStudyUnifiedModal(studyName) {
         return matchesStudy(m.study, studyName) && m.name.toLowerCase().trim() === r.name.toLowerCase().trim();
       });
     });
-    if (refsNoMed.length > 0) alerts.push({icon: '⚠️', text: refsNoMed.length + ' referral(s) with no medical records entry', color: '#d97706'});
+    if (refsNoMed.length > 0) alerts.push({icon: '', text: refsNoMed.length + ' referral(s) with no medical records entry', color: '#d97706'});
   }
   if (medRec && medRec.readySched > 0) {
     var readyNoVisit = MED_RECORDS_DATA.filter(function(m) {
@@ -9454,16 +9454,16 @@ function showStudyUnifiedModal(studyName) {
         return v.patient.toLowerCase().trim() === m.name.toLowerCase().trim();
       });
     });
-    if (readyNoVisit.length > 0) alerts.push({icon: '🔔', text: readyNoVisit.length + ' patient(s) ready to schedule but no upcoming visit', color: '#dc2626'});
+    if (readyNoVisit.length > 0) alerts.push({icon: '', text: readyNoVisit.length + ' patient(s) ready to schedule but no upcoming visit', color: '#dc2626'});
   }
   if (medRec) {
     var pendingApproval = MED_RECORDS_DATA.filter(function(m) {
       return matchesStudy(m.study, studyName) && m.is_active && m.investigator_approval && m.investigator_approval !== 'Approved';
     });
-    if (pendingApproval.length > 0) alerts.push({icon: '📋', text: pendingApproval.length + ' patient(s) pending investigator approval', color: '#f59e0b'});
+    if (pendingApproval.length > 0) alerts.push({icon: '', text: pendingApproval.length + ' patient(s) pending investigator approval', color: '#f59e0b'});
   }
   if (alerts.length > 0) {
-    body += '<h4 style="' + sectionStyle + '">🚨 Integration Alerts</h4>';
+    body += '<h4 style="' + sectionStyle + '">Integration Alerts</h4>';
     alerts.forEach(function(a) {
       body += '<div style="font-size:11px;padding:6px 10px;margin-bottom:4px;border-radius:6px;background:' + a.color + '12;border-left:3px solid ' + a.color + ';color:' + a.color + ';">' + a.icon + ' ' + a.text + '</div>';
     });
@@ -9474,7 +9474,7 @@ function showStudyUnifiedModal(studyName) {
   if (studyDocs && parseInt(studyDocs.total_documents) > 0) {
     var pct = parseFloat(studyDocs.completion_pct) || 0;
     var pctColor = pct >= 95 ? '#059669' : pct >= 80 ? '#d97706' : '#dc2626';
-    body += '<h4 style="' + sectionStyle + '">📄 Documents</h4>';
+    body += '<h4 style="' + sectionStyle + '">Documents</h4>';
     body += '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px;">';
     body += '<div style="font-size:11px;"><strong>Total:</strong> ' + studyDocs.total_documents + '</div>';
     body += '<div style="font-size:11px;"><strong style="color:#059669">Signed:</strong> ' + (studyDocs.signed||0) + '</div>';
@@ -9539,7 +9539,7 @@ function showStudyUnifiedModal(studyName) {
   subtitle += upcoming.length + ' upcoming · ' + refs.length + ' referrals';
   if (studyDocs) subtitle += ' · ' + studyDocs.total_documents + ' docs (' + (studyDocs.completion_pct||0) + '%)';
 
-  openModal('🔬 ' + studyName, subtitle, body);
+  openModal('' + studyName, subtitle, body);
 }
 
 function showCancelsByReason(reason) {
@@ -10659,7 +10659,7 @@ function showCampaignDetailModal(studyName) {
       const dbMatch = PATIENT_DB_MAP.get(nameKey);
       const pVisits = (DATA.allVisitDetail || []).filter(v => v.patient.toLowerCase().trim() === nameKey);
       const apptBooked = pVisits.length > 0
-        ? `<span style="color:#059669;font-weight:700;">✓ ${escapeHTML(pVisits[0].date)}</span><div style="font-size:9px;color:#94a3b8;">${escapeHTML(pVisits[0].visit)}</div>`
+        ? `<span style="color:#059669;font-weight:700;">${escapeHTML(pVisits[0].date)}</span><div style="font-size:9px;color:#94a3b8;">${escapeHTML(pVisits[0].visit)}</div>`
         : r.next_appt ? `<span style="color:#3b82f6;">${escapeHTML(r.next_appt)}</span>` : '<span style="color:#ef4444;font-size:10px;">No appt</span>';
       const pStatus = dbMatch
         ? `<span style="padding:2px 6px;border-radius:3px;font-size:10px;font-weight:600;background:${dbMatch.status==='Available'?'#dcfce7':dbMatch.status==='Do Not Solicit'||dbMatch.status==='Deceased'?'#fef2f2':'#fffbeb'};color:${dbMatch.status==='Available'?'#059669':dbMatch.status==='Do Not Solicit'||dbMatch.status==='Deceased'?'#dc2626':'#d97706'}">${escapeHTML(dbMatch.status)}</span>`
@@ -10719,7 +10719,7 @@ function showCampaignDetailModal(studyName) {
 
   // Upcoming visits for this study
   if (upcoming.length > 0) {
-    html += `<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px;">📅 Upcoming Appointments (${upcoming.length})</div>`;
+    html += `<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px;">Upcoming Appointments (${upcoming.length})</div>`;
     html += `<table class="detail-table" style="width:100%;font-size:11px;"><thead><tr>
       <th>Date</th><th>Patient</th><th>Visit</th><th>Status</th><th>Coordinator</th>
     </tr></thead><tbody>`;
@@ -10738,7 +10738,7 @@ function showCampaignDetailModal(studyName) {
 
   if (!html) html = '<div style="text-align:center;padding:30px;color:#94a3b8;">No cross-reference data available for this campaign</div>';
 
-  openModal('📣 ' + studyName, campaign ? `Vendor: ${campaign.vendor} · ${campaign.first_contact} total contacts` : '', html);
+  openModal('' + studyName, campaign ? `Vendor: ${campaign.vendor} · ${campaign.first_contact} total contacts` : '', html);
 }
 
 // ── Tracker + Stage detail popup (from Physician Tracker table) ──
@@ -11469,7 +11469,7 @@ function renderCrioStudies() {
             + (p.type ? ' <span style="font-size:9px;padding:1px 4px;border-radius:3px;background:#fef2f2;color:#dc2626">' + esc(p.type) + '</span>' : '')
             + '<div style="font-size:10px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%" title="' + esc(p.reason || '') + '">' + reasonText + '</div>'
             + '</div>'
-            + '<button onclick="setWinbackStatus(\'' + esc(pKey) + '\',\'completed\',this)" style="font-size:9px;font-weight:600;padding:2px 6px;border-radius:4px;border:1px solid;cursor:pointer;white-space:nowrap;' + completedClass + '">✓ Done</button>'
+            + '<button onclick="setWinbackStatus(\'' + esc(pKey) + '\',\'completed\',this)" style="font-size:9px;font-weight:600;padding:2px 6px;border-radius:4px;border:1px solid;cursor:pointer;white-space:nowrap;' + completedClass + '">Done</button>'
             + '<button onclick="setWinbackStatus(\'' + esc(pKey) + '\',\'na\',this)" style="font-size:9px;font-weight:600;padding:2px 6px;border-radius:4px;border:1px solid;cursor:pointer;white-space:nowrap;' + naClass + '">N/A</button>'
             + '</div>';
         });
@@ -11652,7 +11652,7 @@ function renderCrioStudies() {
   if (alerts.length > 0) {
     html += '<details style="margin-bottom:8px"><summary style="font-size:11px;font-weight:600;color:#64748b;cursor:pointer;margin-bottom:4px">High-Rate Screen Fail & No-Show Studies — ' + alerts.length + ' alerts</summary>';
     alerts.forEach(function(a) {
-      var icon = a.type === 'screen_fail' ? '🚫' : '📵';
+      var icon = a.type === 'screen_fail' ? '' : '';
       var label = a.type === 'screen_fail' ? 'Screen Fail' : 'No-Show/Cancel V1';
       var color = a.type === 'screen_fail' ? '#dc2626' : '#ef4444';
       var url = 'https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/' + a.key + '/subjects';
@@ -12635,7 +12635,7 @@ function renderFacebookCRM() {
   }
   if (delfaCount > 0) {
     html += `<div style="min-width:120px;text-align:center;padding:8px;">
-      <div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:4px;">🤖 Delfa AI</div>
+      <div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:4px;">Delfa AI</div>
       <div style="font-size:24px;font-weight:800;color:#7C3AED;">${delfaCount}</div>
       <div style="font-size:10px;color:#94a3b8;">AI pre-screened</div>
     </div>`;
@@ -14181,7 +14181,7 @@ function renderStudiesTable() {
           <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden">
             <div style="height:100%;background:${barColor};width:${Math.min(pct,100)}%;border-radius:3px"></div>
           </div>
-          <div style="font-size:9px;color:${pct>=100?'#059669':'#94a3b8'};margin-top:2px">${pct>=100?'✓ Goal reached':`${s.remaining} needed`}</div>
+          <div style="font-size:9px;color:${pct>=100?'#059669':'#94a3b8'};margin-top:2px">${pct>=100?'Goal reached':`${s.remaining} needed`}</div>
         </div>`
       : `<span style="font-size:11px;color:var(--muted)">${s.enrolled > 0 ? s.enrolled+' enrolled' : s.crio_subject_count > 0 ? s.crio_subject_count+' subjects' : '—'}</span>`;
 
@@ -14795,11 +14795,11 @@ function toggleDarkMode() {
   if (isDark) {
     html.removeAttribute('data-theme');
     localStorage.setItem('crp_theme', 'light');
-    document.getElementById('theme-toggle-btn').textContent = '🌙';
+    document.getElementById('theme-toggle-btn').textContent = '';
   } else {
     html.setAttribute('data-theme', 'dark');
     localStorage.setItem('crp_theme', 'dark');
-    document.getElementById('theme-toggle-btn').textContent = '☀️';
+    document.getElementById('theme-toggle-btn').textContent = '';
   }
   // Update Chart.js defaults for new theme
   if (typeof Chart !== 'undefined') {
@@ -14817,7 +14817,7 @@ function toggleDarkMode() {
   if (saved === 'dark') {
     document.documentElement.setAttribute('data-theme', 'dark');
     var btn = document.getElementById('theme-toggle-btn');
-    if (btn) btn.textContent = '☀️';
+    if (btn) btn.textContent = '';
   }
 })();
 
@@ -14977,7 +14977,7 @@ function _injectExportBars() {
     if (view.querySelector('.export-bar')) return;
     var bar = document.createElement('div');
     bar.className = 'export-bar';
-    bar.innerHTML = '<button class="export-btn" onclick="exportPDF()">📄 Print / PDF</button>'
+    bar.innerHTML = '<button class="export-btn" onclick="exportPDF()">Print / PDF</button>'
       + '<button class="export-btn" onclick="exportCSV()">Export CSV</button>';
     view.insertBefore(bar, view.firstChild);
   });
@@ -15023,7 +15023,7 @@ function setHealthChip(id, status, label) {
   const el = document.getElementById(id);
   if (!el) return;
   el.className = 'dh-chip ' + status;
-  const icon = status === 'ok' ? '✓' : status === 'warn' ? '⚠' : status === 'fail' ? '✗' : '';
+  const icon = status === 'ok' ? '' : status === 'warn' ? '' : status === 'fail' ? '' : '';
   el.textContent = icon + ' ' + label;
   _updateHealthButton();
 }
