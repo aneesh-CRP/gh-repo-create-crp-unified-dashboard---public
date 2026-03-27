@@ -10045,6 +10045,32 @@ function renderFollowUpTable() {
   var rows = [];
   var seen = new Set(); // dedup by name+study+cat
 
+  // Build risk lookup by patient name (lowercase)
+  var _riskByName = {};
+  (DATA.riskFlags || []).forEach(function(f) {
+    var n = (f.patient||'').toLowerCase().trim();
+    if (n) _riskByName[n] = f;
+  });
+
+  // Build audit reason lookup by patient+study (most specific reason from BQ)
+  var _auditReasons = {};
+  (window._subjectAudit || []).forEach(function(a) {
+    var n = (a.subject_name||'').toLowerCase().trim().replace(/\s+/g,' ');
+    var s = (a.study_name||'').split(' - ').pop().trim().toLowerCase();
+    var reason = (a.reason||'').trim();
+    if (reason && reason !== 'Changed status via Recruitment API' && reason !== 'updated' && reason !== 'update') {
+      var key = n + '|' + s;
+      if (!_auditReasons[key]) _auditReasons[key] = reason; // keep first (most recent)
+    }
+  });
+
+  // Build recruiting source lookup
+  var _srcByName = {};
+  (window._recruitingData || []).forEach(function(r) {
+    var n = (r.patient_name||'').toLowerCase().trim().replace(/\s+/g,' ');
+    if (n && r.referral_source) _srcByName[n] = r.referral_source;
+  });
+
   function addRows(list, cat, catLabel, catColor) {
     (list || []).forEach(function(r) {
       var name = (r.name || r.subject_name || r.patient || '').trim();
@@ -10054,24 +10080,23 @@ function renderFollowUpTable() {
       seen.add(key);
       var site = r.site || '';
       var siteCode = site.indexOf('Penn') !== -1 ? 'PNJ' : 'PHL';
-      // Lookup referral source
-      var srcObj = window._crioRefSourceMap ? window._crioRefSourceMap.get(name.toLowerCase().replace(/\s+/g,' ').trim()) : null;
-      var source = srcObj ? srcObj.source : '';
+      var nameLo = name.toLowerCase().trim().replace(/\s+/g,' ');
+      // Lookup referral source — try _crioRefSourceMap first, then recruiting data
+      var srcObj = window._crioRefSourceMap ? window._crioRefSourceMap.get(nameLo) : null;
+      var source = srcObj ? srcObj.source : (_srcByName[nameLo] || '');
       // Lookup risk
-      var riskFlag = (DATA.riskFlags || []).find(function(f) { return (f.patient||'').toLowerCase() === name.toLowerCase(); });
+      var riskFlag = _riskByName[nameLo];
       var riskLevel = riskFlag ? riskFlag.level : '';
-      // DNQ reason from audit
-      var dnqReason = '';
-      if (cat === 'screenfail' && window._dnqReasons) {
-        var dnq = window._dnqReasons.find(function(d) { return (d.name||'').toLowerCase() === name.toLowerCase() && (d.study||'').indexOf(study) !== -1; });
-        if (dnq) dnqReason = dnq.reason || dnq.comment || '';
-      }
+      // Best reason: audit trail > cancel reason > category
+      var auditKey = nameLo + '|' + study.toLowerCase();
+      var auditReason = _auditReasons[auditKey] || '';
+      var bestReason = auditReason || r.reason || r.category || '';
       rows.push({
         _name: name, _study: study, _cat: cat, _catLabel: catLabel, _catColor: catColor,
         url: r.url || r.patient_url || '',
         study_url: r.study_url || '',
         status: r.subject_status || r.status || '',
-        reason: r.reason || r.category || dnqReason || '',
+        reason: bestReason,
         date: r.cancel_date || r.last_visit_date || r.date || '',
         coord: r.coord || '',
         site: site, siteCode: siteCode,
