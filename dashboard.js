@@ -1967,7 +1967,7 @@ function updateFinanceOverviewKPIs() {
   // Heroes — mark as live data vs defaults
   var isLive = !!window._financeLastFetch;
   _s('fin-hero-ar', '$' + Math.round(totalAR/1000).toLocaleString() + 'K');
-  _s('fin-hero-ar-sub', (isLive ? '' : '⏳ ') + 'Invoice $' + Math.round(invAR/1000) + 'K + Autopay $' + Math.round(apAR/1000) + 'K');
+  _s('fin-hero-ar-sub', (isLive ? '' : '') + 'Invoice $' + Math.round(invAR/1000) + 'K + Autopay $' + Math.round(apAR/1000) + 'K');
   _s('fin-hero-payments', '$' + Math.round(pmtTotal).toLocaleString());
   _s('fin-hero-payments-sub', pmtMonths + ' months \u00b7 avg $' + avgPmt + 'K/mo');
 
@@ -2963,9 +2963,9 @@ function buildScheduleTable() {
     var cxCount = cancelsByPatient[patKey] || 0;
     var riskBadge = '';
     if (nsCount >= 2) {
-      riskBadge = '<span title="' + nsCount + ' prior no-shows — confirm attendance" style="font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px;margin-left:4px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;cursor:help">⚠ ' + nsCount + 'x NO-SHOW</span>';
+      riskBadge = '<span title="' + nsCount + ' prior no-shows — confirm attendance" style="font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px;margin-left:4px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;cursor:help">' + nsCount + 'x NO-SHOW</span>';
     } else if (nsCount === 1) {
-      riskBadge = '<span title="1 prior no-show — confirm attendance" style="font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px;margin-left:4px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;cursor:help">⚠ NO-SHOW</span>';
+      riskBadge = '<span title="1 prior no-show — confirm attendance" style="font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px;margin-left:4px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;cursor:help">NO-SHOW</span>';
     } else if (cxCount >= 2) {
       riskBadge = '<span title="' + cxCount + ' prior cancellations" style="font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px;margin-left:4px;background:#fff7ed;color:#d97706;border:1px solid #fed7aa;cursor:help">' + cxCount + 'x cancelled</span>';
     }
@@ -3297,14 +3297,14 @@ function _visitKey(row) {
 }
 // ═══ VISIT STATUS TRACKING (real-time patient flow) ═══
 var VISIT_STATUSES = [
-  {id:'arrived',   label:'Arrived',    icon:'🏥', color:'#3b82f6'},
-  {id:'consent',   label:'Consent',    icon:'📋', color:'#8b5cf6'},
-  {id:'eligibility',label:'Eligibility',icon:'✓', color:'#06b6d4'},
-  {id:'labs',      label:'Labs',       icon:'🧪', color:'#d97706'},
-  {id:'exam',      label:'Exam Room',  icon:'🩺', color:'#059669'},
-  {id:'coord',     label:'Coord Office',icon:'👤',color:'#1843ad'},
-  {id:'completed', label:'Completed',  icon:'✅', color:'#16a34a'},
-  {id:'noshow',    label:'No Show',    icon:'✗',  color:'#dc2626'}
+  {id:'arrived',   label:'Arrived',    icon:'', color:'#3b82f6'},
+  {id:'consent',   label:'Consent',    icon:'', color:'#8b5cf6'},
+  {id:'eligibility',label:'Eligibility',icon:'', color:'#06b6d4'},
+  {id:'labs',      label:'Labs',       icon:'', color:'#d97706'},
+  {id:'exam',      label:'Exam Room',  icon:'', color:'#059669'},
+  {id:'coord',     label:'Coord Office',icon:'',color:'#1843ad'},
+  {id:'completed', label:'Completed',  icon:'', color:'#16a34a'},
+  {id:'noshow',    label:'No Show',    icon:'',  color:'#dc2626'}
 ];
 var _visitStatuses = {}; // key → {status, timestamp}
 function _loadVisitStatuses() {
@@ -3691,7 +3691,7 @@ function showInvDetail(invName) {
   const upcoming = (DATA.allVisitDetail||[]).filter(r => r.investigator === invName);
   let body = '';
   if (upcoming.length) {
-    body += `<h4 style="font-size:12px;font-weight:700;color:#475569;margin:0 0 8px;text-transform:uppercase;letter-spacing:.5px;">📆 Upcoming Visits (${upcoming.length})</h4>
+    body += `<h4 style="font-size:12px;font-weight:700;color:#475569;margin:0 0 8px;text-transform:uppercase;letter-spacing:.5px;">Upcoming Visits (${upcoming.length})</h4>
     <table class="detail-table" style="margin-bottom:20px"><thead><tr>
       <th>Date</th><th>Patient</th><th>Study</th><th>Visit</th><th>Coordinator</th>
     </tr></thead><tbody>` +
@@ -6541,7 +6541,7 @@ async function fetchPatientDB() {
   } catch(e) {
     console.warn('CRP: Patient DB fetch failed:', e.message);
     const el = document.getElementById('contact-alert-cards');
-    if (el) el.innerHTML = '<div style="text-align:center;padding:20px;color:#94a3b8;font-size:13px;">⚠️ Could not load patient database — cross-reference unavailable</div>';
+    if (el) el.innerHTML = '<div style="text-align:center;padding:20px;color:#94a3b8;font-size:13px;">Could not load patient database — cross-reference unavailable</div>';
     const badge = document.getElementById('cq-badge');
     if (badge) { badge.textContent = 'Offline'; badge.className = 'badge badge-gray'; }
     return false;
@@ -6692,7 +6692,7 @@ function renderContactAlerts() {
   if (!el) return;
 
   if (CONTACT_ALERTS.length === 0) {
-    el.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);font-size:13px;">🟢 All active patients have clean contact data — no flags found</div>';
+    el.innerHTML = '<div style="padding:24px;text-align:center;color:var(--muted);font-size:13px;">All active patients have clean contact data — no flags found</div>';
     if (badge) { badge.textContent = 'All clear'; badge.className = 'badge badge-green'; }
     return;
   }
@@ -6716,9 +6716,9 @@ function renderContactAlerts() {
       : `<strong style="color:#1e293b">${maskPHI(a.patient)}</strong>`;
     const studyList = (a.studies||[a.study]).join(', ');
     const contactLine = [];
-    if (a.email) contactLine.push(`📧 ${a.email}`);
-    if (a.phone) contactLine.push(`📱 ${a.phone}`);
-    if (!a.email && !a.phone) contactLine.push('❌ No contact info on file');
+    if (a.email) contactLine.push(`${a.email}`);
+    if (a.phone) contactLine.push(`${a.phone}`);
+    if (!a.email && !a.phone) contactLine.push('No contact info on file');
 
     return `<div style="border:1.5px solid ${border};border-radius:10px;padding:14px 16px;background:${bg};">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">
@@ -6740,7 +6740,7 @@ function renderContactAlerts() {
 
   if (redAlerts.length > 0) {
     html += `<div style="margin-bottom:12px;">
-      <div style="font-size:12px;font-weight:700;color:#dc2626;margin-bottom:8px;">🔴 Immediate Action Required (${redAlerts.length})</div>
+      <div style="font-size:12px;font-weight:700;color:#dc2626;margin-bottom:8px;">Immediate Action Required (${redAlerts.length})</div>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:10px;">
         ${redAlerts.map(alertCard).join('')}
       </div>
@@ -6753,7 +6753,7 @@ function renderContactAlerts() {
     const visibleYellow = yellowAlerts.slice(0, showCount);
     const hiddenYellow = yellowAlerts.slice(showCount);
     html += `<div>
-      <div style="font-size:12px;font-weight:700;color:#d97706;margin-bottom:8px;">🟡 Contact Data Gaps (${yellowAlerts.length})</div>
+      <div style="font-size:12px;font-weight:700;color:#d97706;margin-bottom:8px;">Contact Data Gaps (${yellowAlerts.length})</div>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:10px;" id="cq-yellow-grid">
         ${visibleYellow.map(alertCard).join('')}
       </div>
@@ -6791,7 +6791,7 @@ async function connectSheets() {
     const [rows1, legacyCancels, auditRows] = await Promise.all([fetchCSV(url1), fetchCSV(url2).catch(() => []), _fetchAuditLog().catch(() => [])]);
     DATA = processLiveData(rows1, legacyCancels, auditRows);
     window._lastLiveData = DATA;
-    document.getElementById('data-source-badge').textContent = '🔗 Live Google Sheets';
+    document.getElementById('data-source-badge').textContent = 'Live Google Sheets';
     document.getElementById('last-refresh-badge').textContent = 'Updated: ' + new Date().toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'});
     closeSetup();
     renderAll();
@@ -7954,7 +7954,7 @@ function buildActionSteps() {
   }
   function coordChip(name){
     if(!name||name==='nan'||name==='Automated System') return '';
-    return `<span style="font-size:10px;background:#f1f5f9;border-radius:4px;padding:1px 6px;color:#475569;font-weight:600;">👤 ${name}</span>`;
+    return `<span style="font-size:10px;background:#f1f5f9;border-radius:4px;padding:1px 6px;color:#475569;font-weight:600;">${name}</span>`;
   }
 
   // ── Patient table row (per-item checkboxes) ──
@@ -7992,7 +7992,7 @@ function buildActionSteps() {
     return Object.entries(byCoord).sort((a,b)=>b[1].length-a[1].length).map(([coord,pts])=>`
       <div style="margin-bottom:10px;">
         <div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:4px;padding:4px 8px;background:#f8fafc;border-radius:4px;">
-          👤 ${coord} <span style="font-weight:400;color:#94a3b8;">(${pts.length} missing)</span>
+          ${coord} <span style="font-weight:400;color:#94a3b8;">(${pts.length} missing)</span>
         </div>
         ${pts.map(p=>`<div style="display:grid;grid-template-columns:160px 120px 90px 1fr;gap:4px 10px;align-items:center;padding:5px 8px;font-size:12px;border-bottom:1px solid #f8fafc;">
           <span style="font-weight:600;">${pLink(p.name,p.url)}</span>
@@ -8038,7 +8038,7 @@ function buildActionSteps() {
   Object.entries(pu).forEach(([study,v])=>{
     const pts=v.patients||[];
     const sid='prescr-'+study.replace(/\s+/g,'-').toLowerCase();
-    steps.push({pri:3,id:sid,icon:'📋',tag:'PRE-SCREENER UPDATE',tagBg:'#fef3c7',tagColor:'#b45309',
+    steps.push({pri:3,id:sid,icon:'',tag:'PRE-SCREENER UPDATE',tagBg:'#fef3c7',tagColor:'#b45309',
       title:`Protocol criteria changed · ${sLink(study,v.study_url)}`,
       body:`<div style="padding:8px 10px;background:#fef3c7;border-radius:6px;border-left:3px solid #f59e0b;font-size:11px;margin:6px 0;">
         ➤ Revise pre-screening script to reflect updated inclusion/exclusion criteria before booking new patients
@@ -8097,11 +8097,11 @@ function buildActionSteps() {
   if(nsWithUpcoming.length>0){ const sid='ns-upcoming-'+nsWithUpcoming.length; steps.push({pri:7,id:sid,icon:'📱',tag:'NO SHOW — UPCOMING VISIT',tagBg:'#fdf4ff',tagColor:'#7e22ce',
     title:`${nsWithUpcoming.length} patients no-showed but still have visits on the books`,
     body:`<div style="padding:6px 10px;background:#fdf4ff;border-radius:6px;border-left:3px solid #a855f7;font-size:11px;margin:6px 0;">
-      ⚠️ These patients did not show — but future visits are still scheduled. Confirm attendance now or reschedule.
+      These patients did not show — but future visits are still scheduled. Confirm attendance now or reschedule.
     </div><div style="margin-top:4px;">${nsWithUpcoming.map(p=>patRow(p,true,sid)).join('')}</div>`,
     action:'Text + call each patient today. Confirm the upcoming visit explicitly. Log all contact attempts in CRIO.'
   });}
-  if(nsNoUpcoming.length>0){ const sid='ns-resched-'+nsNoUpcoming.length; steps.push({pri:8,id:sid,icon:'📋',tag:'NO SHOW — RESCHEDULE',tagBg:'#f5f3ff',tagColor:'#5b21b6',
+  if(nsNoUpcoming.length>0){ const sid='ns-resched-'+nsNoUpcoming.length; steps.push({pri:8,id:sid,icon:'',tag:'NO SHOW — RESCHEDULE',tagBg:'#f5f3ff',tagColor:'#5b21b6',
     title:`${nsNoUpcoming.length} no-shows with no future visit scheduled`,
     body:`<div style="margin-top:6px;">${nsNoUpcoming.slice(0,6).map(p=>patRow(p,true,sid)).join('')}${nsNoUpcoming.length>6?`<div style="padding:4px 0;color:#94a3b8;font-size:11px;">+${nsNoUpcoming.length-6} more</div>`:''}</div>`,
     action:'Reach out to reschedule. If no response in 5 days: document as LTF.'
@@ -8328,7 +8328,7 @@ function buildPatientPipelineBySite() {
 
   var html = '<div style="display:flex;gap:24px;flex-wrap:wrap;">';
   html += buildSitePipeline('📍 Philadelphia (PHL)', phl, phlTotal, '#1843ad');
-  html += buildSitePipeline('🌿 Pennington (PNJ)', pnj, pnjTotal, '#059669');
+  html += buildSitePipeline('Pennington (PNJ)', pnj, pnjTotal, '#059669');
   html += '</div>';
 
   if (container) container.innerHTML = html;
@@ -9043,7 +9043,7 @@ function showRescheduled() {
 
   // ── Confirmed Rescheduled (have new date) ──
   if (confirmed.length) {
-    body += '<div style="font-size:12px;font-weight:700;color:#059669;margin-bottom:8px;border-bottom:1px solid #e2e8f0;padding-bottom:4px;">✅ Confirmed Rescheduled (' + confirmed.length + ')</div>' +
+    body += '<div style="font-size:12px;font-weight:700;color:#059669;margin-bottom:8px;border-bottom:1px solid #e2e8f0;padding-bottom:4px;">Confirmed Rescheduled (' + confirmed.length + ')</div>' +
       '<div style="margin-bottom:6px;font-size:11px;color:#64748b">Cancelled but have a new appointment booked in the same study.</div>' +
       '<table class="detail-table"><thead><tr>' +
       '<th>Patient</th><th>Study</th><th>Cancelled</th><th>New Date</th><th>Original Reason</th><th>Coordinator</th><th>Site</th>' +
@@ -9063,7 +9063,7 @@ function showRescheduled() {
 
   // ── Pending Reschedules (no new date yet) ──
   if (pending.length) {
-    body += '<div style="font-size:12px;font-weight:700;color:#d97706;margin:' + (confirmed.length ? '20px' : '0') + ' 0 8px;border-bottom:1px solid #e2e8f0;padding-bottom:4px;">⚠️ Pending — No New Appointment (' + pending.length + ')</div>' +
+    body += '<div style="font-size:12px;font-weight:700;color:#d97706;margin:' + (confirmed.length ? '20px' : '0') + ' 0 8px;border-bottom:1px solid #e2e8f0;padding-bottom:4px;">Pending — No New Appointment (' + pending.length + ')</div>' +
       '<div style="margin-bottom:6px;font-size:11px;color:#64748b">Cancel reason mentions reschedule but no new appointment found. These patients may have dropped out.</div>' +
       '<table class="detail-table"><thead><tr>' +
       '<th>Patient</th><th>Study</th><th>Cancelled</th><th>Reason</th><th>Coordinator</th><th>Site</th>' +
@@ -9270,7 +9270,7 @@ function showStudyDetail(studyName, studyUrl) {
 
   let body = '';
   if(upcoming.length) {
-    body += `<h4 style="font-size:12px;font-weight:700;color:#475569;margin:0 0 8px;text-transform:uppercase;letter-spacing:.5px;">📆 Upcoming Visits (${upcoming.length})</h4>
+    body += `<h4 style="font-size:12px;font-weight:700;color:#475569;margin:0 0 8px;text-transform:uppercase;letter-spacing:.5px;">Upcoming Visits (${upcoming.length})</h4>
     <table class="detail-table" style="margin-bottom:20px"><thead><tr>
       <th>Date</th><th>Patient</th><th>Visit</th><th>Status</th><th>Coordinator</th><th>Investigator</th>
     </tr></thead><tbody>` +
@@ -9284,7 +9284,7 @@ function showStudyDetail(studyName, studyUrl) {
     </tr>`).join('') + `</tbody></table>`;
   }
   if(allCancelRows.length) {
-    body += `<h4 style="font-size:12px;font-weight:700;color:#475569;margin:0 0 8px;text-transform:uppercase;letter-spacing:.5px;">❌ Recent Cancellations (${allCancelRows.length})</h4>
+    body += `<h4 style="font-size:12px;font-weight:700;color:#475569;margin:0 0 8px;text-transform:uppercase;letter-spacing:.5px;">Recent Cancellations (${allCancelRows.length})</h4>
     <table class="detail-table"><thead><tr>
       <th>Patient</th><th>Type</th><th>Cancel Date</th><th>Reason</th><th>Coordinator</th>
     </tr></thead><tbody>` +
@@ -9311,7 +9311,7 @@ function showStudyUnifiedModal(studyName) {
   var allCancelRows = (DATA.allCancels||[]).filter(function(r){ return r.study===studyName; });
   var riskEntry = (DATA.riskMatrix||[]).find(function(r){ return r.study===studyName; });
 
-  body += '<h4 style="' + sectionStyle + '">📆 Enrollment & Visits</h4>';
+  body += '<h4 style="' + sectionStyle + '">Enrollment & Visits</h4>';
   if (riskEntry) {
     var pct = riskEntry.target > 0 ? Math.round(riskEntry.enrolled / riskEntry.target * 100) : 0;
     body += '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;">';
@@ -9348,7 +9348,7 @@ function showStudyUnifiedModal(studyName) {
   /* 2 — Referral Pipeline (from REFERRAL_DATA) */
   var refs = REFERRAL_DATA.filter(function(r) { return matchesStudy(r.study, studyName); });
   if (refs.length > 0) {
-    body += '<h4 style="' + sectionStyle + '">🔄 Referral Pipeline (' + refs.length + ')</h4>';
+    body += '<h4 style="' + sectionStyle + '">Referral Pipeline (' + refs.length + ')</h4>';
     var stages = {};
     refs.forEach(function(r) { var s = r.stage || 'Unknown'; stages[s] = (stages[s]||0) + 1; });
     body += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">';
@@ -9375,7 +9375,7 @@ function showStudyUnifiedModal(studyName) {
   /* 3 — Medical Records (from MED_RECORDS_DATA) */
   var medRec = getStudyMedRecords(studyName);
   if (medRec && medRec.total > 0) {
-    body += '<h4 style="' + sectionStyle + '">🏥 Medical Records (' + medRec.total + ')</h4>';
+    body += '<h4 style="' + sectionStyle + '">Medical Records (' + medRec.total + ')</h4>';
     body += '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px;">';
     body += '<div style="font-size:11px;"><span style="color:#8b5cf6;font-weight:700;">' + medRec.active + '</span> active</div>';
     body += '<div style="font-size:11px;"><span style="color:#059669;font-weight:700;">' + medRec.enrolled + '</span> enrolled</div>';
@@ -9410,7 +9410,7 @@ function showStudyUnifiedModal(studyName) {
   if (campaigns.length > 0) {
     var totalContacts = campaigns.reduce(function(sum, c) { return sum + (c.contacts||0); }, 0);
     var totalConversions = campaigns.reduce(function(sum, c) { return sum + (c.conversions||0); }, 0);
-    body += '<h4 style="' + sectionStyle + '">📊 Campaign Activity (' + campaigns.length + ' campaigns)</h4>';
+    body += '<h4 style="' + sectionStyle + '">Campaign Activity (' + campaigns.length + ' campaigns)</h4>';
     body += '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px;">';
     body += '<div style="font-size:11px;"><strong>Contacts:</strong> ' + totalContacts + '</div>';
     body += '<div style="font-size:11px;"><strong>Conversions:</strong> ' + totalConversions + '</div>';
@@ -9421,7 +9421,7 @@ function showStudyUnifiedModal(studyName) {
   /* 5 — FB/Meta Leads (from FB_CRM_DATA) */
   var fbData = getStudyFBLeads(studyName);
   if (fbData.count > 0) {
-    body += '<h4 style="' + sectionStyle + '">📱 Facebook/Meta Leads (' + fbData.count + ')</h4>';
+    body += '<h4 style="' + sectionStyle + '">Facebook/Meta Leads (' + fbData.count + ')</h4>';
     if (fbData.recent > 0) body += '<div style="font-size:11px;margin-bottom:6px;color:#3b82f6;font-weight:600;">' + fbData.recent + ' new leads in last 30 days</div>';
     if (fbData.leads && fbData.leads.length > 0) {
       body += '<table class="detail-table" style="margin-bottom:12px;"><thead><tr><th>Name</th><th>Phone</th><th>Created</th></tr></thead><tbody>';
@@ -9491,7 +9491,7 @@ function showStudyUnifiedModal(studyName) {
   var studyReg = (window._actionTraining||[]).find(function(r){ return r.study_name && (r.study_name.includes(studyName) || studyName.includes(r.study_name.split(' - ').pop())); });
   var studyTodos = (window._actionTodos||[]).filter(function(t){ return t.study_name && (t.study_name.includes(studyName) || studyName.includes(t.study_name.split(' - ').pop())); });
   if ((studyReg && (parseInt(studyReg.trainings_missing)||0) + (parseInt(studyReg.duties_pending)||0) > 0) || studyTodos.length > 0) {
-    body += '<h4 style="' + sectionStyle + '">✅ Compliance</h4>';
+    body += '<h4 style="' + sectionStyle + '">Compliance</h4>';
     if (studyReg) {
       body += '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px;">';
       if (parseInt(studyReg.trainings_missing) > 0) body += '<div style="font-size:11px;color:#dc2626;font-weight:700;">' + studyReg.trainings_missing + ' missing trainings</div>';
@@ -9519,7 +9519,7 @@ function showStudyUnifiedModal(studyName) {
   if (typeof isFinanceUnlocked === 'function' && isFinanceUnlocked()) {
     var gaapStudy = (window._gaapStudyData||[]).find(function(g){ return g.study && (g.study.includes(studyName) || studyName.includes(g.protocol)); });
     if (gaapStudy) {
-      body += '<h4 style="' + sectionStyle + '">💰 Finance (GAAP)</h4>';
+      body += '<h4 style="' + sectionStyle + '">Finance (GAAP)</h4>';
       body += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">';
       body += '<div style="font-size:11px;"><strong>Total Revenue:</strong> $' + Math.round(gaapStudy.total_revenue).toLocaleString() + '</div>';
       body += '<div style="font-size:11px;"><strong>12M Revenue:</strong> $' + Math.round(gaapStudy.revenue_12m).toLocaleString() + '</div>';
@@ -9556,7 +9556,7 @@ function showCoordDetail(coordName) {
 
   let body = '';
   if(upcoming.length) {
-    body += `<h4 style="font-size:12px;font-weight:700;color:#475569;margin:0 0 8px;text-transform:uppercase;letter-spacing:.5px;">📆 Upcoming Visits (${upcoming.length})</h4>
+    body += `<h4 style="font-size:12px;font-weight:700;color:#475569;margin:0 0 8px;text-transform:uppercase;letter-spacing:.5px;">Upcoming Visits (${upcoming.length})</h4>
     <table class="detail-table" style="margin-bottom:20px"><thead><tr>
       <th>Date</th><th>Patient</th><th>Study</th><th>Visit</th><th>Status</th><th>Investigator</th>
     </tr></thead><tbody>` +
@@ -9570,7 +9570,7 @@ function showCoordDetail(coordName) {
     </tr>`).join('') + `</tbody></table>`;
   }
   if(allCancelRows.length) {
-    body += `<h4 style="font-size:12px;font-weight:700;color:#475569;margin:0 0 8px;text-transform:uppercase;letter-spacing:.5px;">❌ Cancellations (${allCancelRows.length})</h4>
+    body += `<h4 style="font-size:12px;font-weight:700;color:#475569;margin:0 0 8px;text-transform:uppercase;letter-spacing:.5px;">Cancellations (${allCancelRows.length})</h4>
     <table class="detail-table"><thead><tr>
       <th>Patient</th><th>Study</th><th>Type</th><th>Date</th><th>Reason</th>
     </tr></thead><tbody>` +
@@ -9639,7 +9639,7 @@ function initReferrals() {
 
 async function refreshReferrals() {
   const badge = document.getElementById('ref-status-badge');
-  if (badge) badge.textContent = '⏳ Fetching...';
+  if (badge) badge.textContent = 'Fetching...';
 
   try {
     // Fetch referral + campaign data — Cloud Function (ClickUp API) or Sheets fallback
@@ -9720,7 +9720,7 @@ async function refreshReferrals() {
         }
       });
     }
-    if (badge) badge.textContent = `✅ ${REFERRAL_DATA.length} referrals · ${new Date().toLocaleTimeString()}`;
+    if (badge) badge.textContent = `${REFERRAL_DATA.length} referrals · ${new Date().toLocaleTimeString()}`;
     setHealthChip('dh-referrals', REFERRAL_DATA.length > 0 ? 'ok' : 'warn', 'Referrals (' + REFERRAL_DATA.length + ')');
     setHealthChip('dh-campaigns', CAMPAIGN_DATA.length > 0 ? 'ok' : 'warn', 'Campaigns (' + CAMPAIGN_DATA.length + ')');
     _log(`CRP Referrals: Loaded ${REFERRAL_DATA.length} referrals, ${CAMPAIGN_DATA.length} campaigns`);
@@ -9745,7 +9745,7 @@ async function refreshReferrals() {
     fetchStudyMasterList().catch(e => console.warn('Study Master List fetch failed:', e));
   } catch(e) {
     console.error('CRP Referrals: CSV fetch failed', e);
-    if (badge) badge.textContent = '❌ Fetch failed';
+    if (badge) badge.textContent = 'Fetch failed';
     setHealthChip('dh-referrals', 'fail', 'Referrals (failed)');
     setHealthChip('dh-campaigns', 'fail', 'Campaigns (failed)');
   }
@@ -10650,7 +10650,7 @@ function showCampaignDetailModal(studyName) {
 
   // Referral Pipeline Participants with cross-reference
   if (referrals.length > 0) {
-    html += `<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px;">📋 Referral Pipeline Participants</div>`;
+    html += `<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px;">Referral Pipeline Participants</div>`;
     html += `<table class="detail-table" style="width:100%;font-size:11px;margin-bottom:16px;"><thead><tr>
       <th>Participant</th><th>Stage</th><th>Source</th><th>Appt Booked</th><th>Patient Status</th><th>Last Updated</th>
     </tr></thead><tbody>`;
@@ -10700,7 +10700,7 @@ function showCampaignDetailModal(studyName) {
       _crioSubjects.forEach(function(s) { _csByStatus[s.status] = (_csByStatus[s.status]||0)+1; });
       var _csStatusOrder = ['ENROLLED','SCREENING','SCHEDULED_V1','PREQUALIFIED','INTERESTED','SCREEN_FAIL','DISCONTINUED','COMPLETED','NOT_INTERESTED','NOT_ELIGIBLE'];
       var _csColors = {'ENROLLED':'#059669','SCREENING':'#8b5cf6','SCHEDULED_V1':'#06b6d4','PREQUALIFIED':'#3b82f6','INTERESTED':'#64748b','SCREEN_FAIL':'#dc2626','DISCONTINUED':'#94a3b8','COMPLETED':'#059669','NOT_INTERESTED':'#94a3b8','NOT_ELIGIBLE':'#dc2626'};
-      html += `<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px;margin-top:16px;">🏥 CRIO Subjects (${_crioSubjects.length} across ${_matchedStudies.length} studies: ${_matchedStudies.map(function(s){return escapeHTML(s.protocol_number);}).join(', ')})</div>`;
+      html += `<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px;margin-top:16px;">CRIO Subjects (${_crioSubjects.length} across ${_matchedStudies.length} studies: ${_matchedStudies.map(function(s){return escapeHTML(s.protocol_number);}).join(', ')})</div>`;
       html += '<div style="display:flex;gap:10px;flex-wrap:wrap;padding:0 0 12px;">';
       _csStatusOrder.forEach(function(st) {
         if (!_csByStatus[st]) return;
@@ -10919,7 +10919,7 @@ function showReferralDetailModal(filterFn, title, subtitle) {
     } else if (_crioSrc) {
       _srcCell = '<span style="color:#8b5cf6;">' + escapeHTML(_crioSrc) + (_isInferred ? ' <em style="font-size:8px;">~</em>' : '') + '</span>';
     } else if (_cuSrc) {
-      _srcCell = '<span style="color:#d97706;" title="No CRIO source — needs update">' + escapeHTML(_cuSrc) + ' <em style="font-size:9px;">⚠ not in CRIO</em></span>';
+      _srcCell = '<span style="color:#d97706;" title="No CRIO source — needs update">' + escapeHTML(_cuSrc) + ' <em style="font-size:9px;">not in CRIO</em></span>';
     } else {
       _srcCell = '<span style="color:#cbd5e1;">—</span>';
     }
@@ -12553,7 +12553,7 @@ async function fetchFacebookCRM() {
   } catch(e) {
     console.warn('CRP: Facebook CRM fetch failed:', e.message);
     const el = document.getElementById('ref-fb-table');
-    if (el) el.innerHTML = '<div style="text-align:center;padding:20px;color:#94a3b8;font-size:13px;">⚠️ Could not load Facebook CRM sheet</div>';
+    if (el) el.innerHTML = '<div style="text-align:center;padding:20px;color:#94a3b8;font-size:13px;">Could not load Facebook CRM sheet</div>';
   }
 }
 
@@ -14978,7 +14978,7 @@ function _injectExportBars() {
     var bar = document.createElement('div');
     bar.className = 'export-bar';
     bar.innerHTML = '<button class="export-btn" onclick="exportPDF()">📄 Print / PDF</button>'
-      + '<button class="export-btn" onclick="exportCSV()">📊 Export CSV</button>';
+      + '<button class="export-btn" onclick="exportCSV()">Export CSV</button>';
     view.insertBefore(bar, view.firstChild);
   });
 }
@@ -15023,7 +15023,7 @@ function setHealthChip(id, status, label) {
   const el = document.getElementById(id);
   if (!el) return;
   el.className = 'dh-chip ' + status;
-  const icon = status === 'ok' ? '✓' : status === 'warn' ? '⚠' : status === 'fail' ? '✗' : '⏳';
+  const icon = status === 'ok' ? '✓' : status === 'warn' ? '⚠' : status === 'fail' ? '✗' : '';
   el.textContent = icon + ' ' + label;
   _updateHealthButton();
 }
@@ -15079,7 +15079,7 @@ function checkDataFreshness(rows) {
     freshEl.textContent = 'Data is ' + ageDays + ' days old';
     freshEl.style.color = '#92400E';
   } else {
-    freshEl.textContent = '⚠ Data is ' + ageDays + ' days old — Looker may have stopped pushing';
+    freshEl.textContent = 'Data is ' + ageDays + ' days old — Looker may have stopped pushing';
     freshEl.style.color = '#991B1B';
   }
 }
@@ -15156,7 +15156,7 @@ async function _crpInit() {
         setHealthChip('dh-crio','warn','CRIO (' + rows1.length + ' rows, low upcoming)');
       } else {
         DATA = newData;
-        if (srcBadge) srcBadge.textContent = '🔗 Live Google Sheets';
+        if (srcBadge) srcBadge.textContent = 'Live Google Sheets';
         if (badge) { badge.textContent = 'Updated: ' + new Date().toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'}); badge.style.color = ''; }
         var fb0=document.getElementById('fallback-banner'); if(fb0) fb0.style.display='none';
         scheduleRender();
@@ -15176,7 +15176,7 @@ async function _crpInit() {
       console.warn('CRP: Phase 1 failed:', e.message, '— retrying in 5s...');
       showToast('Data fetch failed — retrying...', 'warning');
       setHealthChip('dh-crio','warn','CRIO (retrying...)');
-      if (badge) { badge.textContent = '⚠️ Fetch failed — retrying...'; badge.style.color = '#dc2626'; }
+      if (badge) { badge.textContent = 'Fetch failed — retrying...'; badge.style.color = '#dc2626'; }
       await new Promise(r => setTimeout(r, CRP_CONFIG.RETRY_DELAY));
       try {
         const [rows1b, legacyB, auditB] = await Promise.all([
@@ -15189,7 +15189,7 @@ async function _crpInit() {
         const retryData = processLiveData(rows1b, legacyB, auditB);
         if ((retryData.upcomingTotal || 0) >= 5) {
           DATA = retryData;
-          if (srcBadge) srcBadge.textContent = '🔗 Live Google Sheets';
+          if (srcBadge) srcBadge.textContent = 'Live Google Sheets';
           if (badge) { badge.textContent = 'Updated: ' + new Date().toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'}); badge.style.color = ''; }
           scheduleRender();
           _lastDataLoadTimestamp = Date.now();
@@ -15201,7 +15201,7 @@ async function _crpInit() {
           checkDataFreshness(rows1b);
         } else {
           console.warn('CRP: Phase 1 retry also returned low data — staying on SAMPLE');
-          if (badge) badge.textContent = '⚠️ Live data unavailable';
+          if (badge) badge.textContent = 'Live data unavailable';
           showToast('Live data unavailable — using sample data', 'error', 8000);
           var fb=document.getElementById('fallback-banner'); if(fb) fb.style.display='';
           setHealthChip('dh-crio','fail','CRIO (failed)');
@@ -15209,7 +15209,7 @@ async function _crpInit() {
         }
       } catch(e2) {
         console.warn('CRP: Phase 1 retry failed:', e2.message);
-        if (badge) badge.textContent = '⚠️ Live data unavailable — click Refresh';
+        if (badge) badge.textContent = 'Live data unavailable — click Refresh';
         showToast('Live data unavailable — click Refresh to retry', 'error', 8000);
         var fb2=document.getElementById('fallback-banner'); if(fb2) fb2.style.display='';
         setHealthChip('dh-crio','fail','CRIO (failed)');
