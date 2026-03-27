@@ -4929,6 +4929,8 @@ function fetchActionRequiredData() {
       // Update overview KPI
       var kpiEl = document.getElementById('kpi-unsched');
       if (kpiEl) kpiEl.textContent = unschedRows.length;
+      var kpiEl2 = document.getElementById('kpi-unsched-studies');
+      if (kpiEl2) kpiEl2.textContent = unschedRows.length;
       // Re-render studies table to pick up new data
       if (typeof renderStudiesTable === 'function') safe(renderStudiesTable, 'studiesTable-unsched');
     }
