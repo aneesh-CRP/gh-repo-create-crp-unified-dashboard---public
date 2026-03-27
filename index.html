@@ -15392,7 +15392,7 @@ function renderMetaAlerts() {
 
     // Alert: Paused campaign with strong efficiency
     if (meta.status === 'PAUSED' && c.leads > 50 && c.cpl < 10) {
-      alerts.push({ type: 'opportunity', icon: '\uD83D\uDFE2', msg: '<strong>' + escapeHTML(c.campaign) + '</strong> is PAUSED but was a top performer (' + c.leads + ' leads, strong efficiency). Consider reactivating.' });
+      alerts.push({ type: 'opportunity', icon: '', msg: '<strong>' + escapeHTML(c.campaign) + '</strong> is PAUSED but was a top performer (' + c.leads + ' leads, strong efficiency). Consider reactivating.' });
     }
 
     // Alert: Active campaign targeting study in maintenance
@@ -15416,10 +15416,10 @@ function renderMetaAlerts() {
         if (curCtr < prevCtr) ctrDecline++; else ctrDecline = 0;
       }
       if (leadDecline >= 2) {
-        alerts.push({ type: 'warning', icon: '\uD83D\uDCC9', msg: '<strong>' + escapeHTML(c.campaign) + '</strong> lead volume declining ' + (leadDecline+1) + ' weeks in a row \u2014 likely creative fatigue. Refresh ad creative or audience.' });
+        alerts.push({ type: 'warning', icon: '', msg: '<strong>' + escapeHTML(c.campaign) + '</strong> lead volume declining ' + (leadDecline+1) + ' weeks in a row \u2014 likely creative fatigue. Refresh ad creative or audience.' });
       }
       if (ctrDecline >= 2 && leadDecline < 2) {
-        alerts.push({ type: 'warning', icon: '\uD83D\uDCC9', msg: '<strong>' + escapeHTML(c.campaign) + '</strong> CTR declining ' + (ctrDecline+1) + ' consecutive weeks \u2014 audience fatigue signal. Consider new creative.' });
+        alerts.push({ type: 'warning', icon: '', msg: '<strong>' + escapeHTML(c.campaign) + '</strong> CTR declining ' + (ctrDecline+1) + ' consecutive weeks \u2014 audience fatigue signal. Consider new creative.' });
       }
       // Also check first-vs-last spend efficiency
       var first = weeks[0], last = weeks[weeks.length - 1];
@@ -15427,14 +15427,14 @@ function renderMetaAlerts() {
         var firstEff = first.spend / first.leads;
         var lastEff = last.spend / last.leads;
         if (lastEff > firstEff * 1.4 && last.spend > 100 && leadDecline < 2) {
-          alerts.push({ type: 'warning', icon: '\uD83D\uDCC9', msg: '<strong>' + escapeHTML(c.campaign) + '</strong> cost efficiency declining \u2014 CPL up 40%+ over ' + weeks.length + ' weeks. Review targeting.' });
+          alerts.push({ type: 'warning', icon: '', msg: '<strong>' + escapeHTML(c.campaign) + '</strong> cost efficiency declining \u2014 CPL up 40%+ over ' + weeks.length + ' weeks. Review targeting.' });
         }
       }
     }
 
     // Alert: CTR below 1.5%
     if (meta.status === 'ACTIVE' && c.ctr < 1.5 && c.impressions > 10000) {
-      alerts.push({ type: 'info', icon: '\uD83D\uDCA1', msg: '<strong>' + escapeHTML(c.campaign) + '</strong> has low CTR (' + c.ctr.toFixed(2) + '%). Consider refreshing ad creative.' });
+      alerts.push({ type: 'info', icon: '', msg: '<strong>' + escapeHTML(c.campaign) + '</strong> has low CTR (' + c.ctr.toFixed(2) + '%). Consider refreshing ad creative.' });
     }
   });
 
@@ -15445,7 +15445,7 @@ function renderMetaAlerts() {
     var worstActive = active.slice().sort(function(a,b) { return b.cpl - a.cpl; })[0];
     var bestPaused = paused.slice().sort(function(a,b) { return a.cpl - b.cpl; })[0];
     if (worstActive && bestPaused && bestPaused.cpl > 0 && bestPaused.cpl < worstActive.cpl * 0.6) {
-      alerts.push({ type: 'opportunity', icon: '\uD83D\uDD04', msg: 'Budget opportunity: <strong>' + escapeHTML(bestPaused.campaign) + '</strong> (paused, high efficiency) outperforms active <strong>' + escapeHTML(worstActive.campaign) + '</strong>. Consider reallocation.' });
+      alerts.push({ type: 'opportunity', icon: '', msg: 'Budget opportunity: <strong>' + escapeHTML(bestPaused.campaign) + '</strong> (paused, high efficiency) outperforms active <strong>' + escapeHTML(worstActive.campaign) + '</strong>. Consider reallocation.' });
     }
   }
 
@@ -17793,8 +17793,8 @@ async function _crpInit() {
   var _y1i = _now2.getFullYear(), _y2i = _m2i===0 ? _y1i+1 : _y1i;
   window._schedMonth1Prefix = _y1i+'-'+String(_m1i+1).padStart(2,'0');
   window._schedMonth2Prefix = _y2i+'-'+String(_m2i+1).padStart(2,'0');
-  skpi('sched-kpi-month1-label', '\uD83D\uDCC5 ' + _mn2[_m1i]);
-  skpi('sched-kpi-month2-label', '\uD83D\uDCC5 ' + _mn2[_m2i]);
+  skpi('sched-kpi-month1-label', _mn2[_m1i]);
+  skpi('sched-kpi-month2-label', _mn2[_m2i]);
   // Inject export bars into views
   if (typeof _injectExportBars === 'function') _injectExportBars();
 
