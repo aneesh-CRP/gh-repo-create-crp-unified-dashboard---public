@@ -3549,10 +3549,10 @@ function showHorizonDetail(type, weekLabel) {
 function buildCancelStudyBars() {
   const el = document.getElementById('cancel-study-bars');
   if (!el || !DATA) return;
-  var cancels = (DATA.allCancels || []).filter(function(r){return !_patientRecovered(r.name,r.study);});
-  var noShows = (DATA.noShows || []).filter(function(r){return !_patientRecovered(r.name,r.study);});
-  var screenFails = (DATA.screenFails || []).filter(function(r){return !_patientRecovered(r.name,r.study);});
-  var withdrawals = (DATA.withdrawals || []).filter(function(r){return !_patientRecovered(r.name,r.study);});
+  var cancels = (DATA.allCancels || []).filter(function(r){return !_patientRecovered(r.name,r.study,r.subject_key);});
+  var noShows = (DATA.noShows || []).filter(function(r){return !_patientRecovered(r.name,r.study,r.subject_key);});
+  var screenFails = (DATA.screenFails || []).filter(function(r){return !_patientRecovered(r.name,r.study,r.subject_key);});
+  var withdrawals = (DATA.withdrawals || []).filter(function(r){return !_patientRecovered(r.name,r.study,r.subject_key);});
 
   // Aggregate by study
   var studies = {};
@@ -3621,10 +3621,10 @@ function buildReasonBreakdown() {
 function buildSiteStackedBars() {
   var el = document.getElementById('site-stacked-bars');
   if (!el || !DATA || !DATA.sites) return;
-  var cancels = (DATA.allCancels || []).filter(function(r){return !_patientRecovered(r.name,r.study);});
-  var noShows = (DATA.noShows || []).filter(function(r){return !_patientRecovered(r.name,r.study);});
-  var screenFails = (DATA.screenFails || []).filter(function(r){return !_patientRecovered(r.name,r.study);});
-  var withdrawals = (DATA.withdrawals || []).filter(function(r){return !_patientRecovered(r.name,r.study);});
+  var cancels = (DATA.allCancels || []).filter(function(r){return !_patientRecovered(r.name,r.study,r.subject_key);});
+  var noShows = (DATA.noShows || []).filter(function(r){return !_patientRecovered(r.name,r.study,r.subject_key);});
+  var screenFails = (DATA.screenFails || []).filter(function(r){return !_patientRecovered(r.name,r.study,r.subject_key);});
+  var withdrawals = (DATA.withdrawals || []).filter(function(r){return !_patientRecovered(r.name,r.study,r.subject_key);});
   var upcoming = DATA.allVisitDetail || [];
 
   var sites = {};
@@ -3980,7 +3980,7 @@ function renderCoordinatorGoals() {
 
   // Build cancel counts per coordinator for cancel rate column
   var _coordCancels = {};
-  (DATA.allCancels || []).filter(function(c){return !_patientRecovered(c.name,c.study);}).forEach(function(c) {
+  (DATA.allCancels || []).filter(function(c){return !_patientRecovered(c.name,c.study,c.subject_key);}).forEach(function(c) {
     var cn = c.coord || '';
     _coordCancels[cn] = (_coordCancels[cn] || 0) + 1;
   });
@@ -4021,7 +4021,7 @@ function renderCoordWorkloadBalance() {
   var c60ago = new Date(today); c60ago.setDate(c60ago.getDate() - 60);
   var recentCancels = (DATA.allCancels || []).filter(function(c) {
     var d = _parseDate(c.cancel_date);
-    return d && d >= c60ago && !_patientRecovered(c.name, c.study);
+    return d && d >= c60ago && !_patientRecovered(c.name,c.study,c.subject_key);
   });
 
   var coordStats = COORDS.map(function(name) {
@@ -4096,7 +4096,7 @@ function renderCoordCancelTypeChart() {
   var coordStats = [];
 
   COORDS.forEach(function(name) {
-    var cx = DATA.allCancels.filter(function(c) { return c.coord === name && !_patientRecovered(c.name,c.study); });
+    var cx = DATA.allCancels.filter(function(c) { return c.coord === name && !_patientRecovered(c.name,c.study,c.subject_key); });
     var ns = cx.filter(function(c) { return c.type === 'No Show'; }).length;
     var sc = cx.filter(function(c) { return c.type === 'Site Cancelled'; }).length;
     var pc = cx.filter(function(c) { return c.type === 'Patient Cancelled'; }).length;
@@ -4189,7 +4189,7 @@ function renderInvCapacity() {
   var el = document.getElementById('invCapacityContainer');
   if (!el) return;
   var allVisits = DATA.allVisitDetail || [];
-  var cancels = (DATA.allCancels || []).filter(function(c){return !_patientRecovered(c.name,c.study);});
+  var cancels = (DATA.allCancels || []).filter(function(c){return !_patientRecovered(c.name,c.study,c.subject_key);});
   var INVS = CRP_CONFIG.INVESTIGATORS || [];
   if (INVS.length === 0 || allVisits.length === 0) return;
   var schedules = CRP_CONFIG.INV_SCHEDULES || {};
@@ -4775,7 +4775,7 @@ function fetchActionRequiredData() {
   var _s = function(id, val) { var e = document.getElementById(id); if (e) e.textContent = val; };
 
   // Batch fetch feeds in one request (reduces HTTP overhead)
-  fetch(base + '?feed=batch&feeds=comments,documentSummary,visitTodos,regulatory,recruiterStats,demographics,eregPending,prescrVisits,recruiting,subjectAudit,unscheduledVisits&format=json')
+  fetch(base + '?feed=batch&feeds=comments,documentSummary,visitTodos,regulatory,recruiterStats,demographics,eregPending,prescrVisits,recruiting,subjectAudit,unscheduledVisits,subjects&format=json')
   .then(function(r) { return r.json(); })
   .then(function(batch) {
     var results = batch.results || {};
@@ -4876,6 +4876,20 @@ function fetchActionRequiredData() {
         }
       });
       _log('CRP: Subject audit loaded — ' + window._subjectAudit.length + ' transitions, ' + window._dnqReasons.length + ' DNQ reasons, ' + Object.keys(window._latestSubjectStatus).length + ' latest statuses');
+    }
+
+    // BQ subjects table — current status per subject_key (supplements audit trail)
+    var subjectRows = (results.subjects || {}).data || [];
+    if (subjectRows.length > 0) {
+      var STATUS_CODE_MAP = {'-2':'Not Interested','-1':'Not Eligible','1':'Interested','2':'Prequalified',
+        '3':'No Show/Cancelled V1','4':'Scheduled V1','10':'Screening','11':'Enrolled',
+        '12':'Screen Fail','13':'Discontinued','20':'Completed'};
+      window._subjectCurrentStatus = {};
+      subjectRows.forEach(function(s) {
+        var sk = s.subject_id || s.subject_key || '';
+        if (sk) window._subjectCurrentStatus[String(sk)] = STATUS_CODE_MAP[String(s.status)] || String(s.status);
+      });
+      _log('CRP: Subjects loaded — ' + subjectRows.length + ' records, ' + Object.keys(window._subjectCurrentStatus).length + ' status lookups');
     }
 
     // Pre-screening visits + FibroScans (display in schedule, separate from visit metrics)
@@ -7718,6 +7732,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
       url: patientUrl(r['Study Key'], r['Subject Key (Back End)'], r['Site Name']) || '',
       study: (r['Study Name']||'').split(' - ').pop().trim(),
       study_url: studyUrl(r['Study Key'], r['Site Name']) || '',
+      subject_key: r['Subject Key (Back End)']||'',
       subject_status: r['Subject Status']||'',
       coord: cleanCoord(r['Staff Full Name'] || r['Full Name']),
       investigator: cleanCoord(resolveInvestigator(r)),
@@ -8019,12 +8034,20 @@ var _TERMINAL_STATUSES = {'Screen Fail':1,'Not Interested':1,'Not Eligible':1,'D
 var _ACTIVE_STATUSES = {'Screening':1,'Enrolled':1,'Scheduled V1':1,'Interested':1,'Prequalified':1,'Completed':1};
 
 // Check if a patient has recovered from a terminal status (don't count them as SF/cancel/etc)
-function _patientRecovered(name, study) {
-  if (!window._latestSubjectStatus) return false;
-  var key = (name||'').toLowerCase().trim().replace(/\s+/g,' ') + '|' + (study||'').toLowerCase().trim();
-  var latest = window._latestSubjectStatus[key];
-  if (!latest) return false;
-  return !!_ACTIVE_STATUSES[latest.status];
+// Checks both audit trail (by name+study) and subjects table (by subject_key)
+function _patientRecovered(name, study, subjectKey) {
+  // Method 1: audit trail latest status
+  if (window._latestSubjectStatus) {
+    var key = (name||'').toLowerCase().trim().replace(/\s+/g,' ') + '|' + (study||'').toLowerCase().trim();
+    var latest = window._latestSubjectStatus[key];
+    if (latest && _ACTIVE_STATUSES[latest.status]) return true;
+  }
+  // Method 2: subjects table current status (by subject_key if available)
+  if (subjectKey && window._subjectCurrentStatus) {
+    var current = window._subjectCurrentStatus[String(subjectKey)];
+    if (current && _ACTIVE_STATUSES[current]) return true;
+  }
+  return false;
 }
 
 // Get latest status for a patient+study
@@ -8129,7 +8152,7 @@ function renderFollowUpTable() {
   function _filterRecovered(list) {
     if (!window._latestSubjectStatus) return list || [];
     return (list || []).filter(function(r) {
-      return !_patientRecovered(r.name || r.patient, r.study);
+      return !_patientRecovered(r.name||r.patient,r.study,r.subject_key);
     });
   }
   addRows(_filterRecovered(DATA.allCancels), 'cancel', 'Cancel', '#dc2626');
@@ -9076,10 +9099,10 @@ function renderAll() {
   var _sk = function(id,v){ var e=document.getElementById(id); if(e) e.textContent=v; };
   // Adjust counts by excluding patients who have since recovered (per audit trail)
   // Stored globally so cancel rate calculations in other functions can use them
-  window._adjCancel = (DATA.allCancels||[]).filter(function(r){return !_patientRecovered(r.name,r.study);}).length;
-  window._adjNoShow = (DATA.noShows||[]).filter(function(r){return !_patientRecovered(r.name,r.study);}).length;
-  window._adjWithdrew = (DATA.withdrawals||[]).filter(function(r){return !_patientRecovered(r.name,r.study);}).length;
-  window._adjSF = (DATA.screenFails||[]).filter(function(r){return !_patientRecovered(r.name,r.study);}).length;
+  window._adjCancel = (DATA.allCancels||[]).filter(function(r){return !_patientRecovered(r.name,r.study,r.subject_key);}).length;
+  window._adjNoShow = (DATA.noShows||[]).filter(function(r){return !_patientRecovered(r.name,r.study,r.subject_key);}).length;
+  window._adjWithdrew = (DATA.withdrawals||[]).filter(function(r){return !_patientRecovered(r.name,r.study,r.subject_key);}).length;
+  window._adjSF = (DATA.screenFails||[]).filter(function(r){return !_patientRecovered(r.name,r.study,r.subject_key);}).length;
   var _adjCancel = window._adjCancel, _adjNoShow = window._adjNoShow, _adjWithdrew = window._adjWithdrew, _adjSF = window._adjSF;
   _sk('kpi-cancels', _adjCancel);
   _sk('kpi-noshow', _adjNoShow);
