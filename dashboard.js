@@ -4325,7 +4325,7 @@ function renderRecruiterPerformance() {
   html += '<tr style="background:#f8fafc;"><th style="text-align:left;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Recruiter</th><th style="text-align:left;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Activity</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Calls</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Texts</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Patients</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Scheduled</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Screen/Enroll</th></tr>';
   stats.forEach(function(s) {
     var barW = Math.round(s.total / maxTotal * 100);
-    html += '<tr style="border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showCoordDetail(\'' + jsAttr(s.name) + '\')">';
+    html += '<tr style="border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showRecruiterDetail(\'' + jsAttr(s.name) + '\')">';
     html += '<td style="padding:8px;"><div style="font-weight:700;color:#1e293b;">' + escapeHTML(s.nick) + '</div></td>';
     html += '<td style="padding:8px;"><div style="background:#e2e8f0;border-radius:5px;height:18px;overflow:hidden;position:relative;">';
     html += '<div style="height:100%;width:'+barW+'%;background:linear-gradient(90deg,#0369a1,#38bdf8);border-radius:5px;"></div>';
@@ -9626,6 +9626,35 @@ function showCancelsByReason(reason) {
     reason + ' — Cancellations',
     (DATA.allCancels||[]).filter(r=>(r.category||r.reason||'')===reason).length + ' records'
   );
+}
+
+function showRecruiterDetail(recruiterName) {
+  var stats = (window._recruiterStats || []).find(function(r) { return r.recruiter === recruiterName; });
+  if (!stats) { openModal(recruiterName, 'Recruiter', '<p style="color:#94a3b8;padding:20px;text-align:center">No interaction data found</p>'); return; }
+  var h = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:16px;">';
+  var kpi = function(label, val, color) { return '<div style="padding:8px;border-radius:8px;text-align:center;background:'+color+'15"><div style="font-size:18px;font-weight:800;color:'+color+'">'+val+'</div><div style="font-size:9px;color:'+color+';font-weight:600">'+label+'</div></div>'; };
+  h += kpi('Interactions', stats.total_interactions||0, '#3b82f6');
+  h += kpi('Phone Calls', stats.phone_calls||0, '#059669');
+  h += kpi('Texts', stats.texts||0, '#8b5cf6');
+  h += kpi('Emails', stats.emails||0, '#d97706');
+  h += kpi('Patients', stats.unique_patients||0, '#7c3aed');
+  h += kpi('Interested', stats.interested_responses||0, '#059669');
+  h += kpi('Scheduled V1', stats.scheduled_v1||0, '#1843ad');
+  h += kpi('Screen/Enroll', stats.screening_enrolled||0, '#059669');
+  h += '</div>';
+  var declined = parseInt(stats.declined_responses)||0;
+  var noAnswer = parseInt(stats.no_answers)||0;
+  var duration = parseInt(stats.total_duration_seconds)||0;
+  var durationMin = duration > 0 ? Math.round(duration / 60) : 0;
+  h += '<table class="detail-table"><thead><tr><th>Metric</th><th class="r">Value</th></tr></thead><tbody>';
+  h += '<tr><td>Declined Responses</td><td class="r">'+declined+'</td></tr>';
+  h += '<tr><td>No Answers</td><td class="r">'+noAnswer+'</td></tr>';
+  h += '<tr><td>Total Call Duration</td><td class="r">'+durationMin+' min</td></tr>';
+  h += '<tr><td>Studies Touched</td><td class="r">'+(stats.studies||0)+'</td></tr>';
+  var convRate = (parseInt(stats.unique_patients)||0) > 0 ? Math.round((parseInt(stats.interested_responses)||0) / (parseInt(stats.unique_patients)||0) * 100) : 0;
+  h += '<tr><td>Interest Rate</td><td class="r" style="font-weight:700;color:'+(convRate>10?'#059669':'#d97706')+'">'+convRate+'%</td></tr>';
+  h += '</tbody></table>';
+  openModal(recruiterName + ' — Recruiter Performance', (stats.total_interactions||0) + ' interactions · ' + (stats.unique_patients||0) + ' patients (30 days)', h);
 }
 
 function showCoordDetail(coordName) {
