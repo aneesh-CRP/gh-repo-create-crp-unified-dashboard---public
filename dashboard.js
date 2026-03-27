@@ -8078,7 +8078,8 @@ function renderFollowUpTable() {
     var reason = (a.reason||'').trim();
     if (reason && reason !== 'Changed status via Recruitment API' && reason !== 'updated' && reason !== 'update') {
       var key = n + '|' + s;
-      if (!_auditReasons[key]) _auditReasons[key] = reason; // keep first (most recent)
+      if (!_auditReasons[key]) _auditReasons[key] = [];
+      if (_auditReasons[key].indexOf(reason) === -1) _auditReasons[key].push(reason);
     }
   });
 
@@ -8107,8 +8108,8 @@ function renderFollowUpTable() {
       var riskLevel = riskFlag ? riskFlag.level : '';
       // Best reason: audit trail > cancel reason > category
       var auditKey = nameLo + '|' + study.toLowerCase();
-      var auditReason = _auditReasons[auditKey] || '';
-      var bestReason = auditReason || r.reason || r.category || '';
+      var auditReasons = _auditReasons[auditKey] || [];
+      var bestReason = auditReasons.length > 0 ? auditReasons.join(' · ') : (r.reason || r.category || '');
       // Determine most current status: subjects table > audit trail > cancel record
       var _curStatus = r.subject_status || r.status || '';
       var _sk = r.subject_key || '';
@@ -8161,7 +8162,8 @@ function renderFollowUpTable() {
     rows.push({
       _name: name, _study: study, _cat: 'unsched', _catLabel: 'Not Scheduled', _catColor: '#c2410c',
       url: typeof window._crioPatientUrl === 'function' ? window._crioPatientUrl(r.study_key, r.subject_key, site) : '',
-      study_url: '', status: _uStatus, reason: r.last_visit_name || '',
+      study_url: (typeof window._crioStudyUrl === 'function' ? window._crioStudyUrl(r.study_key) : '') || '',
+      status: _uStatus, reason: r.last_visit_name || '',
       date: r.last_visit_date || '', coord: '', site: site,
       siteCode: site.indexOf('Penn') !== -1 ? 'PNJ' : 'PHL',
       source: srcObj ? srcObj.source : '', riskLevel: '', type: '',
@@ -8207,6 +8209,8 @@ function renderFollowUpTable() {
     if (fSite && r.siteCode !== fSite) return false;
     var k = _fuKey(r);
     var hasAction = _fuActions[k] && _fuActions[k].action;
+    // Hide "No Action" patients from all views except "actioned" filter
+    if (_fuFilter !== 'actioned' && hasAction && _fuActions[k].action === 'noaction') return false;
     if (_fuFilter === 'actioned' && !hasAction) return false;
     if (fStatus === 'pending' && hasAction) return false;
     if (fStatus === 'actioned' && !hasAction) return false;
@@ -8256,11 +8260,15 @@ function renderFollowUpTable() {
     html = '<tr><td colspan="11" style="text-align:center;padding:30px;color:#94a3b8;">No patients match current filters</td></tr>';
   }
   tbody.innerHTML = html;
+  // Store for ClickUp sync lookup
+  window._fuRenderedRows = rows;
 }
 
 function setFollowUpAction(sel) {
   var key = sel.dataset.fukey;
   var val = sel.value;
+  // Find the row data from the rendered rows
+  var rowData = (window._fuRenderedRows || []).find(function(r) { return _fuKey(r) === key; });
   if (val) {
     _fuActions[key] = { action: val, ts: Date.now() };
   } else {
@@ -8283,6 +8291,45 @@ function setFollowUpAction(sel) {
   var kpi = document.getElementById('fu-kpi-actioned');
   if (kpi) kpi.textContent = actionedCount;
   if (typeof logAudit === 'function') logAudit('followup_action', val + ' | ' + key);
+  // Sync to ClickUp via cloud function (fire-and-forget)
+  if (val && rowData) {
+    _syncFollowUpToClickUp(rowData, val);
+  }
+}
+
+function _syncFollowUpToClickUp(r, action) {
+  var base = CRP_CONFIG.CF_BASE_URL || 'https://us-east1-crio-468120.cloudfunctions.net/crp-bq-feeds';
+  var payload = {
+    patient: r._name || '',
+    study: r._study || '',
+    category: r._catLabel || '',
+    action: action,
+    reason: r.reason || '',
+    coord: r.coord || '',
+    site: r.siteCode || r.site || '',
+    crio_url: r.url || '',
+    status: r.status || '',
+    source: r.source || '',
+    risk: r.riskLevel || ''
+  };
+  fetch(base + '?action=followup-sync', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  }).then(function(resp) { return resp.json(); }).then(function(data) {
+    if (data.success) {
+      // Store ClickUp task URL for this patient
+      var k = _fuKey(r);
+      if (_fuActions[k]) {
+        _fuActions[k].clickup_url = data.url || '';
+        _fuActions[k].clickup_id = data.task_id || '';
+        _saveFuActions();
+      }
+      _log('ClickUp sync: ' + (data.created ? 'created' : 'updated') + ' task ' + (data.task_id || ''));
+    } else {
+      _log('ClickUp sync failed: ' + (data.error || 'unknown'));
+    }
+  }).catch(function(e) { _log('ClickUp sync error: ' + e.message); });
 }
 
 function buildActionSteps() {

@@ -1820,6 +1820,101 @@ async function clickupFetch(path) {
   });
 }
 
+async function clickupPost(path, body) {
+  if (!CLICKUP_TOKEN) throw new Error('No CLICKUP_TOKEN configured');
+  return new Promise((resolve, reject) => {
+    const u = new URL(CLICKUP_API + path);
+    const data = JSON.stringify(body);
+    const req = https.request({ hostname: u.hostname, path: u.pathname + u.search, method: 'POST',
+      headers: { 'Authorization': CLICKUP_TOKEN, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) }
+    }, res => { let d = ''; res.on('data', c => d += c); res.on('end', () => {
+      try { resolve(JSON.parse(d)); } catch(e) { reject(new Error('ClickUp parse error: ' + d.substring(0, 200))); }
+    }); });
+    req.on('error', reject); req.write(data); req.end();
+  });
+}
+
+async function clickupPut(path, body) {
+  if (!CLICKUP_TOKEN) throw new Error('No CLICKUP_TOKEN configured');
+  return new Promise((resolve, reject) => {
+    const u = new URL(CLICKUP_API + path);
+    const data = JSON.stringify(body);
+    const req = https.request({ hostname: u.hostname, path: u.pathname + u.search, method: 'PUT',
+      headers: { 'Authorization': CLICKUP_TOKEN, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) }
+    }, res => { let d = ''; res.on('data', c => d += c); res.on('end', () => {
+      try { resolve(JSON.parse(d)); } catch(e) { reject(new Error('ClickUp parse error: ' + d.substring(0, 200))); }
+    }); });
+    req.on('error', reject); req.write(data); req.end();
+  });
+}
+
+// ── Follow-Up → ClickUp Sync ──
+const FOLLOWUP_LIST_ID = '901414925909';
+const FU_ACTION_TO_STATUS = {
+  'reschedule': 'reschedule', 'call': 'contact', 'recruit': 'recruit',
+  'rescreen': 're-screen', 'waitlist': 'waitlist', 'lost': 'lost', 'noaction': 'n/a'
+};
+const FU_ACTION_LABELS = {
+  'reschedule': 'Reschedule Visit', 'call': 'Call Patient', 'recruit': 'Send to Recruitment',
+  'rescreen': 'Re-screen', 'waitlist': 'Add to Waitlist', 'lost': 'Mark as Lost', 'noaction': 'No Action Needed'
+};
+
+async function syncFollowUpToClickUp(payload) {
+  const { patient, study, category, action, reason, coord, site, crio_url, status, source, risk } = payload;
+  if (!patient || !action) throw new Error('patient and action are required');
+
+  const statusName = FU_ACTION_TO_STATUS[action] || 'new';
+  const actionLabel = FU_ACTION_LABELS[action] || action;
+
+  // Search for existing task by name in the follow-up list
+  const existing = await clickupFetch('/list/' + FOLLOWUP_LIST_ID + '/task?page=0&limit=100&include_closed=true');
+  const nameLower = patient.toLowerCase().trim();
+  const match = (existing.tasks || []).find(t => (t.name || '').toLowerCase().trim() === nameLower);
+
+  if (match) {
+    // Update existing task status + add comment
+    await clickupPut('/task/' + match.id, { status: statusName });
+    const commentLines = [
+      `**Action:** ${actionLabel}`,
+      `**Study:** ${study || '—'}`,
+      `**Category:** ${category || '—'}`,
+      `**Reason:** ${reason || '—'}`,
+      `**Coordinator:** ${coord || '—'}`,
+      crio_url ? `**CRIO:** ${crio_url}` : '',
+      `*Updated from CRP Dashboard at ${new Date().toISOString().replace('T', ' ').substring(0, 19)}*`
+    ].filter(Boolean).join('\n');
+    await clickupPost('/task/' + match.id + '/comment', { comment_text: commentLines });
+    return { updated: true, task_id: match.id, url: match.url || 'https://app.clickup.com/t/' + match.id };
+  }
+
+  // Create new task with full context
+  const description = [
+    `## Patient Follow-Up`,
+    ``,
+    `**Category:** ${category || '—'}`,
+    `**Current CRIO Status:** ${status || '—'}`,
+    `**Reason:** ${reason || '—'}`,
+    `**Coordinator:** ${coord || '—'}`,
+    `**Site:** ${site || '—'}`,
+    `**Referral Source:** ${source || '—'}`,
+    `**Risk Level:** ${risk || '—'}`,
+    ``,
+    crio_url ? `### CRIO Link\n${crio_url}` : '',
+    ``,
+    `---`,
+    `*Created from CRP Dashboard at ${new Date().toISOString().replace('T', ' ').substring(0, 19)}*`
+  ].filter(Boolean).join('\n');
+
+  const task = await clickupPost('/list/' + FOLLOWUP_LIST_ID + '/task', {
+    name: patient,
+    description,
+    status: statusName,
+    tags: [category || 'follow-up'],
+  });
+
+  return { created: true, task_id: task.id, url: task.url || 'https://app.clickup.com/t/' + task.id };
+}
+
 async function fetchAllClickUpTasks(listId) {
   let all = [], page = 0;
   while (true) {
@@ -2089,9 +2184,23 @@ const CLICKUP_FEEDS = {
 functions.http('crpBqApi', async (req, res) => {
   // CORS
   res.set('Access-Control-Allow-Origin', '*');
-  res.set('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.set('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+
+  // ── POST: Follow-Up → ClickUp sync ──
+  if (req.method === 'POST' && req.query.action === 'followup-sync') {
+    res.set('Cache-Control', 'no-store');
+    try {
+      const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
+      const result = await syncFollowUpToClickUp(body);
+      res.json({ success: true, ...result });
+    } catch (err) {
+      console.error('followup-sync error:', err.message);
+      res.status(500).json({ success: false, error: err.message });
+    }
+    return;
+  }
 
   // Cache-Control: allow CDN/browser caching for 5 minutes
   res.set('Cache-Control', 'public, max-age=300');
