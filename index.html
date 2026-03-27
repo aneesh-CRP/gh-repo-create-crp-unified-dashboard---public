@@ -1411,20 +1411,17 @@ body {
             <th style="padding:10px 12px;text-align:left;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;" onclick="sortMergedTable(this,0)">Study ↕</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;" onclick="sortMergedTable(this,1)">Status ↕</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;" onclick="sortMergedTable(this,2)">Risk ↕</th>
-            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;" onclick="sortMergedTable(this,3)">Cancels ↕</th>
+            <th style="padding:10px 6px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;font-size:11px" onclick="sortMergedTable(this,3)">Cancel ↕</th>
+            <th style="padding:10px 6px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;font-size:11px">No-Show</th>
+            <th style="padding:10px 6px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;font-size:11px">Withdrew</th>
+            <th style="padding:10px 6px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;font-size:11px">SF</th>
+            <th style="padding:10px 6px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;font-size:11px">Resched</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;" onclick="sortMergedTable(this,4)">Upcoming ↕</th>
             <th style="padding:10px 8px;text-align:left;font-weight:700;color:var(--text);white-space:nowrap;">Enrollment</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;" onclick="sortMergedTable(this,6)">Screened ↕</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;" onclick="sortMergedTable(this,7)">In Screen ↕</th>
-            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;" onclick="sortMergedTable(this,8)">SF Rate ↕</th>
-            <th style="padding:10px 8px;text-align:left;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;" onclick="sortMergedTable(this,9)">Sponsor ↕</th>
-            <th style="padding:10px 8px;text-align:left;font-weight:700;color:var(--text);white-space:nowrap;">Therapeutic Area</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Site</th>
-            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Enroll Start</th>
-            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Enroll End</th>
-            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Referrals</th>
-            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">FB Leads</th>
-            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Total Leads</th>
+            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Leads</th>
           </tr>
         </thead>
         <tbody id="merged-study-tbody"></tbody>
@@ -16071,6 +16068,22 @@ function renderStudiesTable() {
   var _avgSF = _sfStudies.length > 0 ? Math.round(_sfStudies.reduce(function(s,r){return s+r.screen_fail_pct;},0)/_sfStudies.length) : 0;
   _skSet('sk-sf-rate', _avgSF + '%');
 
+  // Build per-study cancel breakdown counts
+  var _studyBreakdown = {};
+  function _incBreakdown(list, field) {
+    (list || []).forEach(function(r) {
+      var s = (r.study || '').trim();
+      if (!s) return;
+      if (!_studyBreakdown[s]) _studyBreakdown[s] = {cancels:0, noShows:0, withdrew:0, screenFails:0, rescheduled:0};
+      _studyBreakdown[s][field]++;
+    });
+  }
+  _incBreakdown(DATA.allCancels, 'cancels');
+  _incBreakdown(DATA.noShows, 'noShows');
+  _incBreakdown(DATA.withdrawals, 'withdrew');
+  _incBreakdown(DATA.screenFails, 'screenFails');
+  _incBreakdown(DATA.rescheduledVisits, 'rescheduled');
+
   const studies = (DATA.mergedStudies || []).filter(s => {
     if (_studyFilter === 'all') return true;
     if (_studyFilter === 'critical') return s.risk_level === 'critical';
@@ -16088,7 +16101,7 @@ function renderStudiesTable() {
 
   // Sort
   if (_studySortCol >= 0) {
-    const keys = ['study','enroll_status','risk_score','cancels','upcoming','pct','screened','screening','screen_fail_pct','sponsor'];
+    const keys = ['study','enroll_status','risk_score','cancels','upcoming','pct','screened','screening'];
     const key = keys[_studySortCol] || 'risk_score';
     studies.sort((a,b) => {
       const va = a[key] ?? (_studySortAsc ? 'zzz' : -999);
@@ -16213,28 +16226,30 @@ function renderStudiesTable() {
       return '<span style="color:'+color+';font-weight:'+weight+'">'+escapeHTML(s.enrollment_close)+est+'</span>'+warn;
     })();
 
-    // Referrals/FB/Total — only relevant for enrolling studies
-    const refCell = isEnrolling ? buildPipelineCell(s.study, safeStudy) : '<span style="color:#cbd5e1">—</span>';
-    const fbCell = isEnrolling ? buildFBLeadCell(s.study) : '<span style="color:#cbd5e1">—</span>';
+    // Per-study cancel breakdown
+    var _bd = _studyBreakdown[s.study] || {cancels:0, noShows:0, withdrew:0, screenFails:0, rescheduled:0};
+    function _countCell(val, color, filterCat) {
+      if (!val) return '<span style="font-size:11px;color:#cbd5e1">0</span>';
+      return '<span style="font-size:12px;font-weight:700;color:'+color+';cursor:pointer" data-action="studyCategoryClick" data-study="'+escapeHTML(s.study)+'" data-cat="'+filterCat+'">'+val+'</span>';
+    }
+
+    // Total leads — only relevant for enrolling studies
     const totalCell = isEnrolling ? buildTotalLeadsCell(s.study, safeStudy) : '<span style="color:#cbd5e1">—</span>';
 
     return `<tr style="border-bottom:1px solid var(--border);transition:background .1s" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
       <td style="padding:10px 12px;min-width:160px">${studyCell}${diversityBadge}${indicationTag}${alertTags}</td>
       <td style="padding:10px 8px;text-align:center"><span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:${_sbBg};color:${_sbFg}">${_sb||'—'}</span></td>
       <td style="padding:10px 8px;text-align:center">${riskScoreCell}</td>
-      <td style="padding:10px 8px;text-align:center">${cancelsCell}</td>
+      <td style="padding:10px 6px;text-align:center">${_countCell(_bd.cancels, '#dc2626', 'cancel')}</td>
+      <td style="padding:10px 6px;text-align:center">${_countCell(_bd.noShows, '#f97316', 'noshow')}</td>
+      <td style="padding:10px 6px;text-align:center">${_countCell(_bd.withdrew, '#8b5cf6', 'withdrew')}</td>
+      <td style="padding:10px 6px;text-align:center">${_countCell(_bd.screenFails, '#ef4444', 'screenfail')}</td>
+      <td style="padding:10px 6px;text-align:center">${_countCell(_bd.rescheduled, '#06b6d4', 'rescheduled')}</td>
       <td style="padding:10px 8px;text-align:center">${upcomingCell}</td>
-      <td style="padding:10px 8px;min-width:160px">${enrollCell}</td>
+      <td style="padding:10px 8px;min-width:140px">${enrollCell}</td>
       <td style="padding:10px 8px;text-align:center;font-size:11px;color:var(--muted)">${s.screened||0}</td>
       <td style="padding:10px 8px;text-align:center;font-size:11px;color:${s.screening>0?'#7c3aed':'var(--muted)'};font-weight:${s.screening>0?'700':'400'}">${s.screening||0}</td>
-      <td style="padding:10px 8px;text-align:center;font-size:11px;color:${sfColor};font-weight:600">${s.screen_fail_pct > 0 ? s.screen_fail_pct+'%' : '—'}</td>
-      <td style="padding:10px 8px;font-size:10px;color:#475569;white-space:nowrap;max-width:100px;overflow:hidden;text-overflow:ellipsis;" title="${escapeHTML(s.sponsor||'')}">${escapeHTML(s.sponsor||'—')}</td>
-      <td style="padding:10px 8px;font-size:10px;color:#475569;white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis;" title="${escapeHTML(s.therapeutic_area||'')}">${escapeHTML(s.therapeutic_area||'—')}</td>
       <td style="padding:10px 8px;text-align:center">${siteTags}</td>
-      <td style="padding:10px 8px;text-align:center;font-size:10px;color:var(--muted);white-space:nowrap">${s.enrollment_start ? escapeHTML(s.enrollment_start) : '—'}</td>
-      <td style="padding:10px 8px;text-align:center;font-size:10px;white-space:nowrap">${_ecDisplay}</td>
-      <td style="padding:10px 8px;text-align:center">${refCell}</td>
-      <td style="padding:10px 8px;text-align:center">${fbCell}</td>
       <td style="padding:10px 8px;text-align:center">${totalCell}</td>
     </tr>`;
   });
@@ -16251,6 +16266,19 @@ function renderStudiesTable() {
       if (action === 'studyUnified') showStudyUnifiedModal(study);
       else if (action === 'studyDetailClick') showStudyDetail(study);
       else if (action === 'studyUpcoming') showUpcoming(function(r){ return r.study === study; }, study + ' — Upcoming Visits');
+      else if (action === 'studyCategoryClick') {
+        var cat = el.dataset.cat;
+        var catLabels = {cancel:'Cancellations', noshow:'No-Shows', withdrew:'Withdrawals', screenfail:'Screen Fails', rescheduled:'Rescheduled'};
+        var catDataMap = {cancel:'allCancels', noshow:'noShows', withdrew:'withdrawals', screenfail:'screenFails', rescheduled:'rescheduledVisits'};
+        var dataKey = catDataMap[cat] || 'allCancels';
+        var list = (DATA[dataKey] || []).filter(function(r){ return (r.study||'').trim() === study; });
+        var h = '<table class="detail-table"><thead><tr><th>Patient</th><th>Date</th><th>Visit</th><th>Reason</th></tr></thead><tbody>';
+        list.forEach(function(r) {
+          h += '<tr><td>'+escapeHTML(r.name||'—')+'</td><td>'+escapeHTML(r.cancel_date||r.date||'—')+'</td><td>'+escapeHTML(r.visit||'—')+'</td><td>'+escapeHTML(r.reason||r.category||'—')+'</td></tr>';
+        });
+        h += '</tbody></table>';
+        openModal(study + ' — ' + (catLabels[cat]||cat), list.length + ' records', h);
+      }
     });
   }
   // Lazy-load more rows on scroll (IntersectionObserver) or button fallback
