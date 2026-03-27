@@ -4924,28 +4924,8 @@ function buildScheduleTable() {
   var tbody = document.getElementById('upcoming-tbody');
   if (!tbody) return;
   var visits = (DATA && DATA.allVisitDetail) ? DATA.allVisitDetail.map(function(v){ v._prescreen = false; return v; }) : [];
-  // Merge pre-screening visits (display only, not in metrics)
-  if (window._prescrVisits && window._prescrVisits.length > 0) {
-    window._prescrVisits.forEach(function(r) {
-      var vn = (r.visit_name||'').toLowerCase();
-      var prescrType = vn.indexOf('call') !== -1 ? 'Call' : (vn.indexOf('fibro') !== -1 || vn.indexOf('liver') !== -1 || vn.indexOf('scan') !== -1) ? 'FibroScan' : 'Pre-Screen';
-      var timeRaw = r.scheduled_time || '';
-      var timeFmt = '';
-      if (timeRaw) { var tp = timeRaw.split(':'); var hr = parseInt(tp[0])||0, mn = tp[1]||'00'; timeFmt = (hr===0?'12':hr>12?''+(hr-12):''+hr)+':'+mn+(hr>=12?'p':'a'); }
-      visits.push({
-        name: r.subject_full_name || '', patient: r.subject_full_name || '',
-        date: (() => { var d = _parseDate(r.scheduled_date); return d ? d.toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '—'; })(),
-        date_iso: r.scheduled_date || '',
-        time: timeFmt,
-        study: (r.study_name||'').split(' - ').pop().trim(),
-        study_url: '', visit: r.visit_name || '',
-        patient_url: '', status: r.subject_status || '',
-        coord: r.staff_full_name || '', investigator: r.investigator || '',
-        site: r.site_name || '', _prescreen: true, _prescrType: prescrType
-      });
-    });
-    visits.sort(function(a,b) { return (a.date_iso||'').localeCompare(b.date_iso||''); });
-  }
+  // Pre-screening calls and FibroScans are tracked separately via the
+  // Calls/FibroScan KPI in Cancellation Analysis — not in the schedule table
   if (!visits.length) {
     _log('buildScheduleTable: no allVisitDetail data, keeping static rows');
     return;
@@ -6941,11 +6921,7 @@ function fetchActionRequiredData() {
       // Update KPI
       var prescrKpi = document.getElementById('kpi-prescr-total');
       if (prescrKpi) prescrKpi.textContent = window._prescrVisits.length;
-      _log('Pre-screening visits: ' + window._prescrVisits.length + ' upcoming');
-      safe(buildScheduleTable, 'buildScheduleTable-prescr');
-      safe(hidePastVisits, 'hidePastVisits-prescr');
-      safe(injectVisitConfirmButtons, 'confirmBtns-prescr');
-      safe(function(){ filterSchedTable('all', null); }, 'schedFilter-prescr');
+      _log('Pre-screening visits: ' + window._prescrVisits.length + ' upcoming (KPI only, not in schedule)');
     }
 
     // Unscheduled visits — active subjects with no upcoming appointment
