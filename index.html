@@ -1236,9 +1236,6 @@ body {
   <!-- ═══ SECTION 3: STAFF PERFORMANCE ═══ -->
   <div class="section-title" style="margin-top:24px;margin-bottom:8px;">Staff Performance</div>
 
-  <!-- Coordinator summary KPIs -->
-  <div id="coordBalanceContainer" style="margin-bottom:12px;"></div>
-
   <!-- Coordinator Visit Tracker (weekly cards + monthly table with cancel rate) -->
   <div class="card fade-in" style="margin-bottom:16px;">
     <div style="padding:16px">
@@ -1251,10 +1248,13 @@ body {
       </div>
       <div id="coordGoalsGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px"></div>
       <div style="margin-top:16px">
-        <div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">Monthly Snapshot — <span id="coord-month-label">March 2026</span></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <div style="font-size:13px;font-weight:700;color:var(--navy)">Monthly Snapshot — <span id="coord-month-label">March 2026</span></div>
+          <div id="coordMonthToggle" style="display:flex;gap:2px;background:#f1f5f9;border-radius:6px;padding:2px;"></div>
+        </div>
         <div style="overflow-x:auto">
           <table style="width:100%;border-collapse:collapse;font-size:12px" id="coordMonthTable">
-            <thead><tr style="background:var(--surface2);border-bottom:2px solid var(--border)">
+            <thead id="coordMonthHead"><tr style="background:var(--surface2);border-bottom:2px solid var(--border)">
               <th style="padding:8px 12px;text-align:left;font-weight:700">Coordinator</th>
               <th style="padding:8px 8px;text-align:center;font-weight:700">Visits</th>
               <th style="padding:8px 8px;text-align:center;font-weight:700">Cancels</th>
@@ -5877,8 +5877,8 @@ function computeCoordGoals() {
   // Compute from allVisitDetail if coordGoals not pre-computed
   var COORDS = CRP_CONFIG.SCHEDULE_COORDINATORS || CRP_CONFIG.COORDINATORS || [];
   var COORD_LOWER = COORDS.map(function(c) { return c.toLowerCase(); });
-  var goals = { byDay: {}, byMonth: {}, byDayDetail: {} };
-  COORDS.forEach(function(c) { goals.byDay[c] = {}; goals.byMonth[c] = 0; goals.byDayDetail[c] = {}; });
+  var goals = { byDay: {}, byMonth: {}, byMonthDuration: {}, byDayDetail: {} };
+  COORDS.forEach(function(c) { goals.byDay[c] = {}; goals.byMonth[c] = 0; goals.byMonthDuration[c] = 0; goals.byDayDetail[c] = {}; });
   var seen = new Set();
   var visits = DATA.allVisitDetail || [];
   var now = new Date();
@@ -5899,7 +5899,10 @@ function computeCoordGoals() {
     goals.byDay[name][date] = (goals.byDay[name][date]||0) + 1;
     if (!goals.byDayDetail[name][date]) goals.byDayDetail[name][date] = [];
     goals.byDayDetail[name][date].push({ patient: patient, study: r.study || '', url: r.patient_url || '' });
-    if (date >= yy+'-'+mm+'-01' && date <= yy+'-'+mm+'-31') goals.byMonth[name]++;
+    if (date >= yy+'-'+mm+'-01' && date <= yy+'-'+mm+'-31') {
+      goals.byMonth[name]++;
+      goals.byMonthDuration[name] = (goals.byMonthDuration[name]||0) + (r.duration_min||0);
+    }
   });
   return goals;
 }
@@ -5989,12 +5992,8 @@ function renderCoordinatorGoals() {
     </div>`;
   }).join('');
 
-  // Monthly summary table — snapshot of actual counts
+  // Monthly summary table — snapshot of actual counts, with Visits/Duration toggle
   if (!monthBody) return;
-  var monthMax = 1;
-  COORDS.forEach(function(name) { var v = goals.byMonth[name] || 0; if (v > monthMax) monthMax = v; });
-  var avgPerDay = {};
-  COORDS.forEach(function(name) { avgPerDay[name] = workDaysElapsed > 0 ? (goals.byMonth[name] || 0) / workDaysElapsed : 0; });
 
   // Build cancel counts per coordinator for cancel rate column
   var _coordCancels = {};
@@ -6003,97 +6002,69 @@ function renderCoordinatorGoals() {
     _coordCancels[cn] = (_coordCancels[cn] || 0) + 1;
   });
 
-  monthBody.innerHTML = COORDS.map(name => {
-    const monthVisits = goals.byMonth[name] || 0;
-    const barPct = Math.min(100, Math.round(monthVisits / (monthMax * 1.1) * 100));
-    const avg = avgPerDay[name].toFixed(1);
-    const cancels = _coordCancels[name] || 0;
-    const cancelRate = (monthVisits + cancels) > 0 ? Math.round(cancels / (monthVisits + cancels) * 100) : 0;
-    const crColor = cancelRate > 20 ? '#dc2626' : cancelRate > 10 ? '#f59e0b' : '#059669';
-    return `<tr style="border-bottom:1px solid var(--border);cursor:pointer;" onclick="showCoordDetail('${jsAttr(name)}')">
-      <td style="padding:8px 12px;font-weight:600">${escapeHTML(name)}</td>
-      <td style="padding:8px 8px;text-align:center;font-weight:700">${monthVisits}</td>
-      <td style="padding:8px 8px;text-align:center;color:#d97706;font-weight:600">${cancels}</td>
-      <td style="padding:8px 8px;text-align:center;font-weight:700;color:${crColor}">${cancelRate}%</td>
-      <td style="padding:8px 8px;text-align:center;color:#6B7280">${avg}/day</td>
-      <td style="padding:8px 12px"><div style="background:#E5E7EB;border-radius:6px;height:8px;overflow:hidden"><div style="background:#1843AD;height:100%;width:${barPct}%;border-radius:6px"></div></div></td>
-      <td style="padding:8px 8px;text-align:center;color:#6B7280;font-size:11px">${workDaysElapsed} days tracked</td>
-    </tr>`;
-  }).join('');
-}
-
-function renderCoordWorkloadBalance() {
-  var el = document.getElementById('coordBalanceContainer');
-  if (!el || !DATA.allVisitDetail || DATA.allVisitDetail.length === 0) return;
-  var COORDS = CRP_CONFIG.SCHEDULE_COORDINATORS || CRP_CONFIG.COORDINATORS || [];
-  if (COORDS.length === 0) return;
-
-  // Filter to next 30 days for workload view
-  var today = new Date(); today.setHours(0,0,0,0);
-  var d30 = new Date(today); d30.setDate(d30.getDate() + 30);
-  var upcoming30 = DATA.allVisitDetail.filter(function(v) {
-    var d = _parseDate(v.date_iso);
-    return d && d >= today && d <= d30;
-  });
-  // Cancels from last 60 days for cancel rate
-  var c60ago = new Date(today); c60ago.setDate(c60ago.getDate() - 60);
-  var recentCancels = (DATA.allCancels || []).filter(function(c) {
-    var d = _parseDate(c.cancel_date);
-    return d && d >= c60ago && !_patientRecovered(c.name,c.study,c.subject_key);
-  });
-
-  var coordStats = COORDS.map(function(name) {
-    var visits = upcoming30.filter(function(v){return v.coord===name;});
-    var cancels = recentCancels.filter(function(c){return c.coord===name;});
-    var patients = {};
-    var studies = {};
-    var phl = 0, pnj = 0;
-    var totalDuration = 0;
-    visits.forEach(function(v) { patients[v.patient]=1; studies[v.study]=1; if ((v.site||'').indexOf('Penn')!==-1) pnj++; else phl++; totalDuration += (v.duration_min||0); });
-    var cancelRate = (visits.length+cancels.length) > 0 ? Math.round(cancels.length/(visits.length+cancels.length)*100) : 0;
-    var durationHrs = Math.round(totalDuration / 60 * 10) / 10;
-    return { name:name, visits:visits.length, cancels:cancels.length, patients:Object.keys(patients).length, studies:Object.keys(studies).length, cancelRate:cancelRate, phl:phl, pnj:pnj, totalDuration:totalDuration, durationHrs:durationHrs };
-  }).sort(function(a,b){return b.visits-a.visits;});
-
-  var maxVisits = Math.max.apply(null, coordStats.map(function(c){return c.visits;}).concat([0])) || 1;
-  var maxDuration = Math.max.apply(null, coordStats.map(function(c){return c.durationHrs;}).concat([0])) || 1;
-
-  // Track current toggle mode
-  var curMode = (window._coordBalanceMode || 'visits');
-
-  var html = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">';
-  html += '<div style="font-size:11px;color:#64748b;font-weight:600;">Upcoming Visit Distribution (next 30 days)</div>';
-  html += '<div style="display:flex;gap:2px;background:#f1f5f9;border-radius:6px;padding:2px;">';
-  html += '<button onclick="window._coordBalanceMode=\'visits\';renderCoordWorkloadBalance()" style="font-size:10px;font-weight:600;padding:3px 10px;border:none;border-radius:4px;cursor:pointer;background:'+(curMode==='visits'?'#fff':'transparent')+';color:'+(curMode==='visits'?'#1843AD':'#64748b')+';box-shadow:'+(curMode==='visits'?'0 1px 2px rgba(0,0,0,.1)':'none')+'">Visits</button>';
-  html += '<button onclick="window._coordBalanceMode=\'duration\';renderCoordWorkloadBalance()" style="font-size:10px;font-weight:600;padding:3px 10px;border:none;border-radius:4px;cursor:pointer;background:'+(curMode==='duration'?'#fff':'transparent')+';color:'+(curMode==='duration'?'#1843AD':'#64748b')+';box-shadow:'+(curMode==='duration'?'0 1px 2px rgba(0,0,0,.1)':'none')+'">Duration</button>';
-  html += '</div></div>';
-
-  // Workload table
+  var curMode = window._coordMonthMode || 'visits';
   var isDuration = curMode === 'duration';
-  var barMax = isDuration ? maxDuration : maxVisits;
-  html += '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
-  html += '<tr style="background:#f8fafc;"><th style="text-align:left;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Coordinator</th><th style="text-align:left;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">'+(isDuration?'Total Hours':'Upcoming Visits')+'</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Site</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Patients</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Studies</th></tr>';
-  coordStats.forEach(function(c) {
-    var barVal = isDuration ? c.durationHrs : c.visits;
-    var barLabel = isDuration ? c.durationHrs + 'h' : '' + c.visits;
-    var pct = barMax > 0 ? Math.round(barVal / barMax * 100) : 0;
-    var siteBadge = c.pnj > 0 && c.phl > 0 ? '<span style="color:#072061;font-weight:600;">PHL</span> / <span style="color:#059669;font-weight:600;">PNJ</span>' : c.pnj > 0 ? '<span style="padding:2px 6px;border-radius:4px;background:#05966920;color:#059669;font-weight:600;">PNJ</span>' : '<span style="padding:2px 6px;border-radius:4px;background:#07206120;color:#072061;font-weight:600;">PHL</span>';
 
-    html += '<tr style="border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showCoordDetail(\''+jsAttr(c.name)+'\')">';
-    html += '<td style="padding:8px;"><div style="font-weight:700;color:#1e293b;">'+escapeHTML(c.name.split(' ')[0])+'</div></td>';
-    html += '<td style="padding:8px;"><div style="display:flex;align-items:center;gap:8px;"><div style="flex:1;background:#e2e8f0;border-radius:5px;height:18px;overflow:hidden;position:relative;">';
-    html += '<div style="height:100%;width:'+pct+'%;background:linear-gradient(90deg,#1843AD,#3b82f6);border-radius:5px;"></div>';
-    html += '<div style="position:absolute;left:8px;top:0;font-size:11px;font-weight:700;color:'+(pct>30?'#fff':'#1e293b')+';line-height:18px;">'+barLabel+'</div>';
-    html += '</div></div></td>';
-    html += '<td style="padding:8px;text-align:center;font-size:11px;">'+siteBadge+'</td>';
-    html += '<td style="padding:8px;text-align:center;font-weight:600;color:#475569;">'+c.patients+'</td>';
-    html += '<td style="padding:8px;text-align:center;font-weight:600;color:#475569;">'+c.studies+'</td>';
-    html += '</tr>';
-  });
-  html += '</table>';
+  // Render toggle buttons
+  var toggleEl = document.getElementById('coordMonthToggle');
+  if (toggleEl) {
+    var btnStyle = function(active) { return 'font-size:10px;font-weight:600;padding:3px 10px;border:none;border-radius:4px;cursor:pointer;background:'+(active?'#fff':'transparent')+';color:'+(active?'#1843AD':'#64748b')+';box-shadow:'+(active?'0 1px 2px rgba(0,0,0,.1)':'none'); };
+    toggleEl.innerHTML = '<button onclick="window._coordMonthMode=\'visits\';renderCoordinatorGoals()" style="'+btnStyle(!isDuration)+'">Visits</button>' +
+      '<button onclick="window._coordMonthMode=\'duration\';renderCoordinatorGoals()" style="'+btnStyle(isDuration)+'">Duration</button>';
+  }
 
-  el.innerHTML = html;
+  // Update table header
+  var headEl = document.getElementById('coordMonthHead');
+  if (headEl) {
+    headEl.innerHTML = isDuration
+      ? '<tr style="background:var(--surface2);border-bottom:2px solid var(--border)"><th style="padding:8px 12px;text-align:left;font-weight:700">Coordinator</th><th style="padding:8px 8px;text-align:center;font-weight:700">Hours</th><th style="padding:8px 8px;text-align:center;font-weight:700">Avg/Day</th><th style="padding:8px 8px;text-align:center;font-weight:700">Volume</th><th style="padding:8px 8px;text-align:center;font-weight:700">Period</th></tr>'
+      : '<tr style="background:var(--surface2);border-bottom:2px solid var(--border)"><th style="padding:8px 12px;text-align:left;font-weight:700">Coordinator</th><th style="padding:8px 8px;text-align:center;font-weight:700">Visits</th><th style="padding:8px 8px;text-align:center;font-weight:700">Cancels</th><th style="padding:8px 8px;text-align:center;font-weight:700">Cancel Rate</th><th style="padding:8px 8px;text-align:center;font-weight:700">Avg/Day</th><th style="padding:8px 8px;text-align:center;font-weight:700">Volume</th><th style="padding:8px 8px;text-align:center;font-weight:700">Period</th></tr>';
+  }
+
+  if (isDuration) {
+    // Duration mode
+    var maxDurHrs = 1;
+    COORDS.forEach(function(name) { var h = (goals.byMonthDuration[name]||0)/60; if (h > maxDurHrs) maxDurHrs = h; });
+    monthBody.innerHTML = COORDS.map(name => {
+      const durMin = goals.byMonthDuration[name] || 0;
+      const durHrs = Math.round(durMin / 60 * 10) / 10;
+      const barPct = Math.min(100, Math.round(durHrs / (maxDurHrs * 1.1) * 100));
+      const avgHrs = workDaysElapsed > 0 ? (durHrs / workDaysElapsed).toFixed(1) : '0.0';
+      return `<tr style="border-bottom:1px solid var(--border);cursor:pointer;" onclick="showCoordDetail('${jsAttr(name)}')">
+        <td style="padding:8px 12px;font-weight:600">${escapeHTML(name)}</td>
+        <td style="padding:8px 8px;text-align:center;font-weight:700">${durHrs}h</td>
+        <td style="padding:8px 8px;text-align:center;color:#6B7280">${avgHrs}h/day</td>
+        <td style="padding:8px 12px"><div style="background:#E5E7EB;border-radius:6px;height:8px;overflow:hidden"><div style="background:#7c3aed;height:100%;width:${barPct}%;border-radius:6px"></div></div></td>
+        <td style="padding:8px 8px;text-align:center;color:#6B7280;font-size:11px">${workDaysElapsed} days tracked</td>
+      </tr>`;
+    }).join('');
+  } else {
+    // Visits mode (default)
+    var monthMax = 1;
+    COORDS.forEach(function(name) { var v = goals.byMonth[name] || 0; if (v > monthMax) monthMax = v; });
+    var avgPerDay = {};
+    COORDS.forEach(function(name) { avgPerDay[name] = workDaysElapsed > 0 ? (goals.byMonth[name] || 0) / workDaysElapsed : 0; });
+
+    monthBody.innerHTML = COORDS.map(name => {
+      const monthVisits = goals.byMonth[name] || 0;
+      const barPct = Math.min(100, Math.round(monthVisits / (monthMax * 1.1) * 100));
+      const avg = avgPerDay[name].toFixed(1);
+      const cancels = _coordCancels[name] || 0;
+      const cancelRate = (monthVisits + cancels) > 0 ? Math.round(cancels / (monthVisits + cancels) * 100) : 0;
+      const crColor = cancelRate > 20 ? '#dc2626' : cancelRate > 10 ? '#f59e0b' : '#059669';
+      return `<tr style="border-bottom:1px solid var(--border);cursor:pointer;" onclick="showCoordDetail('${jsAttr(name)}')">
+        <td style="padding:8px 12px;font-weight:600">${escapeHTML(name)}</td>
+        <td style="padding:8px 8px;text-align:center;font-weight:700">${monthVisits}</td>
+        <td style="padding:8px 8px;text-align:center;color:#d97706;font-weight:600">${cancels}</td>
+        <td style="padding:8px 8px;text-align:center;font-weight:700;color:${crColor}">${cancelRate}%</td>
+        <td style="padding:8px 8px;text-align:center;color:#6B7280">${avg}/day</td>
+        <td style="padding:8px 12px"><div style="background:#E5E7EB;border-radius:6px;height:8px;overflow:hidden"><div style="background:#1843AD;height:100%;width:${barPct}%;border-radius:6px"></div></div></td>
+        <td style="padding:8px 8px;text-align:center;color:#6B7280;font-size:11px">${workDaysElapsed} days tracked</td>
+      </tr>`;
+    }).join('');
+  }
 }
+
 
 // ═══ COORDINATOR CANCEL BREAKDOWN BY TYPE (No Show / Site / Patient) ═══
 function renderCoordCancelTypeChart() {
@@ -11176,7 +11147,6 @@ function renderAll() {
     _tabDirty.studies = false;
   }
   safe(renderCoordinatorGoals, 'renderCoordinatorGoals');
-  safe(renderCoordWorkloadBalance, 'renderCoordWorkloadBalance');
   safe(renderInvCapacity, 'renderInvCapacity');
   safe(buildScheduleTable,       'buildScheduleTable');
   safe(buildSchedStudyBars,      'buildSchedStudyBars');
