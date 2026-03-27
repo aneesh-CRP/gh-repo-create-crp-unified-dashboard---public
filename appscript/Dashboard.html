@@ -1253,6 +1253,12 @@ body {
       <div class="tb-sub" id="ar-ereg-sub"></div>
     </div>
     <div class="tb-divider"></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showUnscheduledModal()">
+      <div class="tb-label">Not Scheduled</div>
+      <div class="tb-value" style="color:#c2410c" id="kpi-unsched">—</div>
+      <div class="tb-sub">Active patients, no appt</div>
+    </div>
+    <div class="tb-divider"></div>
     <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="switchTab('referrals',document.querySelector('.nav-tab[onclick*=referrals]'))">
       <div class="tb-label">Active Leads</div>
       <div class="tb-value blue" id="kpi-marketing-leads">—</div>
@@ -1420,6 +1426,7 @@ body {
             <th style="padding:10px 8px;text-align:left;font-weight:700;color:var(--text);white-space:nowrap;">Enrollment</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;" onclick="sortMergedTable(this,6)">Screened ↕</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;" onclick="sortMergedTable(this,7)">In Screen ↕</th>
+            <th style="padding:10px 6px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;font-size:11px">Not Sched</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Site</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Leads</th>
           </tr>

@@ -1697,6 +1697,52 @@ const FEEDS = {
     HAVING total_documents > 0
     ORDER BY total_documents DESC`
   },
+
+  // ── 55. Unscheduled Visits (active subjects with no upcoming appointment) ──
+  unscheduledVisits: {
+    query: () => `
+      WITH active_subjects AS (
+        SELECT sub.subject_key, sub.study_key,
+          ${SUBJECT_NAME_SQL} AS subject_name,
+          CASE sub.status WHEN 10 THEN 'Screening' WHEN 11 THEN 'Enrolled' ELSE CAST(sub.status AS STRING) END AS subject_status
+        FROM ${tbl('subject')} sub
+        JOIN ${tbl('study')} st ON sub.study_key = st.study_key
+        LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
+        WHERE sub.status IN (10, 11)
+          AND sub._fivetran_deleted = false
+          AND st.is_active = 1
+          ${STUDY_FILTER_SQL}
+      ),
+      next_unscheduled AS (
+        SELECT svi.subject_key, svi.study_key, svi.study_visit_key,
+          sv.name AS visit_name,
+          ROW_NUMBER() OVER (PARTITION BY svi.subject_key, svi.study_key ORDER BY sv.sort_order, sv.study_visit_key) AS rn
+        FROM ${tbl('subject_visit')} svi
+        LEFT JOIN ${tbl('study_visit')} sv ON svi.study_visit_key = sv.study_visit_key
+        WHERE svi.status = 0
+          AND svi._fivetran_deleted = false
+      )
+      SELECT
+        CAST(a.study_key AS STRING) AS study_key,
+        ${STUDY_NAME_SQL} AS study_name,
+        CAST(a.subject_key AS STRING) AS subject_key,
+        a.subject_name,
+        a.subject_status,
+        COALESCE(nu.visit_name, 'Unknown') AS next_visit,
+        COALESCE(si.name, '') AS site_name
+      FROM active_subjects a
+      JOIN next_unscheduled nu ON a.subject_key = nu.subject_key AND a.study_key = nu.study_key AND nu.rn = 1
+      JOIN ${tbl('study')} st ON a.study_key = st.study_key
+      LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
+      LEFT JOIN ${tbl('site')} si ON st.site_key = si.site_key
+      WHERE NOT EXISTS (
+        SELECT 1 FROM ${tbl('calendar_appointment')} ca
+        WHERE ca.subject_key = a.subject_key AND ca.study_key = a.study_key
+          AND ca.status != 0 AND ca.start >= CURRENT_DATETIME()
+          AND ca._fivetran_deleted = false
+      )
+      ORDER BY study_name, subject_name`
+  },
 };
 
 // ═══════════════════════════════════════════════════════════

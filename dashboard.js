@@ -4755,7 +4755,7 @@ function fetchActionRequiredData() {
   var _s = function(id, val) { var e = document.getElementById(id); if (e) e.textContent = val; };
 
   // Batch fetch feeds in one request (reduces HTTP overhead)
-  fetch(base + '?feed=batch&feeds=comments,documentSummary,visitTodos,regulatory,recruiterStats,demographics,eregPending,prescrVisits,recruiting,subjectAudit&format=json')
+  fetch(base + '?feed=batch&feeds=comments,documentSummary,visitTodos,regulatory,recruiterStats,demographics,eregPending,prescrVisits,recruiting,subjectAudit,unscheduledVisits&format=json')
   .then(function(r) { return r.json(); })
   .then(function(batch) {
     var results = batch.results || {};
@@ -4855,6 +4855,25 @@ function fetchActionRequiredData() {
       safe(hidePastVisits, 'hidePastVisits-prescr');
       safe(injectVisitConfirmButtons, 'confirmBtns-prescr');
       safe(function(){ filterSchedTable('all', null); }, 'schedFilter-prescr');
+    }
+
+    // Unscheduled visits — active subjects with no upcoming appointment
+    var unschedRows = (results.unscheduledVisits || {}).data || [];
+    window._unscheduledVisits = unschedRows;
+    if (unschedRows.length > 0) {
+      _log('Unscheduled visits: ' + unschedRows.length + ' active subjects need scheduling');
+      // Build per-study counts
+      window._unschedByStudy = {};
+      unschedRows.forEach(function(r) {
+        var s = (r.study_name || '').split(' - ').pop().trim();
+        if (!window._unschedByStudy[s]) window._unschedByStudy[s] = [];
+        window._unschedByStudy[s].push(r);
+      });
+      // Update overview KPI
+      var kpiEl = document.getElementById('kpi-unsched');
+      if (kpiEl) kpiEl.textContent = unschedRows.length;
+      // Re-render studies table to pick up new data
+      if (typeof renderStudiesTable === 'function') safe(renderStudiesTable, 'studiesTable-unsched');
     }
 
     // Demographics — build diversity % per study
@@ -8991,6 +9010,30 @@ function showUpcoming(filterFn, title, sub) {
   </tr>`).join('') +
   `</tbody></table>`;
   openModal(title, sub || rows.length + ' visits', body);
+}
+
+function showUnscheduledModal(studyFilter) {
+  var list = window._unscheduledVisits || [];
+  if (studyFilter) list = list.filter(function(r) { return (r.study_name||'').split(' - ').pop().trim() === studyFilter; });
+  var byStudy = {};
+  list.forEach(function(r) {
+    var s = (r.study_name||'').split(' - ').pop().trim();
+    if (!byStudy[s]) byStudy[s] = [];
+    byStudy[s].push(r);
+  });
+  var h = '<div style="margin-bottom:12px;font-size:12px;color:#64748b;">' + list.length + ' active subjects with no upcoming appointment scheduled</div>';
+  h += '<table class="detail-table"><thead><tr><th>Study</th><th>Patient</th><th>Status</th><th>Next Visit Due</th><th>Site</th></tr></thead><tbody>';
+  Object.entries(byStudy).sort(function(a,b){return b[1].length-a[1].length;}).forEach(function(e) {
+    e[1].forEach(function(r,i) {
+      h += '<tr><td>' + (i===0 ? '<strong>'+escapeHTML(e[0])+'</strong> <span style="color:#94a3b8;font-size:10px;">('+e[1].length+')</span>' : '') + '</td>';
+      h += '<td style="font-weight:600;">'+escapeHTML(r.subject_name||'—')+'</td>';
+      h += '<td><span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:'+(r.subject_status==='Enrolled'?'#05966920':'#d9770620')+';color:'+(r.subject_status==='Enrolled'?'#059669':'#d97706')+'">'+escapeHTML(r.subject_status||'—')+'</span></td>';
+      h += '<td>'+escapeHTML(r.next_visit||'—')+'</td>';
+      h += '<td>'+escapeHTML(r.site_name||'—')+'</td></tr>';
+    });
+  });
+  h += '</tbody></table>';
+  openModal((studyFilter || 'All Studies') + ' — Not Scheduled', list.length + ' patients need appointments', h);
 }
 
 function showRiskFlags(title) {
@@ -14242,6 +14285,7 @@ function renderStudiesTable() {
       <td style="padding:10px 8px;min-width:140px">${enrollCell}</td>
       <td style="padding:10px 8px;text-align:center;font-size:11px;color:var(--muted)">${s.screened||0}</td>
       <td style="padding:10px 8px;text-align:center;font-size:11px;color:${s.screening>0?'#7c3aed':'var(--muted)'};font-weight:${s.screening>0?'700':'400'}">${s.screening||0}</td>
+      <td style="padding:10px 6px;text-align:center">${(() => { var u = (window._unschedByStudy || {})[s.study] || []; return u.length > 0 ? '<span style="font-size:12px;font-weight:700;color:#c2410c;cursor:pointer" onclick="showUnscheduledModal(\''+jsAttr(s.study)+'\')">' + u.length + '</span>' : '<span style="font-size:11px;color:#cbd5e1">0</span>'; })()}</td>
       <td style="padding:10px 8px;text-align:center">${siteTags}</td>
       <td style="padding:10px 8px;text-align:center">${totalCell}</td>
     </tr>`;
