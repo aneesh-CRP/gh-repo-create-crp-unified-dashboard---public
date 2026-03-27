@@ -1704,23 +1704,26 @@ const FEEDS = {
       WITH active_subjects AS (
         SELECT sub.subject_key, sub.study_key,
           ${SUBJECT_NAME_SQL} AS subject_name,
-          CASE sub.status WHEN 10 THEN 'Screening' WHEN 11 THEN 'Enrolled' ELSE CAST(sub.status AS STRING) END AS subject_status
+          CASE sub.status WHEN 10 THEN 'Screening' WHEN 11 THEN 'Enrolled' ELSE CAST(sub.status AS STRING) END AS subject_status,
+          sub.status AS status_code
         FROM ${tbl('subject')} sub
         JOIN ${tbl('study')} st ON sub.study_key = st.study_key
         LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
         WHERE sub.status IN (10, 11)
           AND sub._fivetran_deleted = false
           AND st.is_active = 1
+          AND st.status IN (2, 3)
           ${STUDY_FILTER_SQL}
       ),
-      next_unscheduled AS (
-        SELECT svi.subject_key, svi.study_key, svi.study_visit_key,
-          sv.name AS visit_name,
-          ROW_NUMBER() OVER (PARTITION BY svi.subject_key, svi.study_key ORDER BY sv.study_visit_key) AS rn
+      last_visit AS (
+        SELECT svi.subject_key, svi.study_key,
+          MAX(svi.last_updated) AS last_visit_date,
+          MAX(sv.name) AS last_visit_name
         FROM ${tbl('subject_visit')} svi
         LEFT JOIN ${tbl('study_visit')} sv ON svi.study_visit_key = sv.study_visit_key
-        WHERE svi.status = 0
+        WHERE svi.status IN (21, 22, 23)
           AND svi._fivetran_deleted = false
+        GROUP BY svi.subject_key, svi.study_key
       )
       SELECT
         CAST(a.study_key AS STRING) AS study_key,
@@ -1728,20 +1731,21 @@ const FEEDS = {
         CAST(a.subject_key AS STRING) AS subject_key,
         a.subject_name,
         a.subject_status,
-        COALESCE(nu.visit_name, 'Unknown') AS next_visit,
+        COALESCE(FORMAT_DATETIME('%Y-%m-%d', lv.last_visit_date), 'None') AS last_visit_date,
+        COALESCE(lv.last_visit_name, 'No visits yet') AS last_visit_name,
         COALESCE(si.name, '') AS site_name
       FROM active_subjects a
-      JOIN next_unscheduled nu ON a.subject_key = nu.subject_key AND a.study_key = nu.study_key AND nu.rn = 1
       JOIN ${tbl('study')} st ON a.study_key = st.study_key
       LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
       LEFT JOIN ${tbl('site')} si ON st.site_key = si.site_key
+      LEFT JOIN last_visit lv ON a.subject_key = lv.subject_key AND a.study_key = lv.study_key
       WHERE NOT EXISTS (
         SELECT 1 FROM ${tbl('calendar_appointment')} ca
         WHERE ca.subject_key = a.subject_key AND ca.study_key = a.study_key
           AND ca.status != 0 AND ca.start >= CURRENT_DATETIME()
           AND ca._fivetran_deleted = false
       )
-      ORDER BY study_name, subject_name`
+      ORDER BY study_name, a.subject_name`
   },
 };
 
