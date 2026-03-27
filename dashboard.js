@@ -5134,10 +5134,7 @@ function switchView(name, el) {
   if (name === 'admin') {
     if (_tabDirty.admin) {
       setTimeout(() => {
-        safe(renderCoordinatorGoals, 'renderCoordinatorGoals');
-        safe(renderCoordWorkloadBalance, 'renderCoordWorkloadBalance');
         safe(renderCoordCancelTypeChart, 'renderCoordCancelTypeChart');
-        safe(renderInvCapacity, 'renderInvCapacity');
         safe(renderRecruiterPerformance, 'renderRecruiterPerformance');
         safe(renderTrendsCharts, 'renderTrendsCharts');
         _tabDirty.admin = false;
@@ -8766,6 +8763,9 @@ function renderAll() {
   safe(buildReasonBreakdown, 'buildReasonBreakdown');
   safe(buildSiteStackedBars, 'buildSiteStackedBars');
   if (typeof buildRiskFlagCards === 'function') safe(buildRiskFlagCards, 'buildRiskFlagCards');
+  safe(renderCoordinatorGoals, 'renderCoordinatorGoals');
+  safe(renderCoordWorkloadBalance, 'renderCoordWorkloadBalance');
+  safe(renderInvCapacity, 'renderInvCapacity');
   safe(buildScheduleTable,       'buildScheduleTable');
   safe(buildSchedStudyBars,      'buildSchedStudyBars');
   safe(backfillInvestigators, 'backfillInvestigators');
@@ -8782,12 +8782,9 @@ function renderAll() {
     _tabDirty.actions = false;
   }
 
-  // ── Admin tab: coordinator/investigator charts + trends ──
+  // ── Admin tab: trends charts (defer unless active) ──
   if (activeTab === 'admin') {
-    safe(renderCoordinatorGoals, 'renderCoordinatorGoals');
-    safe(renderCoordWorkloadBalance, 'renderCoordWorkloadBalance');
     safe(renderCoordCancelTypeChart, 'renderCoordCancelTypeChart');
-    safe(renderInvCapacity, 'renderInvCapacity');
     safe(renderRecruiterPerformance, 'renderRecruiterPerformance');
     safe(renderTrendsCharts,       'renderTrendsCharts');
     _tabDirty.admin = false;
