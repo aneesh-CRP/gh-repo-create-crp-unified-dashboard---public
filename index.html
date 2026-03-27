@@ -4148,8 +4148,9 @@ function renderInsights() {
                       AGING_AP.reduce((s,r) => s + r.d91_120 + r.d121_150 + r.d150plus, 0);
   if (el('ins-rev-risk')) el('ins-rev-risk').textContent = '$' + (highAgingAR/1000).toFixed(0) + 'K';
 
-  const cancelRate = (DATA && DATA.cancelTotal && DATA.upcomingTotal)
-    ? Math.round(DATA.cancelTotal / (DATA.cancelTotal + DATA.upcomingTotal) * 100) : null;
+  var _ct = typeof window._adjCancel !== 'undefined' ? window._adjCancel : (DATA.cancelTotal||0);
+  const cancelRate = (DATA && _ct && DATA.upcomingTotal)
+    ? Math.round(_ct / (_ct + DATA.upcomingTotal) * 100) : null;
   if (el('ins-cancel-rate')) el('ins-cancel-rate').textContent = cancelRate !== null ? cancelRate + '%' : '--';
 
   // Build cross-referenced study data
@@ -5566,10 +5567,10 @@ function showHorizonDetail(type, weekLabel) {
 function buildCancelStudyBars() {
   const el = document.getElementById('cancel-study-bars');
   if (!el || !DATA) return;
-  var cancels = DATA.allCancels || [];
-  var noShows = DATA.noShows || [];
-  var screenFails = DATA.screenFails || [];
-  var withdrawals = DATA.withdrawals || [];
+  var cancels = (DATA.allCancels || []).filter(function(r){return !_patientRecovered(r.name,r.study);});
+  var noShows = (DATA.noShows || []).filter(function(r){return !_patientRecovered(r.name,r.study);});
+  var screenFails = (DATA.screenFails || []).filter(function(r){return !_patientRecovered(r.name,r.study);});
+  var withdrawals = (DATA.withdrawals || []).filter(function(r){return !_patientRecovered(r.name,r.study);});
 
   // Aggregate by study
   var studies = {};
@@ -5638,10 +5639,10 @@ function buildReasonBreakdown() {
 function buildSiteStackedBars() {
   var el = document.getElementById('site-stacked-bars');
   if (!el || !DATA || !DATA.sites) return;
-  var cancels = DATA.allCancels || [];
-  var noShows = DATA.noShows || [];
-  var screenFails = DATA.screenFails || [];
-  var withdrawals = DATA.withdrawals || [];
+  var cancels = (DATA.allCancels || []).filter(function(r){return !_patientRecovered(r.name,r.study);});
+  var noShows = (DATA.noShows || []).filter(function(r){return !_patientRecovered(r.name,r.study);});
+  var screenFails = (DATA.screenFails || []).filter(function(r){return !_patientRecovered(r.name,r.study);});
+  var withdrawals = (DATA.withdrawals || []).filter(function(r){return !_patientRecovered(r.name,r.study);});
   var upcoming = DATA.allVisitDetail || [];
 
   var sites = {};
@@ -5997,7 +5998,7 @@ function renderCoordinatorGoals() {
 
   // Build cancel counts per coordinator for cancel rate column
   var _coordCancels = {};
-  (DATA.allCancels || []).forEach(function(c) {
+  (DATA.allCancels || []).filter(function(c){return !_patientRecovered(c.name,c.study);}).forEach(function(c) {
     var cn = c.coord || '';
     _coordCancels[cn] = (_coordCancels[cn] || 0) + 1;
   });
@@ -6113,7 +6114,7 @@ function renderCoordCancelTypeChart() {
   var coordStats = [];
 
   COORDS.forEach(function(name) {
-    var cx = DATA.allCancels.filter(function(c) { return c.coord === name; });
+    var cx = DATA.allCancels.filter(function(c) { return c.coord === name && !_patientRecovered(c.name,c.study); });
     var ns = cx.filter(function(c) { return c.type === 'No Show'; }).length;
     var sc = cx.filter(function(c) { return c.type === 'Site Cancelled'; }).length;
     var pc = cx.filter(function(c) { return c.type === 'Patient Cancelled'; }).length;
@@ -6206,7 +6207,7 @@ function renderInvCapacity() {
   var el = document.getElementById('invCapacityContainer');
   if (!el) return;
   var allVisits = DATA.allVisitDetail || [];
-  var cancels = DATA.allCancels || [];
+  var cancels = (DATA.allCancels || []).filter(function(c){return !_patientRecovered(c.name,c.study);});
   var INVS = CRP_CONFIG.INVESTIGATORS || [];
   if (INVS.length === 0 || allVisits.length === 0) return;
   var schedules = CRP_CONFIG.INV_SCHEDULES || {};
@@ -7182,7 +7183,8 @@ function buildInsights() {
   if (!posEl) return;
 
   const posItems = [];
-  const cancelRate = Math.round(DATA.cancelTotal / (DATA.cancelTotal + DATA.upcomingTotal) * 100);
+  var _ct2 = typeof window._adjCancel !== 'undefined' ? window._adjCancel : (DATA.cancelTotal||0);
+  const cancelRate = Math.round(_ct2 / (_ct2 + DATA.upcomingTotal) * 100);
   if (cancelRate < 30) {
     posItems.push(`<div class="insight-item positive"><span class="insight-icon"></span><div>
       <div class="insight-title">Cancel rate at ${cancelRate}% — within target range</div>
@@ -11091,10 +11093,12 @@ function renderAll() {
   // ── Always render: Overview KPIs (lightweight text updates) ──
   var _sk = function(id,v){ var e=document.getElementById(id); if(e) e.textContent=v; };
   // Adjust counts by excluding patients who have since recovered (per audit trail)
-  var _adjCancel = (DATA.allCancels||[]).filter(function(r){return !_patientRecovered(r.name,r.study);}).length;
-  var _adjNoShow = (DATA.noShows||[]).filter(function(r){return !_patientRecovered(r.name,r.study);}).length;
-  var _adjWithdrew = (DATA.withdrawals||[]).filter(function(r){return !_patientRecovered(r.name,r.study);}).length;
-  var _adjSF = (DATA.screenFails||[]).filter(function(r){return !_patientRecovered(r.name,r.study);}).length;
+  // Stored globally so cancel rate calculations in other functions can use them
+  window._adjCancel = (DATA.allCancels||[]).filter(function(r){return !_patientRecovered(r.name,r.study);}).length;
+  window._adjNoShow = (DATA.noShows||[]).filter(function(r){return !_patientRecovered(r.name,r.study);}).length;
+  window._adjWithdrew = (DATA.withdrawals||[]).filter(function(r){return !_patientRecovered(r.name,r.study);}).length;
+  window._adjSF = (DATA.screenFails||[]).filter(function(r){return !_patientRecovered(r.name,r.study);}).length;
+  var _adjCancel = window._adjCancel, _adjNoShow = window._adjNoShow, _adjWithdrew = window._adjWithdrew, _adjSF = window._adjSF;
   _sk('kpi-cancels', _adjCancel);
   _sk('kpi-noshow', _adjNoShow);
   _sk('kpi-withdrew', _adjWithdrew);
@@ -16923,7 +16927,8 @@ function generateDailyEmail(type) {
   const flags = DATA.riskFlags || [];
   const ad = DATA.actionDetails || {};
   const sites = DATA.sites || [];
-  const cancelRate = DATA.upcomingTotal ? ((DATA.cancelTotal / (DATA.upcomingTotal + DATA.cancelTotal)) * 100).toFixed(1) : '0';
+  var _ct3 = typeof window._adjCancel !== 'undefined' ? window._adjCancel : (DATA.cancelTotal||0);
+  const cancelRate = DATA.upcomingTotal ? ((_ct3 / (DATA.upcomingTotal + _ct3)) * 100).toFixed(1) : '0';
 
   function pUrl(name, url) { return url ? '<a href="' + escapeHTML(url) + '">' + escapeHTML(name) + '</a>' : escapeHTML(name); }
   function sUrl(name, url) { return url ? '<a href="' + escapeHTML(url) + '">' + escapeHTML(name) + '</a>' : escapeHTML(name); }
@@ -16940,7 +16945,7 @@ function generateDailyEmail(type) {
   html += '<div style="background:#f8fafc;padding:16px 24px;border-bottom:2px solid #e2e8f0;">';
   html += '<table style="width:100%;border-collapse:collapse;text-align:center;"><tr>';
   html += '<td style="padding:8px;"><div style="font-size:24px;font-weight:700;color:#072061;">' + (DATA.upcomingTotal || 0) + '</div><div style="font-size:11px;color:#64748b;">Upcoming</div></td>';
-  html += '<td style="padding:8px;"><div style="font-size:24px;font-weight:700;color:#dc2626;">' + (DATA.cancelTotal || 0) + '</div><div style="font-size:11px;color:#64748b;">True Cancellations</div><div style="font-size:10px;color:#94a3b8">' + (DATA.noShowTotal||0) + ' no-shows · ' + (DATA.withdrewTotal||0) + ' withdrew · ' + (DATA.screenFailTotal||0) + ' SF · ' + (DATA.discontinuedTotal||0) + ' disc.</div></td>';
+  html += '<td style="padding:8px;"><div style="font-size:24px;font-weight:700;color:#dc2626;">' + _adjCancel + '</div><div style="font-size:11px;color:#64748b;">True Cancellations</div><div style="font-size:10px;color:#94a3b8">' + _adjNoShow + ' no-shows · ' + _adjWithdrew + ' withdrew · ' + _adjSF + ' SF · ' + (DATA.discontinuedTotal||0) + ' disc.</div></td>';
   html += '<td style="padding:8px;"><div style="font-size:24px;font-weight:700;color:' + (parseFloat(cancelRate) > 15 ? '#dc2626' : '#059669') + ';">' + cancelRate + '%</div><div style="font-size:11px;color:#64748b;">Cancel Rate</div></td>';
   html += '<td style="padding:8px;"><div style="font-size:24px;font-weight:700;color:#d97706;">' + flags.length + '</div><div style="font-size:11px;color:#64748b;">At-Risk Patients</div></td>';
   html += '</tr></table></div>';
