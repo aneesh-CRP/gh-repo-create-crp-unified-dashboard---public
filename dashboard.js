@@ -2985,8 +2985,9 @@ function buildScheduleTable() {
     var invText = esc(v.investigator || '—');
     var invStyle = v.investigator ? 'font-size:11px;color:#7c3aed' : 'font-size:11px;color:#cbd5e1';
     html += '<tr data-date="' + (v.date_iso||'') + '" data-site="' + esc(v.site||'') + '" data-coord="' + esc(v.coord||'') + '">'
-      + '<td class="confirm-cell" style="width:80px;text-align:center;padding:4px;"><span style="font-size:9px;font-weight:700;padding:3px 8px;border-radius:4px;border:1.5px solid #e2e8f0;color:#cbd5e1;">Confirm</span></td>'
+      + '<td class="confirm-cell" style="width:90px;text-align:center;padding:4px;"></td>'
       + '<td style="font-weight:600;color:var(--blue);white-space:nowrap">' + esc(v.date||'—') + '</td>'
+      + '<td style="font-size:11px;color:#64748b;white-space:nowrap">' + esc(v.time||'—') + '</td>'
       + '<td style="font-size:11px">' + studyHtml + '</td>'
       + '<td style="font-size:11px;color:var(--muted)">' + esc(v.visit||'—') + '</td>'
       + '<td style="font-weight:600">' + patHtml + riskBadge + '</td>'
@@ -3294,64 +3295,133 @@ function _visitKey(row) {
   }
   return (dateStr + '__' + patName).replace(/[^a-z0-9]/gi, '-').toLowerCase();
 }
-function toggleVisitConfirm(btn, key) {
-  if (_confirmedVisits[key]) {
-    delete _confirmedVisits[key];
-  } else {
-    _confirmedVisits[key] = Date.now();
+// ═══ VISIT STATUS TRACKING (real-time patient flow) ═══
+var VISIT_STATUSES = [
+  {id:'arrived',   label:'Arrived',    icon:'🏥', color:'#3b82f6'},
+  {id:'consent',   label:'Consent',    icon:'📋', color:'#8b5cf6'},
+  {id:'eligibility',label:'Eligibility',icon:'✓', color:'#06b6d4'},
+  {id:'labs',      label:'Labs',       icon:'🧪', color:'#d97706'},
+  {id:'exam',      label:'Exam Room',  icon:'🩺', color:'#059669'},
+  {id:'coord',     label:'Coord Office',icon:'👤',color:'#1843ad'},
+  {id:'completed', label:'Completed',  icon:'✅', color:'#16a34a'},
+  {id:'noshow',    label:'No Show',    icon:'✗',  color:'#dc2626'}
+];
+var _visitStatuses = {}; // key → {status, timestamp}
+function _loadVisitStatuses() {
+  try {
+    var raw = JSON.parse(localStorage.getItem('crp_visit_statuses') || '{}');
+    var cutoff = Date.now() - 7 * 86400000; // prune > 7 days
+    Object.keys(raw).forEach(function(k) { if (raw[k].ts > cutoff) _visitStatuses[k] = raw[k]; });
+  } catch(e) { _visitStatuses = {}; }
+}
+function _saveVisitStatuses() {
+  try { localStorage.setItem('crp_visit_statuses', JSON.stringify(_visitStatuses)); } catch(e) {}
+}
+function _statusBtnColor(statusId) {
+  var s = VISIT_STATUSES.find(function(x){return x.id===statusId;});
+  return s ? s.color : '#94a3b8';
+}
+function _statusLabel(statusId) {
+  var s = VISIT_STATUSES.find(function(x){return x.id===statusId;});
+  return s ? s.label : '—';
+}
+
+function _makeStatusBtn(key, row) {
+  var wrap = document.createElement('div');
+  wrap.style.cssText = 'position:relative;';
+  var btn = document.createElement('button');
+  btn.className = 'visit-status-btn';
+  var cur = _visitStatuses[key];
+
+  function _render() {
+    cur = _visitStatuses[key];
+    if (cur && cur.status) {
+      var c = _statusBtnColor(cur.status);
+      btn.innerHTML = _statusLabel(cur.status);
+      btn.style.cssText = 'font-size:9px;font-weight:700;padding:3px 6px;border-radius:4px;border:none;cursor:pointer;background:'+c+';color:#fff;white-space:nowrap;min-width:70px;';
+      row.style.background = cur.status === 'completed' ? '#f0fdf4' : cur.status === 'noshow' ? '#fef2f2' : '#f0f9ff';
+      row.style.opacity = cur.status === 'completed' || cur.status === 'noshow' ? '0.6' : '1';
+    } else {
+      btn.innerHTML = '● Track';
+      btn.style.cssText = 'font-size:9px;font-weight:700;padding:3px 6px;border-radius:4px;border:1.5px solid #cbd5e1;cursor:pointer;background:#fff;color:#94a3b8;white-space:nowrap;min-width:70px;';
+      row.style.background = '';
+      row.style.opacity = '1';
+    }
   }
-  _saveConfirmedVisits();
-  _updateConfirmBtn(btn, key);
-  _updateConfirmCount();
+
+  btn.onclick = function(e) {
+    e.stopPropagation();
+    // Toggle dropdown
+    var existing = wrap.querySelector('.status-dropdown');
+    if (existing) { existing.remove(); return; }
+    // Close any other open dropdowns
+    document.querySelectorAll('.status-dropdown').forEach(function(d){d.remove();});
+    var dd = document.createElement('div');
+    dd.className = 'status-dropdown';
+    dd.style.cssText = 'position:absolute;top:100%;left:0;z-index:999;background:#fff;border:1px solid #e2e8f0;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,0.12);padding:4px;min-width:130px;';
+    // Clear option
+    if (cur && cur.status) {
+      var clearBtn = document.createElement('div');
+      clearBtn.textContent = '✕ Clear';
+      clearBtn.style.cssText = 'padding:5px 8px;font-size:10px;cursor:pointer;border-radius:4px;color:#94a3b8;font-weight:600;';
+      clearBtn.onmouseenter = function(){this.style.background='#f8fafc';};
+      clearBtn.onmouseleave = function(){this.style.background='';};
+      clearBtn.onclick = function(ev) { ev.stopPropagation(); delete _visitStatuses[key]; _saveVisitStatuses(); _render(); dd.remove(); _updateStatusCount(); };
+      dd.appendChild(clearBtn);
+    }
+    VISIT_STATUSES.forEach(function(s) {
+      var opt = document.createElement('div');
+      var isActive = cur && cur.status === s.id;
+      opt.innerHTML = '<span style="display:inline-block;width:14px;text-align:center;margin-right:4px;">' + s.icon + '</span>' + s.label;
+      opt.style.cssText = 'padding:5px 8px;font-size:10px;cursor:pointer;border-radius:4px;font-weight:' + (isActive?'700':'500') + ';color:' + (isActive?s.color:'#374151') + ';background:' + (isActive?s.color+'15':'') + ';';
+      opt.onmouseenter = function(){this.style.background=s.color+'20';};
+      opt.onmouseleave = function(){this.style.background=isActive?s.color+'15':'';};
+      opt.onclick = function(ev) {
+        ev.stopPropagation();
+        _visitStatuses[key] = {status: s.id, ts: Date.now()};
+        _saveVisitStatuses();
+        _render();
+        dd.remove();
+        _updateStatusCount();
+        if (typeof logAudit === 'function') logAudit('visit_status', s.id + ' | ' + key);
+      };
+      dd.appendChild(opt);
+    });
+    wrap.appendChild(dd);
+    // Close on outside click
+    setTimeout(function() {
+      document.addEventListener('click', function _closeDD() { dd.remove(); document.removeEventListener('click', _closeDD); }, {once:true});
+    }, 0);
+  };
+  _render();
+  wrap.appendChild(btn);
+  return wrap;
 }
-function _updateConfirmBtn(btn, key) {
-  var done = !!_confirmedVisits[key];
-  btn.innerHTML = done
-    ? '<span style="display:inline-block;width:18px;height:18px;border-radius:4px;background:#059669;color:#fff;font-size:13px;line-height:18px;text-align:center;font-weight:700">&#x2713;</span>'
-    : '<span style="display:inline-block;width:18px;height:18px;border-radius:4px;border:2px solid #cbd5e1;background:#fff;"></span>';
-  btn.title = done ? 'Confirmed — click to undo' : 'Click to confirm visit';
-  btn.closest('tr').style.opacity = done ? '0.55' : '1';
-}
-function _updateConfirmCount() {
+
+function _updateStatusCount() {
   var tbody = document.getElementById('upcoming-tbody');
   if (!tbody) return;
   var rows = tbody.querySelectorAll('tr');
-  var total = 0, confirmed = 0;
+  var total = 0, tracked = 0;
   rows.forEach(function(row) {
     if (row.style.display === 'none') return;
     total++;
     var key = _visitKey(row);
-    if (key && _confirmedVisits[key]) confirmed++;
+    if (key && _visitStatuses[key]) tracked++;
   });
   var badge = document.getElementById('sched-confirm-count');
-  if (badge) badge.textContent = confirmed + '/' + total + ' confirmed';
+  if (badge) badge.textContent = tracked + '/' + total + ' tracked';
 }
-function _makeConfirmBtn(key, row) {
-  var done = !!_confirmedVisits[key];
-  var btn = document.createElement('button');
-  btn.className = 'visit-confirm-btn';
-  btn.dataset.key = key;
-  function _render() {
-    var d = !!_confirmedVisits[key];
-    btn.innerHTML = d ? '&#x2713; Confirmed' : 'Confirm';
-    btn.style.cssText = d
-      ? 'font-size:9px;font-weight:700;padding:3px 8px;border-radius:4px;border:none;cursor:pointer;background:#059669;color:#fff;white-space:nowrap;'
-      : 'font-size:9px;font-weight:700;padding:3px 8px;border-radius:4px;border:1.5px solid #94a3b8;cursor:pointer;background:#fff;color:#64748b;white-space:nowrap;';
-    row.style.background = d ? '#f0fdf4' : '';
-  }
-  btn.onclick = function() {
-    if (_confirmedVisits[key]) { delete _confirmedVisits[key]; } else { _confirmedVisits[key] = Date.now(); }
-    _saveConfirmedVisits();
-    _render();
-    _updateConfirmCount();
-  };
-  _render();
-  return btn;
-}
+
 function injectVisitConfirmButtons() {
+  _loadVisitStatuses();
+  // Also load legacy confirmed visits and migrate them
   _loadConfirmedVisits();
+  Object.keys(_confirmedVisits).forEach(function(k) {
+    if (!_visitStatuses[k]) _visitStatuses[k] = {status:'completed', ts:_confirmedVisits[k]};
+  });
   var tbody = document.getElementById('upcoming-tbody');
-  if (!tbody) { console.warn('injectVisitConfirmButtons: no upcoming-tbody'); return; }
+  if (!tbody) return;
   var rows = tbody.querySelectorAll('tr');
   var injected = 0;
   rows.forEach(function(row) {
@@ -3361,13 +3431,13 @@ function injectVisitConfirmButtons() {
     var td = row.querySelector('td.confirm-cell') || row.cells[0];
     if (!td) return;
     td.innerHTML = '';
-    td.style.cssText = 'width:80px;text-align:center;padding:4px;';
-    td.appendChild(_makeConfirmBtn(key, row));
+    td.style.cssText = 'width:90px;text-align:center;padding:4px;';
+    td.appendChild(_makeStatusBtn(key, row));
     row.dataset.confirmInjected = '1';
     injected++;
   });
-  _updateConfirmCount();
-  _log('injectVisitConfirmButtons: injected ' + injected + '/' + rows.length + ' rows');
+  _updateStatusCount();
+  _log('injectVisitStatusBtns: injected ' + injected + '/' + rows.length);
 }
 
 // ═══════════════════════════════════════════════════
@@ -7601,11 +7671,19 @@ function processLiveData(allRows, legacyCancels, auditLog) {
     }).map(r => {
       const sk = r['Study Key'], subk = r['Subject Key (Back End)'];
       const d = parseDate(r['Scheduled Date']||'');
+      var timeRaw = r['Scheduled Time']||r['scheduled_time']||'';
+      var timeFmt = '';
+      if (timeRaw) {
+        var tp = timeRaw.split(':');
+        var hr = parseInt(tp[0])||0, mn = tp[1]||'00';
+        timeFmt = (hr===0?'12':hr>12?''+(hr-12):''+hr) + ':' + mn + (hr>=12?'p':'a');
+      }
       return {
         name: (r['Subject Full Name']||'').replace(/\s{2,}/g,' ').trim(),
         url: patientUrl(sk, subk, r['Site Name']) || '',
         date: d ? d.toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '—',
         date_iso: r['Scheduled Date']||'',
+        time: timeFmt,
         study: (r['Study Name']||'').split(' - ').pop().trim(),
         study_url: studyUrl(sk, r['Site Name']) || '',
         visit: r['Name']||r['Appointment Type']||'',

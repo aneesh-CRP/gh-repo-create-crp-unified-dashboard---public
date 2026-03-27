@@ -169,6 +169,7 @@ const FEEDS = {
       ${STUDY_NAME_SQL} AS study_name,
       CAST(ca.study_key AS STRING) AS study_key,
       FORMAT_DATETIME('%Y-%m-%d', ca.start) AS scheduled_date,
+      FORMAT_DATETIME('%H:%M', ca.start) AS scheduled_time,
       ${SUBJECT_NAME_SQL} AS subject_full_name,
       CAST(ca.subject_key AS STRING) AS subject_key_back_end,
       COALESCE(sc.name, '') AS full_name,
@@ -209,7 +210,7 @@ const FEEDS = {
       ${STUDY_FILTER_SQL}
     ORDER BY ca.start ASC`,
     headers: {
-      study_name: 'Study Name', study_key: 'Study Key', scheduled_date: 'Scheduled Date',
+      study_name: 'Study Name', study_key: 'Study Key', scheduled_date: 'Scheduled Date', scheduled_time: 'Scheduled Time',
       subject_full_name: 'Subject Full Name', subject_key_back_end: 'Subject Key (Back End)',
       full_name: 'Full Name', appointment_status: 'Appointment Status', visit_name: 'Name',
       subject_status: 'Subject Status', subject_id: 'Subject ID', cancel_date: 'Cancel Date',
