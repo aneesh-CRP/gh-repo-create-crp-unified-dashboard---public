@@ -4836,6 +4836,9 @@ function fetchActionRequiredData() {
       window._prescrVisits = prescr.filter(function(r){ return r.appointment_status !== 'Cancelled'; });
       _log('Pre-screening visits: ' + window._prescrVisits.length + ' upcoming');
       safe(buildScheduleTable, 'buildScheduleTable-prescr');
+      safe(hidePastVisits, 'hidePastVisits-prescr');
+      safe(injectVisitConfirmButtons, 'confirmBtns-prescr');
+      safe(function(){ filterSchedTable('all', null); }, 'schedFilter-prescr');
     }
 
     // Demographics — build diversity % per study
