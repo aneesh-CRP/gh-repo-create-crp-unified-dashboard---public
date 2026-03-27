@@ -1648,31 +1648,32 @@ const FEEDS = {
     ORDER BY sp.payment_date DESC`
   },
 
-  // ── 48. eReg Pending Documents (assigned/pending regulatory documents) ──
+  // ── 48. eReg Pending Documents (assigned subject documents awaiting action) ──
   eregPending: {
     query: () => `SELECT
-      CAST(rd.study_key AS STRING) AS study_key,
+      CAST(sd.study_key AS STRING) AS study_key,
       ${STUDY_NAME_SQL} AS study_name,
-      rd.name AS document_name,
-      COALESCE(rd.description, '') AS description,
-      CASE rd.status WHEN -1 THEN 'Deleted' WHEN 0 THEN 'Updated' WHEN 1 THEN 'Active' WHEN 2 THEN 'Incoming' WHEN 3 THEN 'Assigned' WHEN 4 THEN 'Rejected' WHEN 6 THEN 'Completed' WHEN 10 THEN 'Signed' ELSE CAST(rd.status AS STRING) END AS status,
-      rd.version,
-      COALESCE(rd.file_original_name, '') AS file_name,
-      FORMAT_DATETIME('%Y-%m-%d', rd.date_created) AS date_created,
-      FORMAT_DATETIME('%Y-%m-%d', rd.effective_date) AS effective_date,
-      FORMAT_DATETIME('%Y-%m-%d', rd.expiration_date) AS expiration_date,
-      CASE WHEN rd.is_expired = 1 THEN 'Yes' ELSE 'No' END AS expired,
-      CASE WHEN rd.is_esigned = 1 THEN 'Yes' ELSE 'No' END AS esigned,
-      CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) AS uploaded_by,
+      ${SUBJECT_NAME_SQL} AS subject_name,
+      CAST(sd.subject_key AS STRING) AS subject_key,
+      COALESCE(dt.name, sd.custom_name, '') AS document_name,
+      COALESCE(dc.name, '') AS category,
+      COALESCE(sd.description, '') AS description,
+      CASE sd.status WHEN -1 THEN 'Deleted' WHEN 0 THEN 'Updated' WHEN 1 THEN 'Active' WHEN 2 THEN 'Incoming' WHEN 3 THEN 'Assigned' WHEN 4 THEN 'Rejected' WHEN 6 THEN 'Completed' WHEN 10 THEN 'Signed' ELSE CAST(sd.status AS STRING) END AS status,
+      FORMAT_DATETIME('%Y-%m-%d', sd.date_created) AS date_created,
+      FORMAT_DATETIME('%Y-%m-%d', sd.assigned_date) AS assigned_date,
+      CONCAT(COALESCE(assigned.first_name, ''), ' ', COALESCE(assigned.last_name, '')) AS assigned_to,
       COALESCE(si.name, '') AS site_name
-    FROM ${tbl('regulatory_document')} rd
-    JOIN ${tbl('study')} st ON rd.study_key = st.study_key
+    FROM ${tbl('subject_document')} sd
+    JOIN ${tbl('study')} st ON sd.study_key = st.study_key
     LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
-    LEFT JOIN ${tbl('user')} u ON rd.user_key = u.user_key
-    LEFT JOIN ${tbl('site')} si ON rd.site_key = si.site_key
-    WHERE rd.is_active = 1 AND rd.status IN (2, 3)
+    LEFT JOIN ${tbl('subject')} sub ON sd.subject_key = sub.subject_key
+    LEFT JOIN ${tbl('document_type')} dt ON sd.document_type_key = dt.document_type_key
+    LEFT JOIN ${tbl('document_category')} dc ON sd.document_category_key = dc.document_category_key
+    LEFT JOIN ${tbl('user')} assigned ON sd.assigned_user_key = assigned.user_key
+    LEFT JOIN ${tbl('site')} si ON sd.site_key = si.site_key
+    WHERE sd._fivetran_deleted = false AND sd.status = 3
       AND st.is_active = 1      ${STUDY_FILTER_SQL}
-    ORDER BY rd.date_created DESC`
+    ORDER BY sd.assigned_date DESC`
   },
 
   // ── 47. Document Completion Summary (aggregate per study — was feed 39) ──

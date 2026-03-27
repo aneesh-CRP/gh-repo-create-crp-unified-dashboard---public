@@ -7081,17 +7081,15 @@ function showActionModal(type) {
   } else if (type === 'ereg') {
     var rows = window._actionEreg || [];
     title = 'eReg Pending Documents (' + rows.length + ')';
-    body = '<table class="detail-table"><thead><tr><th>Study</th><th>Document</th><th>Status</th><th>Version</th><th>Effective</th><th>Expiration</th><th>Uploaded By</th></tr></thead><tbody>' +
+    body = '<table class="detail-table"><thead><tr><th>Study</th><th>Subject</th><th>Document</th><th>Category</th><th>Assigned To</th><th>Assigned Date</th></tr></thead><tbody>' +
       rows.slice(0, 100).map(function(r) {
         var studyUrl = _crioStudyUrl(r.study_key);
-        var isExpired = r.expired === 'Yes';
-        return '<tr style="' + (isExpired?'background:#fef2f2':'') + '"><td style="font-size:11px">' + _crioLink(r.study_name||'', studyUrl) + '</td>' +
+        return '<tr><td style="font-size:11px">' + _crioLink(r.study_name||'', studyUrl) + '</td>' +
+          '<td style="font-size:11px">' + escapeHTML(r.subject_name||'') + '</td>' +
           '<td style="font-size:11px">' + escapeHTML(r.document_name||'') + '</td>' +
-          '<td><span style="font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px;background:' + (r.status==='Assigned'?'#fef2f2':'#fffbeb') + ';color:' + (r.status==='Assigned'?'#dc2626':'#d97706') + '">' + escapeHTML(r.status||'') + '</span></td>' +
-          '<td style="font-size:11px">' + escapeHTML(r.version||'') + '</td>' +
-          '<td style="font-size:11px">' + escapeHTML(r.effective_date||'—') + '</td>' +
-          '<td style="font-size:11px;color:' + (isExpired?'#dc2626':'') + '">' + escapeHTML(r.expiration_date||'—') + (isExpired?' ':'') + '</td>' +
-          '<td style="font-size:11px">' + escapeHTML(r.uploaded_by||'') + '</td></tr>';
+          '<td style="font-size:11px">' + escapeHTML(r.category||'') + '</td>' +
+          '<td style="font-size:11px">' + escapeHTML(r.assigned_to||'') + '</td>' +
+          '<td style="font-size:11px">' + escapeHTML(r.assigned_date||'—') + '</td></tr>';
       }).join('') + '</tbody></table>';
   }
   openModal(title, '', body || '<div style="padding:20px;color:#94a3b8">No data available</div>');
