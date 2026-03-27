@@ -1324,7 +1324,61 @@ body {
     <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterStudiesFromKPI('enrolling')"><div class="tb-label">Avg SF Rate</div><div class="tb-value" style="color:#dc2626" id="sk-sf-rate">—</div></div>
   </div>
 
-  <!-- ═══ Cancellation Analysis (moved from Overview) ═══ -->
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;position:relative;z-index:10;" id="studies-filter-bar">
+      <button data-filter="all" class="sched-filter active" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid #1843ad;background:#e8eeff;color:#1843ad;cursor:pointer">All</button>
+      <button data-filter="critical" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Critical</button>
+      <button data-filter="high" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">High Risk</button>
+      <button data-filter="enrolling" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Enrolling</button>
+      <button data-filter="maintenance" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Maintenance</button>
+      <button data-filter="startup" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Startup</button>
+      <button data-filter="preclosed" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Pre-Closed</button>
+      <button data-filter="goal_met" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Goal Met</button>
+      <button data-filter="behind" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Behind Goal</button>
+      <button data-filter="phl" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">PHL</button>
+      <button data-filter="pnj" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">PNJ</button>
+      <select id="ta-filter" onchange="filterStudiesFromKPI(_studyFilter)" style="padding:4px 8px;border-radius:6px;font-size:11px;border:1px solid var(--border);color:var(--muted);background:var(--surface);cursor:pointer">
+        <option value="">All Therapeutic Areas</option>
+      </select>
+  </div>
+
+  <!-- Studies table -->
+  <div class="card fade-in">
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;" id="merged-study-table">
+        <thead>
+          <tr style="background:var(--surface2);border-bottom:2px solid var(--border);">
+            <th style="padding:10px 12px;text-align:left;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;" onclick="sortMergedTable(this,0)">Study ↕</th>
+            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;" onclick="sortMergedTable(this,1)">Status ↕</th>
+            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;" onclick="sortMergedTable(this,2)">Risk ↕</th>
+            <th style="padding:10px 6px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;font-size:11px" onclick="sortMergedTable(this,3)">Cancel/WD ↕</th>
+            <th style="padding:10px 6px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;font-size:11px">No-Show</th>
+            <th style="padding:10px 6px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;font-size:11px">SF</th>
+            <th style="padding:10px 6px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;font-size:11px">Resched</th>
+            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;" onclick="sortMergedTable(this,4)">Upcoming ↕</th>
+            <th style="padding:10px 6px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;font-size:11px">Not Sched</th>
+            <th style="padding:10px 8px;text-align:left;font-weight:700;color:var(--text);white-space:nowrap;">Enrollment</th>
+            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;" onclick="sortMergedTable(this,7)">In Screen ↕</th>
+            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;" onclick="sortMergedTable(this,6)">Screened ↕</th>
+            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Site</th>
+            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Leads</th>
+          </tr>
+        </thead>
+        <tbody id="merged-study-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Upcoming by Study (visual distribution) -->
+  <div class="card mb16 fade-in" style="margin-top:16px;">
+    <div class="card-header">
+      <span class="card-title">Upcoming Visits by Study</span>
+      <span class="badge badge-blue" id="sched-study-count">—</span>
+    </div>
+    <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Scheduled visits per study · click count to see details</div>
+    <div id="upcoming-study-bars" style="padding:12px 16px;max-height:280px;overflow-y:auto;"></div>
+  </div>
+
+  <!-- Cancellation Analysis -->
   <div class="section-title" style="margin-top:16px;margin-bottom:8px;">Cancellation Analysis</div>
   <div class="time-banner fade-in" style="margin-bottom:16px;">
     <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showCancels(null,'Cancellations')">
@@ -1377,61 +1431,6 @@ body {
     </div>
   </div>
   <div id="horizon-grid" class="time-banner fade-in" style="margin-bottom:16px;"></div>
-
-  <!-- Upcoming by Study (visual distribution) -->
-  <div class="card mb16 fade-in">
-    <div class="card-header">
-      <span class="card-title">Upcoming Visits by Study</span>
-      <span class="badge badge-blue" id="sched-study-count">—</span>
-    </div>
-    <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Scheduled visits per study · click count to see details</div>
-    <div id="upcoming-study-bars" style="padding:12px 16px;max-height:280px;overflow-y:auto;"></div>
-  </div>
-
-  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;position:relative;z-index:10;" id="studies-filter-bar">
-      <button data-filter="all" class="sched-filter active" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid #1843ad;background:#e8eeff;color:#1843ad;cursor:pointer">All</button>
-      <button data-filter="critical" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Critical</button>
-      <button data-filter="high" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">High Risk</button>
-      <button data-filter="enrolling" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Enrolling</button>
-      <button data-filter="maintenance" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Maintenance</button>
-      <button data-filter="startup" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Startup</button>
-      <button data-filter="preclosed" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Pre-Closed</button>
-      <button data-filter="goal_met" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Goal Met</button>
-      <button data-filter="behind" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Behind Goal</button>
-      <button data-filter="phl" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">PHL</button>
-      <button data-filter="pnj" class="sched-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">PNJ</button>
-      <select id="ta-filter" onchange="filterStudiesFromKPI(_studyFilter)" style="padding:4px 8px;border-radius:6px;font-size:11px;border:1px solid var(--border);color:var(--muted);background:var(--surface);cursor:pointer">
-        <option value="">All Therapeutic Areas</option>
-      </select>
-  </div>
-
-  <!-- Studies table -->
-  <div class="card fade-in">
-    <div style="overflow-x:auto;">
-      <table style="width:100%;border-collapse:collapse;font-size:12px;" id="merged-study-table">
-        <thead>
-          <tr style="background:var(--surface2);border-bottom:2px solid var(--border);">
-            <th style="padding:10px 12px;text-align:left;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;" onclick="sortMergedTable(this,0)">Study ↕</th>
-            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;" onclick="sortMergedTable(this,1)">Status ↕</th>
-            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;" onclick="sortMergedTable(this,2)">Risk ↕</th>
-            <th style="padding:10px 6px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;font-size:11px" onclick="sortMergedTable(this,3)">Cancel/WD ↕</th>
-            <th style="padding:10px 6px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;font-size:11px">No-Show</th>
-            <th style="padding:10px 6px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;font-size:11px">SF</th>
-            <th style="padding:10px 6px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;font-size:11px">Resched</th>
-            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;" onclick="sortMergedTable(this,4)">Upcoming ↕</th>
-            <th style="padding:10px 6px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;font-size:11px">Not Sched</th>
-            <th style="padding:10px 8px;text-align:left;font-weight:700;color:var(--text);white-space:nowrap;">Enrollment</th>
-            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;" onclick="sortMergedTable(this,7)">In Screen ↕</th>
-            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;" onclick="sortMergedTable(this,6)">Screened ↕</th>
-            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Site</th>
-            <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;">Leads</th>
-          </tr>
-        </thead>
-        <tbody id="merged-study-tbody"></tbody>
-      </table>
-    </div>
-  </div>
-
 
 </div><!-- /view-studies -->
 
