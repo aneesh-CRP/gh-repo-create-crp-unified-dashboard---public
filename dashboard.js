@@ -5250,8 +5250,8 @@ function switchView(name, el) {
       var _y1 = _now.getFullYear(), _y2 = _m2===0 ? _y1+1 : _y1;
       window._schedMonth1Prefix = _y1+'-'+String(_m1+1).padStart(2,'0');
       window._schedMonth2Prefix = _y2+'-'+String(_m2+1).padStart(2,'0');
-      sk('sched-kpi-month1-label', '\uD83D\uDCC5 ' + _mn[_m1]);
-      sk('sched-kpi-month2-label', '\uD83D\uDCC5 ' + _mn[_m2]);
+      sk('sched-kpi-month1-label', _mn[_m1]);
+      sk('sched-kpi-month2-label', _mn[_m2]);
     }, 50);
   }
 }
