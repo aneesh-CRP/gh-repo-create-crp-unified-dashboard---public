@@ -1073,7 +1073,7 @@ body {
   <div class="nav-right" style="margin-left:auto;gap:4px;">
     <span class="data-badge" id="last-refresh-badge" style="font-size:10px;padding:2px 6px;">Loading...</span>
     <button id="theme-toggle-btn" onclick="toggleDarkMode()" title="Toggle dark mode" style="padding:2px 6px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;font-size:12px;cursor:pointer;line-height:1;"></button>
-    <button id="phi-toggle-btn" onclick="togglePHIMask()" title="Click to reveal patient names" style="padding:2px 6px;background:#059669;color:white;border:none;border-radius:4px;font-size:9px;font-weight:600;cursor:pointer;">&#x1f512; PHI</button>
+    <button id="phi-toggle-btn" onclick="togglePHIMask()" title="Click to reveal patient names" style="padding:2px 6px;background:#059669;color:white;border:none;border-radius:4px;font-size:9px;font-weight:600;cursor:pointer;">PHI Masked</button>
     <button id="dh-toggle-btn" onclick="toggleHealthStrip()" title="Data health status" style="padding:2px 6px;background:var(--surface2);border:1px solid var(--border);border-radius:4px;font-size:9px;font-weight:600;cursor:pointer;color:var(--muted);display:none;">Health</button>
     <button class="refresh-btn" id="refresh-btn" onclick="manualRefresh()" style="padding:2px 8px;font-size:10px;">↻</button>
     <span class="data-badge" id="data-source-badge" style="display:none;"></span>
@@ -1319,9 +1319,9 @@ body {
     <div class="tb-divider"></div>
     <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterStudiesFromKPI('startup')"><div class="tb-label">Startup</div><div class="tb-value" style="color:#d97706" id="sk-startup">—</div></div>
     <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterStudiesFromKPI('all')"><div class="tb-label">Total Enrolled</div><div class="tb-value" style="color:#7c3aed" id="sk-enrolled">—</div></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterStudiesFromKPI('enrolling')"><div class="tb-label">Total Enrolled</div><div class="tb-value" style="color:#7c3aed" id="sk-enrolled">—</div></div>
     <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterStudiesFromKPI('all')"><div class="tb-label">Avg SF Rate</div><div class="tb-value" style="color:#dc2626" id="sk-sf-rate">—</div></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterStudiesFromKPI('enrolling')"><div class="tb-label">Avg SF Rate</div><div class="tb-value" style="color:#dc2626" id="sk-sf-rate">—</div></div>
   </div>
 
   <!-- ═══ Cancellation Analysis (moved from Overview) ═══ -->

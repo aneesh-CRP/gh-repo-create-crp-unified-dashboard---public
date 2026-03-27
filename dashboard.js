@@ -1608,7 +1608,7 @@ function togglePHIMask() {
   PHI_MASKED = !PHI_MASKED;
   var btn = document.getElementById('phi-toggle-btn');
   if (btn) {
-    btn.innerHTML = PHI_MASKED ? '&#x1f512; PHI' : '&#x1f513; PHI';
+    btn.innerHTML = PHI_MASKED ? 'PHI Masked' : 'PHI Visible';
     btn.title = PHI_MASKED ? 'Click to reveal patient names' : 'Click to mask patient names';
     btn.style.background = PHI_MASKED ? '#059669' : '#dc2626';
   }
@@ -4056,7 +4056,7 @@ function renderCoordWorkloadBalance() {
   html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:14px;">';
   html += '<div style="'+kpiStyle+'background:#eff6ff;" onclick="showCoordKpiPopup(\'visits\')" title="Total upcoming visits across all 5 coordinators"><div style="font-size:18px;font-weight:800;color:#3b82f6;">'+totalVisits+'</div><div style="font-size:9px;color:#3b82f6;font-weight:600;">Total Visits</div></div>';
   html += '<div style="'+kpiStyle+'background:#f0fdf4;" title="Average upcoming visits per coordinator"><div style="font-size:18px;font-weight:800;color:#059669;">'+avgVisits+'</div><div style="font-size:9px;color:#059669;font-weight:600;">Avg/Coord</div></div>';
-  html += '<div style="'+kpiStyle+'background:'+(balanceScore>=80?'#f0fdf4':'#fffbeb')+';" title="How evenly visits are distributed — 100% = perfectly balanced"><div style="font-size:18px;font-weight:800;color:'+balColor+';">'+balanceScore+'%</div><div style="font-size:9px;color:'+balColor+';font-weight:600;">Balance Score</div></div>';
+  html += '<div style="'+kpiStyle+'background:'+(balanceScore>=80?'#f0fdf4':'#fffbeb')+';" title="How evenly visits are distributed — 100% = perfectly balanced" onclick="showCoordKpiPopup(\'balance\')"><div style="font-size:18px;font-weight:800;color:'+balColor+';">'+balanceScore+'%</div><div style="font-size:9px;color:'+balColor+';font-weight:600;">Balance Score</div></div>';
   html += '<div style="'+kpiStyle+'background:'+(highCancel.length>0?'#fef2f2':'#f0fdf4')+'" onclick="showCoordKpiPopup(\'highCancel\')" title="Coordinators with cancellation rate above 20%"><div style="font-size:18px;font-weight:800;color:'+(highCancel.length>0?'#dc2626':'#059669')+';">'+highCancel.length+'</div><div style="font-size:9px;color:'+(highCancel.length>0?'#dc2626':'#059669')+';font-weight:600;">High Cancel Rate</div></div>';
   html += '</div>';
 
@@ -4374,6 +4374,25 @@ function showCoordKpiPopup(type) {
     });
     if (rows2.length) body2 += '</tbody></table>';
     openModal('High Cancel Rate', 'Coordinators with >20% cancellation rate', body2);
+  } else if (type === 'balance') {
+    var today = new Date(); today.setHours(0,0,0,0);
+    var d30 = new Date(today); d30.setDate(d30.getDate() + 30);
+    var upcoming30 = (DATA.allVisitDetail||[]).filter(function(v) { var d = _parseDate(v.date_iso); return d && d >= today && d <= d30; });
+    var rows3 = COORDS.map(function(name) {
+      var v = upcoming30.filter(function(r){return r.coord===name;});
+      return {name:name, visits:v.length};
+    }).sort(function(a,b){return b.visits-a.visits;});
+    var totalV = rows3.reduce(function(s,r){return s+r.visits;},0);
+    var avgV = COORDS.length > 0 ? Math.round(totalV/COORDS.length) : 0;
+    var body3 = '<div style="margin-bottom:12px;font-size:12px;color:#64748b;">Next 30 days · avg '+avgV+' visits/coordinator · '+totalV+' total</div>';
+    body3 += '<table class="detail-table"><thead><tr><th>Coordinator</th><th class="r">Visits</th><th class="r">vs Avg</th></tr></thead><tbody>';
+    rows3.forEach(function(r){
+      var diff = r.visits - avgV;
+      var diffColor = diff > 0 ? '#059669' : diff < 0 ? '#dc2626' : '#94a3b8';
+      body3 += '<tr onclick="showCoordDetail(\''+jsAttr(r.name)+'\')" style="cursor:pointer"><td style="font-weight:600">'+escapeHTML(r.name)+'</td><td class="r" style="font-weight:700">'+r.visits+'</td><td class="r" style="font-weight:700;color:'+diffColor+'">'+(diff>0?'+':'')+diff+'</td></tr>';
+    });
+    body3 += '</tbody></table>';
+    openModal('Workload Balance', 'Visit distribution across coordinators (next 30 days)', body3);
   }
 }
 
