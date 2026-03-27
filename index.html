@@ -16243,14 +16243,21 @@ function renderStudiesTable() {
   var _avgSF = _sfStudies.length > 0 ? Math.round(_sfStudies.reduce(function(s,r){return s+r.screen_fail_pct;},0)/_sfStudies.length) : 0;
   _skSet('sk-sf-rate', _avgSF + '%');
 
-  // Build per-study cancel breakdown counts
-  var _studyBreakdown = {};
+  // Build per-study AND per-study+site cancel breakdown counts
+  var _studyBreakdown = {};    // keyed by study name (totals)
+  var _studySiteBreakdown = {}; // keyed by "study|PHL" or "study|PNJ"
+  function _siteCode(r) { return (r.site||'').indexOf('Penn') !== -1 ? 'PNJ' : 'PHL'; }
   function _incBreakdown(list, field) {
     (list || []).forEach(function(r) {
       var s = (r.study || '').trim();
       if (!s) return;
+      // Study-wide total
       if (!_studyBreakdown[s]) _studyBreakdown[s] = {cancels:0, noShows:0, withdrew:0, screenFails:0, rescheduled:0};
       _studyBreakdown[s][field]++;
+      // Per-site
+      var sk = s + '|' + _siteCode(r);
+      if (!_studySiteBreakdown[sk]) _studySiteBreakdown[sk] = {cancels:0, noShows:0, withdrew:0, screenFails:0, rescheduled:0};
+      _studySiteBreakdown[sk][field]++;
     });
   }
   _incBreakdown(DATA.allCancels, 'cancels');
@@ -16258,6 +16265,15 @@ function renderStudiesTable() {
   _incBreakdown(DATA.withdrawals, 'withdrew');
   _incBreakdown(DATA.screenFails, 'screenFails');
   _incBreakdown(DATA.rescheduledVisits, 'rescheduled');
+
+  // Build per-study+site upcoming visit counts
+  var _upcomingBySite = {};
+  (DATA.allVisitDetail || []).forEach(function(v) {
+    var s = (v.study || '').trim();
+    var site = (v.site||'').indexOf('Penn') !== -1 ? 'PNJ' : 'PHL';
+    var sk = s + '|' + site;
+    _upcomingBySite[sk] = (_upcomingBySite[sk] || 0) + 1;
+  });
 
   // Populate therapeutic area dropdown
   var taSelect = document.getElementById('ta-filter');
@@ -16415,8 +16431,9 @@ function renderStudiesTable() {
          </div>`
       : `<span style="font-size:11px;color:var(--muted)">0</span>`;
 
-    const upcomingCell = s.upcoming > 0
-      ? `<span style="font-size:12px;font-weight:700;color:#1843ad;cursor:pointer" data-action="studyUpcoming" data-study="${escapeHTML(s.study)}">${s.upcoming}</span>`
+    const _siteUpcoming = _siteKey ? (_upcomingBySite[_siteKey] || 0) : s.upcoming;
+    const upcomingCell = _siteUpcoming > 0
+      ? `<span style="font-size:12px;font-weight:700;color:#1843ad;cursor:pointer" data-action="studyUpcoming" data-study="${escapeHTML(s.study)}">${_siteUpcoming}</span>`
       : `<span style="font-size:11px;color:var(--muted)">0</span>`;
 
     const sfColor = s.screen_fail_pct > 60 ? '#dc2626' : s.screen_fail_pct > 40 ? '#d97706' : 'var(--muted)';
@@ -16433,7 +16450,9 @@ function renderStudiesTable() {
     })();
 
     // Per-study cancel breakdown
-    var _bd = _studyBreakdown[s.study] || {cancels:0, noShows:0, withdrew:0, screenFails:0, rescheduled:0};
+    // Use per-site breakdown if row has a specific site, otherwise study-wide
+    var _siteKey = s._site ? s.study + '|' + s._site : null;
+    var _bd = (_siteKey ? _studySiteBreakdown[_siteKey] : null) || _studyBreakdown[s.study] || {cancels:0, noShows:0, withdrew:0, screenFails:0, rescheduled:0};
     function _countCell(val, color, filterCat) {
       if (!val) return '<span style="font-size:11px;color:#cbd5e1">0</span>';
       return '<span style="font-size:12px;font-weight:700;color:'+color+';cursor:pointer" data-action="studyCategoryClick" data-study="'+escapeHTML(s.study)+'" data-cat="'+filterCat+'">'+val+'</span>';
@@ -16445,8 +16464,9 @@ function renderStudiesTable() {
     // Combined cancel + withdrawal count
     var _cancelWd = _bd.cancels + _bd.withdrew;
 
-    // Unscheduled lookup
-    var _unschedList = (window._unschedByStudyKey || {})[s.crio_study_key] || (window._unschedByStudy || {})[s.study] || [];
+    // Unscheduled lookup — filter by site if row has specific site
+    var _unschedAll = (window._unschedByStudyKey || {})[s.crio_study_key] || (window._unschedByStudy || {})[s.study] || [];
+    var _unschedList = s._site ? _unschedAll.filter(function(r) { return ((r.site_name||'').indexOf('Penn') !== -1 ? 'PNJ' : 'PHL') === s._site; }) : _unschedAll;
     var _unschedCell = _unschedList.length > 0
       ? '<span style="font-size:12px;font-weight:700;color:#c2410c;cursor:pointer" onclick="showUnscheduledModal(\''+jsAttr(s.study)+'\')">' + _unschedList.length + '</span>'
       : '<span style="font-size:11px;color:#cbd5e1">0</span>';
