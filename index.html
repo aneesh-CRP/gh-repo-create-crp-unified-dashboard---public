@@ -1635,132 +1635,119 @@ body {
 <div id="view-actions" class="view">
 
   <div style="margin-bottom:16px;">
-    <span class="card-title" style="font-size:16px;">Action Plan</span>
-    <div style="font-size:10px;color:#94a3b8;margin-top:2px;">Prioritized tasks, at-risk patients, recruitment intelligence, and operational flags — all in one place</div>
+    <span class="card-title" style="font-size:16px;">Patient Follow-Up</span>
+    <div style="font-size:10px;color:#94a3b8;margin-top:2px;">Cancels, no-shows, withdrawals, screen fails, and unscheduled patients — select next steps to update ClickUp</div>
   </div>
 
-  <!-- 1. URGENT: At-Risk Patients -->
-  <div class="section-title" style="margin-bottom:10px;">At-Risk Patients — Immediate Action Required</div>
-  <div class="time-banner fade-in" style="margin-bottom:16px;">
-    <div class="tb-section">
-      <div class="tb-label">At-Risk Patients</div>
-      <div class="tb-value red kpi-clickable" id="risk-kpi-count" onclick="showRiskFlags('At-Risk Patients')">0</div>
-      <div class="tb-sub">Cancelled 2× with upcoming visit</div>
+  <!-- KPI Summary -->
+  <div class="time-banner fade-in" style="margin-bottom:16px;" id="fu-kpi-strip">
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterFollowUp('all')">
+      <div class="tb-label">Total Actions</div>
+      <div class="tb-value blue" id="fu-kpi-total">—</div>
+      <div class="tb-sub">All categories</div>
     </div>
     <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showRiskFlags('Urgent — Next Visit Within 14 Days')">
-      <div class="tb-label">Call This Week</div>
-      <div class="tb-value yellow" id="risk-kpi-urgent">0</div>
-      <div class="tb-sub">Next visit within 14 days</div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterFollowUp('cancel')">
+      <div class="tb-label">Cancels</div>
+      <div class="tb-value red" id="fu-kpi-cancel">0</div>
+      <div class="tb-sub">Site + Patient cancelled</div>
     </div>
     <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showRiskStudies()">
-      <div class="tb-label">Studies Affected</div>
-      <div class="tb-value blue" id="risk-kpi-studies">0</div>
-      <div class="tb-sub">Unique studies with risk flags</div>
-    </div>
-  </div>
-  <div class="card fade-in" style="margin-bottom:16px;">
-    <div class="card-header">
-      <span class="card-title">Patients with 2+ Cancellations Who Have Upcoming Visits</span>
-      <span class="badge badge-red">Call before their next visit</span>
-    </div>
-    <div id="risk-flag-cards" style="padding:12px 16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px;"></div>
-  </div>
-
-  <!-- 2. CRIO RECRUITMENT INTELLIGENCE -->
-  <div class="section-title" style="margin-top:16px;margin-bottom:10px;">CRIO Recruitment Intelligence</div>
-  <div class="card fade-in" style="margin-bottom:16px;">
-    <div class="card-header">
-      <span class="card-title">Win-Backs, Scheduling Gaps & Enrollment Alerts</span>
-      <span class="badge badge-blue" id="crio-studies-badge">Loading...</span>
-    </div>
-    <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Live CRIO subject data — V1 no-shows to re-engage, patients in screening awaiting V1, and enrollment gaps</div>
-    <div id="crio-studies-container" style="padding:12px;">
-      <div style="text-align:center;padding:20px;color:var(--muted);font-size:12px;">Loading CRIO study data...</div>
-    </div>
-  </div>
-
-  <!-- 3. OPERATIONAL FLAGS -->
-  <div class="section-title" style="margin-top:16px;margin-bottom:10px;">Operational Flags</div>
-  <div class="grid-2 mb16 fade-in">
-    <div class="card">
-      <div class="card-header"><span class="card-title">Flags Requiring Action</span></div>
-      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Auto-detected from at-risk patients, high cancel studies, and enrollment gaps</div>
-      <div class="insight-list" id="perf-insight-flags"></div>
-    </div>
-    <div class="card">
-      <div class="card-header"><span class="card-title">Positive Indicators</span></div>
-      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Trends improving, goals met, and operational wins detected this period</div>
-      <div class="insight-list" id="perf-insight-positive"></div>
-    </div>
-  </div>
-
-  <!-- 4. PRIORITIZED STEPS -->
-  <div class="section-title" style="margin-top:16px;margin-bottom:10px;">Prioritized Action Steps</div>
-  <div class="grid-2 mb16">
-    <div>
-      <div class="steps-list" id="action-steps"></div>
-    </div>
-    <div>
-      <div class="card">
-        <div class="card-header"><span class="card-title">Studies Needing Attention</span></div>
-        <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Studies with no upcoming visits or stalled enrollment</div>
-        <div id="dormant-list"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 5. CRIO RECONCILIATION -->
-  <div class="section-title" style="margin-top:16px;margin-bottom:10px;">CRIO Reconciliation</div>
-  <div class="card fade-in" style="margin-bottom:16px;">
-    <div class="card-header">
-      <span class="card-title">Referrals Needing CRIO Entry</span>
-      <span class="badge badge-red" id="crio-recon-badge">—</span>
-    </div>
-    <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Patients at Pre-Screening or later in ClickUp but not found in CRIO patient database · match by phone + name</div>
-    <div id="crio-recon-container" style="padding:12px;">
-      <div style="text-align:center;padding:20px;color:var(--muted);font-size:12px;">Loading reconciliation data...</div>
-    </div>
-  </div>
-
-  <!-- 6. PATIENT CONTACT QUALITY -->
-  <div class="section-title" style="margin-top:16px;margin-bottom:10px;">Patient Contact Quality</div>
-  <div class="time-banner fade-in" style="margin-bottom:16px;">
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showContactAlerts('red')">
-      <div class="tb-label">Red Flags</div>
-      <div class="tb-value red" id="cq-kpi-red">0</div>
-      <div class="tb-sub">Do Not Solicit / Deceased</div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterFollowUp('noshow')">
+      <div class="tb-label">No Shows</div>
+      <div class="tb-value" style="color:#f97316" id="fu-kpi-noshow">0</div>
+      <div class="tb-sub">Missed visits</div>
     </div>
     <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showContactAlerts('yellow')">
-      <div class="tb-label">Yellow Flags</div>
-      <div class="tb-value yellow" id="cq-kpi-yellow">0</div>
-      <div class="tb-sub">Bad contact info</div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterFollowUp('withdrew')">
+      <div class="tb-label">Withdrew</div>
+      <div class="tb-value" style="color:#8b5cf6" id="fu-kpi-withdrew">0</div>
+      <div class="tb-sub">Patient withdrew</div>
     </div>
     <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showContactAlerts('clean')">
-      <div class="tb-label">Clean</div>
-      <div class="tb-value green" id="cq-kpi-clean">0</div>
-      <div class="tb-sub">Good contact data</div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterFollowUp('screenfail')">
+      <div class="tb-label">Screen Fail</div>
+      <div class="tb-value" style="color:#6366f1" id="fu-kpi-sf">0</div>
+      <div class="tb-sub">DNQ + SF</div>
     </div>
     <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showPatientDB()">
-      <div class="tb-label">Patient DB</div>
-      <div class="tb-value blue" id="cq-kpi-db-total">—</div>
-      <div class="tb-sub" id="cq-kpi-db-sub">Loading...</div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterFollowUp('unsched')">
+      <div class="tb-label">Not Scheduled</div>
+      <div class="tb-value" style="color:#c2410c" id="fu-kpi-unsched">0</div>
+      <div class="tb-sub">Active, no appt</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterFollowUp('actioned')">
+      <div class="tb-label">Actioned</div>
+      <div class="tb-value green" id="fu-kpi-actioned">0</div>
+      <div class="tb-sub">Next steps assigned</div>
     </div>
   </div>
-  <div class="card fade-in" style="margin-bottom:16px;">
-    <div class="card-header">
-      <span class="card-title">Patient Contact Cross-Reference</span>
-      <span class="badge badge-blue" id="cq-badge">Checking patient database...</span>
-    </div>
-    <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Cross-references referral patients against CRIO patient database for contact quality issues</div>
-    <div id="contact-alert-cards" style="padding:12px 16px;">
-      <div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">Fetching CRIO patient database...</div>
+
+  <!-- Filters -->
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
+    <select id="fu-filter-study" onchange="renderFollowUpTable()" style="padding:4px 8px;border-radius:6px;font-size:11px;border:1px solid var(--border);color:var(--muted);background:var(--surface);cursor:pointer">
+      <option value="">All Studies</option>
+    </select>
+    <select id="fu-filter-coord" onchange="renderFollowUpTable()" style="padding:4px 8px;border-radius:6px;font-size:11px;border:1px solid var(--border);color:var(--muted);background:var(--surface);cursor:pointer">
+      <option value="">All Coordinators</option>
+    </select>
+    <select id="fu-filter-site" onchange="renderFollowUpTable()" style="padding:4px 8px;border-radius:6px;font-size:11px;border:1px solid var(--border);color:var(--muted);background:var(--surface);cursor:pointer">
+      <option value="">All Sites</option>
+      <option value="PHL">Philadelphia</option>
+      <option value="PNJ">Pennington</option>
+    </select>
+    <select id="fu-filter-status" onchange="renderFollowUpTable()" style="padding:4px 8px;border-radius:6px;font-size:11px;border:1px solid var(--border);color:var(--muted);background:var(--surface);cursor:pointer">
+      <option value="">All Next Steps</option>
+      <option value="pending">Pending (no action)</option>
+      <option value="actioned">Actioned</option>
+    </select>
+    <span class="badge badge-gray" id="fu-table-count" style="margin-left:auto">—</span>
+  </div>
+
+  <!-- Main Follow-Up Table -->
+  <div class="card fade-in">
+    <div style="overflow-x:auto;max-height:700px;overflow-y:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;" id="fu-table">
+        <thead>
+          <tr style="background:var(--surface2);border-bottom:2px solid var(--border);">
+            <th style="padding:8px 10px;text-align:left;font-weight:700;white-space:nowrap;position:sticky;top:0;z-index:2;background:var(--surface2);">Patient</th>
+            <th style="padding:8px 8px;text-align:left;font-weight:700;white-space:nowrap;position:sticky;top:0;z-index:2;background:var(--surface2);">Study</th>
+            <th style="padding:8px 6px;text-align:center;font-weight:700;white-space:nowrap;position:sticky;top:0;z-index:2;background:var(--surface2);font-size:11px">Category</th>
+            <th style="padding:8px 6px;text-align:center;font-weight:700;white-space:nowrap;position:sticky;top:0;z-index:2;background:var(--surface2);font-size:11px">Status</th>
+            <th style="padding:8px 8px;text-align:left;font-weight:700;white-space:nowrap;position:sticky;top:0;z-index:2;background:var(--surface2);font-size:11px">Reason</th>
+            <th style="padding:8px 6px;text-align:center;font-weight:700;white-space:nowrap;position:sticky;top:0;z-index:2;background:var(--surface2);font-size:11px">Date</th>
+            <th style="padding:8px 6px;text-align:center;font-weight:700;white-space:nowrap;position:sticky;top:0;z-index:2;background:var(--surface2);font-size:11px">Coord</th>
+            <th style="padding:8px 6px;text-align:center;font-weight:700;white-space:nowrap;position:sticky;top:0;z-index:2;background:var(--surface2);font-size:11px">Source</th>
+            <th style="padding:8px 6px;text-align:center;font-weight:700;white-space:nowrap;position:sticky;top:0;z-index:2;background:var(--surface2);font-size:11px">Risk</th>
+            <th style="padding:8px 8px;text-align:center;font-weight:700;white-space:nowrap;position:sticky;top:0;z-index:2;background:var(--surface2);min-width:130px">Next Steps</th>
+          </tr>
+        </thead>
+        <tbody id="fu-tbody"></tbody>
+      </table>
     </div>
   </div>
+
+  <!-- Hidden containers for backward compatibility with existing render functions -->
+  <div style="display:none" id="risk-flag-cards"></div>
+  <div style="display:none" id="crio-studies-container"></div>
+  <div style="display:none" id="perf-insight-flags"></div>
+  <div style="display:none" id="perf-insight-positive"></div>
+  <div style="display:none" id="action-steps"></div>
+  <div style="display:none" id="dormant-list"></div>
+  <div style="display:none" id="crio-recon-container"></div>
+  <div style="display:none" id="contact-alert-cards"></div>
+  <div style="display:none" id="risk-kpi-count"></div>
+  <div style="display:none" id="risk-kpi-urgent"></div>
+  <div style="display:none" id="risk-kpi-studies"></div>
+  <div style="display:none" id="crio-recon-badge"></div>
+  <div style="display:none" id="crio-studies-badge"></div>
+  <div style="display:none" id="cq-kpi-red"></div>
+  <div style="display:none" id="cq-kpi-yellow"></div>
+  <div style="display:none" id="cq-kpi-clean"></div>
+  <div style="display:none" id="cq-kpi-db-total"></div>
+  <div style="display:none" id="cq-kpi-db-sub"></div>
+  <div style="display:none" id="cq-badge"></div>
 
 </div><!-- /view-actions -->
 
@@ -7270,11 +7257,14 @@ function switchView(name, el) {
       }, 60);
     }
   }
-  if (name === 'actions' && _tabDirty.actions) {
+  if (name === 'actions') {
     setTimeout(() => {
-      safe(buildActionSteps, 'buildActionSteps');
-      safe(buildInsights, 'buildInsights');
-      _tabDirty.actions = false;
+      safe(renderFollowUpTable, 'renderFollowUpTable');
+      if (_tabDirty.actions) {
+        safe(buildActionSteps, 'buildActionSteps');
+        safe(buildInsights, 'buildInsights');
+        _tabDirty.actions = false;
+      }
     }, 50);
   }
   if (name === 'trends' && typeof LONGITUDINAL !== 'undefined' && LONGITUDINAL) {
@@ -10026,6 +10016,202 @@ function undismissItem(itemKey) {
   buildActionSteps();
 }
 
+// ═══ UNIFIED FOLLOW-UP TABLE ═══
+var _fuFilter = 'all';
+var _fuActions = {}; // key → {action, notes, ts}
+function _loadFuActions() { try { _fuActions = JSON.parse(localStorage.getItem('crp_followup_actions')||'{}'); } catch(e) { _fuActions = {}; } }
+function _saveFuActions() { try { localStorage.setItem('crp_followup_actions', JSON.stringify(_fuActions)); } catch(e) {} }
+function _fuKey(r) { return ((r._name||'')+'|'+(r._study||'')+'|'+(r._cat||'')).replace(/[^a-z0-9|]/gi,'-').toLowerCase(); }
+
+var FU_NEXT_STEPS = [
+  {id:'', label:'Select action...'},
+  {id:'reschedule', label:'Reschedule Visit'},
+  {id:'call', label:'Call Patient'},
+  {id:'recruit', label:'Send to Recruitment'},
+  {id:'rescreen', label:'Re-screen'},
+  {id:'waitlist', label:'Add to Waitlist'},
+  {id:'lost', label:'Mark as Lost'},
+  {id:'noaction', label:'No Action Needed'},
+];
+
+function filterFollowUp(cat) { _fuFilter = cat; renderFollowUpTable(); }
+
+function renderFollowUpTable() {
+  _loadFuActions();
+  var tbody = document.getElementById('fu-tbody');
+  if (!tbody) return;
+
+  // Merge all patient-level data into unified rows
+  var rows = [];
+  var seen = new Set(); // dedup by name+study+cat
+
+  function addRows(list, cat, catLabel, catColor) {
+    (list || []).forEach(function(r) {
+      var name = (r.name || r.subject_name || r.patient || '').trim();
+      var study = (r.study || '').trim();
+      var key = (name+'|'+study+'|'+cat).toLowerCase();
+      if (seen.has(key) || !name) return;
+      seen.add(key);
+      var site = r.site || '';
+      var siteCode = site.indexOf('Penn') !== -1 ? 'PNJ' : 'PHL';
+      // Lookup referral source
+      var srcObj = window._crioRefSourceMap ? window._crioRefSourceMap.get(name.toLowerCase().replace(/\s+/g,' ').trim()) : null;
+      var source = srcObj ? srcObj.source : '';
+      // Lookup risk
+      var riskFlag = (DATA.riskFlags || []).find(function(f) { return (f.patient||'').toLowerCase() === name.toLowerCase(); });
+      var riskLevel = riskFlag ? riskFlag.level : '';
+      // DNQ reason from audit
+      var dnqReason = '';
+      if (cat === 'screenfail' && window._dnqReasons) {
+        var dnq = window._dnqReasons.find(function(d) { return (d.name||'').toLowerCase() === name.toLowerCase() && (d.study||'').indexOf(study) !== -1; });
+        if (dnq) dnqReason = dnq.reason || dnq.comment || '';
+      }
+      rows.push({
+        _name: name, _study: study, _cat: cat, _catLabel: catLabel, _catColor: catColor,
+        url: r.url || r.patient_url || '',
+        study_url: r.study_url || '',
+        status: r.subject_status || r.status || '',
+        reason: r.reason || r.category || dnqReason || '',
+        date: r.cancel_date || r.last_visit_date || r.date || '',
+        coord: r.coord || '',
+        site: site, siteCode: siteCode,
+        source: source,
+        riskLevel: riskLevel,
+        type: r.type || ''
+      });
+    });
+  }
+
+  addRows(DATA.allCancels, 'cancel', 'Cancel', '#dc2626');
+  addRows(DATA.noShows, 'noshow', 'No Show', '#f97316');
+  addRows(DATA.withdrawals, 'withdrew', 'Withdrew', '#8b5cf6');
+  addRows(DATA.screenFails, 'screenfail', 'Screen Fail', '#6366f1');
+  // Unscheduled
+  (window._unscheduledVisits || []).forEach(function(r) {
+    var name = (r.subject_name || '').trim();
+    var study = (r.study_name || '').split(' - ').pop().trim();
+    var key = (name+'|'+study+'|unsched').toLowerCase();
+    if (seen.has(key) || !name) return;
+    seen.add(key);
+    var site = r.site_name || '';
+    var srcObj = window._crioRefSourceMap ? window._crioRefSourceMap.get(name.toLowerCase().replace(/\s+/g,' ').trim()) : null;
+    rows.push({
+      _name: name, _study: study, _cat: 'unsched', _catLabel: 'Not Scheduled', _catColor: '#c2410c',
+      url: typeof window._crioPatientUrl === 'function' ? window._crioPatientUrl(r.study_key, r.subject_key, site) : '',
+      study_url: '', status: r.subject_status || '', reason: r.last_visit_name || '',
+      date: r.last_visit_date || '', coord: '', site: site,
+      siteCode: site.indexOf('Penn') !== -1 ? 'PNJ' : 'PHL',
+      source: srcObj ? srcObj.source : '', riskLevel: '', type: ''
+    });
+  });
+
+  // Update KPIs
+  var _sk = function(id,v) { var e = document.getElementById(id); if (e) e.textContent = v; };
+  _sk('fu-kpi-total', rows.length);
+  _sk('fu-kpi-cancel', rows.filter(function(r){return r._cat==='cancel';}).length);
+  _sk('fu-kpi-noshow', rows.filter(function(r){return r._cat==='noshow';}).length);
+  _sk('fu-kpi-withdrew', rows.filter(function(r){return r._cat==='withdrew';}).length);
+  _sk('fu-kpi-sf', rows.filter(function(r){return r._cat==='screenfail';}).length);
+  _sk('fu-kpi-unsched', rows.filter(function(r){return r._cat==='unsched';}).length);
+  var actionedCount = rows.filter(function(r) { var k = _fuKey(r); return _fuActions[k] && _fuActions[k].action; }).length;
+  _sk('fu-kpi-actioned', actionedCount);
+
+  // Populate filter dropdowns (once)
+  var studySelect = document.getElementById('fu-filter-study');
+  if (studySelect && studySelect.options.length <= 1) {
+    var studies = new Set(); rows.forEach(function(r) { if (r._study) studies.add(r._study); });
+    [...studies].sort().forEach(function(s) { var o = document.createElement('option'); o.value = s; o.textContent = s; studySelect.appendChild(o); });
+  }
+  var coordSelect = document.getElementById('fu-filter-coord');
+  if (coordSelect && coordSelect.options.length <= 1) {
+    var coords = new Set(); rows.forEach(function(r) { if (r.coord) coords.add(r.coord); });
+    [...coords].sort().forEach(function(c) { var o = document.createElement('option'); o.value = c; o.textContent = c; coordSelect.appendChild(o); });
+  }
+
+  // Apply filters
+  var fStudy = studySelect ? studySelect.value : '';
+  var fCoord = coordSelect ? coordSelect.value : '';
+  var fSite = (document.getElementById('fu-filter-site') || {}).value || '';
+  var fStatus = (document.getElementById('fu-filter-status') || {}).value || '';
+
+  var filtered = rows.filter(function(r) {
+    if (_fuFilter !== 'all' && _fuFilter !== 'actioned' && r._cat !== _fuFilter) return false;
+    if (fStudy && r._study !== fStudy) return false;
+    if (fCoord && r.coord !== fCoord) return false;
+    if (fSite && r.siteCode !== fSite) return false;
+    var k = _fuKey(r);
+    var hasAction = _fuActions[k] && _fuActions[k].action;
+    if (_fuFilter === 'actioned' && !hasAction) return false;
+    if (fStatus === 'pending' && hasAction) return false;
+    if (fStatus === 'actioned' && !hasAction) return false;
+    return true;
+  });
+
+  var badge = document.getElementById('fu-table-count');
+  if (badge) badge.textContent = filtered.length + ' / ' + rows.length + ' patients';
+
+  // Render rows
+  var html = '';
+  filtered.forEach(function(r) {
+    var k = _fuKey(r);
+    var act = _fuActions[k] || {};
+    var hasAction = !!act.action;
+    var riskColor = r.riskLevel === 'critical' ? '#dc2626' : r.riskLevel === 'high' ? '#d97706' : r.riskLevel === 'medium' ? '#3b82f6' : r.riskLevel === 'low' ? '#059669' : '#cbd5e1';
+    var rowBg = hasAction ? (act.action === 'lost' || act.action === 'noaction' ? '#f8fafc' : '#f0fdf4') : '';
+    var rowOpacity = (act.action === 'lost' || act.action === 'noaction') ? 'opacity:0.5;' : '';
+
+    html += '<tr style="border-bottom:1px solid #f1f5f9;background:'+rowBg+';'+rowOpacity+'">';
+    html += '<td style="padding:7px 10px;">' + patientLink(r._name, r.url) + '</td>';
+    html += '<td style="padding:7px 8px;font-size:11px;">' + (r.study_url ? extLink(r._study, r.study_url) : escapeHTML(r._study)) + '</td>';
+    html += '<td style="padding:7px 6px;text-align:center;"><span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;background:'+r._catColor+'15;color:'+r._catColor+';">'+r._catLabel+'</span></td>';
+    html += '<td style="padding:7px 6px;text-align:center;">' + statusBadge(r.status) + '</td>';
+    html += '<td style="padding:7px 8px;font-size:10px;color:#475569;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+escapeHTML(r.reason)+'">' + escapeHTML(r.reason || '—') + '</td>';
+    html += '<td style="padding:7px 6px;text-align:center;font-size:11px;color:#64748b;">' + escapeHTML(r.date || '—') + '</td>';
+    html += '<td style="padding:7px 6px;text-align:center;font-size:11px;">' + escapeHTML(r.coord ? r.coord.split(' ')[0] : '—') + '</td>';
+    html += '<td style="padding:7px 6px;text-align:center;font-size:10px;color:#475569;max-width:80px;overflow:hidden;text-overflow:ellipsis;" title="'+escapeHTML(r.source)+'">' + escapeHTML(r.source ? r.source.split(' ')[0] : '—') + '</td>';
+    html += '<td style="padding:7px 6px;text-align:center;"><span style="font-size:9px;font-weight:700;padding:2px 5px;border-radius:4px;background:'+riskColor+'15;color:'+riskColor+';">'+(r.riskLevel||'—')+'</span></td>';
+    // Next steps dropdown
+    html += '<td style="padding:4px 6px;text-align:center;"><select data-fukey="'+escapeHTML(k)+'" onchange="setFollowUpAction(this)" style="font-size:10px;padding:3px 4px;border-radius:4px;border:1px solid '+(hasAction?'#059669':'#e2e8f0')+';color:'+(hasAction?'#059669':'#64748b')+';background:'+(hasAction?'#f0fdf4':'#fff')+';cursor:pointer;width:100%;font-weight:'+(hasAction?'600':'400')+';">';
+    FU_NEXT_STEPS.forEach(function(s) {
+      html += '<option value="'+s.id+'"'+(act.action===s.id?' selected':'')+'>'+escapeHTML(s.label)+'</option>';
+    });
+    html += '</select></td>';
+    html += '</tr>';
+  });
+
+  if (filtered.length === 0) {
+    html = '<tr><td colspan="10" style="text-align:center;padding:30px;color:#94a3b8;">No patients match current filters</td></tr>';
+  }
+  tbody.innerHTML = html;
+}
+
+function setFollowUpAction(sel) {
+  var key = sel.dataset.fukey;
+  var val = sel.value;
+  if (val) {
+    _fuActions[key] = { action: val, ts: Date.now() };
+  } else {
+    delete _fuActions[key];
+  }
+  _saveFuActions();
+  // Update styling immediately
+  var tr = sel.closest('tr');
+  if (tr) {
+    var isTerminal = val === 'lost' || val === 'noaction';
+    tr.style.background = val ? (isTerminal ? '#f8fafc' : '#f0fdf4') : '';
+    tr.style.opacity = isTerminal ? '0.5' : '1';
+    sel.style.borderColor = val ? '#059669' : '#e2e8f0';
+    sel.style.color = val ? '#059669' : '#64748b';
+    sel.style.background = val ? '#f0fdf4' : '#fff';
+    sel.style.fontWeight = val ? '600' : '400';
+  }
+  // Update actioned KPI
+  var actionedCount = Object.values(_fuActions).filter(function(a) { return a.action; }).length;
+  var kpi = document.getElementById('fu-kpi-actioned');
+  if (kpi) kpi.textContent = actionedCount;
+  if (typeof logAudit === 'function') logAudit('followup_action', val + ' | ' + key);
+}
+
 function buildActionSteps() {
   const el     = document.getElementById('action-steps');
   const dormEl = document.getElementById('dormant-list');
@@ -10900,6 +11086,7 @@ function renderAll() {
 
   // ── Actions tab (render if active, defer otherwise) ──
   if (activeTab === 'actions') {
+    safe(renderFollowUpTable,  'renderFollowUpTable');
     safe(buildActionSteps,     'buildActionSteps');
     safe(buildInsights,        'buildInsights');
     _tabDirty.actions = false;

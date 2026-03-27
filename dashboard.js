@@ -5239,11 +5239,14 @@ function switchView(name, el) {
       }, 60);
     }
   }
-  if (name === 'actions' && _tabDirty.actions) {
+  if (name === 'actions') {
     setTimeout(() => {
-      safe(buildActionSteps, 'buildActionSteps');
-      safe(buildInsights, 'buildInsights');
-      _tabDirty.actions = false;
+      safe(renderFollowUpTable, 'renderFollowUpTable');
+      if (_tabDirty.actions) {
+        safe(buildActionSteps, 'buildActionSteps');
+        safe(buildInsights, 'buildInsights');
+        _tabDirty.actions = false;
+      }
     }, 50);
   }
   if (name === 'trends' && typeof LONGITUDINAL !== 'undefined' && LONGITUDINAL) {
@@ -7995,6 +7998,202 @@ function undismissItem(itemKey) {
   buildActionSteps();
 }
 
+// ═══ UNIFIED FOLLOW-UP TABLE ═══
+var _fuFilter = 'all';
+var _fuActions = {}; // key → {action, notes, ts}
+function _loadFuActions() { try { _fuActions = JSON.parse(localStorage.getItem('crp_followup_actions')||'{}'); } catch(e) { _fuActions = {}; } }
+function _saveFuActions() { try { localStorage.setItem('crp_followup_actions', JSON.stringify(_fuActions)); } catch(e) {} }
+function _fuKey(r) { return ((r._name||'')+'|'+(r._study||'')+'|'+(r._cat||'')).replace(/[^a-z0-9|]/gi,'-').toLowerCase(); }
+
+var FU_NEXT_STEPS = [
+  {id:'', label:'Select action...'},
+  {id:'reschedule', label:'Reschedule Visit'},
+  {id:'call', label:'Call Patient'},
+  {id:'recruit', label:'Send to Recruitment'},
+  {id:'rescreen', label:'Re-screen'},
+  {id:'waitlist', label:'Add to Waitlist'},
+  {id:'lost', label:'Mark as Lost'},
+  {id:'noaction', label:'No Action Needed'},
+];
+
+function filterFollowUp(cat) { _fuFilter = cat; renderFollowUpTable(); }
+
+function renderFollowUpTable() {
+  _loadFuActions();
+  var tbody = document.getElementById('fu-tbody');
+  if (!tbody) return;
+
+  // Merge all patient-level data into unified rows
+  var rows = [];
+  var seen = new Set(); // dedup by name+study+cat
+
+  function addRows(list, cat, catLabel, catColor) {
+    (list || []).forEach(function(r) {
+      var name = (r.name || r.subject_name || r.patient || '').trim();
+      var study = (r.study || '').trim();
+      var key = (name+'|'+study+'|'+cat).toLowerCase();
+      if (seen.has(key) || !name) return;
+      seen.add(key);
+      var site = r.site || '';
+      var siteCode = site.indexOf('Penn') !== -1 ? 'PNJ' : 'PHL';
+      // Lookup referral source
+      var srcObj = window._crioRefSourceMap ? window._crioRefSourceMap.get(name.toLowerCase().replace(/\s+/g,' ').trim()) : null;
+      var source = srcObj ? srcObj.source : '';
+      // Lookup risk
+      var riskFlag = (DATA.riskFlags || []).find(function(f) { return (f.patient||'').toLowerCase() === name.toLowerCase(); });
+      var riskLevel = riskFlag ? riskFlag.level : '';
+      // DNQ reason from audit
+      var dnqReason = '';
+      if (cat === 'screenfail' && window._dnqReasons) {
+        var dnq = window._dnqReasons.find(function(d) { return (d.name||'').toLowerCase() === name.toLowerCase() && (d.study||'').indexOf(study) !== -1; });
+        if (dnq) dnqReason = dnq.reason || dnq.comment || '';
+      }
+      rows.push({
+        _name: name, _study: study, _cat: cat, _catLabel: catLabel, _catColor: catColor,
+        url: r.url || r.patient_url || '',
+        study_url: r.study_url || '',
+        status: r.subject_status || r.status || '',
+        reason: r.reason || r.category || dnqReason || '',
+        date: r.cancel_date || r.last_visit_date || r.date || '',
+        coord: r.coord || '',
+        site: site, siteCode: siteCode,
+        source: source,
+        riskLevel: riskLevel,
+        type: r.type || ''
+      });
+    });
+  }
+
+  addRows(DATA.allCancels, 'cancel', 'Cancel', '#dc2626');
+  addRows(DATA.noShows, 'noshow', 'No Show', '#f97316');
+  addRows(DATA.withdrawals, 'withdrew', 'Withdrew', '#8b5cf6');
+  addRows(DATA.screenFails, 'screenfail', 'Screen Fail', '#6366f1');
+  // Unscheduled
+  (window._unscheduledVisits || []).forEach(function(r) {
+    var name = (r.subject_name || '').trim();
+    var study = (r.study_name || '').split(' - ').pop().trim();
+    var key = (name+'|'+study+'|unsched').toLowerCase();
+    if (seen.has(key) || !name) return;
+    seen.add(key);
+    var site = r.site_name || '';
+    var srcObj = window._crioRefSourceMap ? window._crioRefSourceMap.get(name.toLowerCase().replace(/\s+/g,' ').trim()) : null;
+    rows.push({
+      _name: name, _study: study, _cat: 'unsched', _catLabel: 'Not Scheduled', _catColor: '#c2410c',
+      url: typeof window._crioPatientUrl === 'function' ? window._crioPatientUrl(r.study_key, r.subject_key, site) : '',
+      study_url: '', status: r.subject_status || '', reason: r.last_visit_name || '',
+      date: r.last_visit_date || '', coord: '', site: site,
+      siteCode: site.indexOf('Penn') !== -1 ? 'PNJ' : 'PHL',
+      source: srcObj ? srcObj.source : '', riskLevel: '', type: ''
+    });
+  });
+
+  // Update KPIs
+  var _sk = function(id,v) { var e = document.getElementById(id); if (e) e.textContent = v; };
+  _sk('fu-kpi-total', rows.length);
+  _sk('fu-kpi-cancel', rows.filter(function(r){return r._cat==='cancel';}).length);
+  _sk('fu-kpi-noshow', rows.filter(function(r){return r._cat==='noshow';}).length);
+  _sk('fu-kpi-withdrew', rows.filter(function(r){return r._cat==='withdrew';}).length);
+  _sk('fu-kpi-sf', rows.filter(function(r){return r._cat==='screenfail';}).length);
+  _sk('fu-kpi-unsched', rows.filter(function(r){return r._cat==='unsched';}).length);
+  var actionedCount = rows.filter(function(r) { var k = _fuKey(r); return _fuActions[k] && _fuActions[k].action; }).length;
+  _sk('fu-kpi-actioned', actionedCount);
+
+  // Populate filter dropdowns (once)
+  var studySelect = document.getElementById('fu-filter-study');
+  if (studySelect && studySelect.options.length <= 1) {
+    var studies = new Set(); rows.forEach(function(r) { if (r._study) studies.add(r._study); });
+    [...studies].sort().forEach(function(s) { var o = document.createElement('option'); o.value = s; o.textContent = s; studySelect.appendChild(o); });
+  }
+  var coordSelect = document.getElementById('fu-filter-coord');
+  if (coordSelect && coordSelect.options.length <= 1) {
+    var coords = new Set(); rows.forEach(function(r) { if (r.coord) coords.add(r.coord); });
+    [...coords].sort().forEach(function(c) { var o = document.createElement('option'); o.value = c; o.textContent = c; coordSelect.appendChild(o); });
+  }
+
+  // Apply filters
+  var fStudy = studySelect ? studySelect.value : '';
+  var fCoord = coordSelect ? coordSelect.value : '';
+  var fSite = (document.getElementById('fu-filter-site') || {}).value || '';
+  var fStatus = (document.getElementById('fu-filter-status') || {}).value || '';
+
+  var filtered = rows.filter(function(r) {
+    if (_fuFilter !== 'all' && _fuFilter !== 'actioned' && r._cat !== _fuFilter) return false;
+    if (fStudy && r._study !== fStudy) return false;
+    if (fCoord && r.coord !== fCoord) return false;
+    if (fSite && r.siteCode !== fSite) return false;
+    var k = _fuKey(r);
+    var hasAction = _fuActions[k] && _fuActions[k].action;
+    if (_fuFilter === 'actioned' && !hasAction) return false;
+    if (fStatus === 'pending' && hasAction) return false;
+    if (fStatus === 'actioned' && !hasAction) return false;
+    return true;
+  });
+
+  var badge = document.getElementById('fu-table-count');
+  if (badge) badge.textContent = filtered.length + ' / ' + rows.length + ' patients';
+
+  // Render rows
+  var html = '';
+  filtered.forEach(function(r) {
+    var k = _fuKey(r);
+    var act = _fuActions[k] || {};
+    var hasAction = !!act.action;
+    var riskColor = r.riskLevel === 'critical' ? '#dc2626' : r.riskLevel === 'high' ? '#d97706' : r.riskLevel === 'medium' ? '#3b82f6' : r.riskLevel === 'low' ? '#059669' : '#cbd5e1';
+    var rowBg = hasAction ? (act.action === 'lost' || act.action === 'noaction' ? '#f8fafc' : '#f0fdf4') : '';
+    var rowOpacity = (act.action === 'lost' || act.action === 'noaction') ? 'opacity:0.5;' : '';
+
+    html += '<tr style="border-bottom:1px solid #f1f5f9;background:'+rowBg+';'+rowOpacity+'">';
+    html += '<td style="padding:7px 10px;">' + patientLink(r._name, r.url) + '</td>';
+    html += '<td style="padding:7px 8px;font-size:11px;">' + (r.study_url ? extLink(r._study, r.study_url) : escapeHTML(r._study)) + '</td>';
+    html += '<td style="padding:7px 6px;text-align:center;"><span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;background:'+r._catColor+'15;color:'+r._catColor+';">'+r._catLabel+'</span></td>';
+    html += '<td style="padding:7px 6px;text-align:center;">' + statusBadge(r.status) + '</td>';
+    html += '<td style="padding:7px 8px;font-size:10px;color:#475569;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+escapeHTML(r.reason)+'">' + escapeHTML(r.reason || '—') + '</td>';
+    html += '<td style="padding:7px 6px;text-align:center;font-size:11px;color:#64748b;">' + escapeHTML(r.date || '—') + '</td>';
+    html += '<td style="padding:7px 6px;text-align:center;font-size:11px;">' + escapeHTML(r.coord ? r.coord.split(' ')[0] : '—') + '</td>';
+    html += '<td style="padding:7px 6px;text-align:center;font-size:10px;color:#475569;max-width:80px;overflow:hidden;text-overflow:ellipsis;" title="'+escapeHTML(r.source)+'">' + escapeHTML(r.source ? r.source.split(' ')[0] : '—') + '</td>';
+    html += '<td style="padding:7px 6px;text-align:center;"><span style="font-size:9px;font-weight:700;padding:2px 5px;border-radius:4px;background:'+riskColor+'15;color:'+riskColor+';">'+(r.riskLevel||'—')+'</span></td>';
+    // Next steps dropdown
+    html += '<td style="padding:4px 6px;text-align:center;"><select data-fukey="'+escapeHTML(k)+'" onchange="setFollowUpAction(this)" style="font-size:10px;padding:3px 4px;border-radius:4px;border:1px solid '+(hasAction?'#059669':'#e2e8f0')+';color:'+(hasAction?'#059669':'#64748b')+';background:'+(hasAction?'#f0fdf4':'#fff')+';cursor:pointer;width:100%;font-weight:'+(hasAction?'600':'400')+';">';
+    FU_NEXT_STEPS.forEach(function(s) {
+      html += '<option value="'+s.id+'"'+(act.action===s.id?' selected':'')+'>'+escapeHTML(s.label)+'</option>';
+    });
+    html += '</select></td>';
+    html += '</tr>';
+  });
+
+  if (filtered.length === 0) {
+    html = '<tr><td colspan="10" style="text-align:center;padding:30px;color:#94a3b8;">No patients match current filters</td></tr>';
+  }
+  tbody.innerHTML = html;
+}
+
+function setFollowUpAction(sel) {
+  var key = sel.dataset.fukey;
+  var val = sel.value;
+  if (val) {
+    _fuActions[key] = { action: val, ts: Date.now() };
+  } else {
+    delete _fuActions[key];
+  }
+  _saveFuActions();
+  // Update styling immediately
+  var tr = sel.closest('tr');
+  if (tr) {
+    var isTerminal = val === 'lost' || val === 'noaction';
+    tr.style.background = val ? (isTerminal ? '#f8fafc' : '#f0fdf4') : '';
+    tr.style.opacity = isTerminal ? '0.5' : '1';
+    sel.style.borderColor = val ? '#059669' : '#e2e8f0';
+    sel.style.color = val ? '#059669' : '#64748b';
+    sel.style.background = val ? '#f0fdf4' : '#fff';
+    sel.style.fontWeight = val ? '600' : '400';
+  }
+  // Update actioned KPI
+  var actionedCount = Object.values(_fuActions).filter(function(a) { return a.action; }).length;
+  var kpi = document.getElementById('fu-kpi-actioned');
+  if (kpi) kpi.textContent = actionedCount;
+  if (typeof logAudit === 'function') logAudit('followup_action', val + ' | ' + key);
+}
+
 function buildActionSteps() {
   const el     = document.getElementById('action-steps');
   const dormEl = document.getElementById('dormant-list');
@@ -8869,6 +9068,7 @@ function renderAll() {
 
   // ── Actions tab (render if active, defer otherwise) ──
   if (activeTab === 'actions') {
+    safe(renderFollowUpTable,  'renderFollowUpTable');
     safe(buildActionSteps,     'buildActionSteps');
     safe(buildInsights,        'buildInsights');
     _tabDirty.actions = false;

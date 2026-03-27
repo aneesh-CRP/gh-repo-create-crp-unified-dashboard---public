@@ -1635,132 +1635,119 @@ body {
 <div id="view-actions" class="view">
 
   <div style="margin-bottom:16px;">
-    <span class="card-title" style="font-size:16px;">Action Plan</span>
-    <div style="font-size:10px;color:#94a3b8;margin-top:2px;">Prioritized tasks, at-risk patients, recruitment intelligence, and operational flags — all in one place</div>
+    <span class="card-title" style="font-size:16px;">Patient Follow-Up</span>
+    <div style="font-size:10px;color:#94a3b8;margin-top:2px;">Cancels, no-shows, withdrawals, screen fails, and unscheduled patients — select next steps to update ClickUp</div>
   </div>
 
-  <!-- 1. URGENT: At-Risk Patients -->
-  <div class="section-title" style="margin-bottom:10px;">At-Risk Patients — Immediate Action Required</div>
-  <div class="time-banner fade-in" style="margin-bottom:16px;">
-    <div class="tb-section">
-      <div class="tb-label">At-Risk Patients</div>
-      <div class="tb-value red kpi-clickable" id="risk-kpi-count" onclick="showRiskFlags('At-Risk Patients')">0</div>
-      <div class="tb-sub">Cancelled 2× with upcoming visit</div>
+  <!-- KPI Summary -->
+  <div class="time-banner fade-in" style="margin-bottom:16px;" id="fu-kpi-strip">
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterFollowUp('all')">
+      <div class="tb-label">Total Actions</div>
+      <div class="tb-value blue" id="fu-kpi-total">—</div>
+      <div class="tb-sub">All categories</div>
     </div>
     <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showRiskFlags('Urgent — Next Visit Within 14 Days')">
-      <div class="tb-label">Call This Week</div>
-      <div class="tb-value yellow" id="risk-kpi-urgent">0</div>
-      <div class="tb-sub">Next visit within 14 days</div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterFollowUp('cancel')">
+      <div class="tb-label">Cancels</div>
+      <div class="tb-value red" id="fu-kpi-cancel">0</div>
+      <div class="tb-sub">Site + Patient cancelled</div>
     </div>
     <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showRiskStudies()">
-      <div class="tb-label">Studies Affected</div>
-      <div class="tb-value blue" id="risk-kpi-studies">0</div>
-      <div class="tb-sub">Unique studies with risk flags</div>
-    </div>
-  </div>
-  <div class="card fade-in" style="margin-bottom:16px;">
-    <div class="card-header">
-      <span class="card-title">Patients with 2+ Cancellations Who Have Upcoming Visits</span>
-      <span class="badge badge-red">Call before their next visit</span>
-    </div>
-    <div id="risk-flag-cards" style="padding:12px 16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px;"></div>
-  </div>
-
-  <!-- 2. CRIO RECRUITMENT INTELLIGENCE -->
-  <div class="section-title" style="margin-top:16px;margin-bottom:10px;">CRIO Recruitment Intelligence</div>
-  <div class="card fade-in" style="margin-bottom:16px;">
-    <div class="card-header">
-      <span class="card-title">Win-Backs, Scheduling Gaps & Enrollment Alerts</span>
-      <span class="badge badge-blue" id="crio-studies-badge">Loading...</span>
-    </div>
-    <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Live CRIO subject data — V1 no-shows to re-engage, patients in screening awaiting V1, and enrollment gaps</div>
-    <div id="crio-studies-container" style="padding:12px;">
-      <div style="text-align:center;padding:20px;color:var(--muted);font-size:12px;">Loading CRIO study data...</div>
-    </div>
-  </div>
-
-  <!-- 3. OPERATIONAL FLAGS -->
-  <div class="section-title" style="margin-top:16px;margin-bottom:10px;">Operational Flags</div>
-  <div class="grid-2 mb16 fade-in">
-    <div class="card">
-      <div class="card-header"><span class="card-title">Flags Requiring Action</span></div>
-      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Auto-detected from at-risk patients, high cancel studies, and enrollment gaps</div>
-      <div class="insight-list" id="perf-insight-flags"></div>
-    </div>
-    <div class="card">
-      <div class="card-header"><span class="card-title">Positive Indicators</span></div>
-      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Trends improving, goals met, and operational wins detected this period</div>
-      <div class="insight-list" id="perf-insight-positive"></div>
-    </div>
-  </div>
-
-  <!-- 4. PRIORITIZED STEPS -->
-  <div class="section-title" style="margin-top:16px;margin-bottom:10px;">Prioritized Action Steps</div>
-  <div class="grid-2 mb16">
-    <div>
-      <div class="steps-list" id="action-steps"></div>
-    </div>
-    <div>
-      <div class="card">
-        <div class="card-header"><span class="card-title">Studies Needing Attention</span></div>
-        <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Studies with no upcoming visits or stalled enrollment</div>
-        <div id="dormant-list"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 5. CRIO RECONCILIATION -->
-  <div class="section-title" style="margin-top:16px;margin-bottom:10px;">CRIO Reconciliation</div>
-  <div class="card fade-in" style="margin-bottom:16px;">
-    <div class="card-header">
-      <span class="card-title">Referrals Needing CRIO Entry</span>
-      <span class="badge badge-red" id="crio-recon-badge">—</span>
-    </div>
-    <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Patients at Pre-Screening or later in ClickUp but not found in CRIO patient database · match by phone + name</div>
-    <div id="crio-recon-container" style="padding:12px;">
-      <div style="text-align:center;padding:20px;color:var(--muted);font-size:12px;">Loading reconciliation data...</div>
-    </div>
-  </div>
-
-  <!-- 6. PATIENT CONTACT QUALITY -->
-  <div class="section-title" style="margin-top:16px;margin-bottom:10px;">Patient Contact Quality</div>
-  <div class="time-banner fade-in" style="margin-bottom:16px;">
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showContactAlerts('red')">
-      <div class="tb-label">Red Flags</div>
-      <div class="tb-value red" id="cq-kpi-red">0</div>
-      <div class="tb-sub">Do Not Solicit / Deceased</div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterFollowUp('noshow')">
+      <div class="tb-label">No Shows</div>
+      <div class="tb-value" style="color:#f97316" id="fu-kpi-noshow">0</div>
+      <div class="tb-sub">Missed visits</div>
     </div>
     <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showContactAlerts('yellow')">
-      <div class="tb-label">Yellow Flags</div>
-      <div class="tb-value yellow" id="cq-kpi-yellow">0</div>
-      <div class="tb-sub">Bad contact info</div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterFollowUp('withdrew')">
+      <div class="tb-label">Withdrew</div>
+      <div class="tb-value" style="color:#8b5cf6" id="fu-kpi-withdrew">0</div>
+      <div class="tb-sub">Patient withdrew</div>
     </div>
     <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showContactAlerts('clean')">
-      <div class="tb-label">Clean</div>
-      <div class="tb-value green" id="cq-kpi-clean">0</div>
-      <div class="tb-sub">Good contact data</div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterFollowUp('screenfail')">
+      <div class="tb-label">Screen Fail</div>
+      <div class="tb-value" style="color:#6366f1" id="fu-kpi-sf">0</div>
+      <div class="tb-sub">DNQ + SF</div>
     </div>
     <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showPatientDB()">
-      <div class="tb-label">Patient DB</div>
-      <div class="tb-value blue" id="cq-kpi-db-total">—</div>
-      <div class="tb-sub" id="cq-kpi-db-sub">Loading...</div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterFollowUp('unsched')">
+      <div class="tb-label">Not Scheduled</div>
+      <div class="tb-value" style="color:#c2410c" id="fu-kpi-unsched">0</div>
+      <div class="tb-sub">Active, no appt</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterFollowUp('actioned')">
+      <div class="tb-label">Actioned</div>
+      <div class="tb-value green" id="fu-kpi-actioned">0</div>
+      <div class="tb-sub">Next steps assigned</div>
     </div>
   </div>
-  <div class="card fade-in" style="margin-bottom:16px;">
-    <div class="card-header">
-      <span class="card-title">Patient Contact Cross-Reference</span>
-      <span class="badge badge-blue" id="cq-badge">Checking patient database...</span>
-    </div>
-    <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Cross-references referral patients against CRIO patient database for contact quality issues</div>
-    <div id="contact-alert-cards" style="padding:12px 16px;">
-      <div style="text-align:center;padding:20px;color:var(--muted);font-size:13px;">Fetching CRIO patient database...</div>
+
+  <!-- Filters -->
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;align-items:center;">
+    <select id="fu-filter-study" onchange="renderFollowUpTable()" style="padding:4px 8px;border-radius:6px;font-size:11px;border:1px solid var(--border);color:var(--muted);background:var(--surface);cursor:pointer">
+      <option value="">All Studies</option>
+    </select>
+    <select id="fu-filter-coord" onchange="renderFollowUpTable()" style="padding:4px 8px;border-radius:6px;font-size:11px;border:1px solid var(--border);color:var(--muted);background:var(--surface);cursor:pointer">
+      <option value="">All Coordinators</option>
+    </select>
+    <select id="fu-filter-site" onchange="renderFollowUpTable()" style="padding:4px 8px;border-radius:6px;font-size:11px;border:1px solid var(--border);color:var(--muted);background:var(--surface);cursor:pointer">
+      <option value="">All Sites</option>
+      <option value="PHL">Philadelphia</option>
+      <option value="PNJ">Pennington</option>
+    </select>
+    <select id="fu-filter-status" onchange="renderFollowUpTable()" style="padding:4px 8px;border-radius:6px;font-size:11px;border:1px solid var(--border);color:var(--muted);background:var(--surface);cursor:pointer">
+      <option value="">All Next Steps</option>
+      <option value="pending">Pending (no action)</option>
+      <option value="actioned">Actioned</option>
+    </select>
+    <span class="badge badge-gray" id="fu-table-count" style="margin-left:auto">—</span>
+  </div>
+
+  <!-- Main Follow-Up Table -->
+  <div class="card fade-in">
+    <div style="overflow-x:auto;max-height:700px;overflow-y:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;" id="fu-table">
+        <thead>
+          <tr style="background:var(--surface2);border-bottom:2px solid var(--border);">
+            <th style="padding:8px 10px;text-align:left;font-weight:700;white-space:nowrap;position:sticky;top:0;z-index:2;background:var(--surface2);">Patient</th>
+            <th style="padding:8px 8px;text-align:left;font-weight:700;white-space:nowrap;position:sticky;top:0;z-index:2;background:var(--surface2);">Study</th>
+            <th style="padding:8px 6px;text-align:center;font-weight:700;white-space:nowrap;position:sticky;top:0;z-index:2;background:var(--surface2);font-size:11px">Category</th>
+            <th style="padding:8px 6px;text-align:center;font-weight:700;white-space:nowrap;position:sticky;top:0;z-index:2;background:var(--surface2);font-size:11px">Status</th>
+            <th style="padding:8px 8px;text-align:left;font-weight:700;white-space:nowrap;position:sticky;top:0;z-index:2;background:var(--surface2);font-size:11px">Reason</th>
+            <th style="padding:8px 6px;text-align:center;font-weight:700;white-space:nowrap;position:sticky;top:0;z-index:2;background:var(--surface2);font-size:11px">Date</th>
+            <th style="padding:8px 6px;text-align:center;font-weight:700;white-space:nowrap;position:sticky;top:0;z-index:2;background:var(--surface2);font-size:11px">Coord</th>
+            <th style="padding:8px 6px;text-align:center;font-weight:700;white-space:nowrap;position:sticky;top:0;z-index:2;background:var(--surface2);font-size:11px">Source</th>
+            <th style="padding:8px 6px;text-align:center;font-weight:700;white-space:nowrap;position:sticky;top:0;z-index:2;background:var(--surface2);font-size:11px">Risk</th>
+            <th style="padding:8px 8px;text-align:center;font-weight:700;white-space:nowrap;position:sticky;top:0;z-index:2;background:var(--surface2);min-width:130px">Next Steps</th>
+          </tr>
+        </thead>
+        <tbody id="fu-tbody"></tbody>
+      </table>
     </div>
   </div>
+
+  <!-- Hidden containers for backward compatibility with existing render functions -->
+  <div style="display:none" id="risk-flag-cards"></div>
+  <div style="display:none" id="crio-studies-container"></div>
+  <div style="display:none" id="perf-insight-flags"></div>
+  <div style="display:none" id="perf-insight-positive"></div>
+  <div style="display:none" id="action-steps"></div>
+  <div style="display:none" id="dormant-list"></div>
+  <div style="display:none" id="crio-recon-container"></div>
+  <div style="display:none" id="contact-alert-cards"></div>
+  <div style="display:none" id="risk-kpi-count"></div>
+  <div style="display:none" id="risk-kpi-urgent"></div>
+  <div style="display:none" id="risk-kpi-studies"></div>
+  <div style="display:none" id="crio-recon-badge"></div>
+  <div style="display:none" id="crio-studies-badge"></div>
+  <div style="display:none" id="cq-kpi-red"></div>
+  <div style="display:none" id="cq-kpi-yellow"></div>
+  <div style="display:none" id="cq-kpi-clean"></div>
+  <div style="display:none" id="cq-kpi-db-total"></div>
+  <div style="display:none" id="cq-kpi-db-sub"></div>
+  <div style="display:none" id="cq-badge"></div>
 
 </div><!-- /view-actions -->
 
