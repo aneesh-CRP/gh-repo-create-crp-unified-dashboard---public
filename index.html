@@ -11906,6 +11906,8 @@ async function refreshReferrals() {
     _log(`CRP Referrals: Loaded ${REFERRAL_DATA.length} referrals, ${CAMPAIGN_DATA.length} campaigns`);
 
     try { renderReferralDashboard(); } catch(e) { console.error('renderReferralDashboard error:', e); showToast('Referral render error: ' + e.message, 'error', 10000); var _refEl = document.getElementById('ref-tracker-detail'); if (_refEl) _refEl.innerHTML = '<div style="padding:20px;color:#dc2626;font-size:12px;">Render error: ' + e.message + '<br>' + (e.stack||'').split('\\n').slice(0,3).join('<br>') + '</div>'; }
+    // Re-render studies table so Provider Leads + Total Leads columns populate
+    try { if (typeof renderStudiesTable === 'function') renderStudiesTable(); } catch(e) { _log('renderStudiesTable after referrals: ' + e.message); }
 
     // Refresh cross-source KPIs now that referral data is loaded
     safe(buildRecruitmentKPIs, 'buildRecruitmentKPIs');
