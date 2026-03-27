@@ -239,6 +239,20 @@ if ('serviceWorker' in navigator && !(typeof google !== 'undefined' && google.sc
 
 // ═══ CONFIGURATION LAYER ═══
 // Edit this object to customize the dashboard without touching code below
+// Study display name overrides — consolidate variants into a single label
+const STUDY_DISPLAY_MAP = {
+  'N1T-MC-TZ01': 'N1T-MC-MALO',
+  'N1T-MC-RT01': 'N1T-MC-MALO',
+  'Eli Lilly and Company - N1T-MC-TZ01': 'N1T-MC-MALO',
+  'Eli Lilly and Company - N1T-MC-RT01': 'N1T-MC-MALO',
+  'N1T-MC-MALO / N1T-MC-TZ01 / N1T-MC-RT01': 'N1T-MC-MALO',
+};
+function displayStudyName(name) {
+  if (!name) return '';
+  var trimmed = name.includes(' - ') ? name.split(' - ').pop().trim() : name.trim();
+  return STUDY_DISPLAY_MAP[trimmed] || STUDY_DISPLAY_MAP[name] || trimmed;
+}
+
 const CRP_CONFIG = {
   // Organization
   ORG_NAME: 'Clinical Research Philadelphia',
@@ -4771,6 +4785,8 @@ function fetchActionRequiredData() {
         _dbFill++;
       });
       _log('CRP: Recruiting data loaded — ' + window._recruitingData.length + ' records, ' + _crioSourced + ' CRIO-sourced, ' + _inferred + ' inferred, ' + _dbFill + ' CRIO Database, ' + window._crioRefSourceMap.size + ' total mapped (' + Math.round(window._crioRefSourceMap.size/window._recruitingData.length*100) + '% coverage)');
+      // Re-render referral dashboard to pick up recruiting data (Monthly Trend by Source)
+      if (_referralsLoaded && typeof renderReferralDashboard === 'function') try { renderReferralDashboard(); } catch(e) { _log('re-render referrals: ' + e.message); }
     }
 
     // Subject audit trail — DNQ reasons
@@ -7658,7 +7674,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
     return {
       name: (r['Subject Full Name']||'').replace(/\s{2,}/g,' ').trim(),
       url: patientUrl(r['Study Key'], r['Subject Key (Back End)'], r['Site Name']) || '',
-      study: (r['Study Name']||'').split(' - ').pop().trim(),
+      study: displayStudyName(r['Study Name']||''),
       study_url: studyUrl(r['Study Key'], r['Site Name']) || '',
       subject_key: r['Subject Key (Back End)']||'',
       subject_status: r['Subject Status']||'',
@@ -7732,7 +7748,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
         date_iso: r['Scheduled Date']||'',
         time: timeFmt,
         duration_min: parseInt(r['Duration Min']||r['duration_min'])||0,
-        study: (r['Study Name']||'').split(' - ').pop().trim(),
+        study: displayStudyName(r['Study Name']||''),
         study_url: studyUrl(sk, r['Site Name']) || '',
         visit: r['Name']||r['Appointment Type']||'',
         patient: (r['Subject Full Name']||'').replace(/\s{2,}/g,' ').trim(),
@@ -7761,7 +7777,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
       return {
         name: (r['Subject Full Name']||'').replace(/\s{2,}/g,' ').trim(),
         url: patientUrl(sk, subk, r['Site Name']) || '',
-        study: (r['Study Name']||'').split(' - ').pop().trim(),
+        study: displayStudyName(r['Study Name']||''),
         study_url: studyUrl(sk, r['Site Name']) || '',
         coord: cleanCoord(r['Staff Full Name'] || r['Full Name']),
         type: r['Appointment Cancellation Type']||'',
@@ -7776,7 +7792,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
       return {
         name: (r['Subject Full Name']||'').replace(/\s{2,}/g,' ').trim(),
         url: patientUrl(sk, subk, r['Site Name']) || '',
-        study: (r['Study Name']||'').split(' - ').pop().trim(),
+        study: displayStudyName(r['Study Name']||''),
         study_url: studyUrl(sk, r['Site Name']) || '',
         coord: cleanCoord(r['Staff Full Name'] || r['Full Name']),
         reason: r['Cancel Reason']||'',
@@ -10582,9 +10598,9 @@ function renderReferralDashboard() {
     // Use recruiting data counts (vendor-filtered) as primary, pipeline as fallback
     var _enrolled = Math.max(_pipelineEnrolled, crioEnr);
     var _screening = Math.max(_pipelineScreening, crioScr);
-    var _vendorPrefix = {'facebook':'Meta','subjectwell':'SW','study teams':'ST','study max':'SM','studykik':'SK','iconnect':'IC','gardinia - clinlife':'CL'};
+    var _vendorPrefix = {'facebook':'Meta','subjectwell':'SubjectWell','study teams':'Study Teams','study max':'StudyMax','studykik':'StudyKik','iconnect':'iConnect','gardinia - clinlife':'ClinLife'};
     var _prefix = _vendorPrefix[(c.vendor||'').toLowerCase()] || c.vendor;
-    var _campName = _prefix + ': ' + c.study;
+    var _campName = _prefix + ': ' + displayStudyName(c.study);
     // Mark vendor CRIO source as consumed
     var _normVendor = (CRP_CONFIG.SOURCE_NAME_MAP || {})[_vendorLower] || c.vendor;
     if (_crioSourceRows[_normVendor]) _crioUsed.add(_normVendor);
@@ -10631,7 +10647,7 @@ function renderReferralDashboard() {
   }
   var sortedRows = _sortRefRows(unifiedRows, _refSort, _refSortDir);
 
-  var vendorColors = {'Physician':'#072061','Meta':'#3b82f6','SW':'#8b5cf6','ST':'#059669','SM':'#d97706','SK':'#f59e0b','IC':'#06b6d4','CL':'#ec4899','Trial Partners':'#7c3aed'};
+  var vendorColors = {'Physician':'#072061','Meta':'#3b82f6','SubjectWell':'#8b5cf6','Study Teams':'#059669','StudyMax':'#d97706','StudyKik':'#f59e0b','iConnect':'#06b6d4','ClinLife':'#ec4899','Trial Partners':'#7c3aed'};
   var _sortIcon = function(col) { return col === _refSort ? (_refSortDir === 'desc' ? ' ▼' : ' ▲') : ''; };
   var _sortClick = function(col) { return 'onclick="sortRefTable(\''+col+'\')"'; };
   trackerEl.innerHTML = `<table class="fin-table" style="width:100%;font-size:11px;">
@@ -11374,7 +11390,7 @@ function renderCrioReconciliation() {
 
 function showCampaignStudyDetail(campName) {
   // Strip prefix (Meta:, SW:, etc.) to get study name
-  var study = campName.replace(/^(Meta|SW|ST|SM|SK|IC|CL):\s*/, '').split(' / ')[0].toLowerCase().trim();
+  var study = campName.replace(/^(Meta|SubjectWell|Study Teams|StudyMax|StudyKik|iConnect|ClinLife|SW|ST|SM|SK|IC|CL):\s*/, '').split(' / ')[0].toLowerCase().trim();
   // Resolve campaign name → protocol numbers for matching
   var _protos = resolveCampaignProtocols(study);
   var filterFn = function(r) {
