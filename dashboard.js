@@ -3957,24 +3957,24 @@ function renderCoordinatorGoals() {
       const hasVisits = visits > 0;
       const cursor = hasVisits ? 'cursor:pointer;' : '';
       const clickAttr = hasVisits ? `onclick="toggleCoordDayDetail('${jsAttr(name)}','${d}',this)"` : '';
-      return `<div style="text-align:center;flex:1;min-width:28px;${cursor}position:relative" ${clickAttr}>
-        <div style="height:36px;display:flex;align-items:flex-end;justify-content:center">
-          <div style="width:14px;height:${Math.max(3,barH)}%;background:${barColor};border-radius:2px 2px 0 0;transition:height 0.3s"></div>
+      return `<div style="text-align:center;flex:1;min-width:0;${cursor}position:relative" ${clickAttr}>
+        <div style="height:28px;display:flex;align-items:flex-end;justify-content:center">
+          <div style="width:10px;height:${Math.max(3,barH)}%;background:${barColor};border-radius:2px 2px 0 0;transition:height 0.3s"></div>
         </div>
-        <div style="font-size:9px;font-weight:${isToday?'700':'400'};color:${isToday?'#1843AD':'#9CA3AF'};margin-top:1px">${twoWeekLabels[i]}</div>
-        <div style="font-size:8px;color:${isToday?'#1843AD':'#cbd5e1'};font-weight:${isToday?'600':'400'}">${twoWeekDates[i]}</div>
-        <div style="font-size:10px;font-weight:700;color:${visits > 0 ? '#1a202c' : '#D1D5DB'}">${visits}</div>
+        <div style="font-size:8px;font-weight:${isToday?'700':'400'};color:${isToday?'#1843AD':'#9CA3AF'};line-height:1.2">${twoWeekLabels[i].charAt(0)}</div>
+        <div style="font-size:7px;color:${isToday?'#1843AD':'#cbd5e1'};font-weight:${isToday?'600':'400'};line-height:1.2">${twoWeekDates[i]}</div>
+        <div style="font-size:9px;font-weight:700;color:${visits > 0 ? '#1a202c' : '#D1D5DB'};line-height:1.3">${visits}</div>
       </div>`;
     }).join('');
 
     const firstName = name.split(' ')[0];
-    return `<div style="background:#F9FAFB;border-radius:10px;padding:12px;border:1px solid #E5E7EB">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-        <span style="font-weight:700;font-size:13px;color:#1a202c">${firstName}</span>
-        <span style="font-size:11px;font-weight:700;color:#1843AD">${periodTotal} visits</span>
+    return `<div style="background:#F9FAFB;border-radius:8px;padding:10px;border:1px solid #E5E7EB">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <span style="font-weight:700;font-size:12px;color:#1a202c">${firstName}</span>
+        <span style="font-size:10px;font-weight:700;color:#1843AD">${periodTotal}</span>
       </div>
-      <div style="display:flex;gap:2px;margin-bottom:6px">${dayBars}</div>
-      <div class="coord-day-detail" data-coord="${name}" style="display:none;margin-bottom:6px;background:#fff;border:1px solid #E5E7EB;border-radius:6px;padding:8px;font-size:11px"></div>
+      <div style="display:flex;gap:1px">${dayBars}</div>
+      <div class="coord-day-detail" data-coord="${name}" style="display:none;margin-top:4px;background:#fff;border:1px solid #E5E7EB;border-radius:6px;padding:6px;font-size:10px"></div>
     </div>`;
   }).join('');
 
