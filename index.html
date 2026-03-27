@@ -17995,6 +17995,11 @@ async function _crpInit() {
       fetchMetaAds().catch(() => {});
     }, 2000);
 
+    // Re-render the currently active tab with fresh data
+    var _activeNow = _activeTab();
+    if (_activeNow === 'actions') safe(renderFollowUpTable, 'renderFollowUpTable-refresh');
+    if (_activeNow === 'studies') safe(renderStudiesTable, 'renderStudiesTable-refresh');
+
     if (badge) badge.textContent = `Auto-updated: ${now.toLocaleTimeString()}`;
     _lastRefreshTime = Date.now();
     } finally { _autoRefreshInFlight = false; }
