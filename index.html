@@ -1717,6 +1717,7 @@ body {
             <th style="padding:8px 6px;text-align:center;font-weight:700;white-space:nowrap;position:sticky;top:0;z-index:2;background:var(--surface2);font-size:11px">Coord</th>
             <th style="padding:8px 6px;text-align:center;font-weight:700;white-space:nowrap;position:sticky;top:0;z-index:2;background:var(--surface2);font-size:11px">Source</th>
             <th style="padding:8px 6px;text-align:center;font-weight:700;white-space:nowrap;position:sticky;top:0;z-index:2;background:var(--surface2);font-size:11px">Risk</th>
+            <th style="padding:8px 6px;text-align:center;font-weight:700;white-space:nowrap;position:sticky;top:0;z-index:2;background:var(--surface2);font-size:11px">ClickUp</th>
             <th style="padding:8px 8px;text-align:center;font-weight:700;white-space:nowrap;position:sticky;top:0;z-index:2;background:var(--surface2);min-width:130px">Next Steps</th>
           </tr>
         </thead>
@@ -10021,10 +10022,58 @@ var FU_NEXT_STEPS = [
 
 function filterFollowUp(cat) { _fuFilter = cat; renderFollowUpTable(); }
 
+// ═══ ClickUp patient matching for Follow-Up table ═══
+// Builds lookup maps from REFERRAL_DATA for O(1) matching by name and phone
+function _buildClickUpLookup() {
+  var byName = new Map();  // normalized name → referral row
+  var byPhone = new Map(); // normalized 10-digit phone → referral row
+  (typeof REFERRAL_DATA !== 'undefined' ? REFERRAL_DATA : []).forEach(function(r) {
+    if (!r.name) return;
+    var nk = r.name.toLowerCase().replace(/\s+/g, ' ').trim();
+    if (nk && !byName.has(nk)) byName.set(nk, r);
+    // Also index by first+last for partial matching
+    var parts = nk.split(' ');
+    if (parts.length >= 2) {
+      var fl = parts[0] + ' ' + parts[parts.length - 1];
+      if (!byName.has(fl)) byName.set(fl, r);
+    }
+    if (r.phone) {
+      var ph = (r.phone || '').replace(/\D/g, '');
+      if (ph.length >= 10) { ph = ph.slice(-10); if (!byPhone.has(ph)) byPhone.set(ph, r); }
+    }
+  });
+  return { byName: byName, byPhone: byPhone };
+}
+
+function matchClickUpPatient(patientName, cuLookup) {
+  if (!cuLookup) return null;
+  var nk = (patientName || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  // 1. Exact name match
+  if (nk && cuLookup.byName.has(nk)) return cuLookup.byName.get(nk);
+  // 2. First+last partial match
+  var parts = nk.split(' ');
+  if (parts.length >= 2) {
+    var fl = parts[0] + ' ' + parts[parts.length - 1];
+    if (cuLookup.byName.has(fl)) return cuLookup.byName.get(fl);
+  }
+  // 3. Phone match via PATIENT_DB_MAP → get phone → match in ClickUp
+  if (PATIENT_DB_MAP && nk) {
+    var dbEntry = PATIENT_DB_MAP.get(nk);
+    if (dbEntry && dbEntry.phone) {
+      var ph = (dbEntry.phone || '').replace(/\D/g, '');
+      if (ph.length >= 10) { ph = ph.slice(-10); if (cuLookup.byPhone.has(ph)) return cuLookup.byPhone.get(ph); }
+    }
+  }
+  return null;
+}
+
 function renderFollowUpTable() {
   _loadFuActions();
   var tbody = document.getElementById('fu-tbody');
   if (!tbody) return;
+
+  // Build ClickUp lookup once per render
+  var _cuLookup = _buildClickUpLookup();
 
   // Merge all patient-level data into unified rows
   var rows = [];
@@ -10081,6 +10130,7 @@ function renderFollowUpTable() {
       var _sk = r.subject_key || '';
       if (_sk && window._subjectCurrentStatus && window._subjectCurrentStatus[String(_sk)]) _curStatus = window._subjectCurrentStatus[String(_sk)];
       else { var _lat = _getLatestStatus(name, study); if (_lat) _curStatus = _lat.status; }
+      var cuMatch = matchClickUpPatient(name, _cuLookup);
       rows.push({
         _name: name, _study: study, _cat: cat, _catLabel: catLabel, _catColor: catColor,
         url: r.url || r.patient_url || '',
@@ -10092,7 +10142,10 @@ function renderFollowUpTable() {
         site: site, siteCode: siteCode,
         source: source,
         riskLevel: riskLevel,
-        type: r.type || ''
+        type: r.type || '',
+        clickup_url: cuMatch ? cuMatch.url : '',
+        clickup_stage: cuMatch ? cuMatch.stage : '',
+        clickup_tracker: cuMatch ? cuMatch.tracker : ''
       });
     });
   }
@@ -10120,13 +10173,17 @@ function renderFollowUpTable() {
     var _uSk = r.subject_key || '';
     var _uStatus = r.subject_status || '';
     if (_uSk && window._subjectCurrentStatus && window._subjectCurrentStatus[String(_uSk)]) _uStatus = window._subjectCurrentStatus[String(_uSk)];
+    var cuMatchU = matchClickUpPatient(name, _cuLookup);
     rows.push({
       _name: name, _study: study, _cat: 'unsched', _catLabel: 'Not Scheduled', _catColor: '#c2410c',
       url: typeof window._crioPatientUrl === 'function' ? window._crioPatientUrl(r.study_key, r.subject_key, site) : '',
       study_url: '', status: _uStatus, reason: r.last_visit_name || '',
       date: r.last_visit_date || '', coord: '', site: site,
       siteCode: site.indexOf('Penn') !== -1 ? 'PNJ' : 'PHL',
-      source: srcObj ? srcObj.source : '', riskLevel: '', type: ''
+      source: srcObj ? srcObj.source : '', riskLevel: '', type: '',
+      clickup_url: cuMatchU ? cuMatchU.url : '',
+      clickup_stage: cuMatchU ? cuMatchU.stage : '',
+      clickup_tracker: cuMatchU ? cuMatchU.tracker : ''
     });
   });
 
@@ -10195,6 +10252,13 @@ function renderFollowUpTable() {
     html += '<td style="padding:7px 6px;text-align:center;font-size:11px;">' + escapeHTML(r.coord ? r.coord.split(' ')[0] : '—') + '</td>';
     html += '<td style="padding:7px 6px;text-align:center;font-size:10px;color:#475569;max-width:80px;overflow:hidden;text-overflow:ellipsis;" title="'+escapeHTML(r.source)+'">' + escapeHTML(r.source ? r.source.split(' ')[0] : '—') + '</td>';
     html += '<td style="padding:7px 6px;text-align:center;"><span style="font-size:9px;font-weight:700;padding:2px 5px;border-radius:4px;background:'+riskColor+'15;color:'+riskColor+';">'+(r.riskLevel||'—')+'</span></td>';
+    // ClickUp link
+    if (r.clickup_url) {
+      var cuColor = r.clickup_stage === 'Enrolled' ? '#059669' : r.clickup_stage === 'Screening' || r.clickup_stage === 'Pre-Screening' ? '#3b82f6' : r.clickup_stage === 'Lost' || r.clickup_stage === 'DNQ' || r.clickup_stage === 'Screen Fail' ? '#dc2626' : '#7c3aed';
+      html += '<td style="padding:7px 6px;text-align:center;"><a href="'+escapeHTML(r.clickup_url)+'" target="_blank" title="'+escapeHTML((r.clickup_tracker||'')+' · '+r.clickup_stage)+'" style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;background:'+cuColor+'15;color:'+cuColor+';text-decoration:none;white-space:nowrap;">'+escapeHTML(r.clickup_stage||'Open')+'</a></td>';
+    } else {
+      html += '<td style="padding:7px 6px;text-align:center;font-size:9px;color:#cbd5e1;">—</td>';
+    }
     // Next steps dropdown
     html += '<td style="padding:4px 6px;text-align:center;"><select data-fukey="'+escapeHTML(k)+'" onchange="setFollowUpAction(this)" style="font-size:10px;padding:3px 4px;border-radius:4px;border:1px solid '+(hasAction?'#059669':'#e2e8f0')+';color:'+(hasAction?'#059669':'#64748b')+';background:'+(hasAction?'#f0fdf4':'#fff')+';cursor:pointer;width:100%;font-weight:'+(hasAction?'600':'400')+';">';
     FU_NEXT_STEPS.forEach(function(s) {
@@ -10205,7 +10269,7 @@ function renderFollowUpTable() {
   });
 
   if (filtered.length === 0) {
-    html = '<tr><td colspan="10" style="text-align:center;padding:30px;color:#94a3b8;">No patients match current filters</td></tr>';
+    html = '<tr><td colspan="11" style="text-align:center;padding:30px;color:#94a3b8;">No patients match current filters</td></tr>';
   }
   tbody.innerHTML = html;
 }
