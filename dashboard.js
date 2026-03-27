@@ -191,7 +191,7 @@ function parseLocalDate(s) {
 // ═══ SERVICE WORKER REGISTRATION ═══
 if ('serviceWorker' in navigator && !(typeof google !== 'undefined' && google.script && google.script.run)) {
   // Force update: unregister old SW, clear caches, re-register
-  var _swVersion = 'v13';
+  var _swVersion = 'v14';
   var _lastSW = localStorage.getItem('crp_sw_version');
   if (_lastSW && _lastSW !== _swVersion) {
     navigator.serviceWorker.getRegistrations().then(function(regs) {
