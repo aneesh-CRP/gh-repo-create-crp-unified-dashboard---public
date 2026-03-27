@@ -14496,19 +14496,18 @@ function renderStudiesTable() {
       <td style="padding:10px 6px;text-align:center">${_countCell(_bd.noShows, '#f97316', 'noshow')}</td>
       <td style="padding:10px 6px;text-align:center">${_countCell(_bd.screenFails, '#ef4444', 'screenfail')}</td>
       <td style="padding:10px 8px;text-align:center">${upcomingCell}</td>
-      <td style="padding:10px 6px;text-align:center">${_unschedCell}</td>
       <td style="padding:10px 6px;text-align:center">${(() => {
         var ps = window._prescrByStudy || {};
-        // Match pre-screening studies to parent study (e.g., "Cardiology Pre-Screening" → studies with cardio/triglycerides)
-        var count = 0; var matchedRows = [];
+        var count = 0;
         Object.keys(ps).forEach(function(k) {
           if (k.toLowerCase().indexOf(s.study.toLowerCase()) !== -1 || s.study.toLowerCase().indexOf(k.split(' ')[0].toLowerCase()) !== -1) {
-            count += ps[k].total; matchedRows = matchedRows.concat(ps[k].rows);
+            count += ps[k].total;
           }
         });
         if (count === 0) return '<span style="font-size:11px;color:#cbd5e1">0</span>';
         return '<span style="font-size:12px;font-weight:700;color:#0369a1;cursor:pointer" onclick="showPrescrModal(\''+jsAttr(s.study)+'\')">'+count+'</span>';
       })()}</td>
+      <td style="padding:10px 6px;text-align:center">${_unschedCell}</td>
       <td style="padding:10px 8px;min-width:140px;cursor:pointer" data-action="studyUnified" data-study="${escapeHTML(s.study)}">${enrollCell}</td>
       <td style="padding:10px 8px;text-align:center;font-size:11px;color:${s.screening>0?'#7c3aed':'var(--muted)'};font-weight:${s.screening>0?'700':'400'};cursor:pointer" data-action="studyUnified" data-study="${escapeHTML(s.study)}">${s.screening||0}</td>
       <td style="padding:10px 8px;text-align:center;font-size:11px;color:var(--muted);cursor:pointer" data-action="studyUnified" data-study="${escapeHTML(s.study)}">${s.screened||0}</td>
