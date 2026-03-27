@@ -10150,11 +10150,16 @@ function renderFollowUpTable() {
       var auditKey = nameLo + '|' + study.toLowerCase();
       var auditReason = _auditReasons[auditKey] || '';
       var bestReason = auditReason || r.reason || r.category || '';
+      // Determine most current status: subjects table > audit trail > cancel record
+      var _curStatus = r.subject_status || r.status || '';
+      var _sk = r.subject_key || '';
+      if (_sk && window._subjectCurrentStatus && window._subjectCurrentStatus[String(_sk)]) _curStatus = window._subjectCurrentStatus[String(_sk)];
+      else { var _lat = _getLatestStatus(name, study); if (_lat) _curStatus = _lat.status; }
       rows.push({
         _name: name, _study: study, _cat: cat, _catLabel: catLabel, _catColor: catColor,
         url: r.url || r.patient_url || '',
         study_url: r.study_url || '',
-        status: r.subject_status || r.status || '',
+        status: _curStatus,
         reason: bestReason,
         date: r.cancel_date || r.last_visit_date || r.date || '',
         coord: r.coord || '',
@@ -10186,10 +10191,13 @@ function renderFollowUpTable() {
     seen.add(key);
     var site = r.site_name || '';
     var srcObj = window._crioRefSourceMap ? window._crioRefSourceMap.get(name.toLowerCase().replace(/\s+/g,' ').trim()) : null;
+    var _uSk = r.subject_key || '';
+    var _uStatus = r.subject_status || '';
+    if (_uSk && window._subjectCurrentStatus && window._subjectCurrentStatus[String(_uSk)]) _uStatus = window._subjectCurrentStatus[String(_uSk)];
     rows.push({
       _name: name, _study: study, _cat: 'unsched', _catLabel: 'Not Scheduled', _catColor: '#c2410c',
       url: typeof window._crioPatientUrl === 'function' ? window._crioPatientUrl(r.study_key, r.subject_key, site) : '',
-      study_url: '', status: r.subject_status || '', reason: r.last_visit_name || '',
+      study_url: '', status: _uStatus, reason: r.last_visit_name || '',
       date: r.last_visit_date || '', coord: '', site: site,
       siteCode: site.indexOf('Penn') !== -1 ? 'PNJ' : 'PHL',
       source: srcObj ? srcObj.source : '', riskLevel: '', type: ''
