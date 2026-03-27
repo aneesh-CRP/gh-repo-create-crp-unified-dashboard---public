@@ -5963,7 +5963,7 @@ function renderCoordinatorGoals() {
       const isToday = d === todayISO;
       const isPast = d < todayISO;
       const isFuture = d > todayISO;
-      const barColor = isFuture ? (visits > 0 ? '#93c5fd' : '#E5E7EB') : visits > 0 ? '#1843AD' : '#E5E7EB';
+      const barColor = visits >= 2 ? (isFuture ? '#86efac' : '#059669') : visits === 1 ? (isFuture ? '#fdba74' : '#f59e0b') : (isFuture ? '#fca5a5' : '#ef4444');
       const barH = Math.min(100, Math.round((visits / (weekMax * 1.2)) * 100));
       const hasVisits = visits > 0;
       const cursor = hasVisits ? 'cursor:pointer;' : '';
@@ -5974,7 +5974,7 @@ function renderCoordinatorGoals() {
         </div>
         <div style="font-size:8px;font-weight:${isToday?'700':'400'};color:${isToday?'#1843AD':'#9CA3AF'};line-height:1.2">${twoWeekLabels[i].charAt(0)}</div>
         <div style="font-size:7px;color:${isToday?'#1843AD':'#cbd5e1'};font-weight:${isToday?'600':'400'};line-height:1.2">${twoWeekDates[i]}</div>
-        <div style="font-size:9px;font-weight:700;color:${visits > 0 ? '#1a202c' : '#D1D5DB'};line-height:1.3">${visits}</div>
+        <div style="font-size:9px;font-weight:700;color:${visits >= 2 ? '#059669' : visits === 1 ? '#f59e0b' : '#ef4444'};line-height:1.3">${visits}</div>
       </div>`;
     }).join('');
 
@@ -6048,49 +6048,44 @@ function renderCoordWorkloadBalance() {
     var patients = {};
     var studies = {};
     var phl = 0, pnj = 0;
-    visits.forEach(function(v) { patients[v.patient]=1; studies[v.study]=1; if ((v.site||'').indexOf('Penn')!==-1) pnj++; else phl++; });
+    var totalDuration = 0;
+    visits.forEach(function(v) { patients[v.patient]=1; studies[v.study]=1; if ((v.site||'').indexOf('Penn')!==-1) pnj++; else phl++; totalDuration += (v.duration_min||0); });
     var cancelRate = (visits.length+cancels.length) > 0 ? Math.round(cancels.length/(visits.length+cancels.length)*100) : 0;
-    return { name:name, visits:visits.length, cancels:cancels.length, patients:Object.keys(patients).length, studies:Object.keys(studies).length, cancelRate:cancelRate, phl:phl, pnj:pnj };
+    var durationHrs = Math.round(totalDuration / 60 * 10) / 10;
+    return { name:name, visits:visits.length, cancels:cancels.length, patients:Object.keys(patients).length, studies:Object.keys(studies).length, cancelRate:cancelRate, phl:phl, pnj:pnj, totalDuration:totalDuration, durationHrs:durationHrs };
   }).sort(function(a,b){return b.visits-a.visits;});
 
   var maxVisits = Math.max.apply(null, coordStats.map(function(c){return c.visits;}).concat([0])) || 1;
-  var totalVisits = coordStats.reduce(function(s,c){return s+c.visits;},0);
-  var avgVisits = COORDS.length > 0 ? Math.round(totalVisits/COORDS.length) : 0;
-  var maxDev = 0;
-  coordStats.forEach(function(c){var d=Math.abs(c.visits-avgVisits);if(d>maxDev)maxDev=d;});
-  var balanceScore = avgVisits > 0 ? Math.max(0,100-Math.round(maxDev/avgVisits*100)) : 100;
-  var balColor = balanceScore >= 80 ? '#059669' : balanceScore >= 60 ? '#f59e0b' : '#dc2626';
-  var highCancel = coordStats.filter(function(c){return c.cancelRate>20;});
+  var maxDuration = Math.max.apply(null, coordStats.map(function(c){return c.durationHrs;}).concat([0])) || 1;
 
-  var kpiStyle = 'padding:8px;border-radius:8px;text-align:center;cursor:pointer;transition:box-shadow .15s;';
-  var html = '<div style="font-size:11px;color:#64748b;margin-bottom:8px;font-weight:600;">Upcoming Visit Distribution (next 30 days · cancel rate from last 60 days)</div>';
-  html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:14px;">';
-  html += '<div style="'+kpiStyle+'background:#eff6ff;" onclick="showCoordKpiPopup(\'visits\')" title="Total upcoming visits across all 5 coordinators"><div style="font-size:18px;font-weight:800;color:#3b82f6;">'+totalVisits+'</div><div style="font-size:9px;color:#3b82f6;font-weight:600;">Total Visits</div></div>';
-  html += '<div style="'+kpiStyle+'background:#f0fdf4;" title="Average upcoming visits per coordinator"><div style="font-size:18px;font-weight:800;color:#059669;">'+avgVisits+'</div><div style="font-size:9px;color:#059669;font-weight:600;">Avg/Coord</div></div>';
-  html += '<div style="'+kpiStyle+'background:'+(balanceScore>=80?'#f0fdf4':'#fffbeb')+';" title="How evenly visits are distributed — 100% = perfectly balanced" onclick="showCoordKpiPopup(\'balance\')"><div style="font-size:18px;font-weight:800;color:'+balColor+';">'+balanceScore+'%</div><div style="font-size:9px;color:'+balColor+';font-weight:600;">Balance Score</div></div>';
-  html += '<div style="'+kpiStyle+'background:'+(highCancel.length>0?'#fef2f2':'#f0fdf4')+'" onclick="showCoordKpiPopup(\'highCancel\')" title="Coordinators with cancellation rate above 20%"><div style="font-size:18px;font-weight:800;color:'+(highCancel.length>0?'#dc2626':'#059669')+';">'+highCancel.length+'</div><div style="font-size:9px;color:'+(highCancel.length>0?'#dc2626':'#059669')+';font-weight:600;">High Cancel Rate</div></div>';
-  html += '</div>';
+  // Track current toggle mode
+  var curMode = (window._coordBalanceMode || 'visits');
 
-  // Workload table — visits assigned per coordinator via user_appointment
-  html += '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:4px;">';
-  html += '<tr style="background:#f8fafc;"><th style="text-align:left;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Coordinator</th><th style="text-align:left;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;" title="Upcoming scheduled visits assigned to this coordinator">Upcoming Visits</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Site</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;" title="Cancellations / (Visits + Cancellations)">Cancel %</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;" title="Unique patients with upcoming visits">Patients</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;" title="Unique studies with upcoming visits">Studies</th></tr>';
+  var html = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">';
+  html += '<div style="font-size:11px;color:#64748b;font-weight:600;">Upcoming Visit Distribution (next 30 days)</div>';
+  html += '<div style="display:flex;gap:2px;background:#f1f5f9;border-radius:6px;padding:2px;">';
+  html += '<button onclick="window._coordBalanceMode=\'visits\';renderCoordWorkloadBalance()" style="font-size:10px;font-weight:600;padding:3px 10px;border:none;border-radius:4px;cursor:pointer;background:'+(curMode==='visits'?'#fff':'transparent')+';color:'+(curMode==='visits'?'#1843AD':'#64748b')+';box-shadow:'+(curMode==='visits'?'0 1px 2px rgba(0,0,0,.1)':'none')+'">Visits</button>';
+  html += '<button onclick="window._coordBalanceMode=\'duration\';renderCoordWorkloadBalance()" style="font-size:10px;font-weight:600;padding:3px 10px;border:none;border-radius:4px;cursor:pointer;background:'+(curMode==='duration'?'#fff':'transparent')+';color:'+(curMode==='duration'?'#1843AD':'#64748b')+';box-shadow:'+(curMode==='duration'?'0 1px 2px rgba(0,0,0,.1)':'none')+'">Duration</button>';
+  html += '</div></div>';
+
+  // Workload table
+  var isDuration = curMode === 'duration';
+  var barMax = isDuration ? maxDuration : maxVisits;
+  html += '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
+  html += '<tr style="background:#f8fafc;"><th style="text-align:left;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Coordinator</th><th style="text-align:left;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">'+(isDuration?'Total Hours':'Upcoming Visits')+'</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Site</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Patients</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Studies</th></tr>';
   coordStats.forEach(function(c) {
-    var pct = Math.round(c.visits / maxVisits * 100);
-    var crColor = c.cancelRate > 20 ? '#dc2626' : c.cancelRate > 10 ? '#f59e0b' : '#059669';
-    var alerts = [];
-    if (c.cancelRate > 25) alerts.push({text:'High Cancels', bg:'#fef2f2', color:'#dc2626'});
-    if (c.visits > avgVisits * 1.5 && avgVisits > 0 && c.cancelRate < 10) alerts.push({text:'Top Performer', bg:'#f0fdf4', color:'#059669'});
-    var alertHtml = alerts.length > 0 ? '<div style="margin-top:2px;">' + alerts.map(function(a){ return '<span style="font-size:9px;font-weight:600;padding:1px 5px;border-radius:3px;background:'+a.bg+';color:'+a.color+';">'+a.text+'</span>'; }).join(' ') + '</div>' : '';
+    var barVal = isDuration ? c.durationHrs : c.visits;
+    var barLabel = isDuration ? c.durationHrs + 'h' : '' + c.visits;
+    var pct = barMax > 0 ? Math.round(barVal / barMax * 100) : 0;
     var siteBadge = c.pnj > 0 && c.phl > 0 ? '<span style="color:#072061;font-weight:600;">PHL</span> / <span style="color:#059669;font-weight:600;">PNJ</span>' : c.pnj > 0 ? '<span style="padding:2px 6px;border-radius:4px;background:#05966920;color:#059669;font-weight:600;">PNJ</span>' : '<span style="padding:2px 6px;border-radius:4px;background:#07206120;color:#072061;font-weight:600;">PHL</span>';
 
     html += '<tr style="border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showCoordDetail(\''+jsAttr(c.name)+'\')">';
-    html += '<td style="padding:8px;"><div style="font-weight:700;color:#1e293b;">'+escapeHTML(c.name.split(' ')[0])+'</div>'+alertHtml+'</td>';
+    html += '<td style="padding:8px;"><div style="font-weight:700;color:#1e293b;">'+escapeHTML(c.name.split(' ')[0])+'</div></td>';
     html += '<td style="padding:8px;"><div style="display:flex;align-items:center;gap:8px;"><div style="flex:1;background:#e2e8f0;border-radius:5px;height:18px;overflow:hidden;position:relative;">';
     html += '<div style="height:100%;width:'+pct+'%;background:linear-gradient(90deg,#1843AD,#3b82f6);border-radius:5px;"></div>';
-    html += '<div style="position:absolute;left:8px;top:0;font-size:11px;font-weight:700;color:'+(pct>30?'#fff':'#1e293b')+';line-height:18px;">'+c.visits+'</div>';
+    html += '<div style="position:absolute;left:8px;top:0;font-size:11px;font-weight:700;color:'+(pct>30?'#fff':'#1e293b')+';line-height:18px;">'+barLabel+'</div>';
     html += '</div></div></td>';
     html += '<td style="padding:8px;text-align:center;font-size:11px;">'+siteBadge+'</td>';
-    html += '<td style="padding:8px;text-align:center;font-weight:700;color:'+crColor+';">'+c.cancelRate+'%</td>';
     html += '<td style="padding:8px;text-align:center;font-weight:600;color:#475569;">'+c.patients+'</td>';
     html += '<td style="padding:8px;text-align:center;font-weight:600;color:#475569;">'+c.studies+'</td>';
     html += '</tr>';
@@ -9819,6 +9814,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
         date: d ? d.toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '—',
         date_iso: r['Scheduled Date']||'',
         time: timeFmt,
+        duration_min: parseInt(r['Duration Min']||r['duration_min'])||0,
         study: (r['Study Name']||'').split(' - ').pop().trim(),
         study_url: studyUrl(sk, r['Site Name']) || '',
         visit: r['Name']||r['Appointment Type']||'',

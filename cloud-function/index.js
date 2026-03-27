@@ -170,6 +170,7 @@ const FEEDS = {
       CAST(ca.study_key AS STRING) AS study_key,
       FORMAT_DATETIME('%Y-%m-%d', ca.start) AS scheduled_date,
       FORMAT_DATETIME('%H:%M', ca.start) AS scheduled_time,
+      DATETIME_DIFF(ca.\`end\`, ca.start, MINUTE) AS duration_min,
       ${SUBJECT_NAME_SQL} AS subject_full_name,
       CAST(ca.subject_key AS STRING) AS subject_key_back_end,
       COALESCE(sc.name, '') AS full_name,
