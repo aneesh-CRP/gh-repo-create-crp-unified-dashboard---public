@@ -1673,6 +1673,7 @@ const FEEDS = {
     LEFT JOIN ${tbl('user')} assigned ON sd.assigned_user_key = assigned.user_key
     LEFT JOIN ${tbl('site')} si ON sd.site_key = si.site_key
     WHERE sd._fivetran_deleted = false AND sd.status = 3
+      AND sd.assigned_date >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 90 DAY)
       AND st.is_active = 1      ${STUDY_FILTER_SQL}
     ORDER BY sd.assigned_date DESC`
   },

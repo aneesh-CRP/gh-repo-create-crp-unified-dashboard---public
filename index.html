@@ -7079,8 +7079,11 @@ function showActionModal(type) {
     body = '<table class="detail-table"><thead><tr><th>Study</th><th>Subject</th><th>Document</th><th>Category</th><th>Assigned To</th><th>Assigned Date</th></tr></thead><tbody>' +
       rows.slice(0, 100).map(function(r) {
         var studyUrl = _crioStudyUrl(r.study_key);
-        return '<tr><td style="font-size:11px">' + _crioLink(r.study_name||'', studyUrl) + '</td>' +
-          '<td style="font-size:11px">' + escapeHTML(r.subject_name||'') + '</td>' +
+        var pUrl = typeof window._crioPatientUrl === 'function' ? window._crioPatientUrl(r.study_key, r.subject_key, r.site_name) : null;
+        var pName = escapeHTML(maskPHI(r.subject_name||''));
+        var pHtml = pUrl ? '<a href="' + escapeHTML(pUrl) + '" target="_blank" style="color:#1843ad;text-decoration:none">' + pName + '</a>' : pName;
+        return '<tr><td style="font-size:11px">' + _crioLink((r.study_name||'').split(' - ').pop(), studyUrl) + '</td>' +
+          '<td style="font-size:11px">' + pHtml + '</td>' +
           '<td style="font-size:11px">' + escapeHTML(r.document_name||'') + '</td>' +
           '<td style="font-size:11px">' + escapeHTML(r.category||'') + '</td>' +
           '<td style="font-size:11px">' + escapeHTML(r.assigned_to||'') + '</td>' +
