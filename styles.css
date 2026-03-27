@@ -436,8 +436,10 @@ body {
   text-align: left; padding: 7px 10px;
   color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px;
   border-bottom: 1px solid var(--border); font-weight: 600;
+  background: var(--surface, #fff); position: sticky; top: 0; z-index: 1;
 }
 .risk-table td { padding: 8px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+#merged-study-table th, #vis-table th { position: sticky; top: 0; z-index: 2; background: var(--surface2, #f8fafc); }
 .risk-table tr:last-child td { border-bottom: none; }
 .risk-table tr:hover td { background: #f8fafc; }
 .risk-tag {
@@ -678,6 +680,7 @@ body {
   text-align:left; padding:7px 10px; font-size:11px; font-weight:700;
   color:var(--muted); border-bottom:2px solid var(--border); background:var(--surface2, #f8fafc);
   cursor:pointer; user-select:none; white-space:nowrap;
+  position:sticky; top:0; z-index:1;
 }
 .detail-table th:hover { background:var(--surface2, #f1f5f9); color:var(--blue); }
 .detail-table th::after { content:" ⇅"; opacity:.3; font-size:10px; }

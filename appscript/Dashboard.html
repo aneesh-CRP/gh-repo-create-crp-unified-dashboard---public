@@ -452,8 +452,10 @@ body {
   text-align: left; padding: 7px 10px;
   color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px;
   border-bottom: 1px solid var(--border); font-weight: 600;
+  background: var(--surface, #fff); position: sticky; top: 0; z-index: 1;
 }
 .risk-table td { padding: 8px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+#merged-study-table th, #vis-table th { position: sticky; top: 0; z-index: 2; background: var(--surface2, #f8fafc); }
 .risk-table tr:last-child td { border-bottom: none; }
 .risk-table tr:hover td { background: #f8fafc; }
 .risk-tag {
@@ -694,6 +696,7 @@ body {
   text-align:left; padding:7px 10px; font-size:11px; font-weight:700;
   color:var(--muted); border-bottom:2px solid var(--border); background:var(--surface2, #f8fafc);
   cursor:pointer; user-select:none; white-space:nowrap;
+  position:sticky; top:0; z-index:1;
 }
 .detail-table th:hover { background:var(--surface2, #f1f5f9); color:var(--blue); }
 .detail-table th::after { content:" ⇅"; opacity:.3; font-size:10px; }
@@ -1185,42 +1188,6 @@ body {
     </div>
   </div>
 
-  <!-- ═══ SECTION 2: CANCELLATION ANALYSIS ═══ -->
-  <div class="section-title" style="margin-top:24px;margin-bottom:8px;">Cancellation Analysis</div>
-
-  <!-- Cancel + Clinical KPIs -->
-  <div class="time-banner fade-in" style="margin-bottom:16px;">
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showCancels(null,'Cancellations')">
-      <div class="tb-label">Cancels</div>
-      <div class="tb-value red" id="kpi-cancels">0</div>
-      <div class="tb-sub" id="kpi-cancel-range"></div>
-    </div>
-    <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showSplitPopup('noShows','No Shows')">
-      <div class="tb-label">No Shows</div>
-      <div class="tb-value" style="color:#f59e0b" id="kpi-noshow">0</div>
-      <div class="tb-sub">Missed visits</div>
-    </div>
-    <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showSplitPopup('withdrawals','Withdrawals')">
-      <div class="tb-label">Withdrew</div>
-      <div class="tb-value" style="color:#8b5cf6" id="kpi-withdrew">0</div>
-      <div class="tb-sub">Patient withdrew</div>
-    </div>
-    <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showSplitPopup('screenFails','Screen Fails')">
-      <div class="tb-label">Screen Fail</div>
-      <div class="tb-value" style="color:#6366f1" id="kpi-screenfail">0</div>
-      <div class="tb-sub">DNQ + SF</div>
-    </div>
-    <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showRescheduled()">
-      <div class="tb-label">Rescheduled</div>
-      <div class="tb-value" style="color:#059669" id="kpi-rescheduled">0</div>
-      <div class="tb-sub">Rebooked</div>
-    </div>
-  </div>
-
   <!-- Action Required KPIs -->
   <div class="time-banner fade-in" style="margin-bottom:16px;" id="recruitment-kpi-banner">
     <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showRiskFlags('At-Risk Patients')">
@@ -1266,33 +1233,6 @@ body {
     </div>
   </div>
 
-  <!-- Reasons + Site side by side -->
-  <div class="grid-2 mb16 fade-in">
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title">Reasons by Category</span>
-        <span class="badge badge-gray">Last 2 months · excludes rescheduled</span>
-      </div>
-      <div id="reason-breakdown" style="padding:8px 16px;"></div>
-      <div class="chart-wrap" style="height:160px;margin-top:8px;">
-        <canvas id="reasonChart"></canvas>
-      </div>
-    </div>
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title">Site Breakdown · PHL vs PNJ</span>
-        <span class="badge badge-gray">All categories by site</span>
-      </div>
-      <div id="site-stacked-bars"></div>
-      <div class="chart-wrap h200" style="display:none">
-        <canvas id="siteChart"></canvas>
-      </div>
-    </div>
-  </div>
-
-  <!-- 8-Week Horizon -->
-  <div id="horizon-grid" class="time-banner fade-in" style="margin-bottom:16px;"></div>
-
   <!-- ═══ SECTION 3: STAFF PERFORMANCE ═══ -->
   <div class="section-title" style="margin-top:24px;margin-bottom:8px;">Staff Performance</div>
 
@@ -1303,7 +1243,7 @@ body {
   <div class="card fade-in" style="margin-bottom:16px;">
     <div style="padding:16px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <div><div style="font-size:14px;font-weight:700;color:var(--navy)">Coordinator Visit Tracker</div><div style="font-size:10px;color:#94a3b8;">Daily visit counts this week · monthly summary with cancel rate</div></div>
+        <div><div style="font-size:14px;font-weight:700;color:var(--navy)">Coordinator Visit Tracker</div><div style="font-size:10px;color:#94a3b8;">Daily visit counts for next 2 weeks · monthly summary with cancel rate</div></div>
         <div style="display:flex;align-items:center;gap:8px">
           <button onclick="exportCoordHistory()" title="Export coordinator history as JSON" style="background:none;border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:11px;color:var(--muted);cursor:pointer">&#x2B07; Export</button>
           <div style="font-size:11px;color:var(--muted)" id="coord-week-label">This Week</div>
@@ -1383,6 +1323,60 @@ body {
     <div class="tb-divider"></div>
     <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterStudiesFromKPI('all')"><div class="tb-label">Avg SF Rate</div><div class="tb-value" style="color:#dc2626" id="sk-sf-rate">—</div></div>
   </div>
+
+  <!-- ═══ Cancellation Analysis (moved from Overview) ═══ -->
+  <div class="section-title" style="margin-top:16px;margin-bottom:8px;">Cancellation Analysis</div>
+  <div class="time-banner fade-in" style="margin-bottom:16px;">
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showCancels(null,'Cancellations')">
+      <div class="tb-label">Cancels</div>
+      <div class="tb-value red" id="kpi-cancels">0</div>
+      <div class="tb-sub" id="kpi-cancel-range"></div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showSplitPopup('noShows','No Shows')">
+      <div class="tb-label">No Shows</div>
+      <div class="tb-value" style="color:#f59e0b" id="kpi-noshow">0</div>
+      <div class="tb-sub">Missed visits</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showSplitPopup('withdrawals','Withdrawals')">
+      <div class="tb-label">Withdrew</div>
+      <div class="tb-value" style="color:#8b5cf6" id="kpi-withdrew">0</div>
+      <div class="tb-sub">Patient withdrew</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showSplitPopup('screenFails','Screen Fails')">
+      <div class="tb-label">Screen Fail</div>
+      <div class="tb-value" style="color:#6366f1" id="kpi-screenfail">0</div>
+      <div class="tb-sub">DNQ + SF</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showRescheduled()">
+      <div class="tb-label">Rescheduled</div>
+      <div class="tb-value" style="color:#059669" id="kpi-rescheduled">0</div>
+      <div class="tb-sub">Rebooked</div>
+    </div>
+  </div>
+  <div class="grid-2 mb16 fade-in">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Reasons by Category</span>
+        <span class="badge badge-gray">Last 2 months · excludes rescheduled</span>
+      </div>
+      <div id="reason-breakdown" style="padding:8px 16px;"></div>
+      <div class="chart-wrap" style="height:160px;margin-top:8px;">
+        <canvas id="reasonChart"></canvas>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Site Breakdown · PHL vs PNJ</span>
+        <span class="badge badge-gray">All categories by site</span>
+      </div>
+      <div id="site-stacked-bars"></div>
+    </div>
+  </div>
+  <div id="horizon-grid" class="time-banner fade-in" style="margin-bottom:16px;"></div>
 
   <!-- Upcoming by Study (visual distribution) -->
   <div class="card mb16 fade-in">

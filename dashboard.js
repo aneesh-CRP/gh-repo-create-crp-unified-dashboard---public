@@ -3906,19 +3906,20 @@ function renderCoordinatorGoals() {
 
   const now = new Date();
   const todayISO = localISO(now);
-  // Get this week Mon-Fri
-  const dayOfWeek = now.getDay(); // 0=Sun, 1=Mon...
-  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-  const monday = new Date(now); monday.setDate(now.getDate() + mondayOffset);
-  const weekDays = [];
-  for (let i = 0; i < 5; i++) {
-    const d = new Date(monday); d.setDate(monday.getDate() + i);
-    weekDays.push(localISO(d));
+  // Get next 14 days (today + 13)
+  const twoWeekDays = [];
+  const twoWeekLabels = [];
+  const twoWeekDates = [];
+  for (let i = 0; i < 14; i++) {
+    const d = new Date(now); d.setDate(now.getDate() + i);
+    if (d.getDay() === 0 || d.getDay() === 6) continue; // skip weekends
+    twoWeekDays.push(localISO(d));
+    twoWeekLabels.push(['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()]);
+    twoWeekDates.push(d.toLocaleDateString('en-US',{month:'numeric',day:'numeric'}));
   }
-  const dayLabels = ['Mon','Tue','Wed','Thu','Fri'];
 
   const weekLabel = document.getElementById('coord-week-label');
-  if (weekLabel) weekLabel.textContent = 'Week of ' + monday.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  if (weekLabel) weekLabel.textContent = 'Next 2 weeks · ' + twoWeekDays.length + ' working days';
 
   const monthLabel = document.getElementById('coord-month-label');
   if (monthLabel) monthLabel.textContent = now.toLocaleDateString('en-US',{month:'long',year:'numeric'});
@@ -3935,45 +3936,45 @@ function renderCoordinatorGoals() {
     }
   }
 
-  // Build coordinator cards — snapshot of actual visit counts
-  // Find the max daily visits across all coordinators this week for relative bar scaling
+  // Build coordinator cards — 2-week daily view
   var weekMax = 1;
   COORDS.forEach(function(name) {
     var byDay = goals.byDay[name] || {};
-    weekDays.forEach(function(d) { var v = byDay[d] || 0; if (v > weekMax) weekMax = v; });
+    twoWeekDays.forEach(function(d) { var v = byDay[d] || 0; if (v > weekMax) weekMax = v; });
   });
 
   grid.innerHTML = COORDS.map(name => {
     const byDay = goals.byDay[name] || {};
-    const weekTotal = weekDays.reduce((s,d) => s + (byDay[d]||0), 0);
+    const periodTotal = twoWeekDays.reduce((s,d) => s + (byDay[d]||0), 0);
 
-    const detail = goals.byDayDetail ? (goals.byDayDetail[name] || {}) : {};
-    const dayBars = weekDays.map((d,i) => {
+    const dayBars = twoWeekDays.map((d,i) => {
       const visits = byDay[d] || 0;
       const isToday = d === todayISO;
       const isPast = d < todayISO;
-      const barColor = !isPast && !isToday ? '#E5E7EB' : visits > 0 ? '#1843AD' : '#E5E7EB';
+      const isFuture = d > todayISO;
+      const barColor = isFuture ? (visits > 0 ? '#93c5fd' : '#E5E7EB') : visits > 0 ? '#1843AD' : '#E5E7EB';
       const barH = Math.min(100, Math.round((visits / (weekMax * 1.2)) * 100));
-      const hasVisits = visits > 0 && (isPast || isToday);
+      const hasVisits = visits > 0;
       const cursor = hasVisits ? 'cursor:pointer;' : '';
       const clickAttr = hasVisits ? `onclick="toggleCoordDayDetail('${jsAttr(name)}','${d}',this)"` : '';
-      return `<div style="text-align:center;flex:1;${cursor}position:relative" ${clickAttr}>
-        <div style="height:40px;display:flex;align-items:flex-end;justify-content:center">
-          <div style="width:18px;height:${isPast || isToday ? Math.max(4,barH) : 4}%;background:${barColor};border-radius:3px 3px 0 0;transition:height 0.3s"></div>
+      return `<div style="text-align:center;flex:1;min-width:28px;${cursor}position:relative" ${clickAttr}>
+        <div style="height:36px;display:flex;align-items:flex-end;justify-content:center">
+          <div style="width:14px;height:${Math.max(3,barH)}%;background:${barColor};border-radius:2px 2px 0 0;transition:height 0.3s"></div>
         </div>
-        <div style="font-size:10px;font-weight:${isToday?'700':'500'};color:${isToday?'#1843AD':'#9CA3AF'};margin-top:2px">${dayLabels[i]}</div>
-        <div style="font-size:11px;font-weight:700;color:${isPast || isToday && visits > 0 ? '#1a202c' : '#D1D5DB'}">${visits}</div>
+        <div style="font-size:9px;font-weight:${isToday?'700':'400'};color:${isToday?'#1843AD':'#9CA3AF'};margin-top:1px">${twoWeekLabels[i]}</div>
+        <div style="font-size:8px;color:${isToday?'#1843AD':'#cbd5e1'};font-weight:${isToday?'600':'400'}">${twoWeekDates[i]}</div>
+        <div style="font-size:10px;font-weight:700;color:${visits > 0 ? '#1a202c' : '#D1D5DB'}">${visits}</div>
       </div>`;
     }).join('');
 
     const firstName = name.split(' ')[0];
-    return `<div style="background:#F9FAFB;border-radius:10px;padding:14px;border:1px solid #E5E7EB">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+    return `<div style="background:#F9FAFB;border-radius:10px;padding:12px;border:1px solid #E5E7EB">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
         <span style="font-weight:700;font-size:13px;color:#1a202c">${firstName}</span>
-        <span style="font-size:12px;font-weight:700;color:#1843AD">${weekTotal} this week</span>
+        <span style="font-size:11px;font-weight:700;color:#1843AD">${periodTotal} visits</span>
       </div>
-      <div style="display:flex;gap:4px;margin-bottom:8px">${dayBars}</div>
-      <div class="coord-day-detail" data-coord="${name}" style="display:none;margin-bottom:8px;background:#fff;border:1px solid #E5E7EB;border-radius:6px;padding:8px;font-size:11px"></div>
+      <div style="display:flex;gap:2px;margin-bottom:6px">${dayBars}</div>
+      <div class="coord-day-detail" data-coord="${name}" style="display:none;margin-bottom:6px;background:#fff;border:1px solid #E5E7EB;border-radius:6px;padding:8px;font-size:11px"></div>
     </div>`;
   }).join('');
 
@@ -4290,7 +4291,8 @@ function renderRecruiterPerformance() {
         name: rName, nick: nicknames[rName] || rName.split(' ')[0],
         calls: parseInt(r.phone_calls)||0, texts: parseInt(r.texts)||0,
         emails: parseInt(r.emails)||0, patients: parseInt(r.unique_patients)||0,
-        interested: parseInt(r.interested_responses)||0, total: parseInt(r.total_interactions)||0
+        interested: parseInt(r.interested_responses)||0, total: parseInt(r.total_interactions)||0,
+        scheduled: parseInt(r.scheduled_v1)||0, screenEnroll: parseInt(r.screening_enrolled)||0
       });
     });
   }
@@ -4310,13 +4312,17 @@ function renderRecruiterPerformance() {
 
   var kpiStyleR = 'padding:8px;border-radius:8px;text-align:center;cursor:pointer;transition:box-shadow .15s;';
   var html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:14px;">';
+  var totalScheduled = stats.reduce(function(s,r){ return s+r.scheduled; },0);
+  var totalScreenEnroll = stats.reduce(function(s,r){ return s+r.screenEnroll; },0);
   html += '<div style="'+kpiStyleR+'background:#eff6ff;"><div style="font-size:18px;font-weight:800;color:#3b82f6;">'+totalInteractions+'</div><div style="font-size:9px;color:#3b82f6;font-weight:600;">Interactions</div></div>';
   html += '<div style="'+kpiStyleR+'background:#f5f3ff;"><div style="font-size:18px;font-weight:800;color:#7c3aed;">'+totalPatients+'</div><div style="font-size:9px;color:#7c3aed;font-weight:600;">Patients</div></div>';
+  html += '<div style="'+kpiStyleR+'background:#e8eeff;"><div style="font-size:18px;font-weight:800;color:#1843ad;">'+totalScheduled+'</div><div style="font-size:9px;color:#1843ad;font-weight:600;">Scheduled V1</div></div>';
+  html += '<div style="'+kpiStyleR+'background:#f0fdf4;"><div style="font-size:18px;font-weight:800;color:#059669;">'+totalScreenEnroll+'</div><div style="font-size:9px;color:#059669;font-weight:600;">Screening/Enrolled</div></div>';
   html += '<div style="'+kpiStyleR+'background:'+(convPct>10?'#f0fdf4':'#fffbeb')+';"><div style="font-size:18px;font-weight:800;color:'+(convPct>10?'#059669':'#d97706')+';">'+convPct+'%</div><div style="font-size:9px;color:'+(convPct>10?'#059669':'#d97706')+';font-weight:600;">Interest Rate</div></div>';
   html += '</div>';
 
   html += '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:4px;">';
-  html += '<tr style="background:#f8fafc;"><th style="text-align:left;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Recruiter</th><th style="text-align:left;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Activity</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Calls</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Texts</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Patients</th></tr>';
+  html += '<tr style="background:#f8fafc;"><th style="text-align:left;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Recruiter</th><th style="text-align:left;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Activity</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Calls</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Texts</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Patients</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Scheduled</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Screen/Enroll</th></tr>';
   stats.forEach(function(s) {
     var barW = Math.round(s.total / maxTotal * 100);
     html += '<tr style="border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showCoordDetail(\'' + jsAttr(s.name) + '\')">';
@@ -4328,6 +4334,8 @@ function renderRecruiterPerformance() {
     html += '<td style="padding:8px;text-align:center;font-weight:600;color:#475569;">'+s.calls+'</td>';
     html += '<td style="padding:8px;text-align:center;font-weight:600;color:#475569;">'+s.texts+'</td>';
     html += '<td style="padding:8px;text-align:center;font-weight:600;color:#475569;">'+s.patients+'</td>';
+    html += '<td style="padding:8px;text-align:center;font-weight:700;color:'+(s.scheduled>0?'#1843ad':'#cbd5e1')+';">'+s.scheduled+'</td>';
+    html += '<td style="padding:8px;text-align:center;font-weight:700;color:'+(s.screenEnroll>0?'#059669':'#cbd5e1')+';">'+s.screenEnroll+'</td>';
     html += '</tr>';
   });
   html += '</table>';
@@ -5164,7 +5172,18 @@ function switchView(name, el) {
   }
   // Render deferred tab content if dirty
   if (name === 'studies') {
-    setTimeout(() => buildStudiesView(), 50);
+    setTimeout(() => {
+      buildStudiesView();
+      if (_tabDirty.studies) {
+        safe(buildHorizon, 'buildHorizon');
+        safe(buildReasonChart, 'buildReasonChart');
+        safe(buildSiteChart, 'buildSiteChart');
+        safe(buildCancelStudyBars, 'buildCancelStudyBars');
+        safe(buildReasonBreakdown, 'buildReasonBreakdown');
+        safe(buildSiteStackedBars, 'buildSiteStackedBars');
+        _tabDirty.studies = false;
+      }
+    }, 50);
   }
   if (name === 'admin') {
     if (_tabDirty.admin) {
@@ -8794,13 +8813,18 @@ function renderAll() {
   _tabDirty.referrals = true; _tabDirty.actions = true; _tabDirty.admin = true;
 
   // ── Overview tab (always render — it's the default view) ──
-  safe(buildHorizon,         'buildHorizon');
-  safe(buildReasonChart,     'buildReasonChart');
-  safe(buildSiteChart,       'buildSiteChart');
-  safe(buildCancelStudyBars, 'buildCancelStudyBars');
-  safe(buildReasonBreakdown, 'buildReasonBreakdown');
-  safe(buildSiteStackedBars, 'buildSiteStackedBars');
   if (typeof buildRiskFlagCards === 'function') safe(buildRiskFlagCards, 'buildRiskFlagCards');
+
+  // ── Studies tab: cancellation charts (render if active or on initial load) ──
+  if (activeTab === 'studies' || activeTab === 'overview') {
+    safe(buildHorizon,         'buildHorizon');
+    safe(buildReasonChart,     'buildReasonChart');
+    safe(buildSiteChart,       'buildSiteChart');
+    safe(buildCancelStudyBars, 'buildCancelStudyBars');
+    safe(buildReasonBreakdown, 'buildReasonBreakdown');
+    safe(buildSiteStackedBars, 'buildSiteStackedBars');
+    _tabDirty.studies = false;
+  }
   safe(renderCoordinatorGoals, 'renderCoordinatorGoals');
   safe(renderCoordWorkloadBalance, 'renderCoordWorkloadBalance');
   safe(renderInvCapacity, 'renderInvCapacity');
@@ -14278,7 +14302,7 @@ function renderStudiesTable() {
     const totalCell = isEnrolling ? buildTotalLeadsCell(s.study, safeStudy) : '<span style="color:#cbd5e1">—</span>';
 
     return `<tr style="border-bottom:1px solid var(--border);transition:background .1s" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
-      <td style="padding:10px 12px;min-width:160px">${studyCell}${diversityBadge}${indicationTag}${alertTags}</td>
+      <td style="padding:10px 12px;min-width:160px">${studyCell}${diversityBadge}${alertTags}</td>
       <td style="padding:10px 8px;text-align:center"><span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:${_sbBg};color:${_sbFg}">${_sb||'—'}</span></td>
       <td style="padding:10px 8px;text-align:center">${riskScoreCell}</td>
       <td style="padding:10px 6px;text-align:center">${_countCell(_bd.cancels, '#dc2626', 'cancel')}</td>

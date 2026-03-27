@@ -1099,9 +1099,12 @@ const FEEDS = {
         COUNTIF(pi.action_type IN (160, 161, 162)) AS no_answers,
         SUM(COALESCE(pi.action_duration, 0)) AS total_duration_seconds,
         COUNT(DISTINCT pi.patient_key) AS unique_patients,
-        COUNT(DISTINCT pi.study_key) AS studies
+        COUNT(DISTINCT pi.study_key) AS studies,
+        COUNT(DISTINCT CASE WHEN sub.status = 4 THEN pi.patient_key END) AS scheduled_v1,
+        COUNT(DISTINCT CASE WHEN sub.status IN (10, 11) THEN pi.patient_key END) AS screening_enrolled
       FROM ${tbl('patient_interaction')} pi
       JOIN ${tbl('user')} u ON pi.user_key = u.user_key
+      LEFT JOIN ${tbl('subject')} sub ON pi.patient_key = sub.patient_key AND pi.study_key = sub.study_key
       WHERE pi.action_date >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL ${days} DAY)
         AND pi.user_key IS NOT NULL
       GROUP BY recruiter
