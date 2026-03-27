@@ -4901,6 +4901,9 @@ function fetchActionRequiredData() {
         window._prescrByStudy[studyName].total++;
         window._prescrByStudy[studyName].rows.push(r);
       });
+      // Update KPI
+      var prescrKpi = document.getElementById('kpi-prescr-total');
+      if (prescrKpi) prescrKpi.textContent = window._prescrVisits.length;
       _log('Pre-screening visits: ' + window._prescrVisits.length + ' upcoming');
       safe(buildScheduleTable, 'buildScheduleTable-prescr');
       safe(hidePastVisits, 'hidePastVisits-prescr');
@@ -9093,11 +9096,18 @@ function showUpcoming(filterFn, title, sub) {
 function showPrescrModal(studyName) {
   var ps = window._prescrByStudy || {};
   var rows = [];
-  Object.keys(ps).forEach(function(k) {
-    if (k.toLowerCase().indexOf(studyName.toLowerCase()) !== -1 || studyName.toLowerCase().indexOf(k.split(' ')[0].toLowerCase()) !== -1) {
-      rows = rows.concat(ps[k].rows);
+  if (studyName === 'all') {
+    Object.keys(ps).forEach(function(k) { rows = rows.concat(ps[k].rows); });
+  } else {
+    // Try direct match first, then fuzzy
+    if (ps[studyName]) { rows = ps[studyName].rows; }
+    else {
+      Object.keys(ps).forEach(function(k) {
+        var kl = k.toLowerCase(), sl = studyName.toLowerCase();
+        if (kl.indexOf(sl) !== -1 || sl.indexOf(kl) !== -1) rows = rows.concat(ps[k].rows);
+      });
     }
-  });
+  }
   var h = '<table class="detail-table"><thead><tr><th>Patient</th><th>Type</th><th>Date</th><th>Time</th><th>Coordinator</th><th>Site</th></tr></thead><tbody>';
   rows.forEach(function(r) {
     var vn = (r.visit_name||'').toLowerCase();
@@ -14498,17 +14508,6 @@ function renderStudiesTable() {
       <td style="padding:10px 6px;text-align:center">${_countCell(_bd.noShows, '#f97316', 'noshow')}</td>
       <td style="padding:10px 6px;text-align:center">${_countCell(_bd.screenFails, '#ef4444', 'screenfail')}</td>
       <td style="padding:10px 8px;text-align:center">${upcomingCell}</td>
-      <td style="padding:10px 6px;text-align:center">${(() => {
-        var ps = window._prescrByStudy || {};
-        var count = 0;
-        Object.keys(ps).forEach(function(k) {
-          if (k.toLowerCase().indexOf(s.study.toLowerCase()) !== -1 || s.study.toLowerCase().indexOf(k.split(' ')[0].toLowerCase()) !== -1) {
-            count += ps[k].total;
-          }
-        });
-        if (count === 0) return '<span style="font-size:11px;color:#cbd5e1">0</span>';
-        return '<span style="font-size:12px;font-weight:700;color:#0369a1;cursor:pointer" onclick="showPrescrModal(\''+jsAttr(s.study)+'\')">'+count+'</span>';
-      })()}</td>
       <td style="padding:10px 6px;text-align:center">${_unschedCell}</td>
       <td style="padding:10px 8px;min-width:140px;cursor:pointer" data-action="studyUnified" data-study="${escapeHTML(s.study)}">${enrollCell}</td>
       <td style="padding:10px 8px;text-align:center;font-size:11px;color:${s.screening>0?'#7c3aed':'var(--muted)'};font-weight:${s.screening>0?'700':'400'};cursor:pointer" data-action="studyUnified" data-study="${escapeHTML(s.study)}">${s.screening||0}</td>

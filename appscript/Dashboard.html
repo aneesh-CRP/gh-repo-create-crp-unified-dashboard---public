@@ -1354,7 +1354,6 @@ body {
             <th style="padding:10px 6px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;font-size:11px">No-Show</th>
             <th style="padding:10px 6px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;font-size:11px">SF</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;" onclick="sortMergedTable(this,4)">Upcoming ↕</th>
-            <th style="padding:10px 6px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;font-size:11px">Calls/Fibro</th>
             <th style="padding:10px 6px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;font-size:11px">Not Sched</th>
             <th style="padding:10px 8px;text-align:left;font-weight:700;color:var(--text);white-space:nowrap;">Enrollment</th>
             <th style="padding:10px 8px;text-align:center;font-weight:700;color:var(--text);white-space:nowrap;cursor:pointer;" onclick="sortMergedTable(this,7)">In Screen ↕</th>
@@ -1416,6 +1415,12 @@ body {
       <div class="tb-label">Not Scheduled</div>
       <div class="tb-value" style="color:#c2410c" id="kpi-unsched-studies">—</div>
       <div class="tb-sub">Active, no appt</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showPrescrModal('all')">
+      <div class="tb-label">Calls / FibroScan</div>
+      <div class="tb-value" style="color:#0369a1" id="kpi-prescr-total">—</div>
+      <div class="tb-sub">Pre-screening appts</div>
     </div>
   </div>
   <div class="grid-2 mb16 fade-in">
