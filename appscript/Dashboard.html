@@ -49,14 +49,14 @@
   --red-bg: #fef2f2;
   --red-border: #fecaca;
 
-  --yellow: #d97706;
-  --yellow-bg: #fffbeb;
-  --yellow-border: #fde68a;
+  --yellow: #FF9933;
+  --yellow-bg: #fff8f0;
+  --yellow-border: #ffc57a;
   --yellow-light: #fff3e0;
 
-  --violet: #7c3aed;
-  --violet-bg: #f5f3ff;
-  --violet-border: #ddd6fe;
+  --violet: #072061;
+  --violet-bg: #edf0f8;
+  --violet-border: #c8d6e8;
 
   /* ═══ Orange (brand) vs Yellow (semantic) ═══ */
   --orange-light: #fff3e0;
@@ -1204,19 +1204,19 @@ body {
     <div class="tb-divider"></div>
     <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showActionModal('docs')">
       <div class="tb-label">Unsigned Docs</div>
-      <div class="tb-value" style="color:#d97706" id="ar-docs">—</div>
+      <div class="tb-value" style="color:#FF9933" id="ar-docs">—</div>
       <div class="tb-sub" id="ar-docs-sub"></div>
     </div>
     <div class="tb-divider"></div>
     <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showActionModal('todos')">
       <div class="tb-label">Overdue Todos</div>
-      <div class="tb-value" style="color:#f59e0b" id="ar-todos">—</div>
+      <div class="tb-value" style="color:#FF9933" id="ar-todos">—</div>
       <div class="tb-sub" id="ar-todos-sub"></div>
     </div>
     <div class="tb-divider"></div>
     <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showActionModal('ereg')">
       <div class="tb-label">eReg Pending</div>
-      <div class="tb-value" style="color:#7c3aed" id="ar-ereg">—</div>
+      <div class="tb-value" style="color:#072061" id="ar-ereg">—</div>
       <div class="tb-sub" id="ar-ereg-sub"></div>
     </div>
     <div class="tb-divider"></div>
@@ -1314,9 +1314,9 @@ body {
     <div class="tb-divider"></div>
     <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterStudiesFromKPI('maintenance')"><div class="tb-label">Maintenance</div><div class="tb-value" style="color:#059669" id="sk-maintenance">—</div></div>
     <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterStudiesFromKPI('startup')"><div class="tb-label">Startup</div><div class="tb-value" style="color:#d97706" id="sk-startup">—</div></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterStudiesFromKPI('startup')"><div class="tb-label">Startup</div><div class="tb-value" style="color:#FF9933" id="sk-startup">—</div></div>
     <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterStudiesFromKPI('enrolling')"><div class="tb-label">Total Enrolled</div><div class="tb-value" style="color:#7c3aed" id="sk-enrolled">—</div></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterStudiesFromKPI('enrolling')"><div class="tb-label">Total Enrolled</div><div class="tb-value" style="color:#072061" id="sk-enrolled">—</div></div>
     <div class="tb-divider"></div>
     <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterStudiesFromKPI('enrolling')"><div class="tb-label">Avg SF Rate</div><div class="tb-value" style="color:#dc2626" id="sk-sf-rate">—</div></div>
   </div>
@@ -1386,19 +1386,19 @@ body {
     <div class="tb-divider"></div>
     <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showSplitPopup('noShows','No Shows')">
       <div class="tb-label">No Shows</div>
-      <div class="tb-value" style="color:#f59e0b" id="kpi-noshow">0</div>
+      <div class="tb-value" style="color:#FF9933" id="kpi-noshow">0</div>
       <div class="tb-sub">Missed visits</div>
     </div>
     <div class="tb-divider"></div>
     <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showSplitPopup('withdrawals','Withdrawals')">
       <div class="tb-label">Withdrew</div>
-      <div class="tb-value" style="color:#8b5cf6" id="kpi-withdrew">0</div>
+      <div class="tb-value" style="color:#1843AD" id="kpi-withdrew">0</div>
       <div class="tb-sub">Patient withdrew</div>
     </div>
     <div class="tb-divider"></div>
     <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showSplitPopup('screenFails','Screen Fails')">
       <div class="tb-label">Screen Fail</div>
-      <div class="tb-value" style="color:#6366f1" id="kpi-screenfail">0</div>
+      <div class="tb-value" style="color:#1843AD" id="kpi-screenfail">0</div>
       <div class="tb-sub">DNQ + SF</div>
     </div>
     <div class="tb-divider"></div>
@@ -1499,7 +1499,7 @@ body {
       <div class="tb-divider"></div>
       <div class="tb-section">
         <div class="tb-label">Qualified %</div>
-        <div class="tb-value" style="color:#8b5cf6" id="ref-kpi-qualified">—</div>
+        <div class="tb-value" style="color:#1843AD" id="ref-kpi-qualified">—</div>
         <div class="tb-sub">Screening + Enrolled / Total</div>
       </div>
       <div class="tb-divider"></div>
@@ -1658,13 +1658,13 @@ body {
     <div class="tb-divider"></div>
     <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterFollowUp('withdrew')">
       <div class="tb-label">Withdrew</div>
-      <div class="tb-value" style="color:#8b5cf6" id="fu-kpi-withdrew">0</div>
+      <div class="tb-value" style="color:#1843AD" id="fu-kpi-withdrew">0</div>
       <div class="tb-sub">Patient withdrew</div>
     </div>
     <div class="tb-divider"></div>
     <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterFollowUp('screenfail')">
       <div class="tb-label">Screen Fail</div>
-      <div class="tb-value" style="color:#6366f1" id="fu-kpi-sf">0</div>
+      <div class="tb-value" style="color:#1843AD" id="fu-kpi-sf">0</div>
       <div class="tb-sub">DNQ + SF</div>
     </div>
     <div class="tb-divider"></div>
@@ -2512,7 +2512,7 @@ body {
     <div class="tb-divider"></div>
     <div class="tb-section kpi-clickable" style="cursor:pointer">
       <div class="tb-label">Completed Visits</div>
-      <div class="tb-value" style="color:#8b5cf6" id="rpu-kpi-visits">—</div>
+      <div class="tb-value" style="color:#1843AD" id="rpu-kpi-visits">—</div>
       <div class="tb-sub">With eSource data</div>
     </div>
     <div class="tb-divider"></div>

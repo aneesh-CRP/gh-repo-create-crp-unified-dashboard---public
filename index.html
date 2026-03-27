@@ -49,14 +49,14 @@
   --red-bg: #fef2f2;
   --red-border: #fecaca;
 
-  --yellow: #d97706;
-  --yellow-bg: #fffbeb;
-  --yellow-border: #fde68a;
+  --yellow: #FF9933;
+  --yellow-bg: #fff8f0;
+  --yellow-border: #ffc57a;
   --yellow-light: #fff3e0;
 
-  --violet: #7c3aed;
-  --violet-bg: #f5f3ff;
-  --violet-border: #ddd6fe;
+  --violet: #072061;
+  --violet-bg: #edf0f8;
+  --violet-border: #c8d6e8;
 
   /* ═══ Orange (brand) vs Yellow (semantic) ═══ */
   --orange-light: #fff3e0;
@@ -1204,19 +1204,19 @@ body {
     <div class="tb-divider"></div>
     <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showActionModal('docs')">
       <div class="tb-label">Unsigned Docs</div>
-      <div class="tb-value" style="color:#d97706" id="ar-docs">—</div>
+      <div class="tb-value" style="color:#FF9933" id="ar-docs">—</div>
       <div class="tb-sub" id="ar-docs-sub"></div>
     </div>
     <div class="tb-divider"></div>
     <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showActionModal('todos')">
       <div class="tb-label">Overdue Todos</div>
-      <div class="tb-value" style="color:#f59e0b" id="ar-todos">—</div>
+      <div class="tb-value" style="color:#FF9933" id="ar-todos">—</div>
       <div class="tb-sub" id="ar-todos-sub"></div>
     </div>
     <div class="tb-divider"></div>
     <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showActionModal('ereg')">
       <div class="tb-label">eReg Pending</div>
-      <div class="tb-value" style="color:#7c3aed" id="ar-ereg">—</div>
+      <div class="tb-value" style="color:#072061" id="ar-ereg">—</div>
       <div class="tb-sub" id="ar-ereg-sub"></div>
     </div>
     <div class="tb-divider"></div>
@@ -1314,9 +1314,9 @@ body {
     <div class="tb-divider"></div>
     <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterStudiesFromKPI('maintenance')"><div class="tb-label">Maintenance</div><div class="tb-value" style="color:#059669" id="sk-maintenance">—</div></div>
     <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterStudiesFromKPI('startup')"><div class="tb-label">Startup</div><div class="tb-value" style="color:#d97706" id="sk-startup">—</div></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterStudiesFromKPI('startup')"><div class="tb-label">Startup</div><div class="tb-value" style="color:#FF9933" id="sk-startup">—</div></div>
     <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterStudiesFromKPI('enrolling')"><div class="tb-label">Total Enrolled</div><div class="tb-value" style="color:#7c3aed" id="sk-enrolled">—</div></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterStudiesFromKPI('enrolling')"><div class="tb-label">Total Enrolled</div><div class="tb-value" style="color:#072061" id="sk-enrolled">—</div></div>
     <div class="tb-divider"></div>
     <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterStudiesFromKPI('enrolling')"><div class="tb-label">Avg SF Rate</div><div class="tb-value" style="color:#dc2626" id="sk-sf-rate">—</div></div>
   </div>
@@ -1386,19 +1386,19 @@ body {
     <div class="tb-divider"></div>
     <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showSplitPopup('noShows','No Shows')">
       <div class="tb-label">No Shows</div>
-      <div class="tb-value" style="color:#f59e0b" id="kpi-noshow">0</div>
+      <div class="tb-value" style="color:#FF9933" id="kpi-noshow">0</div>
       <div class="tb-sub">Missed visits</div>
     </div>
     <div class="tb-divider"></div>
     <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showSplitPopup('withdrawals','Withdrawals')">
       <div class="tb-label">Withdrew</div>
-      <div class="tb-value" style="color:#8b5cf6" id="kpi-withdrew">0</div>
+      <div class="tb-value" style="color:#1843AD" id="kpi-withdrew">0</div>
       <div class="tb-sub">Patient withdrew</div>
     </div>
     <div class="tb-divider"></div>
     <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showSplitPopup('screenFails','Screen Fails')">
       <div class="tb-label">Screen Fail</div>
-      <div class="tb-value" style="color:#6366f1" id="kpi-screenfail">0</div>
+      <div class="tb-value" style="color:#1843AD" id="kpi-screenfail">0</div>
       <div class="tb-sub">DNQ + SF</div>
     </div>
     <div class="tb-divider"></div>
@@ -1499,7 +1499,7 @@ body {
       <div class="tb-divider"></div>
       <div class="tb-section">
         <div class="tb-label">Qualified %</div>
-        <div class="tb-value" style="color:#8b5cf6" id="ref-kpi-qualified">—</div>
+        <div class="tb-value" style="color:#1843AD" id="ref-kpi-qualified">—</div>
         <div class="tb-sub">Screening + Enrolled / Total</div>
       </div>
       <div class="tb-divider"></div>
@@ -1658,13 +1658,13 @@ body {
     <div class="tb-divider"></div>
     <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterFollowUp('withdrew')">
       <div class="tb-label">Withdrew</div>
-      <div class="tb-value" style="color:#8b5cf6" id="fu-kpi-withdrew">0</div>
+      <div class="tb-value" style="color:#1843AD" id="fu-kpi-withdrew">0</div>
       <div class="tb-sub">Patient withdrew</div>
     </div>
     <div class="tb-divider"></div>
     <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterFollowUp('screenfail')">
       <div class="tb-label">Screen Fail</div>
-      <div class="tb-value" style="color:#6366f1" id="fu-kpi-sf">0</div>
+      <div class="tb-value" style="color:#1843AD" id="fu-kpi-sf">0</div>
       <div class="tb-sub">DNQ + SF</div>
     </div>
     <div class="tb-divider"></div>
@@ -3413,9 +3413,9 @@ function renderFinMarketingROI() {
   var avgCPC = totalClicks > 0 ? (totalSpend / totalClicks) : 0;
   var kpi = '';
   kpi += '<div style="text-align:center;min-width:90px;"><div style="font-size:20px;font-weight:800;color:#dc2626;">$' + totalSpend.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0}) + '</div><div style="font-size:10px;color:#94a3b8;">Total Spend</div></div>';
-  kpi += '<div style="text-align:center;min-width:90px;"><div style="font-size:20px;font-weight:800;color:#3b82f6;">' + totalLeads.toLocaleString() + '</div><div style="font-size:10px;color:#94a3b8;">Total Leads</div></div>';
+  kpi += '<div style="text-align:center;min-width:90px;"><div style="font-size:20px;font-weight:800;color:#1843AD;">' + totalLeads.toLocaleString() + '</div><div style="font-size:10px;color:#94a3b8;">Total Leads</div></div>';
   kpi += '<div style="text-align:center;min-width:90px;"><div style="font-size:20px;font-weight:800;color:' + (avgCPL <= 10 ? '#059669' : avgCPL <= 20 ? '#d97706' : '#dc2626') + ';">$' + avgCPL.toFixed(2) + '</div><div style="font-size:10px;color:#94a3b8;">Avg CPL</div></div>';
-  kpi += '<div style="text-align:center;min-width:90px;"><div style="font-size:20px;font-weight:800;color:#6366f1;">$' + avgCPC.toFixed(2) + '</div><div style="font-size:10px;color:#94a3b8;">Avg CPC</div></div>';
+  kpi += '<div style="text-align:center;min-width:90px;"><div style="font-size:20px;font-weight:800;color:#1843AD;">$' + avgCPC.toFixed(2) + '</div><div style="font-size:10px;color:#94a3b8;">Avg CPC</div></div>';
   kpiEl.innerHTML = kpi;
   var html = '<table class="tbl" style="width:100%;font-size:11px;">';
   html += '<thead><tr><th style="text-align:left;padding:8px 12px;">Campaign</th><th class="r">Spend</th><th class="r">Leads</th><th class="r">CPL</th><th class="r">CPC</th><th class="r">Clicks</th><th class="r">Impressions</th><th class="r">CTR</th></tr></thead><tbody>';
@@ -3426,7 +3426,7 @@ function renderFinMarketingROI() {
     html += '<tr>';
     html += '<td style="padding:7px 12px;font-weight:600;">' + escapeHTML(c.campaign) + '</td>';
     html += '<td class="r" style="font-weight:700;color:#dc2626;">$' + c.spend.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0}) + '</td>';
-    html += '<td class="r" style="font-weight:700;color:#3b82f6;">' + c.leads.toLocaleString() + '</td>';
+    html += '<td class="r" style="font-weight:700;color:#1843AD;">' + c.leads.toLocaleString() + '</td>';
     html += '<td class="r" style="font-weight:600;color:' + cplColor + ';">$' + cpl.toFixed(2) + '</td>';
     html += '<td class="r">$' + cpc.toFixed(2) + '</td>';
     html += '<td class="r">' + c.clicks.toLocaleString() + '</td>';
@@ -3763,7 +3763,7 @@ function renderRevenuePerUser() {
       h += '<td style="text-align:center;font-weight:700;">'+d.visits+'</td>';
       h += '<td style="text-align:center;font-weight:700;color:#059669;">$'+Math.round(d.revenue).toLocaleString()+'</td>';
       h += '<td style="text-align:center;">$'+avgV.toLocaleString()+'</td>';
-      h += '<td style="text-align:center;color:#8b5cf6;">'+d.questions.toLocaleString()+'</td>';
+      h += '<td style="text-align:center;color:#1843AD;">'+d.questions.toLocaleString()+'</td>';
       h += '<td style="padding:5px 8px;font-size:10px;">'+escapeHTML(topStudy ? topStudy[0] : '—')+'<div style="font-size:9px;color:#94a3b8;">$'+Math.round((topStudy?topStudy[1]:0)/1000)+'K</div></td>';
       h += '<td style="padding:4px 8px;"><div style="background:#e2e8f0;border-radius:4px;height:18px;position:relative;overflow:hidden;">';
       h += '<div style="width:'+barW+'%;background:linear-gradient(90deg,#3b82f6,#059669);height:100%;border-radius:4px;"></div>';
@@ -4839,7 +4839,7 @@ function buildRiskFlagCards() {
     html += `<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">`;
     if (critical.length) html += `<span style="font-size:10px;font-weight:800;padding:3px 10px;border-radius:4px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;">${critical.length} CRITICAL (5+×)</span>`;
     if (high.length) html += `<span style="font-size:10px;font-weight:800;padding:3px 10px;border-radius:4px;background:#fff7ed;color:#ea580c;border:1px solid #fed7aa;">${high.length} HIGH (3-4×)</span>`;
-    html += `<span style="font-size:10px;font-weight:600;padding:3px 10px;border-radius:4px;background:#fffbeb;color:#d97706;border:1px solid #fde68a;">${flags.length - critical.length - high.length} MEDIUM (2×)</span>`;
+    html += `<span style="font-size:10px;font-weight:600;padding:3px 10px;border-radius:4px;background:#fffbeb;color:#FF9933;border:1px solid #fde68a;">${flags.length - critical.length - high.length} MEDIUM (2×)</span>`;
     html += `</div>`;
   }
 
@@ -4854,7 +4854,7 @@ function buildRiskFlagCards() {
     if (f.cancelCount > 0) catBadges += `<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:#fff7ed;color:#c2410c;font-weight:600;">${f.cancelCount} cancel</span>`;
     if (f.rescheduleCount > 0) catBadges += `<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:#eff6ff;color:#1843ad;font-weight:600;">${f.rescheduleCount} resched</span>`;
     // Recency badge
-    const recency = f.daysSinceLast != null ? (f.daysSinceLast <= 7 ? `<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:#fef2f2;color:#dc2626;font-weight:700;">Last cancel ${f.daysSinceLast}d ago</span>` : f.daysSinceLast <= 21 ? `<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:#fffbeb;color:#d97706;">Last cancel ${f.daysSinceLast}d ago</span>` : '') : '';
+    const recency = f.daysSinceLast != null ? (f.daysSinceLast <= 7 ? `<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:#fef2f2;color:#dc2626;font-weight:700;">Last cancel ${f.daysSinceLast}d ago</span>` : f.daysSinceLast <= 21 ? `<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:#fffbeb;color:#FF9933;">Last cancel ${f.daysSinceLast}d ago</span>` : '') : '';
     // Cross-study warning
     const crossStudy = f.crossStudyCount > 1 ? `<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:#fdf4ff;color:#7e22ce;font-weight:700;" title="Cancelling across ${f.crossStudyCount} studies">Cross-study (${f.crossStudyCount})</span>` : '';
     // Velocity
@@ -4882,7 +4882,7 @@ function buildRiskFlagCards() {
         <span>Next: <strong style="color:#1e293b">${escapeHTML(f.next_visit)}</strong></span>
         <span>Last cancel: <strong style="color:#1e293b">${escapeHTML(f.last_cancel)}</strong></span>
       </div>
-      ${urgentFlag ? '<div style="margin-top:6px;font-size:11px;font-weight:700;color:#dc2626;">CALL NOW — visit within 14 days</div>' : '<div style="margin-top:6px;font-size:11px;color:#d97706;">Schedule proactive outreach call</div>'}
+      ${urgentFlag ? '<div style="margin-top:6px;font-size:11px;font-weight:700;color:#dc2626;">CALL NOW — visit within 14 days</div>' : '<div style="margin-top:6px;font-size:11px;color:#FF9933;">Schedule proactive outreach call</div>'}
     </div>`;
   }).join('');
 
@@ -4990,7 +4990,7 @@ function buildScheduleTable() {
     } else if (nsCount === 1) {
       riskBadge = '<span title="1 prior no-show — confirm attendance" style="font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px;margin-left:4px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;cursor:help">NO-SHOW</span>';
     } else if (cxCount >= 2) {
-      riskBadge = '<span title="' + cxCount + ' prior cancellations" style="font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px;margin-left:4px;background:#fff7ed;color:#d97706;border:1px solid #fed7aa;cursor:help">' + cxCount + 'x cancelled</span>';
+      riskBadge = '<span title="' + cxCount + ' prior cancellations" style="font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px;margin-left:4px;background:#fff7ed;color:#FF9933;border:1px solid #fed7aa;cursor:help">' + cxCount + 'x cancelled</span>';
     }
     // Study cell (escaped)
     var studyText = esc(v.study||'—');
@@ -5006,7 +5006,7 @@ function buildScheduleTable() {
       : '<span data-phi-original="' + esc(patRaw) + '">' + patText + '</span>';
     // Investigator
     var invText = esc(v.investigator || '—');
-    var invStyle = v.investigator ? 'font-size:11px;color:#7c3aed' : 'font-size:11px;color:#cbd5e1';
+    var invStyle = v.investigator ? 'font-size:11px;color:#072061' : 'font-size:11px;color:#cbd5e1';
     html += '<tr data-date="' + (v.date_iso||'') + '" data-site="' + esc(v.site||'') + '" data-coord="' + esc(v.coord||'') + '">'
       + '<td class="confirm-cell" style="width:90px;text-align:center;padding:4px;"></td>'
       + '<td style="font-weight:600;color:var(--blue);white-space:nowrap">' + esc(v.date||'—') + '</td>'
@@ -5192,7 +5192,7 @@ function showVisitReadiness(idx) {
   if (mr.notes) rows += '<tr><td colspan="2" style="border-top:2px solid #e2e8f0;padding-top:8px"><strong>Notes:</strong> ' + escapeHTML(mr.notes) + '</td></tr>';
   if (mr.ops_notes) rows += '<tr><td colspan="2"><strong>Ops Notes:</strong> ' + escapeHTML(mr.ops_notes) + '</td></tr>';
   var crioBtn = mr.crio_link ? ' <a href="' + escapeHTML(mr.crio_link) + '" target="_blank" style="font-size:11px;color:#072061;text-decoration:none;font-weight:600">[CRIO]</a>' : '';
-  var cuBtn = mr.url ? ' <a href="' + escapeHTML(mr.url) + '" target="_blank" style="font-size:11px;color:#7c3aed;text-decoration:none;font-weight:600">[ClickUp]</a>' : '';
+  var cuBtn = mr.url ? ' <a href="' + escapeHTML(mr.url) + '" target="_blank" style="font-size:11px;color:#072061;text-decoration:none;font-weight:600">[ClickUp]</a>' : '';
   var body = '<div style="margin-bottom:8px">' + crioBtn + cuBtn + '</div>'
     + '<table class="detail-table" style="width:100%"><tbody>' + rows + '</tbody></table>';
   openModal(maskPHI(mr.name), 'Visit Readiness — ' + escapeHTML(mr.study), body);
@@ -5691,11 +5691,11 @@ function buildSiteStackedBars() {
     if (s.withdrew) html += '<div style="width:' + (s.withdrew/allEvents*100).toFixed(1) + '%;background:#8b5cf6;" title="' + s.withdrew + ' withdrew"></div>';
     html += '</div>';
     html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:10px;text-align:left;">';
-    html += '<div><span style="color:#3b82f6;font-weight:700;">' + s.upcoming + '</span> upcoming</div>';
+    html += '<div><span style="color:#1843AD;font-weight:700;">' + s.upcoming + '</span> upcoming</div>';
     html += '<div><span style="color:#dc2626;font-weight:700;">' + s.cancels + '</span> cancels</div>';
-    html += '<div><span style="color:#f59e0b;font-weight:700;">' + s.noShows + '</span> no shows</div>';
-    html += '<div><span style="color:#6366f1;font-weight:700;">' + s.screenFails + '</span> screen fail</div>';
-    html += '<div><span style="color:#8b5cf6;font-weight:700;">' + s.withdrew + '</span> withdrew</div>';
+    html += '<div><span style="color:#FF9933;font-weight:700;">' + s.noShows + '</span> no shows</div>';
+    html += '<div><span style="color:#1843AD;font-weight:700;">' + s.screenFails + '</span> screen fail</div>';
+    html += '<div><span style="color:#1843AD;font-weight:700;">' + s.withdrew + '</span> withdrew</div>';
     var cancelRate = (s.upcoming + s.cancels) > 0 ? Math.round(s.cancels / (s.upcoming + s.cancels) * 100) : 0;
     html += '<div><span style="color:#475569;font-weight:700;">' + cancelRate + '%</span> cancel rate</div>';
     html += '</div></div>';
@@ -6029,7 +6029,7 @@ function renderCoordinatorGoals() {
     return `<tr style="border-bottom:1px solid var(--border);cursor:pointer;" onclick="showCoordDetail('${jsAttr(name)}')">
       <td style="padding:8px 12px;font-weight:600">${escapeHTML(name)}</td>
       <td style="padding:8px 8px;text-align:center;font-weight:700">${monthVisits}</td>
-      <td style="padding:8px 8px;text-align:center;color:#d97706;font-weight:600">${cancels}</td>
+      <td style="padding:8px 8px;text-align:center;color:#FF9933;font-weight:600">${cancels}</td>
       <td style="padding:8px 8px;text-align:center;font-weight:700;color:${crColor}">${cancelRate}%</td>
       <td style="padding:8px 8px;text-align:center;color:#6B7280">${avg}/day</td>
       <td style="padding:8px 12px"><div style="background:#E5E7EB;border-radius:6px;height:8px;overflow:hidden"><div style="background:#1843AD;height:100%;width:${barPct}%;border-radius:6px"></div></div></td>
@@ -6191,8 +6191,8 @@ function renderInvCapacity() {
 
   var kpiStyleI = 'padding:8px;border-radius:8px;text-align:center;cursor:pointer;transition:box-shadow .15s;';
   var html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:14px;">';
-  html += '<div style="'+kpiStyleI+'background:#f5f3ff;" onclick="showInvKpiPopup(\'visits\')"><div style="font-size:18px;font-weight:800;color:#7c3aed;">'+totalVisits+'</div><div style="font-size:9px;color:#7c3aed;font-weight:600;">Total Visits</div></div>';
-  html += '<div style="'+kpiStyleI+'background:#eff6ff;"><div style="font-size:18px;font-weight:800;color:#3b82f6;">'+invStats.length+'</div><div style="font-size:9px;color:#3b82f6;font-weight:600;">Investigators</div></div>';
+  html += '<div style="'+kpiStyleI+'background:#f5f3ff;" onclick="showInvKpiPopup(\'visits\')"><div style="font-size:18px;font-weight:800;color:#072061;">'+totalVisits+'</div><div style="font-size:9px;color:#072061;font-weight:600;">Total Visits</div></div>';
+  html += '<div style="'+kpiStyleI+'background:#eff6ff;"><div style="font-size:18px;font-weight:800;color:#1843AD;">'+invStats.length+'</div><div style="font-size:9px;color:#1843AD;font-weight:600;">Investigators</div></div>';
   html += '<div style="'+kpiStyleI+'background:'+(avgUtil>=70?'#f0fdf4':'#fffbeb')+';"><div style="font-size:18px;font-weight:800;color:'+avgUtilColor+';">'+avgUtil+'%</div><div style="font-size:9px;color:'+avgUtilColor+';font-weight:600;">Avg Utilization</div></div>';
   html += '</div>';
 
@@ -6264,8 +6264,8 @@ function renderRecruiterPerformance() {
   var html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:14px;">';
   var totalScheduled = stats.reduce(function(s,r){ return s+r.scheduled; },0);
   var totalScreenEnroll = stats.reduce(function(s,r){ return s+r.screenEnroll; },0);
-  html += '<div style="'+kpiStyleR+'background:#eff6ff;"><div style="font-size:18px;font-weight:800;color:#3b82f6;">'+totalInteractions+'</div><div style="font-size:9px;color:#3b82f6;font-weight:600;">Interactions</div></div>';
-  html += '<div style="'+kpiStyleR+'background:#f5f3ff;"><div style="font-size:18px;font-weight:800;color:#7c3aed;">'+totalPatients+'</div><div style="font-size:9px;color:#7c3aed;font-weight:600;">Patients</div></div>';
+  html += '<div style="'+kpiStyleR+'background:#eff6ff;"><div style="font-size:18px;font-weight:800;color:#1843AD;">'+totalInteractions+'</div><div style="font-size:9px;color:#1843AD;font-weight:600;">Interactions</div></div>';
+  html += '<div style="'+kpiStyleR+'background:#f5f3ff;"><div style="font-size:18px;font-weight:800;color:#072061;">'+totalPatients+'</div><div style="font-size:9px;color:#072061;font-weight:600;">Patients</div></div>';
   html += '<div style="'+kpiStyleR+'background:#e8eeff;"><div style="font-size:18px;font-weight:800;color:#1843ad;">'+totalScheduled+'</div><div style="font-size:9px;color:#1843ad;font-weight:600;">Scheduled V1</div></div>';
   html += '<div style="'+kpiStyleR+'background:#f0fdf4;"><div style="font-size:18px;font-weight:800;color:#059669;">'+totalScreenEnroll+'</div><div style="font-size:9px;color:#059669;font-weight:600;">Screening/Enrolled</div></div>';
   html += '<div style="'+kpiStyleR+'background:'+(convPct>10?'#f0fdf4':'#fffbeb')+';"><div style="font-size:18px;font-weight:800;color:'+(convPct>10?'#059669':'#d97706')+';">'+convPct+'%</div><div style="font-size:9px;color:'+(convPct>10?'#059669':'#d97706')+';font-weight:600;">Interest Rate</div></div>';
@@ -6306,7 +6306,7 @@ function showCoordKpiPopup(type) {
     }).sort(function(a,b){return b.visits-a.visits;});
     var body = '<table class="detail-table"><thead><tr><th>Coordinator</th><th style="text-align:right">Visits</th><th style="text-align:right">Cancels</th><th style="text-align:right">Total</th></tr></thead><tbody>';
     rows.forEach(function(r){
-      body += '<tr onclick="showCoordDetail(\''+jsAttr(r.name)+'\')" style="cursor:pointer"><td style="font-weight:600">'+escapeHTML(r.name)+'</td><td style="text-align:right;color:#3b82f6;font-weight:700">'+r.visits+'</td><td style="text-align:right;color:#d97706;font-weight:600">'+r.cancels+'</td><td style="text-align:right;font-weight:700">'+(r.visits+r.cancels)+'</td></tr>';
+      body += '<tr onclick="showCoordDetail(\''+jsAttr(r.name)+'\')" style="cursor:pointer"><td style="font-weight:600">'+escapeHTML(r.name)+'</td><td style="text-align:right;color:#1843AD;font-weight:700">'+r.visits+'</td><td style="text-align:right;color:#FF9933;font-weight:600">'+r.cancels+'</td><td style="text-align:right;font-weight:700">'+(r.visits+r.cancels)+'</td></tr>';
     });
     body += '</tbody></table>';
     var total = rows.reduce(function(s,r){return s+r.visits;},0);
@@ -6320,7 +6320,7 @@ function showCoordKpiPopup(type) {
     }).filter(function(r){return r.rate>20;}).sort(function(a,b){return b.rate-a.rate;});
     var body2 = rows2.length === 0 ? '<p style="text-align:center;color:#059669;padding:20px">No coordinators above 20% cancel rate</p>' : '<table class="detail-table"><thead><tr><th>Coordinator</th><th style="text-align:right">Cancel Rate</th><th style="text-align:right">Cancels</th><th style="text-align:right">Visits</th></tr></thead><tbody>';
     rows2.forEach(function(r){
-      body2 += '<tr onclick="showCoordDetail(\''+jsAttr(r.name)+'\')" style="cursor:pointer"><td style="font-weight:600">'+escapeHTML(r.name)+'</td><td style="text-align:right;color:#dc2626;font-weight:700">'+r.rate+'%</td><td style="text-align:right;color:#d97706;font-weight:600">'+r.cancels+'</td><td style="text-align:right">'+r.visits+'</td></tr>';
+      body2 += '<tr onclick="showCoordDetail(\''+jsAttr(r.name)+'\')" style="cursor:pointer"><td style="font-weight:600">'+escapeHTML(r.name)+'</td><td style="text-align:right;color:#dc2626;font-weight:700">'+r.rate+'%</td><td style="text-align:right;color:#FF9933;font-weight:600">'+r.cancels+'</td><td style="text-align:right">'+r.visits+'</td></tr>';
     });
     if (rows2.length) body2 += '</tbody></table>';
     openModal('High Cancel Rate', 'Coordinators with >20% cancellation rate', body2);
@@ -6357,7 +6357,7 @@ function showInvKpiPopup(type) {
     }).sort(function(a,b){return b.visits-a.visits;});
     var body = '<table class="detail-table"><thead><tr><th>Investigator</th><th style="text-align:right">Visits</th><th style="text-align:right">Studies</th></tr></thead><tbody>';
     rows.forEach(function(r){
-      body += '<tr onclick="showInvDetail(\''+jsAttr(r.name)+'\')" style="cursor:pointer"><td style="font-weight:600">'+escapeHTML(r.name)+'</td><td style="text-align:right;color:#7c3aed;font-weight:700">'+r.visits+'</td><td style="text-align:right;font-weight:600;color:#475569">'+r.studies+'</td></tr>';
+      body += '<tr onclick="showInvDetail(\''+jsAttr(r.name)+'\')" style="cursor:pointer"><td style="font-weight:600">'+escapeHTML(r.name)+'</td><td style="text-align:right;color:#072061;font-weight:700">'+r.visits+'</td><td style="text-align:right;font-weight:600;color:#475569">'+r.studies+'</td></tr>';
     });
     body += '</tbody></table>';
     var total = rows.reduce(function(s,r){return s+r.visits;},0);
@@ -6378,7 +6378,7 @@ function showRecruiterKpiPopup(type) {
   }).sort(function(a,b){return b.total-a.total;});
   var body = '<table class="detail-table"><thead><tr><th>Recruiter</th><th style="text-align:right">Calls</th><th style="text-align:right">Texts</th><th style="text-align:right">Emails</th><th style="text-align:right">Patients</th><th style="text-align:right">Interested</th><th style="text-align:right">Total</th></tr></thead><tbody>';
   rows.forEach(function(r){
-    body += '<tr><td style="font-weight:600">'+escapeHTML(r.nick)+'</td><td style="text-align:right">'+r.calls+'</td><td style="text-align:right">'+r.texts+'</td><td style="text-align:right">'+r.emails+'</td><td style="text-align:right;color:#7c3aed;font-weight:600">'+r.patients+'</td><td style="text-align:right;color:#059669;font-weight:600">'+r.interested+'</td><td style="text-align:right;font-weight:700">'+r.total+'</td></tr>';
+    body += '<tr><td style="font-weight:600">'+escapeHTML(r.nick)+'</td><td style="text-align:right">'+r.calls+'</td><td style="text-align:right">'+r.texts+'</td><td style="text-align:right">'+r.emails+'</td><td style="text-align:right;color:#072061;font-weight:600">'+r.patients+'</td><td style="text-align:right;color:#059669;font-weight:600">'+r.interested+'</td><td style="text-align:right;font-weight:700">'+r.total+'</td></tr>';
   });
   body += '</tbody></table>';
   var total = rows.reduce(function(s,r){return s+r.total;},0);
@@ -6417,9 +6417,9 @@ function renderPIApprovalTracker() {
 
   var html = '<div style="padding:12px 16px;">';
   html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:14px;">';
-  html += '<div style="padding:8px;background:#f5f3ff;border-radius:8px;text-align:center;"><div style="font-size:18px;font-weight:800;color:#8b5cf6;">'+confirmed.length+'</div><div style="font-size:9px;color:#8b5cf6;font-weight:600;">Confirmed</div></div>';
-  html += '<div style="padding:8px;background:#fffbeb;border-radius:8px;text-align:center;"><div style="font-size:18px;font-weight:800;color:#d97706;">'+pending.length+'</div><div style="font-size:9px;color:#d97706;font-weight:600;">Pending</div></div>';
-  html += '<div style="padding:8px;background:#eff6ff;border-radius:8px;text-align:center;"><div style="font-size:18px;font-weight:800;color:#3b82f6;">'+Object.keys(byStudy).length+'</div><div style="font-size:9px;color:#3b82f6;font-weight:600;">Studies w/ Pending</div></div>';
+  html += '<div style="padding:8px;background:#f5f3ff;border-radius:8px;text-align:center;"><div style="font-size:18px;font-weight:800;color:#1843AD;">'+confirmed.length+'</div><div style="font-size:9px;color:#1843AD;font-weight:600;">Confirmed</div></div>';
+  html += '<div style="padding:8px;background:#fffbeb;border-radius:8px;text-align:center;"><div style="font-size:18px;font-weight:800;color:#FF9933;">'+pending.length+'</div><div style="font-size:9px;color:#FF9933;font-weight:600;">Pending</div></div>';
+  html += '<div style="padding:8px;background:#eff6ff;border-radius:8px;text-align:center;"><div style="font-size:18px;font-weight:800;color:#1843AD;">'+Object.keys(byStudy).length+'</div><div style="font-size:9px;color:#1843AD;font-weight:600;">Studies w/ Pending</div></div>';
   var totalActive = MED_RECORDS_DATA.filter(function(r){return r.is_active;}).length;
   var approvalRate = totalActive > 0 ? Math.round(confirmed.length / totalActive * 100) : 0;
   var arColor = approvalRate >= 70 ? '#059669' : approvalRate >= 40 ? '#d97706' : '#dc2626';
@@ -6496,7 +6496,7 @@ function renderVendorAnalytics() {
     html += '<td style="text-align:center;">'+v.campaigns+'</td>';
     html += '<td style="text-align:center;font-weight:700;">'+v.contacts.toLocaleString()+'</td>';
     html += '<td style="text-align:center;color:#059669;font-weight:700;">'+v.referrals+'</td>';
-    html += '<td style="text-align:center;color:#8b5cf6;font-weight:700;">'+v.scheduled+'</td>';
+    html += '<td style="text-align:center;color:#1843AD;font-weight:700;">'+v.scheduled+'</td>';
     html += '<td style="text-align:center;color:'+crColor+';font-weight:700;">'+v.contactToRef+'%</td>';
     html += '<td style="text-align:center;color:'+rsColor+';font-weight:700;">'+v.refToSched+'%</td>';
     html += '<td style="text-align:center;"><div style="background:#e2e8f0;border-radius:4px;height:8px;overflow:hidden;width:60px;display:inline-block;"><div style="height:100%;width:'+barPct+'%;background:#3b82f6;border-radius:4px;"></div></div></td>';
@@ -6625,15 +6625,15 @@ function renderRefConversion() {
     var lrColor = s.lostRate > 50 ? '#dc2626' : s.lostRate > 30 ? '#d97706' : '#059669';
     html += '<tr><td style="padding:6px 8px;font-weight:600;">'+escapeHTML(s.name)+'</td>';
     html += '<td style="text-align:center;font-weight:700;">'+s.total+'</td>';
-    html += '<td style="text-align:center;color:#3b82f6;">'+s.newLead+'</td>';
-    html += '<td style="text-align:center;color:#8b5cf6;">'+s.contacted+'</td>';
-    html += '<td style="text-align:center;color:#d97706;">'+s.screening+'</td>';
+    html += '<td style="text-align:center;color:#1843AD;">'+s.newLead+'</td>';
+    html += '<td style="text-align:center;color:#1843AD;">'+s.contacted+'</td>';
+    html += '<td style="text-align:center;color:#FF9933;">'+s.screening+'</td>';
     html += '<td style="text-align:center;color:#059669;font-weight:700;">'+s.enrolled+'</td>';
     html += '<td style="text-align:center;color:'+crColor+';font-weight:700;">'+s.convRate+'%</td>';
     html += '<td style="text-align:center;color:'+lrColor+';">'+s.lostRate+'%</td>';
     if (MED_RECORDS_DATA && MED_RECORDS_DATA.length > 0) {
       var mr = mrBySource[s.name] || 0;
-      html += '<td style="text-align:center;color:#3b82f6;">'+mr+'</td>';
+      html += '<td style="text-align:center;color:#1843AD;">'+mr+'</td>';
     }
     html += '</tr>';
   });
@@ -6988,7 +6988,7 @@ function showActionModal(type) {
         var pct = parseFloat(r.completion_pct) || 0;
         var filesUrl = r.study_key ? _crioBase + '/study/' + r.study_key + '/files' : '';
         return '<tr><td style="font-size:11px">' + _crioLink((r.study_name||'').split(' - ').pop(), filesUrl) + '</td><td class="r">' + (r.total_documents||0) + '</td>' +
-          '<td class="r">' + (r.signed||0) + '</td><td class="r" style="color:#d97706;font-weight:700">' + (r.active||0) + '</td>' +
+          '<td class="r">' + (r.signed||0) + '</td><td class="r" style="color:#FF9933;font-weight:700">' + (r.active||0) + '</td>' +
           '<td class="r" style="color:#dc2626;font-weight:700">' + (r.assigned||0) + '</td>' +
           '<td class="r"><span style="color:' + (pct>=95?'#059669':pct>=80?'#d97706':'#dc2626') + ';font-weight:700">' + pct + '%</span></td>' +
           '<td>' + _crioLink('Files', filesUrl) + '</td></tr>';
@@ -7014,7 +7014,7 @@ function showActionModal(type) {
       rows.map(function(r) {
         return '<tr><td style="font-size:11px">' + escapeHTML(r.study_name||'') + '</td>' +
           '<td class="r" style="color:#dc2626;font-weight:700">' + (r.trainings_missing||0) + '</td>' +
-          '<td class="r" style="color:#d97706;font-weight:700">' + (r.duties_pending||0) + '</td>' +
+          '<td class="r" style="color:#FF9933;font-weight:700">' + (r.duties_pending||0) + '</td>' +
           '<td class="r">' + (r.trainings_expired||0) + '</td>' +
           '<td class="r">' + (r.total_trainings||0) + '</td>' +
           '<td class="r">' + (r.duties_active||0) + '</td></tr>';
@@ -8812,7 +8812,7 @@ function renderContactAlerts() {
     const visibleYellow = yellowAlerts.slice(0, showCount);
     const hiddenYellow = yellowAlerts.slice(showCount);
     html += `<div>
-      <div style="font-size:12px;font-weight:700;color:#d97706;margin-bottom:8px;">Contact Data Gaps (${yellowAlerts.length})</div>
+      <div style="font-size:12px;font-weight:700;color:#FF9933;margin-bottom:8px;">Contact Data Gaps (${yellowAlerts.length})</div>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:10px;" id="cq-yellow-grid">
         ${visibleYellow.map(alertCard).join('')}
       </div>
@@ -10867,8 +10867,8 @@ function buildMedRecAlerts() {
       </div>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center;">
         <div style="cursor:pointer;" onclick="showMedRecFilteredModal('rel_signed')"><span style="font-size:14px;font-weight:800;color:#059669;">${releaseRecvd}</span><div style="font-size:8px;color:#94a3b8;">Signed</div></div>
-        <div style="cursor:pointer;" onclick="showMedRecFilteredModal('rel_pending')"><span style="font-size:14px;font-weight:800;color:#f59e0b;">${releasePending}</span><div style="font-size:8px;color:#94a3b8;">Pending</div></div>
-        <div style="cursor:pointer;" onclick="showMedRecFilteredModal('rel_contact')"><span style="font-size:14px;font-weight:800;color:#8b5cf6;">${releaseContact}</span><div style="font-size:8px;color:#94a3b8;">Contacting</div></div>
+        <div style="cursor:pointer;" onclick="showMedRecFilteredModal('rel_pending')"><span style="font-size:14px;font-weight:800;color:#FF9933;">${releasePending}</span><div style="font-size:8px;color:#94a3b8;">Pending</div></div>
+        <div style="cursor:pointer;" onclick="showMedRecFilteredModal('rel_contact')"><span style="font-size:14px;font-weight:800;color:#1843AD;">${releaseContact}</span><div style="font-size:8px;color:#94a3b8;">Contacting</div></div>
         <div style="cursor:pointer;" onclick="showMedRecFilteredModal('rel_na')"><span style="font-size:14px;font-weight:800;color:#94a3b8;">${releaseNA}</span><div style="font-size:8px;color:#94a3b8;">N/A</div></div>
       </div>
     </div>
@@ -10884,7 +10884,7 @@ function buildMedRecAlerts() {
       </div>
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center;">
         <div style="cursor:pointer;" onclick="showMedRecFilteredModal('rec_received')"><span style="font-size:14px;font-weight:800;color:#059669;">${recsComplete}</span><div style="font-size:8px;color:#94a3b8;">Received</div></div>
-        <div style="cursor:pointer;" onclick="showMedRecFilteredModal('rec_pending')"><span style="font-size:14px;font-weight:800;color:#f59e0b;">${recsPending}</span><div style="font-size:8px;color:#94a3b8;">Pending</div></div>
+        <div style="cursor:pointer;" onclick="showMedRecFilteredModal('rec_pending')"><span style="font-size:14px;font-weight:800;color:#FF9933;">${recsPending}</span><div style="font-size:8px;color:#94a3b8;">Pending</div></div>
         <div style="cursor:pointer;" onclick="showMedRecFilteredModal('rec_unavail')"><span style="font-size:14px;font-weight:800;color:#dc2626;">${recsUnavail}</span><div style="font-size:8px;color:#94a3b8;">Unavailable</div></div>
         <div style="cursor:pointer;" onclick="showMedRecFilteredModal('rec_notset')"><span style="font-size:14px;font-weight:800;color:#94a3b8;">${recsBlank}</span><div style="font-size:8px;color:#94a3b8;">Not Set</div></div>
       </div>
@@ -10897,12 +10897,12 @@ function buildMedRecAlerts() {
         <div style="font-size:8px;color:#059669;font-weight:600;">Active</div>
       </div>
       <div style="padding:5px;background:#eff6ff;border-radius:6px;cursor:pointer;" onclick="showMedRecFilteredModal('in_crio')">
-        <div style="font-size:14px;font-weight:800;color:#3b82f6;">${inCrio}</div>
-        <div style="font-size:8px;color:#3b82f6;font-weight:600;">In CRIO</div>
+        <div style="font-size:14px;font-weight:800;color:#1843AD;">${inCrio}</div>
+        <div style="font-size:8px;color:#1843AD;font-weight:600;">In CRIO</div>
       </div>
       <div style="padding:5px;background:#f5f3ff;border-radius:6px;cursor:pointer;" onclick="showMedRecFilteredModal('pi_approved')">
-        <div style="font-size:14px;font-weight:800;color:#8b5cf6;">${piConfirmed}</div>
-        <div style="font-size:8px;color:#8b5cf6;font-weight:600;">PI Approved</div>
+        <div style="font-size:14px;font-weight:800;color:#1843AD;">${piConfirmed}</div>
+        <div style="font-size:8px;color:#1843AD;font-weight:600;">PI Approved</div>
       </div>
       <div style="padding:5px;background:#fef2f2;border-radius:6px;cursor:pointer;" onclick="showMedRecFilteredModal('closed')">
         <div style="font-size:14px;font-weight:800;color:#dc2626;">${total - active.length}</div>
@@ -10948,16 +10948,16 @@ function buildMedRecAlerts() {
           <div style="font-size:8px;color:#dc2626;font-weight:600;">Appt Passed, No Records</div>
         </div>
         <div style="padding:6px;background:#fffbeb;border-radius:6px;text-align:center;cursor:pointer;" onclick="showMedRecSlaModal('atrisk')">
-          <div style="font-size:16px;font-weight:800;color:#f59e0b;">${_apptSoon.length}</div>
-          <div style="font-size:8px;color:#f59e0b;font-weight:600;">Appt in 14d, No Records</div>
+          <div style="font-size:16px;font-weight:800;color:#FF9933;">${_apptSoon.length}</div>
+          <div style="font-size:8px;color:#FF9933;font-weight:600;">Appt in 14d, No Records</div>
         </div>
         <div style="padding:6px;background:#eff6ff;border-radius:6px;text-align:center;">
-          <div style="font-size:16px;font-weight:800;color:#3b82f6;">${needsRecords}</div>
-          <div style="font-size:8px;color:#3b82f6;font-weight:600;">Awaiting Records</div>
+          <div style="font-size:16px;font-weight:800;color:#1843AD;">${needsRecords}</div>
+          <div style="font-size:8px;color:#1843AD;font-weight:600;">Awaiting Records</div>
         </div>
         <div style="padding:6px;background:#f5f3ff;border-radius:6px;text-align:center;">
-          <div style="font-size:16px;font-weight:800;color:#8b5cf6;">${avgActiveDays}d</div>
-          <div style="font-size:8px;color:#8b5cf6;font-weight:600;">Avg Time in Pipeline</div>
+          <div style="font-size:16px;font-weight:800;color:#1843AD;">${avgActiveDays}d</div>
+          <div style="font-size:8px;color:#1843AD;font-weight:600;">Avg Time in Pipeline</div>
         </div>
       </div>`;
     // Deadline category breakdown
@@ -11008,11 +11008,11 @@ function buildMedRecAlerts() {
         <td style="padding:3px 6px;text-align:center;font-weight:700;">${d.total}</td>
         <td style="padding:3px 6px;text-align:center;">
           <span style="color:${relColor};font-weight:700;">${d.relSigned}</span><span style="color:#94a3b8;font-size:9px;">/${d.total}</span>
-          ${d.relPending > 0 ? '<div style="font-size:8px;color:#f59e0b;">'+d.relPending+' pending</div>' : ''}
+          ${d.relPending > 0 ? '<div style="font-size:8px;color:#FF9933;">'+d.relPending+' pending</div>' : ''}
         </td>
         <td style="padding:3px 6px;text-align:center;">
           <span style="color:${recColor};font-weight:700;">${d.recsRecvd}</span><span style="color:#94a3b8;font-size:9px;">/${d.total}</span>
-          ${d.recsPending > 0 ? '<div style="font-size:8px;color:#f59e0b;">'+d.recsPending+' pending</div>' : ''}
+          ${d.recsPending > 0 ? '<div style="font-size:8px;color:#FF9933;">'+d.recsPending+' pending</div>' : ''}
         </td>
         <td style="padding:3px 6px;">
           <div style="display:flex;flex-direction:column;gap:2px;">
@@ -11598,7 +11598,7 @@ function showRescheduled() {
 
   // ── Pending Reschedules (no new date yet) ──
   if (pending.length) {
-    body += '<div style="font-size:12px;font-weight:700;color:#d97706;margin:' + (confirmed.length ? '20px' : '0') + ' 0 8px;border-bottom:1px solid #e2e8f0;padding-bottom:4px;">Pending — No New Appointment (' + pending.length + ')</div>' +
+    body += '<div style="font-size:12px;font-weight:700;color:#FF9933;margin:' + (confirmed.length ? '20px' : '0') + ' 0 8px;border-bottom:1px solid #e2e8f0;padding-bottom:4px;">Pending — No New Appointment (' + pending.length + ')</div>' +
       '<div style="margin-bottom:6px;font-size:11px;color:#64748b">Cancel reason mentions reschedule but no new appointment found. These patients may have dropped out.</div>' +
       '<table class="detail-table"><thead><tr>' +
       '<th>Patient</th><th>Study</th><th>Cancelled</th><th>Reason</th><th>Coordinator</th><th>Site</th>' +
@@ -11912,10 +11912,10 @@ function showStudyUnifiedModal(studyName) {
   if (medRec && medRec.total > 0) {
     body += '<h4 style="' + sectionStyle + '">Medical Records (' + medRec.total + ')</h4>';
     body += '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px;">';
-    body += '<div style="font-size:11px;"><span style="color:#8b5cf6;font-weight:700;">' + medRec.active + '</span> active</div>';
+    body += '<div style="font-size:11px;"><span style="color:#1843AD;font-weight:700;">' + medRec.active + '</span> active</div>';
     body += '<div style="font-size:11px;"><span style="color:#059669;font-weight:700;">' + medRec.enrolled + '</span> enrolled</div>';
-    body += '<div style="font-size:11px;"><span style="color:#d97706;font-weight:700;">' + medRec.screening + '</span> screening</div>';
-    body += '<div style="font-size:11px;"><span style="color:#f59e0b;font-weight:700;">' + medRec.readySched + '</span> ready to schedule</div>';
+    body += '<div style="font-size:11px;"><span style="color:#FF9933;font-weight:700;">' + medRec.screening + '</span> screening</div>';
+    body += '<div style="font-size:11px;"><span style="color:#FF9933;font-weight:700;">' + medRec.readySched + '</span> ready to schedule</div>';
     if (medRec.dnq > 0) body += '<div style="font-size:11px;"><span style="color:#dc2626;font-weight:700;">' + medRec.dnq + '</span> DNQ</div>';
     body += '</div>';
     if (medRec.patients && medRec.patients.length > 0) {
@@ -11925,8 +11925,8 @@ function showStudyUnifiedModal(studyName) {
         activePatients.slice(0,8).forEach(function(p) {
           var statusColors = {'Enrolled':'#059669','In Screening':'#8b5cf6','Visit Scheduled':'#06b6d4','Ready to Schedule':'#f59e0b','Pending Release':'#94a3b8','Under Review':'#64748b'};
           var sc = statusColors[p.status] || '#94a3b8';
-          var recBadge = p.records_received === 'Received' ? '<span style="color:#059669;font-weight:700;"></span>' : p.records_received === 'Pending' ? '<span style="color:#f59e0b;">⏳</span>' : '<span style="color:#94a3b8;">—</span>';
-          var appBadge = (p.investigator_approval||'').indexOf('Confirmed') !== -1 ? '<span style="color:#059669;"></span>' : (p.investigator_approval ? '<span style="color:#f59e0b;">' + escapeHTML(p.investigator_approval) + '</span>' : '—');
+          var recBadge = p.records_received === 'Received' ? '<span style="color:#059669;font-weight:700;"></span>' : p.records_received === 'Pending' ? '<span style="color:#FF9933;">⏳</span>' : '<span style="color:#94a3b8;">—</span>';
+          var appBadge = (p.investigator_approval||'').indexOf('Confirmed') !== -1 ? '<span style="color:#059669;"></span>' : (p.investigator_approval ? '<span style="color:#FF9933;">' + escapeHTML(p.investigator_approval) + '</span>' : '—');
           var staleColor = p.days_since_update > 14 ? '#dc2626' : p.days_since_update > 7 ? '#f59e0b' : '#64748b';
           body += '<tr><td><a href="' + escapeHTML(p.crio_link || p.url) + '" target="_blank" style="color:#1e293b;text-decoration:none;font-weight:600;">' + maskPHI(p.name) + '</a></td>';
           body += '<td><span style="font-size:10px;padding:2px 6px;border-radius:4px;background:' + sc + '22;color:' + sc + ';font-weight:600;">' + escapeHTML(p.status) + '</span></td>';
@@ -11957,7 +11957,7 @@ function showStudyUnifiedModal(studyName) {
   var fbData = getStudyFBLeads(studyName);
   if (fbData.count > 0) {
     body += '<h4 style="' + sectionStyle + '">Facebook/Meta Leads (' + fbData.count + ')</h4>';
-    if (fbData.recent > 0) body += '<div style="font-size:11px;margin-bottom:6px;color:#3b82f6;font-weight:600;">' + fbData.recent + ' new leads in last 30 days</div>';
+    if (fbData.recent > 0) body += '<div style="font-size:11px;margin-bottom:6px;color:#1843AD;font-weight:600;">' + fbData.recent + ' new leads in last 30 days</div>';
     if (fbData.leads && fbData.leads.length > 0) {
       body += '<table class="detail-table" style="margin-bottom:12px;"><thead><tr><th>Name</th><th>Phone</th><th>Created</th></tr></thead><tbody>';
       fbData.leads.slice(0,6).forEach(function(l) {
@@ -12013,9 +12013,9 @@ function showStudyUnifiedModal(studyName) {
     body += '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px;">';
     body += '<div style="font-size:11px;"><strong>Total:</strong> ' + studyDocs.total_documents + '</div>';
     body += '<div style="font-size:11px;"><strong style="color:#059669">Signed:</strong> ' + (studyDocs.signed||0) + '</div>';
-    body += '<div style="font-size:11px;"><strong style="color:#d97706">Active:</strong> ' + (studyDocs.active||0) + '</div>';
+    body += '<div style="font-size:11px;"><strong style="color:#FF9933">Active:</strong> ' + (studyDocs.active||0) + '</div>';
     body += '<div style="font-size:11px;"><strong style="color:#dc2626">Assigned:</strong> ' + (studyDocs.assigned||0) + '</div>';
-    body += '<div style="font-size:11px;"><strong style="color:#7c3aed">Incoming:</strong> ' + (studyDocs.incoming||0) + '</div>';
+    body += '<div style="font-size:11px;"><strong style="color:#072061">Incoming:</strong> ' + (studyDocs.incoming||0) + '</div>';
     body += '<div style="font-size:11px;"><strong>Subjects:</strong> ' + (studyDocs.subjects_with_docs||0) + '</div>';
     body += '</div>';
     body += '<div style="background:#f1f5f9;border-radius:6px;height:8px;margin-bottom:12px;overflow:hidden"><div style="background:' + pctColor + ';height:100%;width:' + Math.min(pct, 100) + '%;border-radius:6px;transition:width .3s"></div></div>';
@@ -12030,7 +12030,7 @@ function showStudyUnifiedModal(studyName) {
     if (studyReg) {
       body += '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px;">';
       if (parseInt(studyReg.trainings_missing) > 0) body += '<div style="font-size:11px;color:#dc2626;font-weight:700;">' + studyReg.trainings_missing + ' missing trainings</div>';
-      if (parseInt(studyReg.duties_pending) > 0) body += '<div style="font-size:11px;color:#d97706;font-weight:700;">' + studyReg.duties_pending + ' pending duties</div>';
+      if (parseInt(studyReg.duties_pending) > 0) body += '<div style="font-size:11px;color:#FF9933;font-weight:700;">' + studyReg.duties_pending + ' pending duties</div>';
       if (parseInt(studyReg.trainings_expired) > 0) body += '<div style="font-size:11px;">' + studyReg.trainings_expired + ' expired</div>';
       body += '<div style="font-size:11px;">' + (studyReg.duties_active||0) + ' active duties</div>';
       body += '</div>';
@@ -12679,7 +12679,7 @@ function renderReferralDashboard() {
       <th style="text-align:center;cursor:pointer;" ${_sortClick('screening')}>Screening${_sortIcon('screening')}</th>
       <th style="text-align:center;color:#059669;cursor:pointer;" ${_sortClick('enrolled')}>Enrolled${_sortIcon('enrolled')}</th>
       <th style="text-align:center;color:#dc2626;cursor:pointer;" ${_sortClick('dnqTotal')}>DNQ${_sortIcon('dnqTotal')}</th>
-      <th style="text-align:center;color:#d97706;">Stale</th>
+      <th style="text-align:center;color:#FF9933;">Stale</th>
       <th style="text-align:center;cursor:pointer;" ${_sortClick('enrollRate')}>Conv%${_sortIcon('enrollRate')}</th>
     </tr></thead>
     <tbody>${sortedRows.map(r => {
@@ -12722,7 +12722,7 @@ function renderReferralDashboard() {
       <td style="text-align:center;">${unifiedRows.reduce((s,r)=>s+r.screening,0)}</td>
       <td style="text-align:center;color:#059669;">${unifiedRows.reduce((s,r)=>s+r.enrolled,0)}</td>
       <td style="text-align:center;color:#dc2626;">${unifiedRows.reduce((s,r)=>s+(r.sf||0)+(r.notEligible||0)+(r.notInterested||0),0)}</td>
-      <td style="text-align:center;color:#d97706;">${unifiedRows.reduce((s,r)=>s+r.stale,0)||'—'}</td>
+      <td style="text-align:center;color:#FF9933;">${unifiedRows.reduce((s,r)=>s+r.stale,0)||'—'}</td>
       <td style="text-align:center;">${unifiedRows.reduce((s,r)=>s+r.total,0) > 0 ? Math.round(unifiedRows.reduce((s,r)=>s+r.enrolled,0)/unifiedRows.reduce((s,r)=>s+r.total,0)*100)+'%' : '—'}</td>
     </tr>
     </tbody>
@@ -13035,7 +13035,7 @@ function renderReferralDashboard() {
       vh += '<tr style="border-bottom:1px solid #f1f5f9;">';
       vh += '<td style="padding:7px 12px;font-weight:600;">'+escapeHTML(r.source)+'</td>';
       vh += '<td style="text-align:center;font-weight:700;">'+r.total+'</td>';
-      vh += '<td style="text-align:center;color:#8b5cf6;">'+r.screening+'</td>';
+      vh += '<td style="text-align:center;color:#1843AD;">'+r.screening+'</td>';
       vh += '<td style="text-align:center;color:#059669;font-weight:700;">'+r.enrolled+'</td>';
       vh += '<td style="text-align:center;font-weight:700;color:'+speedColor+';">'+r.median+'d</td>';
       vh += '<td style="text-align:center;">'+r.avg+'d</td>';
@@ -13082,7 +13082,7 @@ function renderReferralDashboard() {
       var conv = d.total > 0 ? Math.round(d.enrolled / d.total * 100) : 0;
       var convColor = conv >= 5 ? '#059669' : conv > 0 ? '#d97706' : '#cbd5e1';
       var topSrcs = Object.entries(d.sources).sort(function(a,b){return b[1].total-a[1].total;}).slice(0,4).map(function(s) {
-        var srcConv = s[1].enrolled > 0 ? ' <span style="color:#059669;font-weight:700;">'+s[1].enrolled+'enr</span>' : s[1].screening > 0 ? ' <span style="color:#8b5cf6;">'+s[1].screening+'scr</span>' : '';
+        var srcConv = s[1].enrolled > 0 ? ' <span style="color:#059669;font-weight:700;">'+s[1].enrolled+'enr</span>' : s[1].screening > 0 ? ' <span style="color:#1843AD;">'+s[1].screening+'scr</span>' : '';
         return '<span style="font-size:10px;">'+escapeHTML(s[0])+' ('+s[1].total+')'+srcConv+'</span>';
       }).join(' · ');
       sh += '<tr style="border-bottom:1px solid #f1f5f9;">';
@@ -13220,7 +13220,7 @@ function showStudyPipelineModal(studyName) {
     const upcoming = (DATA.allVisitDetail || []).filter(v => v.patient.toLowerCase().trim() === nameKey);
     const nextApptDisplay = upcoming.length > 0
       ? `<span style="color:#059669;font-weight:600;">${escapeHTML(upcoming[0].date)}</span> <span style="font-size:9px;color:#94a3b8;">${escapeHTML(upcoming[0].visit)}</span>`
-      : r.next_appt ? `<span style="color:#3b82f6;">${escapeHTML(r.next_appt)}</span>` : '<span style="color:#cbd5e1;">—</span>';
+      : r.next_appt ? `<span style="color:#1843AD;">${escapeHTML(r.next_appt)}</span>` : '<span style="color:#cbd5e1;">—</span>';
 
     const staleColor = r.days_since_update >= 14 ? '#dc2626' : r.days_since_update >= 7 ? '#d97706' : '#059669';
     table += `<tr>
@@ -13270,9 +13270,9 @@ function showCampaignDetailModal(studyName) {
   // Campaign Summary KPIs
   if (campaign) {
     html += `<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;padding:12px;background:#f8fafc;border-radius:8px;">
-      <div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#3b82f6;">${campaign.first_contact.toLocaleString()}</div><div style="font-size:10px;color:#94a3b8;">1st Contact</div></div>
-      <div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#f59e0b;">${campaign.second_contact.toLocaleString()}</div><div style="font-size:10px;color:#94a3b8;">2nd Contact</div></div>
-      <div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#8b5cf6;">${campaign.third_contact.toLocaleString()}</div><div style="font-size:10px;color:#94a3b8;">3rd Contact</div></div>
+      <div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#1843AD;">${campaign.first_contact.toLocaleString()}</div><div style="font-size:10px;color:#94a3b8;">1st Contact</div></div>
+      <div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#FF9933;">${campaign.second_contact.toLocaleString()}</div><div style="font-size:10px;color:#94a3b8;">2nd Contact</div></div>
+      <div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#1843AD;">${campaign.third_contact.toLocaleString()}</div><div style="font-size:10px;color:#94a3b8;">3rd Contact</div></div>
       <div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#059669;">${campaign.new_referrals}</div><div style="font-size:10px;color:#94a3b8;">New Referrals</div></div>
       <div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#1843ad;">${referrals.length}</div><div style="font-size:10px;color:#94a3b8;">In Pipeline</div></div>
       <div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#06b6d4;">${upcoming.length}</div><div style="font-size:10px;color:#94a3b8;">Upcoming Visits</div></div>
@@ -13291,14 +13291,14 @@ function showCampaignDetailModal(studyName) {
       const pVisits = (DATA.allVisitDetail || []).filter(v => v.patient.toLowerCase().trim() === nameKey);
       const apptBooked = pVisits.length > 0
         ? `<span style="color:#059669;font-weight:700;">${escapeHTML(pVisits[0].date)}</span><div style="font-size:9px;color:#94a3b8;">${escapeHTML(pVisits[0].visit)}</div>`
-        : r.next_appt ? `<span style="color:#3b82f6;">${escapeHTML(r.next_appt)}</span>` : '<span style="color:#ef4444;font-size:10px;">No appt</span>';
+        : r.next_appt ? `<span style="color:#1843AD;">${escapeHTML(r.next_appt)}</span>` : '<span style="color:#ef4444;font-size:10px;">No appt</span>';
       const pStatus = dbMatch
         ? `<span style="padding:2px 6px;border-radius:3px;font-size:10px;font-weight:600;background:${dbMatch.status==='Available'?'#dcfce7':dbMatch.status==='Do Not Solicit'||dbMatch.status==='Deceased'?'#fef2f2':'#fffbeb'};color:${dbMatch.status==='Available'?'#059669':dbMatch.status==='Do Not Solicit'||dbMatch.status==='Deceased'?'#dc2626':'#d97706'}">${escapeHTML(dbMatch.status)}</span>`
         : '<span style="color:#94a3b8;font-size:10px;">Not in DB</span>';
       const staleColor = r.days_since_update >= 14 ? '#dc2626' : r.days_since_update >= 7 ? '#d97706' : '#059669';
       const _cm = matchCrioPatient(r.name, r.phone);
       const _nUrl = _cm && _cm.crio_url ? _cm.crio_url : r.url;
-      const _nSt = _cm && _cm.crio_url ? 'font-weight:600;color:#8b5cf6;text-decoration:none;' : 'font-weight:600;color:#1e293b;text-decoration:none;';
+      const _nSt = _cm && _cm.crio_url ? 'font-weight:600;color:#1843AD;text-decoration:none;' : 'font-weight:600;color:#1e293b;text-decoration:none;';
       html += `<tr>
         <td style="padding:6px 8px;"><a href="${escapeHTML(_nUrl)}" target="_blank" style="${_nSt}">${maskPHI(r.name)}</a>${_cm && _cm.crio_url ? ' <a href="'+escapeHTML(r.url)+'" target="_blank" style="font-size:9px;color:#94a3b8;" title="ClickUp">CU</a>' : ''}</td>
         <td style="padding:6px 8px;text-align:center;"><span style="padding:2px 6px;border-radius:3px;font-size:10px;font-weight:600;background:${(STAGE_COLORS[r.stage]||'#94a3b8')}22;color:${STAGE_COLORS[r.stage]||'#94a3b8'}">${escapeHTML(r.stage)}</span></td>
@@ -13400,7 +13400,7 @@ function renderCrioReconciliation() {
     html += '<td style="padding:5px 8px;font-size:10px;">' + escapeHTML(r.study || '—') + '</td>';
     html += '<td style="padding:5px 8px;text-align:center;"><span style="padding:2px 6px;border-radius:3px;font-size:10px;font-weight:600;background:#dc262618;color:#dc2626;">' + escapeHTML(r.stage) + '</span></td>';
     html += '<td style="padding:5px 8px;font-size:10px;">' + escapeHTML(r.phone || '—') + '</td>';
-    html += '<td style="padding:5px 8px;text-align:center;font-weight:600;color:#d97706;">' + (r.days_since_update || '—') + 'd</td>';
+    html += '<td style="padding:5px 8px;text-align:center;font-weight:600;color:#FF9933;">' + (r.days_since_update || '—') + 'd</td>';
     html += '</tr>';
   });
   html += '</tbody></table>';
@@ -13533,7 +13533,7 @@ function showReferralDetailModal(filterFn, title, subtitle) {
     // Link to CRIO if matched, otherwise ClickUp
     const _crioMatch = matchCrioPatient(r.name, r.phone);
     const _nameUrl = _crioMatch && _crioMatch.crio_url ? _crioMatch.crio_url : r.url;
-    const _nameStyle = _crioMatch && _crioMatch.crio_url ? 'font-weight:600;color:#8b5cf6;text-decoration:none;' : 'font-weight:600;color:#1e293b;text-decoration:none;';
+    const _nameStyle = _crioMatch && _crioMatch.crio_url ? 'font-weight:600;color:#1843AD;text-decoration:none;' : 'font-weight:600;color:#1e293b;text-decoration:none;';
     // Source comparison: ClickUp tracker (authoritative) vs CRIO referral_source
     const _crioSrcObj = window._crioRefSourceMap ? window._crioRefSourceMap.get(nameKey) : null;
     const _crioSrc = _crioSrcObj ? _crioSrcObj.source : null;
@@ -13548,9 +13548,9 @@ function showReferralDetailModal(filterFn, title, subtitle) {
         _srcCell = '<span style="color:#dc2626;font-weight:600;" title="CRIO source does not match provider tracker">' + escapeHTML(_crioSrc) + '</span><div style="font-size:9px;color:#94a3b8;">CU: ' + escapeHTML(_cuSrc) + '</div>';
       }
     } else if (_crioSrc) {
-      _srcCell = '<span style="color:#8b5cf6;">' + escapeHTML(_crioSrc) + (_isInferred ? ' <em style="font-size:8px;">~</em>' : '') + '</span>';
+      _srcCell = '<span style="color:#1843AD;">' + escapeHTML(_crioSrc) + (_isInferred ? ' <em style="font-size:8px;">~</em>' : '') + '</span>';
     } else if (_cuSrc) {
-      _srcCell = '<span style="color:#d97706;" title="No CRIO source — needs update">' + escapeHTML(_cuSrc) + ' <em style="font-size:9px;">not in CRIO</em></span>';
+      _srcCell = '<span style="color:#FF9933;" title="No CRIO source — needs update">' + escapeHTML(_cuSrc) + ' <em style="font-size:9px;">not in CRIO</em></span>';
     } else {
       _srcCell = '<span style="color:#cbd5e1;">—</span>';
     }
@@ -14039,9 +14039,9 @@ function renderCrioStudies() {
     + '<div style="font-size:10px;color:#64748b">V1 No-Shows</div>'
     + '<div style="font-size:9px;color:#dc2626">Win-back</div></div>';
   html += '<div style="background:#d9770612;padding:6px 12px;border-radius:8px;flex:1;min-width:90px;text-align:center">'
-    + '<div style="font-size:20px;font-weight:700;color:#d97706">' + totalQualNS + '</div>'
+    + '<div style="font-size:20px;font-weight:700;color:#FF9933">' + totalQualNS + '</div>'
     + '<div style="font-size:10px;color:#64748b">In Screening</div>'
-    + '<div style="font-size:9px;color:#d97706">Schedule V1</div></div>';
+    + '<div style="font-size:9px;color:#FF9933">Schedule V1</div></div>';
   html += '<div style="background:#05966912;padding:6px 12px;border-radius:8px;flex:1;min-width:90px;text-align:center">'
     + '<div style="font-size:20px;font-weight:700;color:#059669">' + corrections.length + '</div>'
     + '<div style="font-size:10px;color:#64748b">Data Fixes</div>'
@@ -14069,7 +14069,7 @@ function renderCrioStudies() {
       + '<div style="font-size:10px;color:#64748b;margin-bottom:8px">Patients scheduled for Visit 1 / Screening who cancelled or no-showed. Mark each as Completed (follow-up done) or N/A (not applicable). Status is saved locally.</div>';
     winbacks.forEach(function(w) {
       var url = 'https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/' + w.key + '/subjects';
-      var tag = w.is_prescreen ? ' <span style="font-size:8px;background:#dbeafe;color:#3b82f6;padding:1px 4px;border-radius:3px;vertical-align:middle">Pre-Screen</span>' : '';
+      var tag = w.is_prescreen ? ' <span style="font-size:8px;background:#dbeafe;color:#1843AD;padding:1px 4px;border-radius:3px;vertical-align:middle">Pre-Screen</span>' : '';
       var sn = w.study.toLowerCase().trim();
       var patients = winbackCancelsByStudy[sn] || [];
       // Sort by cancel date descending (most recent first)
@@ -14150,14 +14150,14 @@ function renderCrioStudies() {
   // ── Section 2: Qualified — Not Yet Scheduled ──
   if (qualNotSched.length > 0) {
     html += '<div style="margin-bottom:14px">'
-      + '<div style="font-size:12px;font-weight:700;color:#d97706;margin-bottom:6px">Qualified — Not Yet Scheduled for V1</div>'
+      + '<div style="font-size:12px;font-weight:700;color:#FF9933;margin-bottom:6px">Qualified — Not Yet Scheduled for V1</div>'
       + '<div style="font-size:10px;color:#64748b;margin-bottom:8px">Patients currently in Screening who could be moved to Scheduled V1. Review and schedule where ready.</div>';
     qualNotSched.forEach(function(q) {
       var url = 'https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/' + q.key + '/subjects';
       html += '<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;margin-bottom:3px;border-left:3px solid #d97706;background:#d9770608;border-radius:0 6px 6px 0;font-size:11px">'
-        + '<span style="font-size:16px;font-weight:800;color:#d97706;min-width:28px;text-align:right">' + q.screening + '</span>'
+        + '<span style="font-size:16px;font-weight:800;color:#FF9933;min-width:28px;text-align:right">' + q.screening + '</span>'
         + '<div style="flex:1">'
-        + '<a href="' + esc(url) + '" target="_blank" style="color:#d97706;font-weight:600;text-decoration:none">' + esc(q.study) + '</a>'
+        + '<a href="' + esc(url) + '" target="_blank" style="color:#FF9933;font-weight:600;text-decoration:none">' + esc(q.study) + '</a>'
         + (q.scheduled_v1 > 0 ? ' <span style="font-size:9px;color:#059669">(' + q.scheduled_v1 + ' already scheduled)</span>' : '')
         + (q.coord ? ' <span style="color:#94a3b8">· ' + esc(q.coord) + '</span>' : '')
         + '</div>'
@@ -14200,14 +14200,14 @@ function renderCrioStudies() {
 
   if (enrolledNoVisit.length > 0) {
     html += '<div style="margin-bottom:14px">'
-      + '<div style="font-size:12px;font-weight:700;color:#7c3aed;margin-bottom:6px">Enrolled — No Upcoming Visit Scheduled</div>'
+      + '<div style="font-size:12px;font-weight:700;color:#072061;margin-bottom:6px">Enrolled — No Upcoming Visit Scheduled</div>'
       + '<div style="font-size:10px;color:#64748b;margin-bottom:8px">These studies have enrolled patients but few or no visits on the calendar. Patients may have quietly dropped out.</div>';
     enrolledNoVisit.forEach(function(e) {
       var url = 'https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/' + e.key + '/subjects';
       html += '<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;margin-bottom:3px;border-left:3px solid #7c3aed;background:#7c3aed08;border-radius:0 6px 6px 0;font-size:11px">'
-        + '<span style="font-size:16px;font-weight:800;color:#7c3aed;min-width:28px;text-align:right">' + e.gap + '</span>'
+        + '<span style="font-size:16px;font-weight:800;color:#072061;min-width:28px;text-align:right">' + e.gap + '</span>'
         + '<div style="flex:1">'
-        + '<a href="' + esc(url) + '" target="_blank" style="color:#7c3aed;font-weight:600;text-decoration:none">' + esc(e.study) + '</a>'
+        + '<a href="' + esc(url) + '" target="_blank" style="color:#072061;font-weight:600;text-decoration:none">' + esc(e.study) + '</a>'
         + ' <span style="font-size:9px;color:#94a3b8">' + e.enrolled + ' enrolled, ' + e.upcoming + ' upcoming</span>'
         + (e.coord ? ' <span style="color:#94a3b8">· ' + esc(e.coord) + '</span>' : '')
         + '</div>'
@@ -14994,9 +14994,9 @@ function renderMedRecTab() {
     var stale = data.filter(function(r){ return r.is_active && r.days_since_update > 14; }).length;
     kpiEl.innerHTML =
       '<div class="tb-section kpi-clickable" onclick="filterMedRec(\'all\',null)"><div class="tb-label">Active</div><div class="tb-value blue">'+active.length+'</div></div>' +
-      '<div class="tb-section kpi-clickable" onclick="filterMedRec(\'pending_release\',null)"><div class="tb-label">Pending Release</div><div class="tb-value" style="color:#f59e0b">'+pendRel+'</div></div>' +
+      '<div class="tb-section kpi-clickable" onclick="filterMedRec(\'pending_release\',null)"><div class="tb-label">Pending Release</div><div class="tb-value" style="color:#FF9933">'+pendRel+'</div></div>' +
       '<div class="tb-section kpi-clickable" onclick="filterMedRec(\'ready_sched\',null)"><div class="tb-label">Ready to Schedule</div><div class="tb-value green">'+readySch+'</div></div>' +
-      '<div class="tb-section kpi-clickable" onclick="filterMedRec(\'in_screening\',null)"><div class="tb-label">In Screening</div><div class="tb-value" style="color:#8b5cf6">'+inScreen+'</div></div>' +
+      '<div class="tb-section kpi-clickable" onclick="filterMedRec(\'in_screening\',null)"><div class="tb-label">In Screening</div><div class="tb-value" style="color:#1843AD">'+inScreen+'</div></div>' +
       '<div class="tb-section kpi-clickable" onclick="filterMedRec(\'enrolled\',null)"><div class="tb-label">Enrolled</div><div class="tb-value green">'+enrolled+'</div></div>' +
       '<div class="tb-section kpi-clickable" onclick="filterMedRec(\'pi_pending\',null)"><div class="tb-label">PI Pending</div><div class="tb-value" style="color:#dc2626">'+piPend+'</div></div>' +
       '<div class="tb-section"><div class="tb-label">Stale (14d+)</div><div class="tb-value" style="color:'+(stale>0?'#dc2626':'#059669')+'">'+stale+'</div></div>';
@@ -15053,7 +15053,7 @@ function renderMedRecTab() {
       sHtml += '<div style="display:grid;grid-template-columns:1fr 60px 60px;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showMedRecDetailModal(\''+jsAttr(name)+'\')">';
       sHtml += '<div><div style="font-size:11px;font-weight:600;margin-bottom:3px;">'+escapeHTML(name)+'</div>';
       sHtml += '<div style="height:5px;background:#e2e8f0;border-radius:3px;overflow:hidden;"><div style="width:'+pct+'%;height:100%;background:#8b5cf6;border-radius:3px;"></div></div></div>';
-      sHtml += '<div style="text-align:center;font-size:12px;font-weight:700;color:#8b5cf6;">'+s.active+'</div>';
+      sHtml += '<div style="text-align:center;font-size:12px;font-weight:700;color:#1843AD;">'+s.active+'</div>';
       sHtml += '<div style="text-align:center;font-size:11px;color:#94a3b8;">'+s.closed+' closed</div>';
       sHtml += '</div>';
     });
@@ -15581,16 +15581,16 @@ function renderMetaFunnel() {
   // Per-campaign funnel table
   html += '<div style="padding:4px 16px 0;font-size:9px;color:#94a3b8;">Approximate cross-reference (matched by campaign/study name) \u00B7 Meta API \u00B7 FB CRM Sheet \u00B7 ClickUp \u00B7 CRIO</div>';
   html += '<div style="overflow-x:auto;"><table class="fin-table" style="width:100%;font-size:10px;">';
-  html += '<thead><tr><th style="text-align:left;padding:6px 10px;">Campaign</th><th style="text-align:center;">Meta Leads</th><th style="text-align:center;">CRM</th><th style="text-align:center;">Pipeline</th><th style="text-align:center;color:#d97706;">CRIO Scr</th><th style="text-align:center;color:#059669;">CRIO Enr</th><th style="text-align:center;">Visits</th><th style="text-align:center;">Conv %</th></tr></thead><tbody>';
+  html += '<thead><tr><th style="text-align:left;padding:6px 10px;">Campaign</th><th style="text-align:center;">Meta Leads</th><th style="text-align:center;">CRM</th><th style="text-align:center;">Pipeline</th><th style="text-align:center;color:#FF9933;">CRIO Scr</th><th style="text-align:center;color:#059669;">CRIO Enr</th><th style="text-align:center;">Visits</th><th style="text-align:center;">Conv %</th></tr></thead><tbody>';
   funnelRows.forEach(function(r) {
     var conv = r.metaLeads > 0 ? Math.round(r.crioEnrolled / r.metaLeads * 100) : 0;
     var convColor = conv >= 5 ? '#059669' : conv >= 2 ? '#d97706' : '#94a3b8';
     html += '<tr style="transition:background .1s" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'\'">';
     html += '<td style="padding:5px 10px;font-weight:600;">' + escapeHTML(r.campaign) + '<div style="font-size:8px;color:#94a3b8;">' + (r.studies.length > 0 ? r.studies.join(', ') : 'No study mapped') + '</div></td>';
-    html += '<td style="text-align:center;font-weight:700;color:#3b82f6;">' + r.metaLeads + '</td>';
-    html += '<td style="text-align:center;color:#6366f1;">' + r.crmLeads + '</td>';
-    html += '<td style="text-align:center;color:#8b5cf6;">' + r.inPipeline + '</td>';
-    html += '<td style="text-align:center;color:#d97706;font-weight:' + (r.crioScreening > 0 ? '700' : '400') + ';">' + (r.crioScreening || '—') + '</td>';
+    html += '<td style="text-align:center;font-weight:700;color:#1843AD;">' + r.metaLeads + '</td>';
+    html += '<td style="text-align:center;color:#1843AD;">' + r.crmLeads + '</td>';
+    html += '<td style="text-align:center;color:#1843AD;">' + r.inPipeline + '</td>';
+    html += '<td style="text-align:center;color:#FF9933;font-weight:' + (r.crioScreening > 0 ? '700' : '400') + ';">' + (r.crioScreening || '—') + '</td>';
     html += '<td style="text-align:center;font-weight:700;color:#059669;">' + (r.crioEnrolled || '—') + '</td>';
     html += '<td style="text-align:center;color:#06b6d4;">' + r.ctmsVisits + '</td>';
     html += '<td style="text-align:center;font-weight:700;color:' + convColor + ';">' + conv + '%</td>';
@@ -15620,9 +15620,9 @@ function renderMetaAds() {
 
   // KPI banner (no dollar amounts)
   var html = '<div style="display:flex;gap:16px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid #f1f5f9;">';
-  html += '<div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#3b82f6;">' + totalLeads.toLocaleString() + '</div><div style="font-size:10px;color:#94a3b8;">Total Leads</div></div>';
-  html += '<div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#6366f1;">' + totalImpressions.toLocaleString() + '</div><div style="font-size:10px;color:#94a3b8;">Impressions</div></div>';
-  html += '<div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#8b5cf6;">' + totalClicks.toLocaleString() + '</div><div style="font-size:10px;color:#94a3b8;">Clicks</div></div>';
+  html += '<div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#1843AD;">' + totalLeads.toLocaleString() + '</div><div style="font-size:10px;color:#94a3b8;">Total Leads</div></div>';
+  html += '<div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#1843AD;">' + totalImpressions.toLocaleString() + '</div><div style="font-size:10px;color:#94a3b8;">Impressions</div></div>';
+  html += '<div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#1843AD;">' + totalClicks.toLocaleString() + '</div><div style="font-size:10px;color:#94a3b8;">Clicks</div></div>';
   html += '<div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:' + (parseFloat(avgCtr) >= 2 ? '#059669' : '#d97706') + ';">' + avgCtr + '%</div><div style="font-size:10px;color:#94a3b8;">Avg CTR</div></div>';
   html += '<div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#06b6d4;">' + totalEngagement.toLocaleString() + '</div><div style="font-size:10px;color:#94a3b8;">Engagement</div></div>';
   html += '</div>';
@@ -15654,7 +15654,7 @@ function renderMetaAds() {
     html += '<tr style="transition:background .1s" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'\'">';
     html += '<td style="padding:7px 12px;font-weight:600;">' + escapeHTML(c.campaign) + '</td>';
     html += '<td style="text-align:center;"><span style="font-size:10px;padding:2px 8px;border-radius:10px;background:' + (meta.status === 'ACTIVE' ? '#ECFDF5' : '#F1F5F9') + ';color:' + statusColor + ';font-weight:600;">' + statusLabel + '</span></td>';
-    html += '<td style="text-align:center;font-weight:700;color:#3b82f6;">' + c.leads.toLocaleString() + '</td>';
+    html += '<td style="text-align:center;font-weight:700;color:#1843AD;">' + c.leads.toLocaleString() + '</td>';
     html += '<td style="text-align:center;font-weight:600;color:' + ctrColor + ';">' + c.ctr.toFixed(2) + '%</td>';
     html += '<td style="text-align:center;">' + c.engagement.toLocaleString() + '</td>';
     html += '<td style="text-align:center;">' + spark + '</td>';
@@ -15680,7 +15680,7 @@ function renderMetaAds() {
       html += '<table style="width:100%;font-size:10px;border-collapse:collapse;"><thead><tr style="background:#f8fafc;"><th style="text-align:left;padding:4px 12px;">Campaign</th><th style="text-align:center;padding:4px 6px;">Meta</th><th style="text-align:center;padding:4px 6px;">CRM</th><th style="text-align:center;padding:4px 6px;">Gap</th><th style="text-align:center;padding:4px 6px;">Capture</th></tr></thead><tbody>';
       crossRef.forEach(function(x) {
         var p = x.metaLeads > 0 ? Math.round(x.crmLeads/x.metaLeads*100) : 0;
-        html += '<tr style="border-top:1px solid #f1f5f9;"><td style="padding:4px 12px;font-weight:600;">'+escapeHTML(x.campaign)+'</td><td style="text-align:center;color:#3b82f6;font-weight:600;">'+x.metaLeads+'</td><td style="text-align:center;color:#059669;font-weight:600;">'+x.crmLeads+'</td><td style="text-align:center;color:'+(x.gap>50?'#dc2626':x.gap>10?'#d97706':'#059669')+';font-weight:700;">'+(x.gap>0?'-'+x.gap:'\u2713')+'</td><td style="text-align:center;font-weight:700;color:'+(p>=80?'#059669':p>=50?'#d97706':'#dc2626')+';">'+p+'%</td></tr>';
+        html += '<tr style="border-top:1px solid #f1f5f9;"><td style="padding:4px 12px;font-weight:600;">'+escapeHTML(x.campaign)+'</td><td style="text-align:center;color:#1843AD;font-weight:600;">'+x.metaLeads+'</td><td style="text-align:center;color:#059669;font-weight:600;">'+x.crmLeads+'</td><td style="text-align:center;color:'+(x.gap>50?'#dc2626':x.gap>10?'#d97706':'#059669')+';font-weight:700;">'+(x.gap>0?'-'+x.gap:'\u2713')+'</td><td style="text-align:center;font-weight:700;color:'+(p>=80?'#059669':p>=50?'#d97706':'#dc2626')+';">'+p+'%</td></tr>';
       });
       html += '</tbody></table></div>';
     }
@@ -15806,7 +15806,7 @@ function renderMetaAlignment() {
     html += '<td style="padding:5px 10px;font-weight:600;text-transform:capitalize;">' + escapeHTML(r.indication) + '</td>';
     html += '<td style="text-align:center;font-size:10px;">' + campNames + '</td>';
     html += '<td style="text-align:center;"><span style="font-size:10px;padding:2px 8px;border-radius:10px;background:' + (r.hasActive ? '#ECFDF5' : '#F1F5F9') + ';color:' + (r.hasActive ? '#059669' : '#94a3b8') + ';font-weight:600;">' + (r.hasActive ? 'Active' : 'Paused') + '</span></td>';
-    html += '<td style="text-align:center;font-weight:700;color:#3b82f6;">' + r.totalLeads + '</td>';
+    html += '<td style="text-align:center;font-weight:700;color:#1843AD;">' + r.totalLeads + '</td>';
     var pipColor = r.pipelineVolume < 5 ? '#dc2626' : r.pipelineVolume < 15 ? '#d97706' : '#059669';
     html += '<td style="text-align:center;font-weight:600;color:' + pipColor + ';">' + (r.pipelineVolume || 0) + '</td>';
     html += '<td style="padding:5px 10px;">' + studyHtml + '</td>';
@@ -16206,7 +16206,7 @@ async function compareBQvLegacy(bqUrl) {
   html += '<div style="background:#f0fdf4;padding:12px;border-radius:8px;text-align:center"><div style="font-size:24px;font-weight:700;color:#059669">' + matched.length + '</div><div style="color:#065f46">Matched</div></div>';
   html += '<div style="background:#fef2f2;padding:12px;border-radius:8px;text-align:center"><div style="font-size:24px;font-weight:700;color:#dc2626">' + onlyInLegacy.length + '</div><div style="color:#991b1b">Only in Legacy</div></div>';
   html += '<div style="background:#eff6ff;padding:12px;border-radius:8px;text-align:center"><div style="font-size:24px;font-weight:700;color:#2563eb">' + onlyInBQ.length + '</div><div style="color:#1e40af">Only in BQ</div></div>';
-  html += '<div style="background:#fffbeb;padding:12px;border-radius:8px;text-align:center"><div style="font-size:24px;font-weight:700;color:#d97706">' + diffs.length + '</div><div style="color:#92400e">Field Diffs</div></div>';
+  html += '<div style="background:#fffbeb;padding:12px;border-radius:8px;text-align:center"><div style="font-size:24px;font-weight:700;color:#FF9933">' + diffs.length + '</div><div style="color:#92400e">Field Diffs</div></div>';
   html += '</div>';
   html += '<div style="font-size:12px;color:#64748b;margin-bottom:8px">Legacy: ' + legacyLatest.length + ' rows | BQ: ' + bqLatest.length + ' rows | Match rate: ' + (matched.length ? Math.round(matched.length / Math.max(legacyLatest.length, bqLatest.length) * 100) : 0) + '%</div>';
 
@@ -16227,7 +16227,7 @@ async function compareBQvLegacy(bqUrl) {
     html += '</table></details>';
   }
   if (diffs.length) {
-    html += '<details style="margin:8px 0"><summary style="cursor:pointer;font-weight:600;color:#d97706">Field Differences (' + diffs.length + ')</summary><table style="width:100%;font-size:11px;border-collapse:collapse;margin-top:4px">';
+    html += '<details style="margin:8px 0"><summary style="cursor:pointer;font-weight:600;color:#FF9933">Field Differences (' + diffs.length + ')</summary><table style="width:100%;font-size:11px;border-collapse:collapse;margin-top:4px">';
     html += '<tr style="background:#fef3c7"><th style="padding:4px;text-align:left">Patient</th><th style="padding:4px;text-align:left">Field</th><th style="padding:4px;text-align:left">Legacy</th><th style="padding:4px;text-align:left">BQ</th></tr>';
     diffs.slice(0, 40).forEach(function(d) {
       d.diffs.forEach(function(fd, i) {
@@ -16593,7 +16593,7 @@ function buildFBLeadCell(studyName) {
   var color = d.recent > 0 ? '#3b82f6' : '#94a3b8';
   return '<div style="text-align:center;">' +
     '<div style="font-size:11px;font-weight:700;color:' + color + ';">' + d.count + '</div>' +
-    (d.recent > 0 ? '<div style="font-size:9px;color:#3b82f6;">' + d.recent + ' new</div>' : '') +
+    (d.recent > 0 ? '<div style="font-size:9px;color:#1843AD;">' + d.recent + ' new</div>' : '') +
     '</div>';
 }
 
@@ -16939,7 +16939,7 @@ function renderStudiesTable() {
         var ref = typeof getStudyReferralPipeline === 'function' ? getStudyReferralPipeline(s.study) : null;
         var provLeads = ref ? ref.referrals.filter(function(r){ return r.tracker && r.tracker.length > 0; }) : [];
         if (provLeads.length === 0) return '<span style="font-size:11px;color:#cbd5e1">0</span>';
-        return '<span style="font-size:12px;font-weight:700;color:#7c3aed;cursor:pointer" onclick="showProviderLeadsModal(\''+jsAttr(s.study)+'\')">'+provLeads.length+'</span>';
+        return '<span style="font-size:12px;font-weight:700;color:#072061;cursor:pointer" onclick="showProviderLeadsModal(\''+jsAttr(s.study)+'\')">'+provLeads.length+'</span>';
       })()}</td>
       <td style="padding:10px 8px;text-align:center">${totalCell}</td>
     </tr>`;
@@ -17033,7 +17033,7 @@ function generateDailyEmail(type) {
   html += '<td style="padding:8px;"><div style="font-size:24px;font-weight:700;color:#072061;">' + (DATA.upcomingTotal || 0) + '</div><div style="font-size:11px;color:#64748b;">Upcoming</div></td>';
   html += '<td style="padding:8px;"><div style="font-size:24px;font-weight:700;color:#dc2626;">' + _adjCancel + '</div><div style="font-size:11px;color:#64748b;">True Cancellations</div><div style="font-size:10px;color:#94a3b8">' + _adjNoShow + ' no-shows · ' + _adjWithdrew + ' withdrew · ' + _adjSF + ' SF · ' + (DATA.discontinuedTotal||0) + ' disc.</div></td>';
   html += '<td style="padding:8px;"><div style="font-size:24px;font-weight:700;color:' + (parseFloat(cancelRate) > 15 ? '#dc2626' : '#059669') + ';">' + cancelRate + '%</div><div style="font-size:11px;color:#64748b;">Cancel Rate</div></td>';
-  html += '<td style="padding:8px;"><div style="font-size:24px;font-weight:700;color:#d97706;">' + flags.length + '</div><div style="font-size:11px;color:#64748b;">At-Risk Patients</div></td>';
+  html += '<td style="padding:8px;"><div style="font-size:24px;font-weight:700;color:#FF9933;">' + flags.length + '</div><div style="font-size:11px;color:#64748b;">At-Risk Patients</div></td>';
   html += '</tr></table></div>';
 
   // Site Breakdown
@@ -17139,7 +17139,7 @@ function generateDailyEmail(type) {
   });
   if (proactive.length) {
     html += '<div style="background:#fffbeb;border-left:4px solid #d97706;padding:12px 16px;margin-bottom:12px;border-radius:0 6px 6px 0;">';
-    html += '<h4 style="margin:0 0 8px;color:#d97706;font-size:13px;">PROACTIVE OUTREACH — ' + proactive.length + ' at-risk patient' + (proactive.length > 1 ? 's' : '') + ' (visit >14 days out)</h4>';
+    html += '<h4 style="margin:0 0 8px;color:#FF9933;font-size:13px;">PROACTIVE OUTREACH — ' + proactive.length + ' at-risk patient' + (proactive.length > 1 ? 's' : '') + ' (visit >14 days out)</h4>';
     html += '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
     proactive.slice(0, 10).forEach(f => {
       html += '<tr style="border-bottom:1px solid #fef3c7;"><td style="padding:4px 6px;font-weight:600;">' + pUrl(f.patient, f.patient_url) + '</td><td style="padding:4px 6px;">' + sUrl(f.study, f.study_url) + '</td><td style="text-align:right;padding:4px 6px;">' + f.cancels + ' cancels</td><td style="text-align:right;padding:4px 6px;">' + f.next_visit + '</td></tr>';
@@ -17363,9 +17363,9 @@ function renderRetention() {
     '<th style="padding:6px 8px;text-align:left">Study</th>' +
     '<th style="padding:6px;text-align:right">Total</th>' +
     '<th style="padding:6px;text-align:right;color:#059669">Enrolled</th>' +
-    '<th style="padding:6px;text-align:right;color:#3b82f6">Screening</th>' +
+    '<th style="padding:6px;text-align:right;color:#1843AD">Screening</th>' +
     '<th style="padding:6px;text-align:right;color:#dc2626">SF</th>' +
-    '<th style="padding:6px;text-align:right;color:#d97706">Disc</th>' +
+    '<th style="padding:6px;text-align:right;color:#FF9933">Disc</th>' +
     '<th style="padding:6px;text-align:right">SF Rate</th></tr>';
   data.forEach(function(r) {
     var total = parseInt(r.total_subjects) || 1;
@@ -18556,7 +18556,7 @@ document.addEventListener('click', function(e) {
     <div class="tb-divider"></div>
     <div class="tb-section kpi-clickable" style="cursor:pointer">
       <div class="tb-label">Completed Visits</div>
-      <div class="tb-value" style="color:#8b5cf6" id="rpu-kpi-visits">—</div>
+      <div class="tb-value" style="color:#1843AD" id="rpu-kpi-visits">—</div>
       <div class="tb-sub">With eSource data</div>
     </div>
     <div class="tb-divider"></div>
