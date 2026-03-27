@@ -3954,22 +3954,22 @@ function renderCoordinatorGoals() {
       const cursor = hasVisits ? 'cursor:pointer;' : '';
       const clickAttr = hasVisits ? `onclick="toggleCoordDayDetail('${jsAttr(name)}','${d}',this)"` : '';
       return `<div style="text-align:center;flex:1;min-width:0;${cursor}position:relative" ${clickAttr}>
-        <div style="height:28px;display:flex;align-items:flex-end;justify-content:center">
-          <div style="width:10px;height:${Math.max(3,barH)}%;background:${barColor};border-radius:2px 2px 0 0;transition:height 0.3s"></div>
+        <div style="height:48px;display:flex;align-items:flex-end;justify-content:center">
+          <div style="width:16px;height:${Math.max(4,barH)}%;background:${barColor};border-radius:3px 3px 0 0;transition:height 0.3s"></div>
         </div>
-        <div style="font-size:8px;font-weight:${isToday?'700':'400'};color:${isToday?'#1843AD':'#9CA3AF'};line-height:1.2">${twoWeekLabels[i].charAt(0)}</div>
-        <div style="font-size:7px;color:${isToday?'#1843AD':'#cbd5e1'};font-weight:${isToday?'600':'400'};line-height:1.2">${twoWeekDates[i]}</div>
-        <div style="font-size:9px;font-weight:700;color:${visits >= 2 ? '#059669' : visits === 1 ? '#f59e0b' : '#ef4444'};line-height:1.3">${visits}</div>
+        <div style="font-size:9px;font-weight:${isToday?'700':'500'};color:${isToday?'#1843AD':'#9CA3AF'};line-height:1.3;margin-top:2px">${twoWeekLabels[i].charAt(0)}</div>
+        <div style="font-size:8px;color:${isToday?'#1843AD':'#cbd5e1'};font-weight:${isToday?'600':'400'};line-height:1.3">${twoWeekDates[i]}</div>
+        <div style="font-size:11px;font-weight:700;color:${visits >= 2 ? '#059669' : visits === 1 ? '#f59e0b' : '#ef4444'};line-height:1.4">${visits}</div>
       </div>`;
     }).join('');
 
     const firstName = name.split(' ')[0];
-    return `<div style="background:#F9FAFB;border-radius:8px;padding:10px;border:1px solid #E5E7EB">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-        <span style="font-weight:700;font-size:12px;color:#1a202c">${firstName}</span>
-        <span style="font-size:10px;font-weight:700;color:#1843AD">${periodTotal}</span>
+    return `<div style="background:#F9FAFB;border-radius:10px;padding:14px;border:1px solid #E5E7EB">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <span style="font-weight:700;font-size:14px;color:#1a202c">${firstName}</span>
+        <span style="font-size:12px;font-weight:700;color:#1843AD">${periodTotal} visits</span>
       </div>
-      <div style="display:flex;gap:1px">${dayBars}</div>
+      <div style="display:flex;gap:2px">${dayBars}</div>
       <div class="coord-day-detail" data-coord="${name}" style="display:none;margin-top:4px;background:#fff;border:1px solid #E5E7EB;border-radius:6px;padding:6px;font-size:10px"></div>
     </div>`;
   }).join('');
@@ -3984,66 +3984,28 @@ function renderCoordinatorGoals() {
     _coordCancels[cn] = (_coordCancels[cn] || 0) + 1;
   });
 
-  var curMode = window._coordMonthMode || 'visits';
-  var isDuration = curMode === 'duration';
+  var monthMax = 1;
+  COORDS.forEach(function(name) { var v = goals.byMonth[name] || 0; if (v > monthMax) monthMax = v; });
+  var avgPerDay = {};
+  COORDS.forEach(function(name) { avgPerDay[name] = workDaysElapsed > 0 ? (goals.byMonth[name] || 0) / workDaysElapsed : 0; });
 
-  // Render toggle buttons
-  var toggleEl = document.getElementById('coordMonthToggle');
-  if (toggleEl) {
-    var btnStyle = function(active) { return 'font-size:10px;font-weight:600;padding:3px 10px;border:none;border-radius:4px;cursor:pointer;background:'+(active?'#fff':'transparent')+';color:'+(active?'#1843AD':'#64748b')+';box-shadow:'+(active?'0 1px 2px rgba(0,0,0,.1)':'none'); };
-    toggleEl.innerHTML = '<button onclick="window._coordMonthMode=\'visits\';renderCoordinatorGoals()" style="'+btnStyle(!isDuration)+'">Visits</button>' +
-      '<button onclick="window._coordMonthMode=\'duration\';renderCoordinatorGoals()" style="'+btnStyle(isDuration)+'">Duration</button>';
-  }
-
-  // Update table header
-  var headEl = document.getElementById('coordMonthHead');
-  if (headEl) {
-    headEl.innerHTML = isDuration
-      ? '<tr style="background:var(--surface2);border-bottom:2px solid var(--border)"><th style="padding:8px 12px;text-align:left;font-weight:700">Coordinator</th><th style="padding:8px 8px;text-align:center;font-weight:700">Hours</th><th style="padding:8px 8px;text-align:center;font-weight:700">Avg/Day</th><th style="padding:8px 8px;text-align:center;font-weight:700">Volume</th><th style="padding:8px 8px;text-align:center;font-weight:700">Period</th></tr>'
-      : '<tr style="background:var(--surface2);border-bottom:2px solid var(--border)"><th style="padding:8px 12px;text-align:left;font-weight:700">Coordinator</th><th style="padding:8px 8px;text-align:center;font-weight:700">Visits</th><th style="padding:8px 8px;text-align:center;font-weight:700">Cancels</th><th style="padding:8px 8px;text-align:center;font-weight:700">Cancel Rate</th><th style="padding:8px 8px;text-align:center;font-weight:700">Avg/Day</th><th style="padding:8px 8px;text-align:center;font-weight:700">Volume</th><th style="padding:8px 8px;text-align:center;font-weight:700">Period</th></tr>';
-  }
-
-  if (isDuration) {
-    // Duration mode
-    var maxDurHrs = 1;
-    COORDS.forEach(function(name) { var h = (goals.byMonthDuration[name]||0)/60; if (h > maxDurHrs) maxDurHrs = h; });
-    monthBody.innerHTML = COORDS.map(name => {
-      const durMin = goals.byMonthDuration[name] || 0;
-      const durHrs = Math.round(durMin / 60 * 10) / 10;
-      const barPct = Math.min(100, Math.round(durHrs / (maxDurHrs * 1.1) * 100));
-      const avgHrs = workDaysElapsed > 0 ? (durHrs / workDaysElapsed).toFixed(1) : '0.0';
-      return `<tr style="border-bottom:1px solid var(--border);cursor:pointer;" onclick="showCoordDetail('${jsAttr(name)}')">
-        <td style="padding:8px 12px;font-weight:600">${escapeHTML(name)}</td>
-        <td style="padding:8px 8px;text-align:center;font-weight:700">${durHrs}h</td>
-        <td style="padding:8px 8px;text-align:center;color:#6B7280">${avgHrs}h/day</td>
-        <td style="padding:8px 12px"><div style="background:#E5E7EB;border-radius:6px;height:8px;overflow:hidden"><div style="background:#7c3aed;height:100%;width:${barPct}%;border-radius:6px"></div></div></td>
-        <td style="padding:8px 8px;text-align:center;color:#6B7280;font-size:11px">${workDaysElapsed} days tracked</td>
-      </tr>`;
-    }).join('');
-  } else {
-    // Visits mode (default)
-    var monthMax = 1;
-    COORDS.forEach(function(name) { var v = goals.byMonth[name] || 0; if (v > monthMax) monthMax = v; });
-    var avgPerDay = {};
-    COORDS.forEach(function(name) { avgPerDay[name] = workDaysElapsed > 0 ? (goals.byMonth[name] || 0) / workDaysElapsed : 0; });
-
-    monthBody.innerHTML = COORDS.map(name => {
-      const monthVisits = goals.byMonth[name] || 0;
-      const barPct = Math.min(100, Math.round(monthVisits / (monthMax * 1.1) * 100));
-      const avg = avgPerDay[name].toFixed(1);
-      const cancels = _coordCancels[name] || 0;
-      const cancelRate = (monthVisits + cancels) > 0 ? Math.round(cancels / (monthVisits + cancels) * 100) : 0;
-      const crColor = cancelRate > 20 ? '#dc2626' : cancelRate > 10 ? '#f59e0b' : '#059669';
-      return `<tr style="border-bottom:1px solid var(--border);cursor:pointer;" onclick="showCoordDetail('${jsAttr(name)}')">
-        <td style="padding:8px 12px;font-weight:600">${escapeHTML(name)}</td>
-        <td style="padding:8px 8px;text-align:center;font-weight:700">${monthVisits}</td>
-        <td style="padding:8px 8px;text-align:center;color:#d97706;font-weight:600">${cancels}</td>
-        <td style="padding:8px 8px;text-align:center;font-weight:700;color:${crColor}">${cancelRate}%</td>
-        <td style="padding:8px 8px;text-align:center;color:#6B7280">${avg}/day</td>
-        <td style="padding:8px 12px"><div style="background:#E5E7EB;border-radius:6px;height:8px;overflow:hidden"><div style="background:#1843AD;height:100%;width:${barPct}%;border-radius:6px"></div></div></td>
-        <td style="padding:8px 8px;text-align:center;color:#6B7280;font-size:11px">${workDaysElapsed} days tracked</td>
-      </tr>`;
-    }).join('');
+  monthBody.innerHTML = COORDS.map(name => {
+    const monthVisits = goals.byMonth[name] || 0;
+    const barPct = Math.min(100, Math.round(monthVisits / (monthMax * 1.1) * 100));
+    const avg = avgPerDay[name].toFixed(1);
+    const cancels = _coordCancels[name] || 0;
+    const cancelRate = (monthVisits + cancels) > 0 ? Math.round(cancels / (monthVisits + cancels) * 100) : 0;
+    const crColor = cancelRate > 20 ? '#dc2626' : cancelRate > 10 ? '#f59e0b' : '#059669';
+    return `<tr style="border-bottom:1px solid var(--border);cursor:pointer;" onclick="showCoordDetail('${jsAttr(name)}')">
+      <td style="padding:8px 12px;font-weight:600">${escapeHTML(name)}</td>
+      <td style="padding:8px 8px;text-align:center;font-weight:700">${monthVisits}</td>
+      <td style="padding:8px 8px;text-align:center;color:#d97706;font-weight:600">${cancels}</td>
+      <td style="padding:8px 8px;text-align:center;font-weight:700;color:${crColor}">${cancelRate}%</td>
+      <td style="padding:8px 8px;text-align:center;color:#6B7280">${avg}/day</td>
+      <td style="padding:8px 12px"><div style="background:#E5E7EB;border-radius:6px;height:8px;overflow:hidden"><div style="background:#1843AD;height:100%;width:${barPct}%;border-radius:6px"></div></div></td>
+      <td style="padding:8px 8px;text-align:center;color:#6B7280;font-size:11px">${workDaysElapsed} days tracked</td>
+    </tr>`;
+  }).join('');
   }
 }
 
