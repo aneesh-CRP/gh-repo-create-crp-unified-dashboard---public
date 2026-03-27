@@ -425,6 +425,7 @@ const FEEDS = {
       ${STUDY_NAME_SQL} AS study_name,
       CAST(ca.study_key AS STRING) AS study_key,
       FORMAT_DATETIME('%Y-%m-%d', ca.start) AS scheduled_date,
+      FORMAT_DATETIME('%H:%M', ca.start) AS scheduled_time,
       ${SUBJECT_NAME_SQL} AS subject_full_name,
       CAST(ca.subject_key AS STRING) AS subject_key_back_end,
       CASE ca.status WHEN 0 THEN 'Cancelled' ELSE 'Active' END AS appointment_status,
@@ -455,7 +456,9 @@ const FEEDS = {
     WHERE ca.subject_key IS NOT NULL AND st.is_active = 1      AND ca.status != 0
       AND ca.start >= CURRENT_DATETIME()
       AND ca.start <= DATETIME_ADD(CURRENT_DATETIME(), INTERVAL 365 DAY)
-      AND LOWER(CONCAT(COALESCE(st.nickname, ''), ' ', COALESCE(st.protocol_number, ''))) LIKE '%pre-screen%'
+      AND (LOWER(CONCAT(COALESCE(st.nickname, ''), ' ', COALESCE(st.protocol_number, ''))) LIKE '%pre-screen%'
+        OR LOWER(COALESCE(sv.name, '')) LIKE '%fibro%'
+        OR LOWER(COALESCE(sv.name, '')) LIKE '%liver%scan%')
       AND st.status != 0
     ORDER BY ca.start ASC`
   },

@@ -2890,15 +2890,21 @@ function buildScheduleTable() {
   // Merge pre-screening visits (display only, not in metrics)
   if (window._prescrVisits && window._prescrVisits.length > 0) {
     window._prescrVisits.forEach(function(r) {
+      var vn = (r.visit_name||'').toLowerCase();
+      var prescrType = vn.indexOf('call') !== -1 ? 'Call' : (vn.indexOf('fibro') !== -1 || vn.indexOf('liver') !== -1 || vn.indexOf('scan') !== -1) ? 'FibroScan' : 'Pre-Screen';
+      var timeRaw = r.scheduled_time || '';
+      var timeFmt = '';
+      if (timeRaw) { var tp = timeRaw.split(':'); var hr = parseInt(tp[0])||0, mn = tp[1]||'00'; timeFmt = (hr===0?'12':hr>12?''+(hr-12):''+hr)+':'+mn+(hr>=12?'p':'a'); }
       visits.push({
         name: r.subject_full_name || '', patient: r.subject_full_name || '',
         date: (() => { var d = _parseDate(r.scheduled_date); return d ? d.toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '—'; })(),
         date_iso: r.scheduled_date || '',
+        time: timeFmt,
         study: (r.study_name||'').split(' - ').pop().trim(),
         study_url: '', visit: r.visit_name || '',
         patient_url: '', status: r.subject_status || '',
         coord: r.staff_full_name || '', investigator: r.investigator || '',
-        site: r.site_name || '', _prescreen: true
+        site: r.site_name || '', _prescreen: true, _prescrType: prescrType
       });
     });
     visits.sort(function(a,b) { return (a.date_iso||'').localeCompare(b.date_iso||''); });
@@ -2980,7 +2986,7 @@ function buildScheduleTable() {
     var studyHtml = v.study_url
       ? '<a href="' + v.study_url + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="text-decoration:none;color:var(--navy);font-weight:600">' + studyText + linkSvg + '</a>'
       : studyText;
-    if (v._prescreen) studyHtml += ' <span style="font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px;background:#dbeafe;color:#3b82f6;">Pre-Screen</span>';
+    if (v._prescreen) { var _ptColor = v._prescrType==='FibroScan'?'#7c3aed':v._prescrType==='Call'?'#0369a1':'#3b82f6'; studyHtml += ' <span style="font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px;background:'+_ptColor+'15;color:'+_ptColor+';">'+(v._prescrType||'Pre-Screen')+'</span>'; }
     // Patient cell (PHI masked + escaped)
     var patRaw = v.patient||'—';
     var patText = esc(PHI_MASKED ? maskPHI(patRaw) : patRaw);
@@ -4879,10 +4885,22 @@ function fetchActionRequiredData() {
       _log('CRP: Subject audit loaded — ' + window._subjectAudit.length + ' transitions, ' + window._dnqReasons.length + ' DNQ reasons');
     }
 
-    // Pre-screening visits (display only in schedule table, not in metrics)
+    // Pre-screening visits + FibroScans (display in schedule, separate from visit metrics)
     var prescr = (results.prescrVisits || {}).data || [];
     if (prescr.length > 0) {
       window._prescrVisits = prescr.filter(function(r){ return r.appointment_status !== 'Cancelled'; });
+      // Build per-study counts for the Calls/Fibro column
+      window._prescrByStudy = {};
+      window._prescrVisits.forEach(function(r) {
+        var vn = (r.visit_name||'').toLowerCase();
+        var type = vn.indexOf('call') !== -1 ? 'call' : (vn.indexOf('fibro') !== -1 || vn.indexOf('liver') !== -1 || vn.indexOf('scan') !== -1) ? 'fibro' : 'other';
+        // Map pre-screening study to parent study for matching
+        var studyName = (r.study_name||'').split(' - ').pop().trim();
+        if (!window._prescrByStudy[studyName]) window._prescrByStudy[studyName] = {calls:0, fibro:0, other:0, total:0, rows:[]};
+        window._prescrByStudy[studyName][type]++;
+        window._prescrByStudy[studyName].total++;
+        window._prescrByStudy[studyName].rows.push(r);
+      });
       _log('Pre-screening visits: ' + window._prescrVisits.length + ' upcoming');
       safe(buildScheduleTable, 'buildScheduleTable-prescr');
       safe(hidePastVisits, 'hidePastVisits-prescr');
@@ -9068,6 +9086,30 @@ function showUpcoming(filterFn, title, sub) {
   </tr>`).join('') +
   `</tbody></table>`;
   openModal(title, sub || rows.length + ' visits', body);
+}
+
+function showPrescrModal(studyName) {
+  var ps = window._prescrByStudy || {};
+  var rows = [];
+  Object.keys(ps).forEach(function(k) {
+    if (k.toLowerCase().indexOf(studyName.toLowerCase()) !== -1 || studyName.toLowerCase().indexOf(k.split(' ')[0].toLowerCase()) !== -1) {
+      rows = rows.concat(ps[k].rows);
+    }
+  });
+  var h = '<table class="detail-table"><thead><tr><th>Patient</th><th>Type</th><th>Date</th><th>Time</th><th>Coordinator</th><th>Site</th></tr></thead><tbody>';
+  rows.forEach(function(r) {
+    var vn = (r.visit_name||'').toLowerCase();
+    var type = vn.indexOf('call') !== -1 ? 'Call' : (vn.indexOf('fibro') !== -1 || vn.indexOf('liver') !== -1 || vn.indexOf('scan') !== -1) ? 'FibroScan' : 'Pre-Screen';
+    var typeColor = type === 'FibroScan' ? '#7c3aed' : type === 'Call' ? '#0369a1' : '#3b82f6';
+    h += '<tr><td>'+patientLink(r.subject_full_name||'—', null)+'</td>';
+    h += '<td><span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:'+typeColor+'15;color:'+typeColor+'">'+type+'</span></td>';
+    h += '<td>'+escapeHTML(r.scheduled_date||'—')+'</td>';
+    h += '<td>'+escapeHTML(r.scheduled_time||'—')+'</td>';
+    h += '<td style="font-size:11px">'+escapeHTML(r.staff_full_name||'—')+'</td>';
+    h += '<td>'+siteBadge(r.site_name)+'</td></tr>';
+  });
+  h += '</tbody></table>';
+  openModal(studyName + ' — Pre-Screening Calls & FibroScans', rows.length + ' appointments', h);
 }
 
 function showProviderLeadsModal(studyName) {
@@ -14455,6 +14497,18 @@ function renderStudiesTable() {
       <td style="padding:10px 6px;text-align:center">${_countCell(_bd.screenFails, '#ef4444', 'screenfail')}</td>
       <td style="padding:10px 8px;text-align:center">${upcomingCell}</td>
       <td style="padding:10px 6px;text-align:center">${_unschedCell}</td>
+      <td style="padding:10px 6px;text-align:center">${(() => {
+        var ps = window._prescrByStudy || {};
+        // Match pre-screening studies to parent study (e.g., "Cardiology Pre-Screening" → studies with cardio/triglycerides)
+        var count = 0; var matchedRows = [];
+        Object.keys(ps).forEach(function(k) {
+          if (k.toLowerCase().indexOf(s.study.toLowerCase()) !== -1 || s.study.toLowerCase().indexOf(k.split(' ')[0].toLowerCase()) !== -1) {
+            count += ps[k].total; matchedRows = matchedRows.concat(ps[k].rows);
+          }
+        });
+        if (count === 0) return '<span style="font-size:11px;color:#cbd5e1">0</span>';
+        return '<span style="font-size:12px;font-weight:700;color:#0369a1;cursor:pointer" onclick="showPrescrModal(\''+jsAttr(s.study)+'\')">'+count+'</span>';
+      })()}</td>
       <td style="padding:10px 8px;min-width:140px;cursor:pointer" data-action="studyUnified" data-study="${escapeHTML(s.study)}">${enrollCell}</td>
       <td style="padding:10px 8px;text-align:center;font-size:11px;color:${s.screening>0?'#7c3aed':'var(--muted)'};font-weight:${s.screening>0?'700':'400'};cursor:pointer" data-action="studyUnified" data-study="${escapeHTML(s.study)}">${s.screening||0}</td>
       <td style="padding:10px 8px;text-align:center;font-size:11px;color:var(--muted);cursor:pointer" data-action="studyUnified" data-study="${escapeHTML(s.study)}">${s.screened||0}</td>
