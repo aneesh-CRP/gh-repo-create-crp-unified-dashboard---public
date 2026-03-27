@@ -14262,6 +14262,22 @@ function renderStudiesTable() {
     return true;
   });
 
+  // Expand multi-site studies into one row per site
+  var expanded = [];
+  studies.forEach(function(s) {
+    var siteList = s.sites && s.sites.length > 0 ? s.sites : ['PHL'];
+    if (siteList.length === 1) {
+      expanded.push(Object.assign({}, s, { _site: siteList[0] }));
+    } else {
+      siteList.forEach(function(site) {
+        expanded.push(Object.assign({}, s, { _site: site, sites: [site] }));
+      });
+    }
+  });
+  // Replace studies with expanded rows
+  studies.length = 0;
+  expanded.forEach(function(s) { studies.push(s); });
+
   // Sort
   if (_studySortCol >= 0) {
     const keys = ['study','enroll_status','risk_score','cancels','upcoming','pct','screened','screening'];
