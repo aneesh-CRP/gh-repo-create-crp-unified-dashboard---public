@@ -14362,7 +14362,7 @@ function renderStudiesTable() {
 
     return `<tr style="border-bottom:1px solid var(--border);transition:background .1s" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''" data-ta="${escapeHTML(s.therapeutic_area||'')}">
       <td style="padding:10px 12px;min-width:160px">${studyCell}${diversityBadge}${alertTags}</td>
-      <td style="padding:10px 8px;text-align:center"><span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:${_sbBg};color:${_sbFg}">${_sb||'—'}</span></td>
+      <td style="padding:10px 8px;text-align:center;cursor:pointer" data-action="studyUnified" data-study="${escapeHTML(s.study)}"><span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:${_sbBg};color:${_sbFg}">${_sb||'—'}</span></td>
       <td style="padding:10px 8px;text-align:center">${riskScoreCell}</td>
       <td style="padding:10px 6px;text-align:center">${_cancelWd > 0 ? '<span style="font-size:12px;font-weight:700;color:#dc2626;cursor:pointer" data-action="studyCategoryClick" data-study="'+escapeHTML(s.study)+'" data-cat="cancel">'+_cancelWd+'</span>' : '<span style="font-size:11px;color:#cbd5e1">0</span>'}</td>
       <td style="padding:10px 6px;text-align:center">${_countCell(_bd.noShows, '#f97316', 'noshow')}</td>
@@ -14370,9 +14370,9 @@ function renderStudiesTable() {
       <td style="padding:10px 6px;text-align:center">${_countCell(_bd.rescheduled, '#06b6d4', 'rescheduled')}</td>
       <td style="padding:10px 8px;text-align:center">${upcomingCell}</td>
       <td style="padding:10px 6px;text-align:center">${_unschedCell}</td>
-      <td style="padding:10px 8px;min-width:140px">${enrollCell}</td>
-      <td style="padding:10px 8px;text-align:center;font-size:11px;color:var(--muted)">${s.screened||0}</td>
-      <td style="padding:10px 8px;text-align:center;font-size:11px;color:${s.screening>0?'#7c3aed':'var(--muted)'};font-weight:${s.screening>0?'700':'400'}">${s.screening||0}</td>
+      <td style="padding:10px 8px;min-width:140px;cursor:pointer" data-action="studyUnified" data-study="${escapeHTML(s.study)}">${enrollCell}</td>
+      <td style="padding:10px 8px;text-align:center;font-size:11px;color:${s.screening>0?'#7c3aed':'var(--muted)'};font-weight:${s.screening>0?'700':'400'};cursor:pointer" data-action="studyUnified" data-study="${escapeHTML(s.study)}">${s.screening||0}</td>
+      <td style="padding:10px 8px;text-align:center;font-size:11px;color:var(--muted);cursor:pointer" data-action="studyUnified" data-study="${escapeHTML(s.study)}">${s.screened||0}</td>
       <td style="padding:10px 8px;text-align:center">${siteTags}</td>
       <td style="padding:10px 8px;text-align:center">${totalCell}</td>
     </tr>`;
