@@ -1721,32 +1721,27 @@ const FEEDS = {
       comments AS (
         SELECT c.user_key,
           CAST(c.study_key AS STRING) AS study_key,
+          ${STUDY_NAME_SQL} AS study_name,
           COUNT(*) AS comments_created,
           COUNTIF(c.is_resolved = 0) AS open_comments
         FROM ${tbl('comment')} c
         JOIN ${tbl('study')} st ON c.study_key = st.study_key
+        LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
         WHERE c._fivetran_deleted = false AND st.is_active = 1
           AND c.date_created >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 90 DAY)
-        GROUP BY c.user_key, c.study_key
+        GROUP BY c.user_key, c.study_key, study_name
       ),
       signoffs AS (
         SELECT so.user_key,
           CAST(so.study_key AS STRING) AS study_key,
+          ${STUDY_NAME_SQL} AS study_name,
           COUNT(*) AS signoffs
         FROM ${tbl('subject_visit_sign_off')} so
         JOIN ${tbl('study')} st ON so.study_key = st.study_key
+        LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
         WHERE st.is_active = 1 AND so.is_active = 1
           AND so.date_created >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 90 DAY)
-        GROUP BY so.user_key, so.study_key
-      ),
-      pending_duties AS (
-        SELECT rdu.user_key,
-          CAST(rdu.study_key AS STRING) AS study_key,
-          COUNTIF(rdu.status = 0) AS pending_duties
-        FROM ${tbl('regulatory_duty_user')} rdu
-        JOIN ${tbl('study')} st ON rdu.study_key = st.study_key
-        WHERE rdu._fivetran_deleted = false AND st.is_active = 1
-        GROUP BY rdu.user_key, rdu.study_key
+        GROUP BY so.user_key, so.study_key, study_name
       ),
       all_users AS (
         SELECT DISTINCT user_key, user_name FROM doc_done
@@ -1758,23 +1753,21 @@ const FEEDS = {
     SELECT
       au.user_name,
       COALESCE(d.site_name, '') AS site_name,
-      COALESCE(d.study_key, c.study_key, so.study_key, pd.study_key, pdu.study_key) AS study_key,
-      COALESCE(d.study_name, '') AS study_name,
+      COALESCE(d.study_key, c.study_key, so.study_key, pd.study_key) AS study_key,
+      COALESCE(NULLIF(d.study_name,''), c.study_name, so.study_name, '') AS study_name,
       COALESCE(d.docs_uploaded, 0) AS docs_uploaded,
       COALESCE(d.docs_signed, 0) AS docs_signed,
       COALESCE(d.docs_assigned_done, 0) AS docs_assigned_done,
       COALESCE(c.comments_created, 0) AS comments_created,
       COALESCE(c.open_comments, 0) AS open_comments,
       COALESCE(so.signoffs, 0) AS signoffs,
-      COALESCE(pd.pending_docs, 0) AS pending_docs,
-      COALESCE(pdu.pending_duties, 0) AS pending_duties
+      COALESCE(pd.pending_docs, 0) AS pending_docs
     FROM all_users au
     LEFT JOIN doc_done d ON au.user_key = d.user_key
     LEFT JOIN comments c ON au.user_key = c.user_key AND COALESCE(d.study_key, c.study_key) = c.study_key
     LEFT JOIN signoffs so ON au.user_key = so.user_key AND COALESCE(d.study_key, so.study_key) = so.study_key
     LEFT JOIN pending_docs pd ON au.user_key = pd.user_key AND COALESCE(d.study_key, pd.study_key) = pd.study_key
-    LEFT JOIN pending_duties pdu ON au.user_key = pdu.user_key AND COALESCE(d.study_key, pdu.study_key) = pdu.study_key
-    WHERE (COALESCE(d.docs_uploaded,0) + COALESCE(d.docs_signed,0) + COALESCE(c.comments_created,0) + COALESCE(so.signoffs,0) + COALESCE(pd.pending_docs,0) + COALESCE(pdu.pending_duties,0)) > 0
+    WHERE (COALESCE(d.docs_uploaded,0) + COALESCE(d.docs_signed,0) + COALESCE(c.comments_created,0) + COALESCE(so.signoffs,0) + COALESCE(pd.pending_docs,0)) > 0
     ORDER BY au.user_name, d.study_key`
   },
 

@@ -4068,19 +4068,25 @@ function renderRegulatoryPerformance() {
     return;
   }
 
-  var COORDS = CRP_CONFIG.COORDINATORS || [];
+  // Use SCHEDULE_COORDINATORS (not all COORDINATORS) — recruiters don't do regulatory work
+  var COORDS = CRP_CONFIG.SCHEDULE_COORDINATORS || CRP_CONFIG.COORDINATORS || [];
   var INVESTIGATORS = CRP_CONFIG.INVESTIGATORS || [];
   var REMOTE_CRCS = ['Huzaif Qazi','Jeehan Choudhary','Aadil Ansari','Siddhesh Mhatre','Aditi Chorage','Nice Jain','Prachi Khanolkar','Kajal Jadhav'];
   var coordLo = COORDS.map(function(n){return n.toLowerCase();});
   var invLo = INVESTIGATORS.map(function(n){return n.toLowerCase();});
   var remoteLo = REMOTE_CRCS.map(function(n){return n.toLowerCase();});
 
+  // Name normalization — fix case variants (e.g. "Stacey scott" → "Stacey Scott")
+  var _nameNorm = {};
+  COORDS.concat(INVESTIGATORS).concat(REMOTE_CRCS).forEach(function(n) { _nameNorm[n.toLowerCase()] = n; });
+
   // Aggregate per user (combine per-study rows)
   var byUser = {};
   window._regPerfData.forEach(function(r) {
-    var name = (r.user_name || '').trim();
-    if (!name) return;
-    if (!byUser[name]) byUser[name] = { name: name, site: '', docs_uploaded: 0, docs_signed: 0, comments: 0, open_comments: 0, signoffs: 0, pending_docs: 0, pending_duties: 0, studies: {} };
+    var rawName = (r.user_name || '').trim();
+    if (!rawName) return;
+    var name = _nameNorm[rawName.toLowerCase()] || rawName; // normalize to canonical name
+    if (!byUser[name]) byUser[name] = { name: name, site: '', docs_uploaded: 0, docs_signed: 0, comments: 0, open_comments: 0, signoffs: 0, pending_docs: 0, studies: {} };
     var u = byUser[name];
     u.docs_uploaded += parseInt(r.docs_uploaded) || 0;
     u.docs_signed += parseInt(r.docs_signed) || 0;
@@ -4088,12 +4094,11 @@ function renderRegulatoryPerformance() {
     u.open_comments += parseInt(r.open_comments) || 0;
     u.signoffs += parseInt(r.signoffs) || 0;
     u.pending_docs += parseInt(r.pending_docs) || 0;
-    u.pending_duties += parseInt(r.pending_duties) || 0;
-    if (r.site_name && !u.site) u.site = r.site_name;
+        if (r.site_name && !u.site) u.site = r.site_name;
     else if (r.site_name && u.site && u.site !== r.site_name) u.site = 'Both';
     // Per-study detail for drill-down
     var sk = r.study_key || '';
-    if (sk && !u.studies[sk]) u.studies[sk] = { study_name: r.study_name || '', study_key: sk, docs_uploaded: 0, docs_signed: 0, comments: 0, signoffs: 0, pending_docs: 0, pending_duties: 0 };
+    if (sk && !u.studies[sk]) u.studies[sk] = { study_name: r.study_name || '', study_key: sk, docs_uploaded: 0, docs_signed: 0, comments: 0, signoffs: 0, pending_docs: 0, };
     if (sk) {
       var st = u.studies[sk];
       st.docs_uploaded += parseInt(r.docs_uploaded) || 0;
@@ -4101,8 +4106,7 @@ function renderRegulatoryPerformance() {
       st.comments += parseInt(r.comments_created) || 0;
       st.signoffs += parseInt(r.signoffs) || 0;
       st.pending_docs += parseInt(r.pending_docs) || 0;
-      st.pending_duties += parseInt(r.pending_duties) || 0;
-    }
+          }
   });
 
   function classify(name) {
@@ -4120,13 +4124,13 @@ function renderRegulatoryPerformance() {
   });
 
   // Also add missing users with zero
-  COORDS.forEach(function(n) { if (!byUser[n]) groups.coord.push({ name: n, site: '', docs_uploaded: 0, docs_signed: 0, comments: 0, open_comments: 0, signoffs: 0, pending_docs: 0, pending_duties: 0, studies: {} }); });
-  REMOTE_CRCS.forEach(function(n) { if (!byUser[n]) groups.remote.push({ name: n, site: '', docs_uploaded: 0, docs_signed: 0, comments: 0, open_comments: 0, signoffs: 0, pending_docs: 0, pending_duties: 0, studies: {} }); });
-  INVESTIGATORS.forEach(function(n) { if (!byUser[n]) groups.inv.push({ name: n, site: '', docs_uploaded: 0, docs_signed: 0, comments: 0, open_comments: 0, signoffs: 0, pending_docs: 0, pending_duties: 0, studies: {} }); });
+  COORDS.forEach(function(n) { if (!byUser[n]) groups.coord.push({ name: n, site: '', docs_uploaded: 0, docs_signed: 0, comments: 0, open_comments: 0, signoffs: 0, pending_docs: 0, studies: {} }); });
+  REMOTE_CRCS.forEach(function(n) { if (!byUser[n]) groups.remote.push({ name: n, site: '', docs_uploaded: 0, docs_signed: 0, comments: 0, open_comments: 0, signoffs: 0, pending_docs: 0, studies: {} }); });
+  INVESTIGATORS.forEach(function(n) { if (!byUser[n]) groups.inv.push({ name: n, site: '', docs_uploaded: 0, docs_signed: 0, comments: 0, open_comments: 0, signoffs: 0, pending_docs: 0, studies: {} }); });
 
   // Sort each group by total done desc
   function totalDone(u) { return u.docs_signed + u.docs_uploaded + u.comments + u.signoffs; }
-  function totalPending(u) { return u.pending_docs + u.open_comments + u.pending_duties; }
+  function totalPending(u) { return u.pending_docs + u.open_comments; }
   groups.coord.sort(function(a,b){return totalDone(b)-totalDone(a);});
   groups.remote.sort(function(a,b){return totalDone(b)-totalDone(a);});
   groups.inv.sort(function(a,b){return totalDone(b)-totalDone(a);});
@@ -4224,7 +4228,7 @@ function showRegPerfDetail(userName, metric) {
     if ((r.user_name || '').trim() !== userName) return;
     var sk = r.study_key || '';
     if (!sk) return;
-    if (!byStudy[sk]) byStudy[sk] = { study_name: displayStudyName(r.study_name || ''), study_key: sk, docs_uploaded: 0, docs_signed: 0, comments: 0, open_comments: 0, signoffs: 0, pending_docs: 0, pending_duties: 0 };
+    if (!byStudy[sk]) byStudy[sk] = { study_name: displayStudyName(r.study_name || ''), study_key: sk, docs_uploaded: 0, docs_signed: 0, comments: 0, open_comments: 0, signoffs: 0, pending_docs: 0, };
     var s = byStudy[sk];
     s.docs_uploaded += parseInt(r.docs_uploaded) || 0;
     s.docs_signed += parseInt(r.docs_signed) || 0;
@@ -4236,38 +4240,42 @@ function showRegPerfDetail(userName, metric) {
   });
 
   var studies = Object.values(byStudy).filter(function(s) {
-    if (metric === 'pending') return (s.pending_docs + s.open_comments + s.pending_duties) > 0;
+    if (metric === 'pending') return (s.pending_docs + s.open_comments) > 0;
     return (s[metric] || 0) > 0;
   }).sort(function(a,b) {
-    if (metric === 'pending') return (b.pending_docs+b.open_comments+b.pending_duties) - (a.pending_docs+a.open_comments+a.pending_duties);
+    if (metric === 'pending') return (b.pending_docs+b.open_comments) - (a.pending_docs+a.open_comments);
     return (b[metric]||0) - (a[metric]||0);
   });
 
   var labels = {docs_signed:'Documents Signed',docs_uploaded:'Documents Uploaded',comments:'Comments Created',signoffs:'Sign-Offs',pending:'Pending Items'};
   var title = escapeHTML(userName) + ' — ' + (labels[metric] || metric);
   var total = studies.reduce(function(s,st) {
-    if (metric === 'pending') return s + st.pending_docs + st.open_comments + st.pending_duties;
+    if (metric === 'pending') return s + st.pending_docs + st.open_comments;
     return s + (st[metric]||0);
   }, 0);
 
   var body = '<table class="detail-table" style="width:100%;font-size:12px;"><thead><tr><th style="text-align:left;padding:8px;">Study</th>';
   if (metric === 'pending') {
-    body += '<th style="text-align:center;">Docs</th><th style="text-align:center;">Comments</th><th style="text-align:center;">Duties</th><th style="text-align:center;">Total</th>';
+    body += '<th style="text-align:center;">Docs</th><th style="text-align:center;">Comments</th><th style="text-align:center;">Total</th>';
   } else {
     body += '<th style="text-align:center;">Count</th>';
   }
   body += '<th style="text-align:center;">CRIO</th></tr></thead><tbody>';
 
+  // Build study name lookup from all reg perf data + any global study map
+  var _studyNames = {};
+  (window._regPerfData || []).forEach(function(r) { if (r.study_key && r.study_name) _studyNames[r.study_key] = r.study_name; });
+
   studies.forEach(function(s) {
     var studyUrl = typeof window._crioStudyUrl === 'function' ? window._crioStudyUrl(s.study_key) : '';
-    var studyLink = studyUrl ? '<a href="'+escapeHTML(studyUrl)+'" target="_blank" style="color:#1843AD;text-decoration:none;font-weight:600;">'+escapeHTML(s.study_name || s.study_key)+'</a>' : escapeHTML(s.study_name || s.study_key);
+    var sName = displayStudyName(s.study_name || _studyNames[s.study_key] || s.study_key);
+    var studyLink = studyUrl ? '<a href="'+escapeHTML(studyUrl)+'" target="_blank" style="color:#1843AD;text-decoration:none;font-weight:600;">'+escapeHTML(sName)+'</a>' : escapeHTML(sName);
     body += '<tr style="border-bottom:1px solid #f1f5f9;">';
     body += '<td style="padding:6px 8px;">'+studyLink+'</td>';
     if (metric === 'pending') {
       body += '<td style="text-align:center;color:'+(s.pending_docs?'#dc2626':'#cbd5e1')+';">'+(s.pending_docs||'—')+'</td>';
       body += '<td style="text-align:center;color:'+(s.open_comments?'#FF9933':'#cbd5e1')+';">'+(s.open_comments||'—')+'</td>';
-      body += '<td style="text-align:center;color:'+(s.pending_duties?'#072061':'#cbd5e1')+';">'+(s.pending_duties||'—')+'</td>';
-      body += '<td style="text-align:center;font-weight:700;">'+(s.pending_docs+s.open_comments+s.pending_duties)+'</td>';
+      body += '<td style="text-align:center;font-weight:700;">'+(s.pending_docs+s.open_comments)+'</td>';
     } else {
       body += '<td style="text-align:center;font-weight:700;">'+(s[metric]||0)+'</td>';
     }
