@@ -89,13 +89,13 @@
   --red: #f87171;
   --red-bg: #2a1515;
   --red-border: #7f1d1d;
-  --yellow: #fbbf24;
-  --yellow-bg: #2a2210;
+  --yellow: #ff9933;
+  --yellow-bg: #2a2010;
   --yellow-border: #92400e;
-  --yellow-light: #2a2210;
-  --violet: #a78bfa;
-  --violet-bg: #1e1536;
-  --violet-border: #4c1d95;
+  --yellow-light: #2a2010;
+  --violet: #5b8def;
+  --violet-bg: #1a2744;
+  --violet-border: #2d3f56;
   --orange-light: #2a2010;
   --orange-border: #c67a20;
 }
@@ -901,7 +901,7 @@ body {
     }
     @media (max-width: 800px) {
       .nav-hamburger { display: inline-block; }
-      .nav-tabs-wrapper { display: none; flex-direction: column; position: absolute; top: 50px; left: 0; right: 0;
+      .nav-tabs-wrapper { display: none; flex-direction: column; position: absolute; top: 40px; left: 0; right: 0;
         background: var(--surface); border-bottom: 2px solid var(--border); z-index: 999; padding: 8px 0; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
       .nav-tabs-wrapper.open { display: flex; }
       .nav-tabs-wrapper .nav-tab { display: block; width: 100%; text-align: left; padding: 10px 24px; border-radius: 0; }
@@ -9531,13 +9531,14 @@ function processLiveData(allRows, legacyCancels, auditLog) {
     const m = {};
     rows.forEach(r => {
       const sn = r[nameField];
-      if (!m[sn]) m[sn] = { count: 0, study_url: studyUrl(r[keyField], r[siteField]),
-        site: siteSlug(r[keyField], r[siteField])===PNJ ? 'Pennington, NJ' : 'Philadelphia, PA' };
+      if (!m[sn]) m[sn] = { count: 0, study_url: null, sites: new Set() };
       m[sn].count++;
+      var siteName = siteSlug(r[keyField], r[siteField])===PNJ ? 'Pennington, NJ' : 'Philadelphia, PA';
+      m[sn].sites.add(siteName);
       if (!m[sn].study_url) m[sn].study_url = studyUrl(r[keyField], r[siteField]);
     });
     return Object.entries(m)
-      .map(([full,v]) => ({name: full.split(' - ').pop(), full, count: v.count, site: v.site, study_url: v.study_url}))
+      .map(([full,v]) => ({name: full.split(' - ').pop(), full, count: v.count, site: [...v.sites].join(', '), sites: v.sites, study_url: v.study_url}))
       .sort((a,b) => b.count - a.count);
   }
 
@@ -10103,7 +10104,13 @@ function processLiveData(allRows, legacyCancels, auditLog) {
       upcomingByStudy.forEach(s => {
         liveUpcoming[s.name] = s.count; liveUpcoming[s.full] = s.count;
         liveStudyUrl[s.name] = s.study_url; liveStudyUrl[s.full] = s.study_url;
-        if (s.site) { if (!liveSites[s.name]) liveSites[s.name] = new Set(); liveSites[s.name].add(s.site.includes('Penn') ? 'PNJ' : 'PHL'); }
+        if (s.sites && s.sites.size > 0) {
+          if (!liveSites[s.name]) liveSites[s.name] = new Set();
+          s.sites.forEach(function(siteName) { liveSites[s.name].add(siteName.includes('Penn') ? 'PNJ' : 'PHL'); });
+        } else if (s.site) {
+          if (!liveSites[s.name]) liveSites[s.name] = new Set();
+          liveSites[s.name].add(s.site.includes('Penn') ? 'PNJ' : 'PHL');
+        }
       });
       const riskLookup = {};
       riskMatrix.forEach(r => { riskLookup[r.study] = r; riskLookup[r.full] = r; });

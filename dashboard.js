@@ -7508,13 +7508,14 @@ function processLiveData(allRows, legacyCancels, auditLog) {
     const m = {};
     rows.forEach(r => {
       const sn = r[nameField];
-      if (!m[sn]) m[sn] = { count: 0, study_url: studyUrl(r[keyField], r[siteField]),
-        site: siteSlug(r[keyField], r[siteField])===PNJ ? 'Pennington, NJ' : 'Philadelphia, PA' };
+      if (!m[sn]) m[sn] = { count: 0, study_url: null, sites: new Set() };
       m[sn].count++;
+      var siteName = siteSlug(r[keyField], r[siteField])===PNJ ? 'Pennington, NJ' : 'Philadelphia, PA';
+      m[sn].sites.add(siteName);
       if (!m[sn].study_url) m[sn].study_url = studyUrl(r[keyField], r[siteField]);
     });
     return Object.entries(m)
-      .map(([full,v]) => ({name: full.split(' - ').pop(), full, count: v.count, site: v.site, study_url: v.study_url}))
+      .map(([full,v]) => ({name: full.split(' - ').pop(), full, count: v.count, site: [...v.sites].join(', '), sites: v.sites, study_url: v.study_url}))
       .sort((a,b) => b.count - a.count);
   }
 
@@ -8080,7 +8081,13 @@ function processLiveData(allRows, legacyCancels, auditLog) {
       upcomingByStudy.forEach(s => {
         liveUpcoming[s.name] = s.count; liveUpcoming[s.full] = s.count;
         liveStudyUrl[s.name] = s.study_url; liveStudyUrl[s.full] = s.study_url;
-        if (s.site) { if (!liveSites[s.name]) liveSites[s.name] = new Set(); liveSites[s.name].add(s.site.includes('Penn') ? 'PNJ' : 'PHL'); }
+        if (s.sites && s.sites.size > 0) {
+          if (!liveSites[s.name]) liveSites[s.name] = new Set();
+          s.sites.forEach(function(siteName) { liveSites[s.name].add(siteName.includes('Penn') ? 'PNJ' : 'PHL'); });
+        } else if (s.site) {
+          if (!liveSites[s.name]) liveSites[s.name] = new Set();
+          liveSites[s.name].add(s.site.includes('Penn') ? 'PNJ' : 'PHL');
+        }
       });
       const riskLookup = {};
       riskMatrix.forEach(r => { riskLookup[r.study] = r; riskLookup[r.full] = r; });
