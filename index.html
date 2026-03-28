@@ -1290,6 +1290,16 @@ body {
     </div>
   </div>
 
+  <!-- Regulatory Performance -->
+  <div class="card fade-in" style="margin-bottom:12px;">
+    <div class="card-header">
+      <span class="card-title">Regulatory Performance</span>
+      <span class="badge badge-gray" id="reg-perf-badge">Loading...</span>
+    </div>
+    <div style="font-size:10px;color:#94a3b8;padding:2px 12px 0;">Documents signed/uploaded, comments, sign-offs, pending items · last 90 days · click numbers for study detail</div>
+    <div id="regPerfContainer" style="padding:8px 12px;"></div>
+  </div>
+
   <!-- Hidden containers for backward compat -->
   <div id="coord-prod-container" style="display:none"></div>
   <div style="display:none"><canvas id="trendsCoordChart"></canvas></div>
@@ -6057,6 +6067,246 @@ function renderCoordinatorGoals() {
 
 
 // ═══ COORDINATOR CANCEL BREAKDOWN BY TYPE (No Show / Site / Patient) ═══
+// ═══ REGULATORY PERFORMANCE ═══
+window._regPerfData = [];
+
+function loadRegulatoryPerformance() {
+  var base = CRP_CONFIG.CF_BASE;
+  if (!base) return;
+  fetch(base + '?feed=regulatoryPerformance&format=json')
+    .then(function(r) { return r.json(); })
+    .then(function(j) {
+      window._regPerfData = j.data || [];
+      _log('Regulatory Performance: ' + window._regPerfData.length + ' rows');
+      renderRegulatoryPerformance();
+    })
+    .catch(function(e) { _log('Regulatory Performance failed: ' + e.message); });
+}
+
+function renderRegulatoryPerformance() {
+  var el = document.getElementById('regPerfContainer');
+  var badge = document.getElementById('reg-perf-badge');
+  if (!el || !window._regPerfData || window._regPerfData.length === 0) {
+    if (el) el.innerHTML = '<div style="padding:16px;color:#94a3b8;font-size:12px;text-align:center;">No data</div>';
+    return;
+  }
+
+  var COORDS = CRP_CONFIG.COORDINATORS || [];
+  var INVESTIGATORS = CRP_CONFIG.INVESTIGATORS || [];
+  var REMOTE_CRCS = ['Huzaif Qazi','Jeehan Choudhary','Aadil Ansari','Siddhesh Mhatre','Aditi Chorage','Nice Jain','Prachi Khanolkar','Kajal Jadhav'];
+  var coordLo = COORDS.map(function(n){return n.toLowerCase();});
+  var invLo = INVESTIGATORS.map(function(n){return n.toLowerCase();});
+  var remoteLo = REMOTE_CRCS.map(function(n){return n.toLowerCase();});
+
+  // Aggregate per user (combine per-study rows)
+  var byUser = {};
+  window._regPerfData.forEach(function(r) {
+    var name = (r.user_name || '').trim();
+    if (!name) return;
+    if (!byUser[name]) byUser[name] = { name: name, site: '', docs_uploaded: 0, docs_signed: 0, comments: 0, open_comments: 0, signoffs: 0, pending_docs: 0, pending_duties: 0, studies: {} };
+    var u = byUser[name];
+    u.docs_uploaded += parseInt(r.docs_uploaded) || 0;
+    u.docs_signed += parseInt(r.docs_signed) || 0;
+    u.comments += parseInt(r.comments_created) || 0;
+    u.open_comments += parseInt(r.open_comments) || 0;
+    u.signoffs += parseInt(r.signoffs) || 0;
+    u.pending_docs += parseInt(r.pending_docs) || 0;
+    u.pending_duties += parseInt(r.pending_duties) || 0;
+    if (r.site_name && !u.site) u.site = r.site_name;
+    else if (r.site_name && u.site && u.site !== r.site_name) u.site = 'Both';
+    // Per-study detail for drill-down
+    var sk = r.study_key || '';
+    if (sk && !u.studies[sk]) u.studies[sk] = { study_name: r.study_name || '', study_key: sk, docs_uploaded: 0, docs_signed: 0, comments: 0, signoffs: 0, pending_docs: 0, pending_duties: 0 };
+    if (sk) {
+      var st = u.studies[sk];
+      st.docs_uploaded += parseInt(r.docs_uploaded) || 0;
+      st.docs_signed += parseInt(r.docs_signed) || 0;
+      st.comments += parseInt(r.comments_created) || 0;
+      st.signoffs += parseInt(r.signoffs) || 0;
+      st.pending_docs += parseInt(r.pending_docs) || 0;
+      st.pending_duties += parseInt(r.pending_duties) || 0;
+    }
+  });
+
+  function classify(name) {
+    var lo = name.toLowerCase();
+    if (coordLo.indexOf(lo) !== -1) return 'coord';
+    if (invLo.indexOf(lo) !== -1) return 'inv';
+    if (remoteLo.indexOf(lo) !== -1) return 'remote';
+    return null;
+  }
+
+  var groups = { coord: [], remote: [], inv: [] };
+  Object.values(byUser).forEach(function(u) {
+    var g = classify(u.name);
+    if (g) groups[g].push(u);
+  });
+
+  // Also add missing users with zero
+  COORDS.forEach(function(n) { if (!byUser[n]) groups.coord.push({ name: n, site: '', docs_uploaded: 0, docs_signed: 0, comments: 0, open_comments: 0, signoffs: 0, pending_docs: 0, pending_duties: 0, studies: {} }); });
+  REMOTE_CRCS.forEach(function(n) { if (!byUser[n]) groups.remote.push({ name: n, site: '', docs_uploaded: 0, docs_signed: 0, comments: 0, open_comments: 0, signoffs: 0, pending_docs: 0, pending_duties: 0, studies: {} }); });
+  INVESTIGATORS.forEach(function(n) { if (!byUser[n]) groups.inv.push({ name: n, site: '', docs_uploaded: 0, docs_signed: 0, comments: 0, open_comments: 0, signoffs: 0, pending_docs: 0, pending_duties: 0, studies: {} }); });
+
+  // Sort each group by total done desc
+  function totalDone(u) { return u.docs_signed + u.docs_uploaded + u.comments + u.signoffs; }
+  function totalPending(u) { return u.pending_docs + u.open_comments + u.pending_duties; }
+  groups.coord.sort(function(a,b){return totalDone(b)-totalDone(a);});
+  groups.remote.sort(function(a,b){return totalDone(b)-totalDone(a);});
+  groups.inv.sort(function(a,b){return totalDone(b)-totalDone(a);});
+
+  var allUsers = groups.coord.concat(groups.remote).concat(groups.inv);
+  var totalSigned = allUsers.reduce(function(s,u){return s+u.docs_signed;},0);
+  var totalUploaded = allUsers.reduce(function(s,u){return s+u.docs_uploaded;},0);
+  var totalComments = allUsers.reduce(function(s,u){return s+u.comments;},0);
+  var totalSignoffs = allUsers.reduce(function(s,u){return s+u.signoffs;},0);
+  var totalPend = allUsers.reduce(function(s,u){return s+totalPending(u);},0);
+
+  if (badge) badge.textContent = allUsers.length + ' staff · ' + (totalSigned+totalUploaded+totalComments+totalSignoffs) + ' actions';
+
+  function siteLabel(s) {
+    if (!s) return '<span style="color:#94a3b8;">—</span>';
+    if (s === 'Both' || s.indexOf(',') !== -1) return '<span style="color:#072061;font-weight:600;">PHL</span>/<span style="color:#059669;font-weight:600;">PNJ</span>';
+    return s.indexOf('Penn') !== -1 ? '<span style="padding:1px 4px;border-radius:3px;background:#05966915;color:#059669;font-weight:600;font-size:9px;">PNJ</span>' : '<span style="padding:1px 4px;border-radius:3px;background:#07206115;color:#072061;font-weight:600;font-size:9px;">PHL</span>';
+  }
+
+  function numCell(val, userName, metric, color) {
+    if (!val) return '<td style="text-align:center;color:#cbd5e1;font-size:11px;">—</td>';
+    return '<td style="text-align:center;font-weight:700;font-size:11px;cursor:pointer;color:'+color+';" onclick="showRegPerfDetail(\''+jsAttr(userName)+'\',\''+metric+'\')">' + val + '</td>';
+  }
+
+  function pendCell(val, userName) {
+    if (!val) return '<td style="text-align:center;color:#cbd5e1;font-size:11px;">—</td>';
+    return '<td style="text-align:center;font-weight:700;font-size:11px;cursor:pointer;color:#dc2626;" onclick="showRegPerfDetail(\''+jsAttr(userName)+'\',\'pending\')">' + val + '</td>';
+  }
+
+  function buildGroup(title, users, columns) {
+    if (users.length === 0) return '';
+    var maxDone = Math.max.apply(null, users.map(totalDone).concat([1]));
+    var h = '<div style="font-size:12px;font-weight:700;color:#072061;margin:10px 0 6px;">'+title+'</div>';
+    h += '<table style="width:100%;border-collapse:collapse;font-size:11px;"><thead><tr style="background:var(--surface2);border-bottom:2px solid var(--border);">';
+    h += '<th style="text-align:left;padding:6px 8px;font-weight:700;">Name</th>';
+    h += '<th style="text-align:center;padding:4px 6px;font-weight:700;">Site</th>';
+    columns.forEach(function(c) { h += '<th style="text-align:center;padding:4px 6px;font-weight:700;color:'+c.color+';">'+c.label+'</th>'; });
+    h += '<th style="text-align:center;padding:4px 6px;font-weight:700;">Done</th>';
+    h += '<th style="text-align:center;padding:4px 6px;font-weight:700;color:#dc2626;">Pending</th>';
+    h += '<th style="padding:4px 8px;font-weight:700;">Volume</th>';
+    h += '</tr></thead><tbody>';
+    users.forEach(function(u) {
+      var done = totalDone(u);
+      var pend = totalPending(u);
+      var barDone = Math.round(done / maxDone * 100);
+      var barPend = pend > 0 ? Math.min(30, Math.round(pend / (done + pend) * 100)) : 0;
+      h += '<tr style="border-bottom:1px solid #f1f5f9;">';
+      h += '<td style="padding:6px 8px;font-weight:600;">'+escapeHTML(u.name)+'</td>';
+      h += '<td style="text-align:center;padding:4px 6px;">'+siteLabel(u.site)+'</td>';
+      columns.forEach(function(c) { h += numCell(u[c.key], u.name, c.key, c.color); });
+      h += '<td style="text-align:center;font-weight:700;color:#1843AD;">'+done+'</td>';
+      h += pendCell(pend, u.name);
+      h += '<td style="padding:4px 8px;"><div style="display:flex;height:10px;border-radius:3px;overflow:hidden;background:#e2e8f0;">';
+      h += '<div style="width:'+barDone+'%;background:#1843AD;"></div>';
+      if (barPend) h += '<div style="width:'+barPend+'%;background:#dc2626;"></div>';
+      h += '</div></td>';
+      h += '</tr>';
+    });
+    h += '</tbody></table>';
+    return h;
+  }
+
+  // KPI strip
+  var html = '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:10px;text-align:center;">';
+  html += '<div><div style="font-size:18px;font-weight:800;color:#1843AD;">'+totalSigned+'</div><div style="font-size:9px;color:#94a3b8;">Signed</div></div>';
+  html += '<div><div style="font-size:18px;font-weight:800;color:#072061;">'+totalUploaded+'</div><div style="font-size:9px;color:#94a3b8;">Uploaded</div></div>';
+  html += '<div><div style="font-size:18px;font-weight:800;color:#FF9933;">'+totalComments+'</div><div style="font-size:9px;color:#94a3b8;">Comments</div></div>';
+  html += '<div><div style="font-size:18px;font-weight:800;color:#059669;">'+totalSignoffs+'</div><div style="font-size:9px;color:#94a3b8;">Sign-Offs</div></div>';
+  html += '<div><div style="font-size:18px;font-weight:800;color:#dc2626;">'+totalPend+'</div><div style="font-size:9px;color:#94a3b8;">Pending</div></div>';
+  html += '</div>';
+
+  html += buildGroup('Coordinators', groups.coord, [
+    {key:'docs_signed',label:'Signed',color:'#1843AD'},
+    {key:'docs_uploaded',label:'Uploaded',color:'#072061'},
+    {key:'comments',label:'Comments',color:'#FF9933'}
+  ]);
+  html += buildGroup('Remote CRCs', groups.remote, [
+    {key:'docs_uploaded',label:'Uploaded',color:'#072061'},
+    {key:'comments',label:'Comments',color:'#FF9933'}
+  ]);
+  html += buildGroup('Investigators', groups.inv, [
+    {key:'docs_signed',label:'Signed',color:'#1843AD'},
+    {key:'signoffs',label:'Sign-Offs',color:'#059669'}
+  ]);
+
+  el.innerHTML = html;
+}
+
+// Detail modal — per-study breakdown with CRIO links
+function showRegPerfDetail(userName, metric) {
+  var userData = null;
+  // Rebuild from raw data
+  var byStudy = {};
+  (window._regPerfData || []).forEach(function(r) {
+    if ((r.user_name || '').trim() !== userName) return;
+    var sk = r.study_key || '';
+    if (!sk) return;
+    if (!byStudy[sk]) byStudy[sk] = { study_name: displayStudyName(r.study_name || ''), study_key: sk, docs_uploaded: 0, docs_signed: 0, comments: 0, open_comments: 0, signoffs: 0, pending_docs: 0, pending_duties: 0 };
+    var s = byStudy[sk];
+    s.docs_uploaded += parseInt(r.docs_uploaded) || 0;
+    s.docs_signed += parseInt(r.docs_signed) || 0;
+    s.comments += parseInt(r.comments_created) || 0;
+    s.open_comments += parseInt(r.open_comments) || 0;
+    s.signoffs += parseInt(r.signoffs) || 0;
+    s.pending_docs += parseInt(r.pending_docs) || 0;
+    s.pending_duties += parseInt(r.pending_duties) || 0;
+  });
+
+  var studies = Object.values(byStudy).filter(function(s) {
+    if (metric === 'pending') return (s.pending_docs + s.open_comments + s.pending_duties) > 0;
+    return (s[metric] || 0) > 0;
+  }).sort(function(a,b) {
+    if (metric === 'pending') return (b.pending_docs+b.open_comments+b.pending_duties) - (a.pending_docs+a.open_comments+a.pending_duties);
+    return (b[metric]||0) - (a[metric]||0);
+  });
+
+  var labels = {docs_signed:'Documents Signed',docs_uploaded:'Documents Uploaded',comments:'Comments Created',signoffs:'Sign-Offs',pending:'Pending Items'};
+  var title = escapeHTML(userName) + ' — ' + (labels[metric] || metric);
+  var total = studies.reduce(function(s,st) {
+    if (metric === 'pending') return s + st.pending_docs + st.open_comments + st.pending_duties;
+    return s + (st[metric]||0);
+  }, 0);
+
+  var body = '<table class="detail-table" style="width:100%;font-size:12px;"><thead><tr><th style="text-align:left;padding:8px;">Study</th>';
+  if (metric === 'pending') {
+    body += '<th style="text-align:center;">Docs</th><th style="text-align:center;">Comments</th><th style="text-align:center;">Duties</th><th style="text-align:center;">Total</th>';
+  } else {
+    body += '<th style="text-align:center;">Count</th>';
+  }
+  body += '<th style="text-align:center;">CRIO</th></tr></thead><tbody>';
+
+  studies.forEach(function(s) {
+    var studyUrl = typeof window._crioStudyUrl === 'function' ? window._crioStudyUrl(s.study_key) : '';
+    var studyLink = studyUrl ? '<a href="'+escapeHTML(studyUrl)+'" target="_blank" style="color:#1843AD;text-decoration:none;font-weight:600;">'+escapeHTML(s.study_name || s.study_key)+'</a>' : escapeHTML(s.study_name || s.study_key);
+    body += '<tr style="border-bottom:1px solid #f1f5f9;">';
+    body += '<td style="padding:6px 8px;">'+studyLink+'</td>';
+    if (metric === 'pending') {
+      body += '<td style="text-align:center;color:'+(s.pending_docs?'#dc2626':'#cbd5e1')+';">'+(s.pending_docs||'—')+'</td>';
+      body += '<td style="text-align:center;color:'+(s.open_comments?'#FF9933':'#cbd5e1')+';">'+(s.open_comments||'—')+'</td>';
+      body += '<td style="text-align:center;color:'+(s.pending_duties?'#072061':'#cbd5e1')+';">'+(s.pending_duties||'—')+'</td>';
+      body += '<td style="text-align:center;font-weight:700;">'+(s.pending_docs+s.open_comments+s.pending_duties)+'</td>';
+    } else {
+      body += '<td style="text-align:center;font-weight:700;">'+(s[metric]||0)+'</td>';
+    }
+    // CRIO link to study files/regulatory page
+    var crioLink = studyUrl ? studyUrl.replace('/subjects', '/files') : '';
+    if (metric === 'pending' || metric === 'docs_signed' || metric === 'docs_uploaded') crioLink = studyUrl ? studyUrl.replace('/subjects', '/files') : '';
+    else if (metric === 'comments') crioLink = studyUrl || '';
+    else if (metric === 'signoffs') crioLink = studyUrl || '';
+    body += '<td style="text-align:center;">'+(crioLink ? '<a href="'+escapeHTML(crioLink)+'" target="_blank" style="color:#1843AD;font-size:10px;font-weight:600;text-decoration:none;">Open</a>' : '—')+'</td>';
+    body += '</tr>';
+  });
+
+  body += '</tbody></table>';
+  openModal(title + ' (' + total + ')', '', body);
+}
+
 function renderCoordCancelTypeChart() {
   var canvas = document.getElementById('coordCancelTypeChart');
   var tableEl = document.getElementById('coord-cancel-type-table');
@@ -17972,6 +18222,7 @@ async function _crpInit() {
 
     // Phase 3: Supplemental data (Action Required + Patient DB + Meta Ads)
     if (typeof fetchActionRequiredData === 'function') fetchActionRequiredData();
+    if (typeof loadRegulatoryPerformance === 'function') loadRegulatoryPerformance();
     fetchPatientDB().then(ok => {
       if (ok) {
         _log('CRP: Patient DB cross-reference complete');
