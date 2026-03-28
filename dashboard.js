@@ -924,7 +924,7 @@ function showStudyModal(s){
   if (typeof showStudyUnifiedModal === 'function') { showStudyUnifiedModal(s.includes(' - ') ? s.split(' - ').pop().trim() : s); return; }
   const ar=TOP_AR_STUDIES.find(x=>x.study===s);const p=pid(s);const rev=p?STUDY_REVENUE_12M[p]||0:0;
   const ms=FIN_MERGED_STUDIES.find(x=>s.includes(x.study));const ui=UNINVOICED.find(x=>x.study===s);
-  let h='<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">';
+  let h='<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:12px">';
   if(ar){h+='<div><strong>Invoice AR:</strong> '+fmt(ar.invAR)+'</div><div><strong>Autopay AR:</strong> '+fmt(ar.apAR)+'</div><div><strong>Total AR:</strong> '+fmt(ar.total)+'</div><div><strong>Collected:</strong> '+fmt(ar.collected)+'</div>';}
   h+='<div><strong>12M Revenue:</strong> '+fmt(rev)+'</div>';
   if(ui)h+='<div><strong>Uninvoiced:</strong> '+fmt(ui.amount)+'</div>';
@@ -969,7 +969,7 @@ function showRevPerStudyPopup() {
   var count = entries.length || 1;
   var total = entries.reduce(function(s,e){return s+e[1];},0);
   var avg = total / count;
-  var h = '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px;text-align:center">';
+  var h = '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px;text-align:center">';
   h += '<div><div style="font-size:20px;font-weight:800;color:#FF9933">'+fmtK(avg)+'</div><div style="font-size:10px;color:#94a3b8">Avg per Study</div></div>';
   h += '<div><div style="font-size:20px;font-weight:800;color:#1843AD">'+count+'</div><div style="font-size:10px;color:#94a3b8">Active Studies</div></div>';
   h += '<div><div style="font-size:20px;font-weight:800;color:#14B8A6">'+fmtK(total)+'</div><div style="font-size:10px;color:#94a3b8">Total Revenue</div></div>';
@@ -1172,7 +1172,7 @@ function renderPayTypeChart() {
   container.innerHTML = REVENUE_BY_PAY_TYPE.map(d => {
     const pct = (d.amount / maxAmt * 100).toFixed(0);
     const c = colors[d.type] || '#1843AD';
-    return '<div style="margin-bottom:16px"><div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:13px"><span style="font-weight:600;color:#1a202c">' + escapeHTML(d.type) + '</span><span style="color:#4A5568;font-weight:700">' + fmt(d.amount) + '</span></div><div style="background:#F3F4F6;border-radius:6px;height:28px;overflow:hidden"><div style="background:' + c + ';height:100%;width:' + pct + '%;border-radius:6px;transition:width 0.5s"></div></div></div>';
+    return '<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:13px"><span style="font-weight:600;color:#1a202c">' + escapeHTML(d.type) + '</span><span style="color:#4A5568;font-weight:700">' + fmt(d.amount) + '</span></div><div style="background:#F3F4F6;border-radius:6px;height:28px;overflow:hidden"><div style="background:' + c + ';height:100%;width:' + pct + '%;border-radius:6px;transition:width 0.5s"></div></div></div>';
   }).join('');
 }
 
@@ -1237,7 +1237,7 @@ function renderUnpaidApTypeChart() {
     const pct = total > 0 ? Math.round(d.amount / total * 100) : 0;
     const barPct = (d.amount / maxAmt * 100).toFixed(0);
     const c = colors[d.type] || '#6B7280';
-    return '<div style="margin-bottom:16px"><div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:13px"><span style="font-weight:600;color:#1a202c">' + escapeHTML(d.type) + ' <span style="color:#9CA3AF;font-weight:400">(' + d.count + ' items · ' + pct + '%)</span></span><span style="color:#4A5568;font-weight:700">' + fmt(d.amount) + '</span></div><div style="background:#F3F4F6;border-radius:6px;height:24px;overflow:hidden"><div style="background:' + c + ';height:100%;width:' + barPct + '%;border-radius:6px;transition:width 0.5s"></div></div></div>';
+    return '<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:13px"><span style="font-weight:600;color:#1a202c">' + escapeHTML(d.type) + ' <span style="color:#9CA3AF;font-weight:400">(' + d.count + ' items · ' + pct + '%)</span></span><span style="color:#4A5568;font-weight:700">' + fmt(d.amount) + '</span></div><div style="background:#F3F4F6;border-radius:6px;height:24px;overflow:hidden"><div style="background:' + c + ';height:100%;width:' + barPct + '%;border-radius:6px;transition:width 0.5s"></div></div></div>';
   }).join('');
 }
 
@@ -2192,7 +2192,7 @@ function renderInsights() {
   const cancelRevEl = el('ins-cancel-revenue');
   if (cancelRevEl) {
     const cancelStudies = Object.values(crossMap).filter(s=>s.cancels>0).sort((a,b)=>b.cancels-a.cancels);
-    let totalLostEst=0, html='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-bottom:16px">';
+    let totalLostEst=0, html='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-bottom:12px">';
     cancelStudies.slice(0,8).forEach(s=>{
       const rev12=STUDY_REVENUE_12M[s.code]||0;
       const enrolled=s.enrolled||1;
@@ -3552,11 +3552,11 @@ function showHorizonDetail(type, weekLabel) {
     document.body.appendChild(overlay);
   }
   overlay.innerHTML = `<div style="background:#fff;border-radius:12px;max-width:800px;width:100%;max-height:80vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3)">
-    <div style="padding:16px 20px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center">
+    <div style="padding:12px 14px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center">
       <div style="font-size:15px;font-weight:700;color:#1a202c">${escapeHTML(title)} <span style="font-weight:400;color:#64748b;font-size:13px">(${rows.length} records)</span></div>
       <button onclick="var _ho=document.getElementById('horizon-overlay');if(_ho)_ho.remove()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#94a3b8;padding:4px 8px">✕</button>
     </div>
-    <div style="padding:16px 20px">${rows.length ? tableHTML : '<div style="text-align:center;padding:24px;color:#94a3b8">No records for this week</div>'}</div>
+    <div style="padding:12px 14px">${rows.length ? tableHTML : '<div style="text-align:center;padding:24px;color:#94a3b8">No records for this week</div>'}</div>
   </div>`;
 }
 
@@ -3699,7 +3699,7 @@ function showInvDetail(invName) {
   let body = '';
   if (upcoming.length) {
     body += `<h4 style="font-size:12px;font-weight:700;color:#475569;margin:0 0 8px;text-transform:uppercase;letter-spacing:.5px;">Upcoming Visits (${upcoming.length})</h4>
-    <table class="detail-table" style="margin-bottom:20px"><thead><tr>
+    <table class="detail-table" style="margin-bottom:12px"><thead><tr>
       <th>Date</th><th>Patient</th><th>Study</th><th>Visit</th><th>Coordinator</th>
     </tr></thead><tbody>` +
     upcoming.map(r=>`<tr>
@@ -9790,7 +9790,7 @@ function showStudyDetail(studyName, studyUrl) {
   let body = '';
   if(upcoming.length) {
     body += `<h4 style="font-size:12px;font-weight:700;color:#475569;margin:0 0 8px;text-transform:uppercase;letter-spacing:.5px;">Upcoming Visits (${upcoming.length})</h4>
-    <table class="detail-table" style="margin-bottom:20px"><thead><tr>
+    <table class="detail-table" style="margin-bottom:12px"><thead><tr>
       <th>Date</th><th>Patient</th><th>Visit</th><th>Status</th><th>Coordinator</th><th>Investigator</th>
     </tr></thead><tbody>` +
     upcoming.map(r=>`<tr>
@@ -10072,7 +10072,7 @@ function showCancelsByReason(reason) {
 function showRecruiterDetail(recruiterName) {
   var stats = (window._recruiterStats || []).find(function(r) { return r.recruiter === recruiterName; });
   if (!stats) { openModal(recruiterName, 'Recruiter', '<p style="color:#94a3b8;padding:20px;text-align:center">No interaction data found</p>'); return; }
-  var h = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:16px;">';
+  var h = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:12px;">';
   var kpi = function(label, val, color) { return '<div style="padding:8px;border-radius:8px;text-align:center;background:'+color+'15"><div style="font-size:18px;font-weight:800;color:'+color+'">'+val+'</div><div style="font-size:9px;color:'+color+';font-weight:600">'+label+'</div></div>'; };
   h += kpi('Interactions', stats.total_interactions||0, '#1843AD');
   h += kpi('Phone Calls', stats.phone_calls||0, '#059669');
@@ -10105,7 +10105,7 @@ function showCoordDetail(coordName) {
   let body = '';
   if(upcoming.length) {
     body += `<h4 style="font-size:12px;font-weight:700;color:#475569;margin:0 0 8px;text-transform:uppercase;letter-spacing:.5px;">Upcoming Visits (${upcoming.length})</h4>
-    <table class="detail-table" style="margin-bottom:20px"><thead><tr>
+    <table class="detail-table" style="margin-bottom:12px"><thead><tr>
       <th>Date</th><th>Patient</th><th>Study</th><th>Visit</th><th>Status</th><th>Investigator</th>
     </tr></thead><tbody>` +
     upcoming.map(r=>`<tr>
@@ -11169,7 +11169,7 @@ function showStudyPipelineModal(studyName) {
   const CU = CRP_CONFIG.CLICKUP;
 
   // Funnel bars
-  let funnel = '<div style="margin-bottom:16px;">';
+  let funnel = '<div style="margin-bottom:12px;">';
   [...CU.PIPELINE_ORDER, ...CU.CLOSED_STAGES].forEach(stage => {
     const count = ref.stages[stage] || 0;
     if (count === 0) return;
@@ -11253,7 +11253,7 @@ function showCampaignDetailModal(studyName) {
 
   // Campaign Summary KPIs
   if (campaign) {
-    html += `<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;padding:12px;background:#f8fafc;border-radius:8px;">
+    html += `<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;padding:12px;background:#f8fafc;border-radius:8px;">
       <div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#1843AD;">${campaign.first_contact.toLocaleString()}</div><div style="font-size:10px;color:#94a3b8;">1st Contact</div></div>
       <div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#FF9933;">${campaign.second_contact.toLocaleString()}</div><div style="font-size:10px;color:#94a3b8;">2nd Contact</div></div>
       <div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#1843AD;">${campaign.third_contact.toLocaleString()}</div><div style="font-size:10px;color:#94a3b8;">3rd Contact</div></div>
@@ -11266,7 +11266,7 @@ function showCampaignDetailModal(studyName) {
   // Referral Pipeline Participants with cross-reference
   if (referrals.length > 0) {
     html += `<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px;">Referral Pipeline Participants</div>`;
-    html += `<table class="detail-table" style="width:100%;font-size:11px;margin-bottom:16px;"><thead><tr>
+    html += `<table class="detail-table" style="width:100%;font-size:11px;margin-bottom:12px;"><thead><tr>
       <th>Participant</th><th>Stage</th><th>Source</th><th>Appt Booked</th><th>Patient Status</th><th>Last Updated</th>
     </tr></thead><tbody>`;
     referrals.sort((a,b) => a.days_since_update - b.days_since_update).forEach(r => {
@@ -14186,7 +14186,7 @@ async function compareBQvLegacy(bqUrl) {
 
   // ── Build visual modal report ──
   var html = '<div style="font-family:system-ui;font-size:13px;line-height:1.6">';
-  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">';
   html += '<div style="background:#f0fdf4;padding:12px;border-radius:8px;text-align:center"><div style="font-size:24px;font-weight:700;color:#059669">' + matched.length + '</div><div style="color:#065f46">Matched</div></div>';
   html += '<div style="background:#fef2f2;padding:12px;border-radius:8px;text-align:center"><div style="font-size:24px;font-weight:700;color:#dc2626">' + onlyInLegacy.length + '</div><div style="color:#991b1b">Only in Legacy</div></div>';
   html += '<div style="background:#eff6ff;padding:12px;border-radius:8px;text-align:center"><div style="font-size:24px;font-weight:700;color:#1843AD">' + onlyInBQ.length + '</div><div style="color:#1e40af">Only in BQ</div></div>';
@@ -15156,7 +15156,7 @@ function generateDailyEmail(type) {
     html += '<h2 style="margin:0 0 16px;font-size:16px;color:#059669;border-bottom:2px solid #059669;padding-bottom:6px;">Financial Summary</h2>';
     if (FIN_DATA.summary) {
       const s = FIN_DATA.summary;
-      html += '<table style="width:100%;border-collapse:collapse;text-align:center;margin-bottom:16px;"><tr>';
+      html += '<table style="width:100%;border-collapse:collapse;text-align:center;margin-bottom:12px;"><tr>';
       if (s.totalAR !== undefined) html += '<td style="padding:8px;"><div style="font-size:20px;font-weight:700;color:#072061;">$' + Number(s.totalAR).toLocaleString() + '</div><div style="font-size:11px;color:#64748b;">Outstanding AR</div></td>';
       if (s.collected !== undefined) html += '<td style="padding:8px;"><div style="font-size:20px;font-weight:700;color:#059669;">$' + Number(s.collected).toLocaleString() + '</div><div style="font-size:11px;color:#64748b;">Collected</div></td>';
       if (s.collectionPct !== undefined) html += '<td style="padding:8px;"><div style="font-size:20px;font-weight:700;color:#1843AD;">' + s.collectionPct + '%</div><div style="font-size:11px;color:#64748b;">Collection Rate</div></td>';
