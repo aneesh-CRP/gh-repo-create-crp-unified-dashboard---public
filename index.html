@@ -5971,16 +5971,22 @@ function renderCoordinatorGoals() {
 
   grid.innerHTML = COORDS.map(name => {
     const byDay = goals.byDay[name] || {};
-    const periodTotal = twoWeekDays.reduce((s,d) => s + (byDay[d]||0), 0);
+    const _byDet = goals.byDayDetail ? (goals.byDayDetail[name] || {}) : {};
+    const periodTotal = twoWeekDays.reduce((s,d) => { var det = (_byDet[d]||[]).length; return s + (det > 0 ? det : (byDay[d]||0)); }, 0);
 
+    const byDetail = goals.byDayDetail ? (goals.byDayDetail[name] || {}) : {};
     const dayBars = twoWeekDays.map((d,i) => {
-      const visits = byDay[d] || 0;
+      const snapCount = byDay[d] || 0;
+      const detailCount = (byDetail[d] || []).length;
+      // Show actual detail count when we have patient data; fall back to snapshot count for bar height
+      const visits = detailCount > 0 ? detailCount : snapCount;
+      const barVisits = Math.max(visits, snapCount); // bar uses higher for visual
       const isToday = d === todayISO;
       const isPast = d < todayISO;
       const isFuture = d > todayISO;
       const barColor = visits >= 2 ? (isFuture ? '#86efac' : '#059669') : visits === 1 ? (isFuture ? '#fdba74' : '#FF9933') : (isFuture ? '#fca5a5' : '#ef4444');
-      const barH = Math.min(100, Math.round((visits / (weekMax * 1.2)) * 100));
-      const hasVisits = visits > 0;
+      const barH = Math.min(100, Math.round((barVisits / (weekMax * 1.2)) * 100));
+      const hasVisits = detailCount > 0;
       const cursor = hasVisits ? 'cursor:pointer;' : '';
       const clickAttr = hasVisits ? `onclick="toggleCoordDayDetail('${jsAttr(name)}','${d}',this)"` : '';
       return `<div style="text-align:center;flex:1;min-width:0;${cursor}position:relative" ${clickAttr}>
