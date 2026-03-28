@@ -634,17 +634,17 @@ const CRP = {
 // STAGE COLORS — unified color map for all pipeline/funnel stages
 // ════════════════════════════════════════
 const STAGE_COLORS = {
-  'New Lead': '#3b82f6',
-  'Contacted': '#f59e0b',
-  'Pre-Screening': '#8b5cf6',
-  'Screening': '#06b6d4',
+  'New Lead': '#1843AD',
+  'Contacted': '#FF9933',
+  'Pre-Screening': '#1843AD',
+  'Screening': '#A2DCEB',
   'Screened': '#10b981',
   'Enrolled': '#059669',
-  'Randomization': '#8b5cf6',
+  'Randomization': '#1843AD',
   'Treatment': '#1843ad',
-  'Follow-Up': '#6366f1',
+  'Follow-Up': '#1843AD',
   'DNQ': '#ef4444',
-  'Screen Fail': '#f97316',
+  'Screen Fail': '#FF9933',
   'Lost': '#94a3b8',
   'Other': '#6b7280',
   'Unknown': '#9ca3af',
@@ -970,8 +970,8 @@ function showRevPerStudyPopup() {
   var total = entries.reduce(function(s,e){return s+e[1];},0);
   var avg = total / count;
   var h = '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px;text-align:center">';
-  h += '<div><div style="font-size:20px;font-weight:800;color:#F59E0B">'+fmtK(avg)+'</div><div style="font-size:10px;color:#94a3b8">Avg per Study</div></div>';
-  h += '<div><div style="font-size:20px;font-weight:800;color:#8B5CF6">'+count+'</div><div style="font-size:10px;color:#94a3b8">Active Studies</div></div>';
+  h += '<div><div style="font-size:20px;font-weight:800;color:#FF9933">'+fmtK(avg)+'</div><div style="font-size:10px;color:#94a3b8">Avg per Study</div></div>';
+  h += '<div><div style="font-size:20px;font-weight:800;color:#1843AD">'+count+'</div><div style="font-size:10px;color:#94a3b8">Active Studies</div></div>';
   h += '<div><div style="font-size:20px;font-weight:800;color:#14B8A6">'+fmtK(total)+'</div><div style="font-size:10px;color:#94a3b8">Total Revenue</div></div>';
   h += '</div>';
   h += '<table><thead><tr><th>Study</th><th class="r">Revenue</th><th class="r">vs Avg</th></tr></thead><tbody>';
@@ -987,7 +987,7 @@ function showRevPerStudyPopup() {
 function showRevByTypePopup() {
   var total = REVENUE_BY_TYPE.reduce(function(s,t){return s+t.amount;},0);
   var h = '<table><thead><tr><th>Revenue Type</th><th class="r">Amount</th><th class="r">%</th><th>Distribution</th></tr></thead><tbody>';
-  var colors = ['#8B5CF6','#14B8A6','#F59E0B','#EF4444','#6B7280'];
+  var colors = ['#1843AD','#14B8A6','#FF9933','#EF4444','#6B7280'];
   REVENUE_BY_TYPE.forEach(function(t, i){
     var pct = total > 0 ? Math.round(t.amount/total*100) : 0;
     var color = colors[i % colors.length];
@@ -1049,7 +1049,7 @@ function renderAgingTables(){
   ap.innerHTML+='<tr class="total-row"><td>TOTAL</td><td class="r">'+fmt(at.c)+'</td><td class="r">'+fmt(at.a)+'</td><td class="r">'+fmt(at.b)+'</td><td class="r">'+fmt(at.d)+'</td><td class="r">'+fmt(at.e)+'</td><td class="r">'+fmt(at.f)+'</td><td class="r">'+fmt(at.c+at.a+at.b+at.d+at.e+at.f)+'</td></tr>';
 }
 function renderAgingKPIs(){
-  const bks=[{k:'current',l:'Current (0-30d)',c:'#10B981'},{k:'d30_60',l:'30-60 Days',c:'#F59E0B'},{k:'d61_90',l:'61-90 Days',c:'#F97316'},{k:'d91_120',l:'91-120 Days',c:'#EF4444'},{k:'d121_150',l:'121-150 Days',c:'#DC2626'},{k:'d150plus',l:'>150 Days',c:'#7F1D1D'}];
+  const bks=[{k:'current',l:'Current (0-30d)',c:'#10B981'},{k:'d30_60',l:'30-60 Days',c:'#FF9933'},{k:'d61_90',l:'61-90 Days',c:'#FF9933'},{k:'d91_120',l:'91-120 Days',c:'#EF4444'},{k:'d121_150',l:'121-150 Days',c:'#DC2626'},{k:'d150plus',l:'>150 Days',c:'#7F1D1D'}];
   var _akEl=document.getElementById('agingKPIs');if(!_akEl)return;
   _akEl.innerHTML=bks.map(b=>{
     const iv=AGING_INV.reduce((s,x)=>s+(x[b.k]||0),0);const ap=AGING_AP.reduce((s,x)=>s+(x[b.k]||0),0);const t=iv+ap;
@@ -1096,7 +1096,7 @@ function renderRevenueTab() {
   drawRevChartOn('revChartDetail');
 
   // Revenue by Type donut
-  drawDonutChart('revTypeDonut', 'revTypeLegend', REVENUE_BY_TYPE, ['#8B5CF6','#14B8A6','#F59E0B','#EF4444','#6B7280']);
+  drawDonutChart('revTypeDonut', 'revTypeLegend', REVENUE_BY_TYPE, ['#1843AD','#14B8A6','#FF9933','#EF4444','#6B7280']);
 
   // Revenue by Payment Type horizontal bars
   renderPayTypeChart();
@@ -1171,7 +1171,7 @@ function renderPayTypeChart() {
   const colors = { 'Autopay': '#60A5FA', 'Invoice': '#FBBF24' };
   container.innerHTML = REVENUE_BY_PAY_TYPE.map(d => {
     const pct = (d.amount / maxAmt * 100).toFixed(0);
-    const c = colors[d.type] || '#8B5CF6';
+    const c = colors[d.type] || '#1843AD';
     return '<div style="margin-bottom:16px"><div style="display:flex;justify-content:space-between;margin-bottom:4px;font-size:13px"><span style="font-weight:600;color:#1a202c">' + escapeHTML(d.type) + '</span><span style="color:#4A5568;font-weight:700">' + fmt(d.amount) + '</span></div><div style="background:#F3F4F6;border-radius:6px;height:28px;overflow:hidden"><div style="background:' + c + ';height:100%;width:' + pct + '%;border-radius:6px;transition:width 0.5s"></div></div></div>';
   }).join('');
 }
@@ -1211,7 +1211,7 @@ function renderAccruals() {
   // Uninvoiced by Category donut
   if (UNINVOICED_BY_CATEGORY.length) {
     const catData = UNINVOICED_BY_CATEGORY.map(c => ({ type: c.category, amount: c.amount }));
-    drawDonutChart('uninvCatDonut', 'uninvCatLegend', catData, ['#8B5CF6','#EC4899','#F59E0B','#14B8A6','#EF4444','#60A5FA','#6B7280']);
+    drawDonutChart('uninvCatDonut', 'uninvCatLegend', catData, ['#1843AD','#EC4899','#FF9933','#14B8A6','#EF4444','#60A5FA','#6B7280']);
   }
 
   // Unpaid AP by Revenue Type bars
@@ -1232,7 +1232,7 @@ function renderUnpaidApTypeChart() {
   if (!UNPAID_AP_BY_TYPE.length) { container.innerHTML = '<div style="color:#9CA3AF;text-align:center">No data</div>'; return; }
   const total = UNPAID_AP_BY_TYPE.reduce((s,d) => s + d.amount, 0);
   const maxAmt = Math.max(...UNPAID_AP_BY_TYPE.map(d => d.amount));
-  const colors = { 'Visit': '#F59E0B', 'Procedure': '#14B8A6', 'Unscheduled Visit': '#8B5CF6' };
+  const colors = { 'Visit': '#FF9933', 'Procedure': '#14B8A6', 'Unscheduled Visit': '#1843AD' };
   container.innerHTML = UNPAID_AP_BY_TYPE.map(d => {
     const pct = total > 0 ? Math.round(d.amount / total * 100) : 0;
     const barPct = (d.amount / maxAmt * 100).toFixed(0);
@@ -1246,13 +1246,13 @@ function renderUnpaidApAging() {
   if (!UNPAID_AP_AGING.length) { container.innerHTML = '<div style="color:#9CA3AF;text-align:center">No data</div>'; return; }
   const total = UNPAID_AP_AGING.reduce((s,d) => s + d.amount, 0);
   const maxAmt = Math.max(...UNPAID_AP_AGING.map(d => d.amount));
-  const agingColors = { '0-30': '#10B981', '31-60': '#F59E0B', '61-90': '#F97316', '91-120': '#EF4444', '121+': '#7F1D1D' };
+  const agingColors = { '0-30': '#10B981', '31-60': '#FF9933', '61-90': '#FF9933', '91-120': '#EF4444', '121+': '#7F1D1D' };
   // Check for data concentration warning — if 121+ bucket has >80% of total
   const bucket121 = UNPAID_AP_AGING.find(d => d.bucket === '121+');
   const pct121 = (bucket121 && total > 0) ? Math.round(bucket121.amount / total * 100) : 0;
   let warningHtml = '';
   if (pct121 >= 80) {
-    warningHtml = '<div style="background:#FEF3C7;border:1px solid #F59E0B;border-radius:8px;padding:12px 16px;margin-bottom:12px;display:flex;align-items:center;gap:10px;">' +
+    warningHtml = '<div style="background:#FEF3C7;border:1px solid #FF9933;border-radius:8px;padding:12px 16px;margin-bottom:12px;display:flex;align-items:center;gap:10px;">' +
       '<span style="font-size:18px;"></span>' +
       '<div><div style="font-weight:700;font-size:12px;color:#92400E;">Data Quality Flag: ' + pct121 + '% of unpaid autopay is in the 121+ day bucket</div>' +
       '<div style="font-size:11px;color:#B45309;margin-top:2px;">This may indicate stale data or a batch processing delay. Verify autopay payment records are current in the Master Sheet.</div></div></div>';
@@ -1282,7 +1282,7 @@ function renderUninvoicedDetail() {
 }
 
 function getCategoryColor(cat) {
-  const map = { 'Start-Up Fees': '#8B5CF6', 'Close-Out Fees': '#EF4444', 'Archiving / Storage': '#F59E0B', 'Ethics / IRB Fees': '#14B8A6', 'SAE Reports': '#EC4899', 'Pharmacy Fees': '#60A5FA', 'Other Fees': '#6B7280' };
+  const map = { 'Start-Up Fees': '#1843AD', 'Close-Out Fees': '#EF4444', 'Archiving / Storage': '#FF9933', 'Ethics / IRB Fees': '#14B8A6', 'SAE Reports': '#EC4899', 'Pharmacy Fees': '#60A5FA', 'Other Fees': '#6B7280' };
   return map[cat] || '#6B7280';
 }
 
@@ -1331,7 +1331,7 @@ function renderCollections(){
   // Summary
   const counts={New:0,Contacted:0,Escalated:0,Disputed:0,Resolved:0};
   collData.forEach(i=>counts[i.status]=(counts[i.status]||0)+1);
-  const colors={New:'#1D4ED8',Contacted:'#D97706',Escalated:'#EA580C',Disputed:'#DC2626',Resolved:'#059669'};
+  const colors={New:'#1D4ED8',Contacted:'#FF9933',Escalated:'#FF9933',Disputed:'#DC2626',Resolved:'#059669'};
   document.getElementById('collSummary').innerHTML=Object.entries(counts).map(([s,c])=>'<div class="cs-card"><div class="cs-label">'+s+'</div><div class="cs-val" style="color:'+colors[s]+'">'+c+'</div></div>').join('');
   // Filters
   document.getElementById('statusFilters').innerHTML=['All','New','Contacted','Escalated','Disputed','Resolved'].map(s=>'<button class="fbtn'+(s===collFilter?' active':'')+'" onclick="collFilter=\''+s+'\';renderCollections()">'+s+'</button>').join('');
@@ -1341,7 +1341,7 @@ function renderCollections(){
   else if(collSort==='amount')d.sort((a,b)=>Math.abs(b.unpaid)-Math.abs(a.unpaid));
   else{const o={New:0,Contacted:1,Escalated:2,Disputed:3,Resolved:4};d.sort((a,b)=>o[a.status]-o[b.status]);}
   const pm={New:'pill-new',Contacted:'pill-contacted',Escalated:'pill-escalated',Disputed:'pill-disputed',Resolved:'pill-resolved'};
-  document.getElementById('collBody').innerHTML=d.map(r=>'<tr><td>'+slink(r.study)+'</td><td>'+escapeHTML(r.invoice)+'</td><td class="r" style="font-weight:700;color:'+(r.days>365?'#DC2626':r.days>180?'#EA580C':'#4A5568')+'">'+r.days+'</td><td class="r">'+fmt(r.unpaid)+'</td><td><span class="pill '+(pm[r.status]||'pill-new')+'" onclick="cycleSt(\''+jsAttr(r.invoice)+'\')" title="Click to cycle status">'+escapeHTML(r.status)+'</span></td><td><button class="notes-btn" onclick="toggleNote(\''+jsAttr(r.invoice)+'\')">Notes</button><input class="notes-input" data-inv="'+escapeHTML(r.invoice)+'" value="'+escapeHTML(r.notes||'')+'" onblur="saveNote(\''+jsAttr(r.invoice)+'\')" onkeypress="if(event.key===\'Enter\')saveNote(\''+jsAttr(r.invoice)+'\')" placeholder="Add note..."></td></tr>').join('');
+  document.getElementById('collBody').innerHTML=d.map(r=>'<tr><td>'+slink(r.study)+'</td><td>'+escapeHTML(r.invoice)+'</td><td class="r" style="font-weight:700;color:'+(r.days>365?'#DC2626':r.days>180?'#FF9933':'#4A5568')+'">'+r.days+'</td><td class="r">'+fmt(r.unpaid)+'</td><td><span class="pill '+(pm[r.status]||'pill-new')+'" onclick="cycleSt(\''+jsAttr(r.invoice)+'\')" title="Click to cycle status">'+escapeHTML(r.status)+'</span></td><td><button class="notes-btn" onclick="toggleNote(\''+jsAttr(r.invoice)+'\')">Notes</button><input class="notes-input" data-inv="'+escapeHTML(r.invoice)+'" value="'+escapeHTML(r.notes||'')+'" onblur="saveNote(\''+jsAttr(r.invoice)+'\')" onkeypress="if(event.key===\'Enter\')saveNote(\''+jsAttr(r.invoice)+'\')" placeholder="Add note..."></td></tr>').join('');
 }
 
 // ══════════ ALERTS ══════════
@@ -1398,7 +1398,7 @@ function renderFinMarketingROI() {
   var kpi = '';
   kpi += '<div style="text-align:center;min-width:90px;"><div style="font-size:20px;font-weight:800;color:#dc2626;">$' + totalSpend.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0}) + '</div><div style="font-size:10px;color:#94a3b8;">Total Spend</div></div>';
   kpi += '<div style="text-align:center;min-width:90px;"><div style="font-size:20px;font-weight:800;color:#1843AD;">' + totalLeads.toLocaleString() + '</div><div style="font-size:10px;color:#94a3b8;">Total Leads</div></div>';
-  kpi += '<div style="text-align:center;min-width:90px;"><div style="font-size:20px;font-weight:800;color:' + (avgCPL <= 10 ? '#059669' : avgCPL <= 20 ? '#d97706' : '#dc2626') + ';">$' + avgCPL.toFixed(2) + '</div><div style="font-size:10px;color:#94a3b8;">Avg CPL</div></div>';
+  kpi += '<div style="text-align:center;min-width:90px;"><div style="font-size:20px;font-weight:800;color:' + (avgCPL <= 10 ? '#059669' : avgCPL <= 20 ? '#FF9933' : '#dc2626') + ';">$' + avgCPL.toFixed(2) + '</div><div style="font-size:10px;color:#94a3b8;">Avg CPL</div></div>';
   kpi += '<div style="text-align:center;min-width:90px;"><div style="font-size:20px;font-weight:800;color:#1843AD;">$' + avgCPC.toFixed(2) + '</div><div style="font-size:10px;color:#94a3b8;">Avg CPC</div></div>';
   kpiEl.innerHTML = kpi;
   var html = '<table class="tbl" style="width:100%;font-size:11px;">';
@@ -1406,7 +1406,7 @@ function renderFinMarketingROI() {
   camps.forEach(function(c) {
     var cpl = c.leads > 0 ? (c.spend / c.leads) : 0;
     var cpc = c.clicks > 0 ? (c.spend / c.clicks) : 0;
-    var cplColor = cpl <= 10 ? '#059669' : cpl <= 20 ? '#d97706' : '#dc2626';
+    var cplColor = cpl <= 10 ? '#059669' : cpl <= 20 ? '#FF9933' : '#dc2626';
     html += '<tr>';
     html += '<td style="padding:7px 12px;font-weight:600;">' + escapeHTML(c.campaign) + '</td>';
     html += '<td class="r" style="font-weight:700;color:#dc2626;">$' + c.spend.toLocaleString(undefined,{minimumFractionDigits:0,maximumFractionDigits:0}) + '</td>';
@@ -1610,7 +1610,7 @@ function backfillInvestigators() {
            || '';
     if (inv) {
       invCell.textContent = inv;
-      invCell.style.color = '#7c3aed';
+      invCell.style.color = '#072061';
       invCell.style.fontSize = '11px';
       filled++;
     }
@@ -1750,7 +1750,7 @@ function renderRevenuePerUser() {
       h += '<td style="text-align:center;color:#1843AD;">'+d.questions.toLocaleString()+'</td>';
       h += '<td style="padding:5px 8px;font-size:10px;">'+escapeHTML(topStudy ? topStudy[0] : '—')+'<div style="font-size:9px;color:#94a3b8;">$'+Math.round((topStudy?topStudy[1]:0)/1000)+'K</div></td>';
       h += '<td style="padding:4px 8px;"><div style="background:#e2e8f0;border-radius:4px;height:18px;position:relative;overflow:hidden;">';
-      h += '<div style="width:'+barW+'%;background:linear-gradient(90deg,#3b82f6,#059669);height:100%;border-radius:4px;"></div>';
+      h += '<div style="width:'+barW+'%;background:linear-gradient(90deg,#1843AD,#059669);height:100%;border-radius:4px;"></div>';
       h += '<span style="position:absolute;left:6px;top:0;font-size:10px;font-weight:700;color:'+(barW>30?'#fff':'#374151')+';line-height:18px;">$'+Math.round(d.revenue/1000)+'K</span></div></td>';
       h += '</tr>';
     });
@@ -1804,7 +1804,7 @@ function renderRevenuePerUser() {
     th += '<th style="text-align:left;padding:6px 8px;">Coordinator</th>';
     months.forEach(function(m){th+='<th style="text-align:center;padding:4px 6px;">'+m.substring(5)+'/'+m.substring(2,4)+'</th>';});
     th += '<th style="text-align:center;padding:4px 8px;font-weight:700;">Total</th></tr></thead><tbody>';
-    var colors = ['#3b82f6','#059669','#d97706','#8b5cf6','#06b6d4'];
+    var colors = ['#1843AD','#059669','#FF9933','#1843AD','#A2DCEB'];
     topUsers.forEach(function(user, i) {
       var total = months.reduce(function(s,m){return s+(byMonth[m]&&byMonth[m][user]||0);},0);
       var maxM = Math.max.apply(null, months.map(function(m){return byMonth[m]&&byMonth[m][user]||0;}))||1;
@@ -1856,7 +1856,7 @@ function showRPUUserModal(userName, role) {
   h += '<table class="detail-table" style="margin-top:4px;"><thead><tr><th>Date</th><th>Study</th><th>Visit</th><th>Subject</th><th>Status</th><th class="r">Revenue</th><th>Type</th></tr></thead><tbody>';
   visits.sort(function(a,b){return (b.date_completed||'').localeCompare(a.date_completed||'');}).forEach(function(r) {
     var rev = parseFloat(r.visit_revenue||0);
-    var typeColor = r.revenue_type === 'Actual' ? '#059669' : r.revenue_type === 'Contracted' ? '#3b82f6' : '#94a3b8';
+    var typeColor = r.revenue_type === 'Actual' ? '#059669' : r.revenue_type === 'Contracted' ? '#1843AD' : '#94a3b8';
     h += '<tr><td>'+escapeHTML(r.date_completed||'—')+'</td><td>'+slink(r.study_name||'')+'</td><td>'+escapeHTML(r.visit_name||'—')+'</td><td>'+escapeHTML(r.subject_name||'—')+'</td><td>'+escapeHTML(r.visit_status||'—')+'</td><td class="r" style="font-weight:600;">'+fmt(rev)+'</td><td style="color:'+typeColor+';font-weight:600;">'+escapeHTML(r.revenue_type||'—')+'</td></tr>';
   });
   h += '</tbody></table>';
@@ -1927,7 +1927,7 @@ function showRPUMonthModal(userName, month) {
   var h = '<table class="detail-table"><thead><tr><th>Date</th><th>Study</th><th>Visit</th><th>Subject</th><th class="r">Revenue</th><th>Type</th></tr></thead><tbody>';
   visits.sort(function(a,b){return (b.date_completed||'').localeCompare(a.date_completed||'');}).forEach(function(r) {
     var rev = parseFloat(r.visit_revenue||0);
-    var typeColor = r.revenue_type === 'Actual' ? '#059669' : r.revenue_type === 'Contracted' ? '#3b82f6' : '#94a3b8';
+    var typeColor = r.revenue_type === 'Actual' ? '#059669' : r.revenue_type === 'Contracted' ? '#1843AD' : '#94a3b8';
     h += '<tr><td>'+escapeHTML(r.date_completed||'—')+'</td><td>'+slink(r.study_name||'')+'</td><td>'+escapeHTML(r.visit_name||'—')+'</td><td>'+escapeHTML(r.subject_name||'—')+'</td><td class="r" style="font-weight:600;">'+fmt(rev)+'</td><td style="color:'+typeColor+';font-weight:600;">'+escapeHTML(r.revenue_type||'—')+'</td></tr>';
   });
   h += '<tr class="total-row"><td colspan="4">TOTAL</td><td class="r">'+fmt(totalRev)+'</td><td></td></tr></tbody></table>';
@@ -2227,7 +2227,7 @@ function renderInsights() {
         ]
       },
       'Screen Fail / DNQ': {
-        icon: '', color: '#C2410C', bg: '#FFF7ED', border: '#FED7AA',
+        icon: '', color: '#FF9933', bg: '#FFF7ED', border: '#FED7AA',
         impact: 'Wasted screening resources, indicates pre-screening gaps',
         nextSteps: [
           'Review the pre-screening checklist for each study with screen fails',
@@ -2238,7 +2238,7 @@ function renderInsights() {
         ]
       },
       'Screen Fail/DNQ': {
-        icon: '', color: '#C2410C', bg: '#FFF7ED', border: '#FED7AA',
+        icon: '', color: '#FF9933', bg: '#FFF7ED', border: '#FED7AA',
         impact: 'Wasted screening resources, indicates pre-screening gaps',
         nextSteps: [
           'Review the pre-screening checklist for each study with screen fails',
@@ -2249,7 +2249,7 @@ function renderInsights() {
         ]
       },
       'Patient Withdrew': {
-        icon: '', color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE',
+        icon: '', color: '#072061', bg: '#F5F3FF', border: '#DDD6FE',
         impact: 'Permanent loss of enrolled patient, impacts enrollment targets',
         nextSteps: [
           'Conduct exit interview within 48hrs — understand root cause (comfort, travel, compensation)',
@@ -2260,7 +2260,7 @@ function renderInsights() {
         ]
       },
       'Weather': {
-        icon: '', color: '#0369A1', bg: '#F0F9FF', border: '#BAE6FD',
+        icon: '', color: '#1843AD', bg: '#F0F9FF', border: '#BAE6FD',
         impact: 'Temporary disruption, patients generally willing to reschedule',
         nextSteps: [
           'Proactively reschedule within 48hrs of weather event',
@@ -2357,7 +2357,7 @@ function renderInsights() {
       else{alert='OK';ac='risk-low';}
       const nm=ms.name||code;
       const link=CRIO_LINKS[code]?'<a href="'+escapeHTML(CRIO_LINKS[code])+'" target="_blank" style="color:inherit;text-decoration:none">'+escapeHTML(nm)+'</a>':escapeHTML(nm);
-      rows.push({pct,html:'<tr class="clickable" onclick="showStudyModal(\''+jsAttr(code)+'\')"><td>'+link+'</td><td><span class="badge '+(st==='Enrolling'?'badge-green':st==='Maintenance'?'badge-yellow':'badge-gray')+'">'+en+' enrolled</span></td><td class="r">$'+(cur/1000).toFixed(0)+'K</td><td class="r" style="color:'+(pct>40?'#EF4444':'inherit')+'">$'+(over/1000).toFixed(0)+'K</td><td class="r" style="font-weight:700;color:'+(pct>60?'#dc2626':pct>40?'#F59E0B':'#10B981')+'">'+pct+'%</td><td><span class="risk-tag '+ac+'">'+alert+'</span></td></tr>'});
+      rows.push({pct,html:'<tr class="clickable" onclick="showStudyModal(\''+jsAttr(code)+'\')"><td>'+link+'</td><td><span class="badge '+(st==='Enrolling'?'badge-green':st==='Maintenance'?'badge-yellow':'badge-gray')+'">'+en+' enrolled</span></td><td class="r">$'+(cur/1000).toFixed(0)+'K</td><td class="r" style="color:'+(pct>40?'#EF4444':'inherit')+'">$'+(over/1000).toFixed(0)+'K</td><td class="r" style="font-weight:700;color:'+(pct>60?'#dc2626':pct>40?'#FF9933':'#10B981')+'">'+pct+'%</td><td><span class="risk-tag '+ac+'">'+alert+'</span></td></tr>'});
     });
     rows.sort((a,b)=>b.pct-a.pct);
     agingOpsBody.innerHTML=rows.map(r=>r.html).join('');
@@ -2427,7 +2427,7 @@ function renderInsights() {
       let h='<table class="tbl"><thead><tr><th>Month</th><th class="r">Collections</th><th class="r">Revenue</th><th class="r">Efficiency</th></tr></thead><tbody>';
       MONTHLY_PAYMENTS.forEach((p,i)=>{
         const r=MONTHLY_REVENUE[i];const rv=r?(r.invoicables+r.autopay):0;const eff=rv>0?((p.amount/rv)*100).toFixed(0):'--';
-        h+='<tr><td>'+p.month+'</td><td class="r">'+fmt(p.amount)+'</td><td class="r">'+(rv?fmt(rv):'--')+'</td><td class="r" style="color:'+(parseInt(eff)>80?'#10B981':parseInt(eff)>50?'#F59E0B':'#EF4444')+'">'+eff+'%</td></tr>';
+        h+='<tr><td>'+p.month+'</td><td class="r">'+fmt(p.amount)+'</td><td class="r">'+(rv?fmt(rv):'--')+'</td><td class="r" style="color:'+(parseInt(eff)>80?'#10B981':parseInt(eff)>50?'#FF9933':'#EF4444')+'">'+eff+'%</td></tr>';
       });
       h+='</tbody></table>';
       showFinModal('Collection Efficiency — Monthly Trend',h);
@@ -2480,7 +2480,7 @@ function renderInsights() {
     if (oldInv.length) {
       actions.push({
         priority: 2,
-        html: '<div style="display:flex;gap:12px;align-items:flex-start;padding:14px;background:#FEF3C7;border-radius:10px;border-left:4px solid #F59E0B">'+icon('⏰','#FEF3C7')+'<div><div style="font-weight:700;font-size:13px;color:#92400E">'+oldInv.length+' invoices over 1 year old ($'+fmt(oldInv.reduce((s,i)=>s+Math.abs(i.unpaid),0))+')</div><div style="font-size:12px;color:#6B7280;margin-top:4px">Oldest: '+oldInv.sort((a,b)=>b.days-a.days)[0].days+' days overdue</div><div style="font-size:12px;font-weight:600;color:#D97706;margin-top:6px">→ Escalate to site director. Consider formal collection process or write-off review.</div></div></div>'
+        html: '<div style="display:flex;gap:12px;align-items:flex-start;padding:14px;background:#FEF3C7;border-radius:10px;border-left:4px solid #FF9933">'+icon('⏰','#FEF3C7')+'<div><div style="font-weight:700;font-size:13px;color:#92400E">'+oldInv.length+' invoices over 1 year old ($'+fmt(oldInv.reduce((s,i)=>s+Math.abs(i.unpaid),0))+')</div><div style="font-size:12px;color:#6B7280;margin-top:4px">Oldest: '+oldInv.sort((a,b)=>b.days-a.days)[0].days+' days overdue</div><div style="font-size:12px;font-weight:600;color:#FF9933;margin-top:6px">→ Escalate to site director. Consider formal collection process or write-off review.</div></div></div>'
       });
     }
 
@@ -2505,7 +2505,7 @@ function renderInsights() {
     if (highCancel.length) {
       actions.push({
         priority: 3,
-        html: '<div style="display:flex;gap:12px;align-items:flex-start;padding:14px;background:#EFF6FF;border-radius:10px;border-left:4px solid #3B82F6">'+icon('','#DBEAFE')+'<div><div style="font-weight:700;font-size:13px;color:#1E40AF">'+highCancel.length+' studies with 10+ cancellations need retention review</div><div style="font-size:12px;color:#6B7280;margin-top:4px">'+highCancel.slice(0,5).map(s=>s.code+' ('+s.cancels+' cancels)').join(', ')+'</div><div style="font-size:12px;font-weight:600;color:#2563EB;margin-top:6px">→ Schedule root cause analysis meeting. Review coordinator assignments and patient communication protocols.</div></div></div>'
+        html: '<div style="display:flex;gap:12px;align-items:flex-start;padding:14px;background:#EFF6FF;border-radius:10px;border-left:4px solid #1843AD">'+icon('','#DBEAFE')+'<div><div style="font-weight:700;font-size:13px;color:#1E40AF">'+highCancel.length+' studies with 10+ cancellations need retention review</div><div style="font-size:12px;color:#6B7280;margin-top:4px">'+highCancel.slice(0,5).map(s=>s.code+' ('+s.cancels+' cancels)').join(', ')+'</div><div style="font-size:12px;font-weight:600;color:#1843AD;margin-top:6px">→ Schedule root cause analysis meeting. Review coordinator assignments and patient communication protocols.</div></div></div>'
       });
     }
 
@@ -2513,7 +2513,7 @@ function renderInsights() {
     if (parseInt(efficiency) < 70) {
       actions.push({
         priority: 2,
-        html: '<div style="display:flex;gap:12px;align-items:flex-start;padding:14px;background:#FEF3C7;border-radius:10px;border-left:4px solid #F59E0B">'+icon('','#FEF3C7')+'<div><div style="font-weight:700;font-size:13px;color:#92400E">Collection efficiency at '+efficiency+'% — below 70% target</div><div style="font-size:12px;color:#6B7280;margin-top:4px">Gap: $'+fmt(totalBilled * 0.7 - totalCollected)+' needed to reach target</div><div style="font-size:12px;font-weight:600;color:#D97706;margin-top:6px">→ Prioritize top 5 studies by AR balance. Send payment reminders for invoices 60+ days.</div></div></div>'
+        html: '<div style="display:flex;gap:12px;align-items:flex-start;padding:14px;background:#FEF3C7;border-radius:10px;border-left:4px solid #FF9933">'+icon('','#FEF3C7')+'<div><div style="font-weight:700;font-size:13px;color:#92400E">Collection efficiency at '+efficiency+'% — below 70% target</div><div style="font-size:12px;color:#6B7280;margin-top:4px">Gap: $'+fmt(totalBilled * 0.7 - totalCollected)+' needed to reach target</div><div style="font-size:12px;font-weight:600;color:#FF9933;margin-top:6px">→ Prioritize top 5 studies by AR balance. Send payment reminders for invoices 60+ days.</div></div></div>'
       });
     }
 
@@ -2606,9 +2606,9 @@ let DATA = SAMPLE;
 // ═══════════════════════════════════════════════════
 let charts = {};
 
-const COLORS = ['#072061','#059669','#d97706','#dc2626','#7c3aed',
-                '#0ea5e9','#ff9933','#10b981','#ef4444','#8b5cf6',
-                '#1843ad','#6366f1'];
+const COLORS = ['#072061','#059669','#FF9933','#dc2626','#072061',
+                '#A2DCEB','#ff9933','#10b981','#ef4444','#1843AD',
+                '#1843ad','#1843AD'];
 
 function chartDefaults() {
   Chart.defaults.font.family = "'IBM Plex Sans', sans-serif";
@@ -2689,7 +2689,7 @@ function buildSiteChart() {
       datasets: [
         { label: 'Upcoming Visits', data: s.map(x => x.upcoming), backgroundColor: '#bfdbfe', borderColor: '#072061', borderWidth: 1.5, borderRadius: 4, yAxisID: 'y' },
         { label: 'Cancellations',   data: s.map(x => x.cancels),  backgroundColor: '#fca5a5', borderColor: '#dc2626', borderWidth: 1.5, borderRadius: 4, yAxisID: 'y' },
-        { label: 'Cancel Rate %',   data: s.map(x => x.cancelRate || 0), type: 'line', borderColor: '#7c3aed', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 5, pointBackgroundColor: '#7c3aed', yAxisID: 'y2' }
+        { label: 'Cancel Rate %',   data: s.map(x => x.cancelRate || 0), type: 'line', borderColor: '#072061', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 5, pointBackgroundColor: '#072061', yAxisID: 'y2' }
       ]
     },
     options: {
@@ -2801,7 +2801,7 @@ function buildRiskFlagCards() {
     return;
   }
 
-  const sevColors = {critical:{border:'#dc2626',bg:'#fef2f2',label:'CRITICAL'},high:{border:'#ea580c',bg:'#fff7ed',label:'HIGH'},medium:{border:'#d97706',bg:'#fffbeb',label:'MEDIUM'}};
+  const sevColors = {critical:{border:'#dc2626',bg:'#fef2f2',label:'CRITICAL'},high:{border:'#FF9933',bg:'#fff7ed',label:'HIGH'},medium:{border:'#FF9933',bg:'#fffbeb',label:'MEDIUM'}};
   const linkSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-left:2px;opacity:0.4;vertical-align:middle"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>';
 
   // Split into active vs dismissed
@@ -2822,7 +2822,7 @@ function buildRiskFlagCards() {
   if (critical.length > 0 || high.length > 0) {
     html += `<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">`;
     if (critical.length) html += `<span style="font-size:10px;font-weight:800;padding:3px 10px;border-radius:4px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;">${critical.length} CRITICAL (5+×)</span>`;
-    if (high.length) html += `<span style="font-size:10px;font-weight:800;padding:3px 10px;border-radius:4px;background:#fff7ed;color:#ea580c;border:1px solid #fed7aa;">${high.length} HIGH (3-4×)</span>`;
+    if (high.length) html += `<span style="font-size:10px;font-weight:800;padding:3px 10px;border-radius:4px;background:#fff7ed;color:#FF9933;border:1px solid #fed7aa;">${high.length} HIGH (3-4×)</span>`;
     html += `<span style="font-size:10px;font-weight:600;padding:3px 10px;border-radius:4px;background:#fffbeb;color:#FF9933;border:1px solid #fde68a;">${flags.length - critical.length - high.length} MEDIUM (2×)</span>`;
     html += `</div>`;
   }
@@ -2835,12 +2835,12 @@ function buildRiskFlagCards() {
     // Category breakdown badges
     let catBadges = '';
     if (f.noShowCount > 0) catBadges += `<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:#fef2f2;color:#dc2626;font-weight:600;">${f.noShowCount} no-show</span>`;
-    if (f.cancelCount > 0) catBadges += `<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:#fff7ed;color:#c2410c;font-weight:600;">${f.cancelCount} cancel</span>`;
+    if (f.cancelCount > 0) catBadges += `<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:#fff7ed;color:#FF9933;font-weight:600;">${f.cancelCount} cancel</span>`;
     if (f.rescheduleCount > 0) catBadges += `<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:#eff6ff;color:#1843ad;font-weight:600;">${f.rescheduleCount} resched</span>`;
     // Recency badge
     const recency = f.daysSinceLast != null ? (f.daysSinceLast <= 7 ? `<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:#fef2f2;color:#dc2626;font-weight:700;">Last cancel ${f.daysSinceLast}d ago</span>` : f.daysSinceLast <= 21 ? `<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:#fffbeb;color:#FF9933;">Last cancel ${f.daysSinceLast}d ago</span>` : '') : '';
     // Cross-study warning
-    const crossStudy = f.crossStudyCount > 1 ? `<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:#fdf4ff;color:#7e22ce;font-weight:700;" title="Cancelling across ${f.crossStudyCount} studies">Cross-study (${f.crossStudyCount})</span>` : '';
+    const crossStudy = f.crossStudyCount > 1 ? `<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:#fdf4ff;color:#072061;font-weight:700;" title="Cancelling across ${f.crossStudyCount} studies">Cross-study (${f.crossStudyCount})</span>` : '';
     // Velocity
     const velocityBadge = f.velocity >= 3 ? `<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:#fef2f2;color:#dc2626;font-weight:600;" title="${f.velocity}/mo cancel rate">Rapid (${f.velocity}/mo)</span>` : '';
 
@@ -2913,11 +2913,11 @@ function buildScheduleTable() {
     'enrolled':       {bg:'#05966920',fg:'#059669'},
     'randomized':     {bg:'#05966920',fg:'#059669'},
     'active':         {bg:'#05966920',fg:'#059669'},
-    'screening':      {bg:'#d9770620',fg:'#d97706'},
-    'in screening':   {bg:'#d9770620',fg:'#d97706'},
-    'prequalified':   {bg:'#3b82f620',fg:'#3b82f6'},
-    'qualified':      {bg:'#3b82f620',fg:'#3b82f6'},
-    'new':            {bg:'#3b82f620',fg:'#3b82f6'},
+    'screening':      {bg:'#FF993320',fg:'#FF9933'},
+    'in screening':   {bg:'#FF993320',fg:'#FF9933'},
+    'prequalified':   {bg:'#1843AD20',fg:'#1843AD'},
+    'qualified':      {bg:'#1843AD20',fg:'#1843AD'},
+    'new':            {bg:'#1843AD20',fg:'#1843AD'},
     'completed':      {bg:'#6b728020',fg:'#6b7280'},
     'discontinued':   {bg:'#6b728020',fg:'#6b7280'},
     'withdrawn':      {bg:'#6b728020',fg:'#6b7280'},
@@ -2946,7 +2946,7 @@ function buildScheduleTable() {
       if (key) _mrByPatient[key] = mr;
     });
   }
-  var _mrStatusColors = {'Enrolled':'#059669','In Screening':'#8b5cf6','Visit Scheduled':'#06b6d4','Ready to Schedule':'#f59e0b','Pending Release':'#94a3b8','Under Review':'#64748b','DNQ':'#dc2626','Screen Fail':'#dc2626','No Show':'#dc2626','Complete':'#059669','Discontinued':'#94a3b8'};
+  var _mrStatusColors = {'Enrolled':'#059669','In Screening':'#1843AD','Visit Scheduled':'#A2DCEB','Ready to Schedule':'#FF9933','Pending Release':'#94a3b8','Under Review':'#64748b','DNQ':'#dc2626','Screen Fail':'#dc2626','No Show':'#dc2626','Complete':'#059669','Discontinued':'#94a3b8'};
 
   // Build rescheduled patient lookup for badge
   var _rescheduledSet = new Set();
@@ -2981,7 +2981,7 @@ function buildScheduleTable() {
     var studyHtml = v.study_url
       ? '<a href="' + v.study_url + '" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="text-decoration:none;color:var(--navy);font-weight:600">' + studyText + linkSvg + '</a>'
       : studyText;
-    if (v._prescreen) { var _ptColor = v._prescrType==='FibroScan'?'#7c3aed':v._prescrType==='Call'?'#0369a1':'#3b82f6'; studyHtml += ' <span style="font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px;background:'+_ptColor+'15;color:'+_ptColor+';">'+(v._prescrType||'Pre-Screen')+'</span>'; }
+    if (v._prescreen) { var _ptColor = v._prescrType==='FibroScan'?'#072061':v._prescrType==='Call'?'#1843AD':'#1843AD'; studyHtml += ' <span style="font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px;background:'+_ptColor+'15;color:'+_ptColor+';">'+(v._prescrType||'Pre-Screen')+'</span>'; }
     // Patient cell (PHI masked + escaped)
     var patRaw = v.patient||'—';
     var patText = esc(PHI_MASKED ? maskPHI(patRaw) : patRaw);
@@ -3070,7 +3070,7 @@ function buildUpcomingDetailTable(rows) {
   }
   const tbody = document.getElementById('upcoming-tbody');
   if (!tbody) return;
-  const statusColors = { 'Enrolled':'#059669','Scheduled V1':'#072061','Screening':'#d97706','Prequalified':'#7c3aed' };
+  const statusColors = { 'Enrolled':'#059669','Scheduled V1':'#072061','Screening':'#FF9933','Prequalified':'#072061' };
   tbody.innerHTML = rows.map(r => {
     const sc = statusColors[r.status] || '#94a3b8';
     const siteShort = (r.site||'').includes('Penn') ? 'PNJ' : 'PHL';
@@ -3089,7 +3089,7 @@ function buildUpcomingDetailTable(rows) {
       <td>${patientCell}</td>
       <td><span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:${sc}20;color:${sc}">${escapeHTML(r.status)}</span></td>
       <td style="font-size:11px">${escapeHTML(r.coord)}</td>
-      <td style="font-size:11px;color:${r.investigator ? '#7c3aed' : '#cbd5e1'}">${escapeHTML(r.investigator || '—')}</td>
+      <td style="font-size:11px;color:${r.investigator ? '#072061' : '#cbd5e1'}">${escapeHTML(r.investigator || '—')}</td>
       <td><span style="font-size:9px;font-weight:700;padding:2px 5px;border-radius:3px;background:${siteColor}20;color:${siteColor}">${siteShort}</span></td>
     </tr>`;
   }).join('');
@@ -3139,7 +3139,7 @@ function _medReadiness(mr, crioStatus) {
 
 function _readinessBadge(mr, idx, crioStatus) {
   var r = _medReadiness(mr, crioStatus);
-  var colors = { 'complete':'#059669', 'pending':'#d97706', 'needs-action':'#dc2626' };
+  var colors = { 'complete':'#059669', 'pending':'#FF9933', 'needs-action':'#dc2626' };
   var c = colors[r.level] || '#94a3b8';
   return '<span onclick="showVisitReadiness(' + idx + ')" style="cursor:pointer;display:inline-block;margin-left:6px;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:' + c + '20;color:' + c + ';vertical-align:middle;border:1px solid ' + c + '40" title="Click for details">' + escapeHTML(r.label) + '</span>';
 }
@@ -3304,10 +3304,10 @@ function _visitKey(row) {
 }
 // ═══ VISIT STATUS TRACKING (real-time patient flow) ═══
 var VISIT_STATUSES = [
-  {id:'arrived',   label:'Arrived',    icon:'', color:'#3b82f6'},
-  {id:'consent',   label:'Consent',    icon:'', color:'#8b5cf6'},
-  {id:'eligibility',label:'Eligibility',icon:'', color:'#06b6d4'},
-  {id:'labs',      label:'Labs',       icon:'', color:'#d97706'},
+  {id:'arrived',   label:'Arrived',    icon:'', color:'#1843AD'},
+  {id:'consent',   label:'Consent',    icon:'', color:'#1843AD'},
+  {id:'eligibility',label:'Eligibility',icon:'', color:'#A2DCEB'},
+  {id:'labs',      label:'Labs',       icon:'', color:'#FF9933'},
   {id:'exam',      label:'Exam Room',  icon:'', color:'#059669'},
   {id:'coord',     label:'Coord Office',icon:'',color:'#1843ad'},
   {id:'completed', label:'Completed',  icon:'', color:'#16a34a'},
@@ -3538,7 +3538,7 @@ function showHorizonDetail(type, weekLabel) {
         <td style="padding:6px 8px;font-size:11px">${escapeHTML(r.study)}</td>
         <td style="padding:6px 8px;font-size:11px;color:var(--muted)">${escapeHTML(r.visit)}</td>
         <td style="padding:6px 8px;font-size:11px">${escapeHTML(r.coord)}</td>
-        <td style="padding:6px 8px;font-size:11px;color:${r.investigator ? '#7c3aed' : '#cbd5e1'}">${escapeHTML(r.investigator || '—')}</td>
+        <td style="padding:6px 8px;font-size:11px;color:${r.investigator ? '#072061' : '#cbd5e1'}">${escapeHTML(r.investigator || '—')}</td>
       </tr>`).join('')}</tbody></table>`;
   }
 
@@ -3586,13 +3586,13 @@ function buildCancelStudyBars() {
   var sorted = Object.values(studies).sort(function(a,b) { return b.total - a.total; }).slice(0, 12);
   if (sorted.length === 0) { el.innerHTML = '<div style="padding:20px;color:#94a3b8;font-size:12px;text-align:center;">No data</div>'; return; }
   var max = sorted[0].total || 1;
-  var colors = { cancels: '#dc2626', noShows: '#f59e0b', screenFails: '#6366f1', withdrew: '#8b5cf6' };
+  var colors = { cancels: '#dc2626', noShows: '#FF9933', screenFails: '#1843AD', withdrew: '#1843AD' };
 
   el.innerHTML = '<div style="display:flex;gap:6px;margin-bottom:8px;font-size:9px;color:#94a3b8;">' +
     '<span><span style="display:inline-block;width:8px;height:8px;background:#dc2626;border-radius:2px;margin-right:3px;"></span>Cancels</span>' +
-    '<span><span style="display:inline-block;width:8px;height:8px;background:#f59e0b;border-radius:2px;margin-right:3px;"></span>No Shows</span>' +
-    '<span><span style="display:inline-block;width:8px;height:8px;background:#6366f1;border-radius:2px;margin-right:3px;"></span>Screen Fail</span>' +
-    '<span><span style="display:inline-block;width:8px;height:8px;background:#8b5cf6;border-radius:2px;margin-right:3px;"></span>Withdrew</span></div>' +
+    '<span><span style="display:inline-block;width:8px;height:8px;background:#FF9933;border-radius:2px;margin-right:3px;"></span>No Shows</span>' +
+    '<span><span style="display:inline-block;width:8px;height:8px;background:#1843AD;border-radius:2px;margin-right:3px;"></span>Screen Fail</span>' +
+    '<span><span style="display:inline-block;width:8px;height:8px;background:#1843AD;border-radius:2px;margin-right:3px;"></span>Withdrew</span></div>' +
     sorted.map(function(d) {
     var totalPct = (d.total / max * 100);
     var cW = d.total > 0 ? (d.cancels / d.total * totalPct) : 0;
@@ -3603,9 +3603,9 @@ function buildCancelStudyBars() {
       '<span style="font-size:10px;color:#64748b;width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + escapeHTML(d.study) + '">' + escapeHTML(d.study) + '</span>' +
       '<div style="flex:1;height:12px;background:#f1f5f9;border-radius:4px;overflow:hidden;display:flex;">' +
       (cW > 0 ? '<div style="width:' + cW.toFixed(1) + '%;background:#dc2626;height:100%;"></div>' : '') +
-      (nW > 0 ? '<div style="width:' + nW.toFixed(1) + '%;background:#f59e0b;height:100%;"></div>' : '') +
-      (sW > 0 ? '<div style="width:' + sW.toFixed(1) + '%;background:#6366f1;height:100%;"></div>' : '') +
-      (wW > 0 ? '<div style="width:' + wW.toFixed(1) + '%;background:#8b5cf6;height:100%;"></div>' : '') +
+      (nW > 0 ? '<div style="width:' + nW.toFixed(1) + '%;background:#FF9933;height:100%;"></div>' : '') +
+      (sW > 0 ? '<div style="width:' + sW.toFixed(1) + '%;background:#1843AD;height:100%;"></div>' : '') +
+      (wW > 0 ? '<div style="width:' + wW.toFixed(1) + '%;background:#1843AD;height:100%;"></div>' : '') +
       '</div>' +
       '<span style="font-size:11px;font-weight:700;color:#1e293b;width:28px;text-align:right;">' + d.total + '</span></div>';
   }).join('');
@@ -3617,8 +3617,8 @@ function buildReasonBreakdown() {
   var reasons = DATA.cancelReasons || [];
   if (reasons.length === 0) { el.innerHTML = '<div style="padding:20px;color:#94a3b8;font-size:12px;text-align:center;">No data</div>'; return; }
   var total = reasons.reduce(function(s, r) { return s + r.count; }, 0);
-  var catColors = { 'Patient Cancelled': '#dc2626', 'Site Cancelled': '#f59e0b', 'No Show': '#f97316', 'Screen Fail / DNQ': '#6366f1',
-    'Patient Withdrew': '#8b5cf6', 'Rescheduled': '#059669', 'Weather': '#0ea5e9', 'BMI / Labs': '#d946ef',
+  var catColors = { 'Patient Cancelled': '#dc2626', 'Site Cancelled': '#FF9933', 'No Show': '#FF9933', 'Screen Fail / DNQ': '#1843AD',
+    'Patient Withdrew': '#1843AD', 'Rescheduled': '#059669', 'Weather': '#A2DCEB', 'BMI / Labs': '#d946ef',
     'Admin Error': '#64748b', 'Undocumented': '#94a3b8', 'Other': '#475569' };
   el.innerHTML = reasons.map(function(r) {
     var cat = r.reason || r.category || '—';
@@ -3668,11 +3668,11 @@ function buildSiteStackedBars() {
     html += '<div style="text-align:center;">';
     html += '<div style="font-size:14px;font-weight:700;color:' + (site === 'PHL' ? '#072061' : '#059669') + ';margin-bottom:8px;">' + site + '</div>';
     html += '<div style="display:flex;height:16px;border-radius:4px;overflow:hidden;margin-bottom:8px;">';
-    if (s.upcoming) html += '<div style="width:' + (s.upcoming/allEvents*100).toFixed(1) + '%;background:#3b82f6;" title="' + s.upcoming + ' upcoming"></div>';
+    if (s.upcoming) html += '<div style="width:' + (s.upcoming/allEvents*100).toFixed(1) + '%;background:#1843AD;" title="' + s.upcoming + ' upcoming"></div>';
     if (s.cancels) html += '<div style="width:' + (s.cancels/allEvents*100).toFixed(1) + '%;background:#dc2626;" title="' + s.cancels + ' cancels"></div>';
-    if (s.noShows) html += '<div style="width:' + (s.noShows/allEvents*100).toFixed(1) + '%;background:#f59e0b;" title="' + s.noShows + ' no shows"></div>';
-    if (s.screenFails) html += '<div style="width:' + (s.screenFails/allEvents*100).toFixed(1) + '%;background:#6366f1;" title="' + s.screenFails + ' SF"></div>';
-    if (s.withdrew) html += '<div style="width:' + (s.withdrew/allEvents*100).toFixed(1) + '%;background:#8b5cf6;" title="' + s.withdrew + ' withdrew"></div>';
+    if (s.noShows) html += '<div style="width:' + (s.noShows/allEvents*100).toFixed(1) + '%;background:#FF9933;" title="' + s.noShows + ' no shows"></div>';
+    if (s.screenFails) html += '<div style="width:' + (s.screenFails/allEvents*100).toFixed(1) + '%;background:#1843AD;" title="' + s.screenFails + ' SF"></div>';
+    if (s.withdrew) html += '<div style="width:' + (s.withdrew/allEvents*100).toFixed(1) + '%;background:#1843AD;" title="' + s.withdrew + ' withdrew"></div>';
     html += '</div>';
     html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:10px;text-align:left;">';
     html += '<div><span style="color:#1843AD;font-weight:700;">' + s.upcoming + '</span> upcoming</div>';
@@ -3686,11 +3686,11 @@ function buildSiteStackedBars() {
   });
   html += '</div>';
   html += '<div style="display:flex;gap:8px;justify-content:center;font-size:9px;color:#94a3b8;padding:4px 0;">' +
-    '<span><span style="display:inline-block;width:8px;height:8px;background:#3b82f6;border-radius:2px;margin-right:3px;"></span>Upcoming</span>' +
+    '<span><span style="display:inline-block;width:8px;height:8px;background:#1843AD;border-radius:2px;margin-right:3px;"></span>Upcoming</span>' +
     '<span><span style="display:inline-block;width:8px;height:8px;background:#dc2626;border-radius:2px;margin-right:3px;"></span>Cancels</span>' +
-    '<span><span style="display:inline-block;width:8px;height:8px;background:#f59e0b;border-radius:2px;margin-right:3px;"></span>No Shows</span>' +
-    '<span><span style="display:inline-block;width:8px;height:8px;background:#6366f1;border-radius:2px;margin-right:3px;"></span>Screen Fail</span>' +
-    '<span><span style="display:inline-block;width:8px;height:8px;background:#8b5cf6;border-radius:2px;margin-right:3px;"></span>Withdrew</span></div>';
+    '<span><span style="display:inline-block;width:8px;height:8px;background:#FF9933;border-radius:2px;margin-right:3px;"></span>No Shows</span>' +
+    '<span><span style="display:inline-block;width:8px;height:8px;background:#1843AD;border-radius:2px;margin-right:3px;"></span>Screen Fail</span>' +
+    '<span><span style="display:inline-block;width:8px;height:8px;background:#1843AD;border-radius:2px;margin-right:3px;"></span>Withdrew</span></div>';
   el.innerHTML = html;
 }
 
@@ -3962,7 +3962,7 @@ function renderCoordinatorGoals() {
       const isToday = d === todayISO;
       const isPast = d < todayISO;
       const isFuture = d > todayISO;
-      const barColor = visits >= 2 ? (isFuture ? '#86efac' : '#059669') : visits === 1 ? (isFuture ? '#fdba74' : '#f59e0b') : (isFuture ? '#fca5a5' : '#ef4444');
+      const barColor = visits >= 2 ? (isFuture ? '#86efac' : '#059669') : visits === 1 ? (isFuture ? '#fdba74' : '#FF9933') : (isFuture ? '#fca5a5' : '#ef4444');
       const barH = Math.min(100, Math.round((visits / (weekMax * 1.2)) * 100));
       const hasVisits = visits > 0;
       const cursor = hasVisits ? 'cursor:pointer;' : '';
@@ -3973,7 +3973,7 @@ function renderCoordinatorGoals() {
         </div>
         <div style="font-size:9px;font-weight:${isToday?'700':'500'};color:${isToday?'#1843AD':'#9CA3AF'};line-height:1.3;margin-top:2px">${twoWeekLabels[i].charAt(0)}</div>
         <div style="font-size:8px;color:${isToday?'#1843AD':'#cbd5e1'};font-weight:${isToday?'600':'400'};line-height:1.3">${twoWeekDates[i]}</div>
-        <div style="font-size:11px;font-weight:700;color:${visits >= 2 ? '#059669' : visits === 1 ? '#f59e0b' : '#ef4444'};line-height:1.4">${visits}</div>
+        <div style="font-size:11px;font-weight:700;color:${visits >= 2 ? '#059669' : visits === 1 ? '#FF9933' : '#ef4444'};line-height:1.4">${visits}</div>
       </div>`;
     }).join('');
 
@@ -4009,7 +4009,7 @@ function renderCoordinatorGoals() {
     const avg = avgPerDay[name].toFixed(1);
     const cancels = _coordCancels[name] || 0;
     const cancelRate = (monthVisits + cancels) > 0 ? Math.round(cancels / (monthVisits + cancels) * 100) : 0;
-    const crColor = cancelRate > 20 ? '#dc2626' : cancelRate > 10 ? '#f59e0b' : '#059669';
+    const crColor = cancelRate > 20 ? '#dc2626' : cancelRate > 10 ? '#FF9933' : '#059669';
     return `<tr style="border-bottom:1px solid var(--border);cursor:pointer;" onclick="showCoordDetail('${jsAttr(name)}')">
       <td style="padding:8px 12px;font-weight:600">${escapeHTML(name)}</td>
       <td style="padding:8px 8px;text-align:center;font-weight:700">${monthVisits}</td>
@@ -4067,7 +4067,7 @@ function renderCoordCancelTypeChart() {
       datasets: [
         { label: 'No Show', data: chartOrder.map(function(n) { var s = coordStats.find(function(r) { return r.name === n; }); return s ? s.noShow : 0; }), backgroundColor: '#dc2626', borderRadius: 3 },
         { label: 'Site Cancelled', data: chartOrder.map(function(n) { var s = coordStats.find(function(r) { return r.name === n; }); return s ? s.site : 0; }), backgroundColor: '#1843ad', borderRadius: 3 },
-        { label: 'Patient Cancelled', data: chartOrder.map(function(n) { var s = coordStats.find(function(r) { return r.name === n; }); return s ? s.patient : 0; }), backgroundColor: '#c2410c', borderRadius: 3 }
+        { label: 'Patient Cancelled', data: chartOrder.map(function(n) { var s = coordStats.find(function(r) { return r.name === n; }); return s ? s.patient : 0; }), backgroundColor: '#FF9933', borderRadius: 3 }
       ]
     },
     options: {
@@ -4089,7 +4089,7 @@ function renderCoordCancelTypeChart() {
     h += '<th style="text-align:center;">Total</th>';
     h += '<th style="text-align:center;color:#dc2626;">No Show</th>';
     h += '<th style="text-align:center;color:#1843ad;">Site</th>';
-    h += '<th style="text-align:center;color:#c2410c;">Patient</th>';
+    h += '<th style="text-align:center;color:#FF9933;">Patient</th>';
     h += '<th style="text-align:center;min-width:120px;">Breakdown</th>';
     h += '</tr></thead><tbody>';
     sorted.forEach(function(r) {
@@ -4102,12 +4102,12 @@ function renderCoordCancelTypeChart() {
       h += '<td style="text-align:center;font-weight:700;">' + r.total + '</td>';
       h += '<td style="text-align:center;color:#dc2626;font-weight:' + (r.noShow > 0 ? '700' : '400') + ';">' + (r.noShow || '—') + '</td>';
       h += '<td style="text-align:center;color:#1843ad;font-weight:' + (r.site > 0 ? '700' : '400') + ';">' + (r.site || '—') + '</td>';
-      h += '<td style="text-align:center;color:#c2410c;font-weight:' + (r.patient > 0 ? '700' : '400') + ';">' + (r.patient || '—') + '</td>';
+      h += '<td style="text-align:center;color:#FF9933;font-weight:' + (r.patient > 0 ? '700' : '400') + ';">' + (r.patient || '—') + '</td>';
       // Stacked bar
       h += '<td style="padding:4px 8px;"><div style="display:flex;gap:1px;height:14px;border-radius:3px;overflow:hidden;">';
       if (nsPct > 0) h += '<div style="width:' + nsPct + '%;background:#dc2626;" title="No Show ' + nsPct + '%"></div>';
       if (scPct > 0) h += '<div style="width:' + scPct + '%;background:#1843ad;" title="Site ' + scPct + '%"></div>';
-      if (pcPct > 0) h += '<div style="width:' + pcPct + '%;background:#c2410c;" title="Patient ' + pcPct + '%"></div>';
+      if (pcPct > 0) h += '<div style="width:' + pcPct + '%;background:#FF9933;" title="Patient ' + pcPct + '%"></div>';
       var remPct = 100 - nsPct - scPct - pcPct;
       if (remPct > 0) h += '<div style="width:' + remPct + '%;background:#e2e8f0;" title="Other"></div>';
       h += '</div></td>';
@@ -4119,7 +4119,7 @@ function renderCoordCancelTypeChart() {
     h += '<td style="text-align:center;">' + totalAll + '</td>';
     h += '<td style="text-align:center;color:#dc2626;">' + totalNS + '</td>';
     h += '<td style="text-align:center;color:#1843ad;">' + totalSC + '</td>';
-    h += '<td style="text-align:center;color:#c2410c;">' + totalPC + '</td>';
+    h += '<td style="text-align:center;color:#FF9933;">' + totalPC + '</td>';
     h += '<td></td></tr>';
     h += '</tbody></table>';
     tableEl.innerHTML = h;
@@ -4171,7 +4171,7 @@ function renderInvCapacity() {
   var maxVisits = Math.max.apply(null, invStats.map(function(i){return i.visits;}).concat([0])) || 1;
   var totalVisits = invStats.reduce(function(s,i){return s+i.visits;},0);
   var avgUtil = invStats.length > 0 ? Math.round(invStats.reduce(function(s,i){return s+i.utilPct;},0)/invStats.length) : 0;
-  var avgUtilColor = avgUtil >= 70 ? '#059669' : avgUtil >= 40 ? '#f59e0b' : '#dc2626';
+  var avgUtilColor = avgUtil >= 70 ? '#059669' : avgUtil >= 40 ? '#FF9933' : '#dc2626';
 
   var kpiStyleI = 'padding:8px;border-radius:8px;text-align:center;cursor:pointer;transition:box-shadow .15s;';
   var html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:14px;">';
@@ -4184,11 +4184,11 @@ function renderInvCapacity() {
   html += '<tr style="background:#f8fafc;"><th style="text-align:left;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Investigator</th><th style="text-align:left;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Visits</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Utilization</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Studies</th><th style="text-align:center;padding:6px 8px;font-weight:600;color:#64748b;font-size:10px;">Avg/Day</th></tr>';
   invStats.forEach(function(inv) {
     var pct = Math.round(inv.visits / maxVisits * 100);
-    var utilColor = inv.utilPct >= 80 ? '#059669' : inv.utilPct >= 50 ? '#f59e0b' : '#94a3b8';
+    var utilColor = inv.utilPct >= 80 ? '#059669' : inv.utilPct >= 50 ? '#FF9933' : '#94a3b8';
     html += '<tr style="border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showInvDetail(\''+jsAttr(inv.name)+'\')">';
     html += '<td style="padding:8px;"><div style="font-weight:700;color:#1e293b;">'+escapeHTML(inv.name.split(' ')[0])+'</div></td>';
     html += '<td style="padding:8px;"><div style="background:#e2e8f0;border-radius:5px;height:18px;overflow:hidden;position:relative;">';
-    html += '<div style="height:100%;width:'+pct+'%;background:linear-gradient(90deg,#7c3aed,#a78bfa);border-radius:5px;"></div>';
+    html += '<div style="height:100%;width:'+pct+'%;background:linear-gradient(90deg,#072061,#a78bfa);border-radius:5px;"></div>';
     html += '<div style="position:absolute;left:8px;top:0;font-size:11px;font-weight:700;color:'+(pct>30?'#fff':'#1e293b')+';line-height:18px;">'+inv.visits+'</div>';
     html += '</div></td>';
     html += '<td style="padding:8px;text-align:center;font-weight:700;color:'+utilColor+';">'+inv.utilPct+'%</td>';
@@ -4252,7 +4252,7 @@ function renderRecruiterPerformance() {
   html += '<div style="'+kpiStyleR+'background:#f5f3ff;"><div style="font-size:18px;font-weight:800;color:#072061;">'+totalPatients+'</div><div style="font-size:9px;color:#072061;font-weight:600;">Patients</div></div>';
   html += '<div style="'+kpiStyleR+'background:#e8eeff;"><div style="font-size:18px;font-weight:800;color:#1843ad;">'+totalScheduled+'</div><div style="font-size:9px;color:#1843ad;font-weight:600;">Scheduled V1</div></div>';
   html += '<div style="'+kpiStyleR+'background:#f0fdf4;"><div style="font-size:18px;font-weight:800;color:#059669;">'+totalScreenEnroll+'</div><div style="font-size:9px;color:#059669;font-weight:600;">Screening/Enrolled</div></div>';
-  html += '<div style="'+kpiStyleR+'background:'+(convPct>10?'#f0fdf4':'#fffbeb')+';"><div style="font-size:18px;font-weight:800;color:'+(convPct>10?'#059669':'#d97706')+';">'+convPct+'%</div><div style="font-size:9px;color:'+(convPct>10?'#059669':'#d97706')+';font-weight:600;">Interest Rate</div></div>';
+  html += '<div style="'+kpiStyleR+'background:'+(convPct>10?'#f0fdf4':'#fffbeb')+';"><div style="font-size:18px;font-weight:800;color:'+(convPct>10?'#059669':'#FF9933')+';">'+convPct+'%</div><div style="font-size:9px;color:'+(convPct>10?'#059669':'#FF9933')+';font-weight:600;">Interest Rate</div></div>';
   html += '</div>';
 
   html += '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:4px;">';
@@ -4262,7 +4262,7 @@ function renderRecruiterPerformance() {
     html += '<tr style="border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showRecruiterDetail(\'' + jsAttr(s.name) + '\')">';
     html += '<td style="padding:8px;"><div style="font-weight:700;color:#1e293b;">' + escapeHTML(s.nick) + '</div></td>';
     html += '<td style="padding:8px;"><div style="background:#e2e8f0;border-radius:5px;height:18px;overflow:hidden;position:relative;">';
-    html += '<div style="height:100%;width:'+barW+'%;background:linear-gradient(90deg,#0369a1,#38bdf8);border-radius:5px;"></div>';
+    html += '<div style="height:100%;width:'+barW+'%;background:linear-gradient(90deg,#1843AD,#38bdf8);border-radius:5px;"></div>';
     html += '<div style="position:absolute;left:8px;top:0;font-size:11px;font-weight:700;color:'+(barW>30?'#fff':'#1e293b')+';line-height:18px;">'+s.total+'</div>';
     html += '</div></td>';
     html += '<td style="padding:8px;text-align:center;font-weight:600;color:#475569;">'+s.calls+'</td>';
@@ -4406,7 +4406,7 @@ function renderPIApprovalTracker() {
   html += '<div style="padding:8px;background:#eff6ff;border-radius:8px;text-align:center;"><div style="font-size:18px;font-weight:800;color:#1843AD;">'+Object.keys(byStudy).length+'</div><div style="font-size:9px;color:#1843AD;font-weight:600;">Studies w/ Pending</div></div>';
   var totalActive = MED_RECORDS_DATA.filter(function(r){return r.is_active;}).length;
   var approvalRate = totalActive > 0 ? Math.round(confirmed.length / totalActive * 100) : 0;
-  var arColor = approvalRate >= 70 ? '#059669' : approvalRate >= 40 ? '#d97706' : '#dc2626';
+  var arColor = approvalRate >= 70 ? '#059669' : approvalRate >= 40 ? '#FF9933' : '#dc2626';
   html += '<div style="padding:8px;background:#f8fafc;border-radius:8px;text-align:center;"><div style="font-size:18px;font-weight:800;color:'+arColor+';">'+approvalRate+'%</div><div style="font-size:9px;color:'+arColor+';font-weight:600;">Approval Rate</div></div>';
   html += '</div>';
 
@@ -4419,7 +4419,7 @@ function renderPIApprovalTracker() {
         return p.date_updated ? Math.floor((today - new Date(p.date_updated)) / 86400000) : 999;
       });
       var maxDays = Math.max.apply(null, daysWaiting.concat([0]));
-      var urgColor = maxDays > 14 ? '#dc2626' : maxDays > 7 ? '#d97706' : '#059669';
+      var urgColor = maxDays > 14 ? '#dc2626' : maxDays > 7 ? '#FF9933' : '#059669';
       html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:#f8fafc;border-radius:6px;border-left:3px solid '+urgColor+';">';
       html += '<div><span style="font-weight:700;font-size:11px;">'+escapeHTML(study)+'</span> <span style="font-size:10px;color:#94a3b8;">'+patients.length+' patient'+(patients.length>1?'s':'')+'</span></div>';
       html += '<div style="font-size:10px;font-weight:700;color:'+urgColor+';">'+maxDays+'d waiting</div>';
@@ -4473,8 +4473,8 @@ function renderVendorAnalytics() {
   html += '<th style="text-align:center;">Ref→Sched</th><th style="text-align:center;">Volume</th>';
   html += '</tr></thead><tbody>';
   vendorList.forEach(function(v) {
-    var crColor = v.contactToRef >= 10 ? '#059669' : v.contactToRef >= 5 ? '#d97706' : '#dc2626';
-    var rsColor = v.refToSched >= 30 ? '#059669' : v.refToSched >= 15 ? '#d97706' : '#dc2626';
+    var crColor = v.contactToRef >= 10 ? '#059669' : v.contactToRef >= 5 ? '#FF9933' : '#dc2626';
+    var rsColor = v.refToSched >= 30 ? '#059669' : v.refToSched >= 15 ? '#FF9933' : '#dc2626';
     var barPct = Math.round(v.contacts / maxContacts * 100);
     html += '<tr><td style="padding:6px 8px;font-weight:700;"><span style="padding:2px 8px;border-radius:4px;background:#e8eeff;color:#1843ad;">'+escapeHTML(v.name)+'</span></td>';
     html += '<td style="text-align:center;">'+v.campaigns+'</td>';
@@ -4483,7 +4483,7 @@ function renderVendorAnalytics() {
     html += '<td style="text-align:center;color:#1843AD;font-weight:700;">'+v.scheduled+'</td>';
     html += '<td style="text-align:center;color:'+crColor+';font-weight:700;">'+v.contactToRef+'%</td>';
     html += '<td style="text-align:center;color:'+rsColor+';font-weight:700;">'+v.refToSched+'%</td>';
-    html += '<td style="text-align:center;"><div style="background:#e2e8f0;border-radius:4px;height:8px;overflow:hidden;width:60px;display:inline-block;"><div style="height:100%;width:'+barPct+'%;background:#3b82f6;border-radius:4px;"></div></div></td>';
+    html += '<td style="text-align:center;"><div style="background:#e2e8f0;border-radius:4px;height:8px;overflow:hidden;width:60px;display:inline-block;"><div style="height:100%;width:'+barPct+'%;background:#1843AD;border-radius:4px;"></div></div></td>';
     html += '</tr>';
   });
   html += '</tbody></table></div>';
@@ -4512,11 +4512,11 @@ function renderContactSequence() {
   }
 
   var steps = [
-    { label: '1st Contact', count: total1, color: '#3b82f6' },
-    { label: '2nd Contact', count: total2, color: '#8b5cf6' },
+    { label: '1st Contact', count: total1, color: '#1843AD' },
+    { label: '2nd Contact', count: total2, color: '#1843AD' },
     { label: '3rd Contact', count: total3, color: '#ec4899' },
     { label: 'Referrals', count: totalRef, color: '#059669' },
-    { label: 'Scheduled', count: totalSched, color: '#d97706' }
+    { label: 'Scheduled', count: totalSched, color: '#FF9933' }
   ];
   var maxCount = Math.max.apply(null, steps.map(function(s){return s.count;}).concat([0])) || 1;
 
@@ -4605,8 +4605,8 @@ function renderRefConversion() {
   if (MED_RECORDS_DATA && MED_RECORDS_DATA.length > 0) html += '<th style="text-align:center;">In Med Rec</th>';
   html += '</tr></thead><tbody>';
   sourceList.forEach(function(s) {
-    var crColor = s.convRate >= 15 ? '#059669' : s.convRate >= 5 ? '#d97706' : '#dc2626';
-    var lrColor = s.lostRate > 50 ? '#dc2626' : s.lostRate > 30 ? '#d97706' : '#059669';
+    var crColor = s.convRate >= 15 ? '#059669' : s.convRate >= 5 ? '#FF9933' : '#dc2626';
+    var lrColor = s.lostRate > 50 ? '#dc2626' : s.lostRate > 30 ? '#FF9933' : '#059669';
     html += '<tr><td style="padding:6px 8px;font-weight:600;">'+escapeHTML(s.name)+'</td>';
     html += '<td style="text-align:center;font-weight:700;">'+s.total+'</td>';
     html += '<td style="text-align:center;color:#1843AD;">'+s.newLead+'</td>';
@@ -4961,7 +4961,7 @@ function showActionModal(type) {
           '<td style="font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHTML(r.message||'') + '">' + escapeHTML((r.message||'').substring(0,60)) + '</td>' +
           '<td style="font-size:10px">' + escapeHTML(r.created_by||'') + '</td>' +
           '<td style="font-size:10px;font-weight:600">' + escapeHTML(r.assigned_to||'—') + '</td>' +
-          '<td style="font-weight:700;color:' + (parseInt(r.days_outstanding)>90?'#dc2626':parseInt(r.days_outstanding)>30?'#d97706':'#059669') + '">' + (r.days_outstanding||'') + 'd</td>' +
+          '<td style="font-weight:700;color:' + (parseInt(r.days_outstanding)>90?'#dc2626':parseInt(r.days_outstanding)>30?'#FF9933':'#059669') + '">' + (r.days_outstanding||'') + 'd</td>' +
           '<td>' + _crioLink('Open', commentUrl) + '</td></tr>';
       }).join('') + '</tbody></table>';
   } else if (type === 'docs') {
@@ -4974,7 +4974,7 @@ function showActionModal(type) {
         return '<tr><td style="font-size:11px">' + _crioLink((r.study_name||'').split(' - ').pop(), filesUrl) + '</td><td class="r">' + (r.total_documents||0) + '</td>' +
           '<td class="r">' + (r.signed||0) + '</td><td class="r" style="color:#FF9933;font-weight:700">' + (r.active||0) + '</td>' +
           '<td class="r" style="color:#dc2626;font-weight:700">' + (r.assigned||0) + '</td>' +
-          '<td class="r"><span style="color:' + (pct>=95?'#059669':pct>=80?'#d97706':'#dc2626') + ';font-weight:700">' + pct + '%</span></td>' +
+          '<td class="r"><span style="color:' + (pct>=95?'#059669':pct>=80?'#FF9933':'#dc2626') + ';font-weight:700">' + pct + '%</span></td>' +
           '<td>' + _crioLink('Files', filesUrl) + '</td></tr>';
       }).join('') + '</tbody></table>';
   } else if (type === 'todos') {
@@ -4987,7 +4987,7 @@ function showActionModal(type) {
         return '<tr style="' + (isOverdue?'background:#fef2f2':'') + '"><td style="font-size:11px">' + escapeHTML((r.study_name||'').split(' - ').pop()) + '</td>' +
           '<td style="font-size:11px">' + escapeHTML(maskPHI(r.subject_name||'')) + '</td>' +
           '<td style="font-size:11px">' + escapeHTML(r.todo_name||'') + '</td>' +
-          '<td><span style="font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px;background:' + (isOverdue?'#fef2f2':'#fffbeb') + ';color:' + (isOverdue?'#dc2626':'#d97706') + '">' + escapeHTML(r.status||'') + '</span></td>' +
+          '<td><span style="font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px;background:' + (isOverdue?'#fef2f2':'#fffbeb') + ';color:' + (isOverdue?'#dc2626':'#FF9933') + '">' + escapeHTML(r.status||'') + '</span></td>' +
           '<td style="white-space:nowrap;color:' + (isOverdue?'#dc2626':'') + '">' + escapeHTML(r.due_date||'') + '</td>' +
           '<td>' + _crioLink('Open', todoUrl) + '</td></tr>';
       }).join('') + '</tbody></table>';
@@ -6317,7 +6317,7 @@ function renderCRIOvsQB() {
     var gaugeTotal = compRows.length || 1;
     var gaugeBars = [
       { label: 'Aligned', count: statusCounts.Aligned, color: '#10B981' },
-      { label: 'Partial', count: statusCounts.Partial, color: '#F59E0B' },
+      { label: 'Partial', count: statusCounts.Partial, color: '#FF9933' },
       { label: 'Low Match', count: statusCounts['Low Match'], color: '#EF4444' },
       { label: 'Limited Data', count: statusCounts.Limited, color: '#60A5FA' },
       { label: 'No QB Data', count: statusCounts['No QB Data'], color: '#9CA3AF' },
@@ -6335,7 +6335,7 @@ function renderCRIOvsQB() {
   }
 
   // ── Revenue Comparison Table
-  const statusColor = { 'Aligned': '#10B981', 'Partial': '#F59E0B', 'Low Match': '#EF4444', 'No QB Data': '#9CA3AF', 'QB Only': '#60A5FA' };
+  const statusColor = { 'Aligned': '#10B981', 'Partial': '#FF9933', 'Low Match': '#EF4444', 'No QB Data': '#9CA3AF', 'QB Only': '#60A5FA' };
   const limitedColor = '#60A5FA';
   let tableHtml = compRows.map(r => {
     const isLimited = r.status.includes('mo data');
@@ -6345,7 +6345,7 @@ function renderCRIOvsQB() {
     '<td class="r">' + (r.crioBilled ? fmtD(r.crioBilled) : '—') + '<div style="font-size:10px;color:var(--muted)">AR: ' + fmtD(r.crioAR) + ' + Coll: ' + fmtD(r.crioColl) + '</div></td>' +
     '<td class="r" style="color:var(--muted)">' + (r.crioRev ? fmtD(r.crioRev) : '—') + '</td>' +
     '<td class="r">' + (r.qbRev ? fmtD(r.qbRev) : '—') + (r.qbAccount ? '<div style="font-size:10px;color:var(--muted)">' + esc(r.qbAccount) + '</div>' : '') + '</td>' +
-    '<td class="r" style="color:' + (r.diff > 5000 ? '#EF4444' : r.diff < -5000 ? '#F59E0B' : '#10B981') + ';font-weight:600">' + (Math.abs(r.diff) > 100 ? (r.diff > 0 ? '+' : '') + fmtD(r.diff) : '—') + '</td>' +
+    '<td class="r" style="color:' + (r.diff > 5000 ? '#EF4444' : r.diff < -5000 ? '#FF9933' : '#10B981') + ';font-weight:600">' + (Math.abs(r.diff) > 100 ? (r.diff > 0 ? '+' : '') + fmtD(r.diff) : '—') + '</td>' +
     '<td class="r">' + (r.matchPct > 0 ? r.matchPct + '%' : '—') + '</td>' +
     '<td class="r">' + (r.qbMonths > 0 ? r.qbMonths : '—') + (r.qbFirst ? '<div style="font-size:9px;color:var(--muted)">' + esc(r.qbFirst) + '</div>' : '') + '</td>' +
     '<td><span style="display:inline-block;padding:2px 8px;border-radius:9px;font-size:10px;font-weight:600;background:' + sColor + '22;color:' + sColor + '">' + esc(r.status) + '</span></td>' +
@@ -6358,7 +6358,7 @@ function renderCRIOvsQB() {
     '<td class="r">' + fmtD(totalCrioBilled) + '</td>' +
     '<td class="r" style="color:var(--muted)">' + fmtD(totalCrio12M) + '</td>' +
     '<td class="r">' + fmtD(totalQbMatched) + '</td>' +
-    '<td class="r" style="color:' + (totalCrioBilled - totalQbMatched > 0 ? '#EF4444' : '#F59E0B') + '">' + (totalCrioBilled - totalQbMatched > 0 ? '+' : '') + fmtD(totalCrioBilled - totalQbMatched) + '</td>' +
+    '<td class="r" style="color:' + (totalCrioBilled - totalQbMatched > 0 ? '#EF4444' : '#FF9933') + '">' + (totalCrioBilled - totalQbMatched > 0 ? '+' : '') + fmtD(totalCrioBilled - totalQbMatched) + '</td>' +
     '<td class="r">' + allAlignPct + '%</td>' +
     '<td></td>' +
     '<td><span style="display:inline-block;padding:2px 8px;border-radius:9px;font-size:10px;font-weight:600;background:#10B98122;color:#10B981">' + matureAlignPct + '% mature</span></td></tr>';
@@ -6410,7 +6410,7 @@ function renderCRIOvsQB() {
       labels: chartLabels,
       datasets: [
         { label: 'CRIO Billed', data: chartRows.map(r => Math.round(r.crioBilled)), backgroundColor: '#10B98140', borderColor: '#10B981', borderWidth: 1.5, borderRadius: 3 },
-        { label: 'QB Revenue', data: chartRows.map(r => Math.round(r.qbRev)), backgroundColor: '#8B5CF640', borderColor: '#8B5CF6', borderWidth: 1.5, borderRadius: 3 }
+        { label: 'QB Revenue', data: chartRows.map(r => Math.round(r.qbRev)), backgroundColor: '#1843AD40', borderColor: '#1843AD', borderWidth: 1.5, borderRadius: 3 }
       ]
     },
     options: {
@@ -6442,7 +6442,7 @@ function renderCRIOvsQB() {
       data: {
         labels: monthCols.map(function(m) { var p = m.split(' '); return p[0].substring(0,3) + ' ' + (p[1]||'').slice(-2); }),
         datasets: [
-          { label: 'Total QB Income', data: allMonthly, borderColor: '#8B5CF6', backgroundColor: '#8B5CF620', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#8B5CF6', fill: true, tension: 0.3 },
+          { label: 'Total QB Income', data: allMonthly, borderColor: '#1843AD', backgroundColor: '#1843AD20', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#1843AD', fill: true, tension: 0.3 },
           { label: 'CRIO-Matched', data: monthlyTotals, borderColor: '#10B981', backgroundColor: '#10B98120', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#10B981', fill: true, tension: 0.3 }
         ]
       },
@@ -6461,9 +6461,9 @@ function renderCRIOvsQB() {
   if (typeof AGING_INV !== 'undefined' && typeof AGING_AP !== 'undefined') {
     var buckets = [
       { label: 'Current', key: 'current', color: '#10B981' },
-      { label: '30-60d', key: 'd30_60', color: '#3B82F6' },
-      { label: '61-90d', key: 'd61_90', color: '#F59E0B' },
-      { label: '91-120d', key: 'd91_120', color: '#F97316' },
+      { label: '30-60d', key: 'd30_60', color: '#1843AD' },
+      { label: '61-90d', key: 'd61_90', color: '#FF9933' },
+      { label: '91-120d', key: 'd91_120', color: '#FF9933' },
       { label: '121-150d', key: 'd121_150', color: '#EF4444' },
       { label: '150d+', key: 'd150plus', color: '#DC2626' },
     ];
@@ -6474,8 +6474,8 @@ function renderCRIOvsQB() {
       data: {
         labels: buckets.map(function(b) { return b.label; }),
         datasets: [
-          { label: 'Invoice AR', data: invTotals.map(Math.round), backgroundColor: '#3B82F640', borderColor: '#3B82F6', borderWidth: 1.5, borderRadius: 3 },
-          { label: 'Autopay AR', data: apTotals.map(Math.round), backgroundColor: '#8B5CF640', borderColor: '#8B5CF6', borderWidth: 1.5, borderRadius: 3 }
+          { label: 'Invoice AR', data: invTotals.map(Math.round), backgroundColor: '#1843AD40', borderColor: '#1843AD', borderWidth: 1.5, borderRadius: 3 },
+          { label: 'Autopay AR', data: apTotals.map(Math.round), backgroundColor: '#1843AD40', borderColor: '#1843AD', borderWidth: 1.5, borderRadius: 3 }
         ]
       },
       options: {
@@ -6496,11 +6496,11 @@ function renderCRIOvsQB() {
       var totalAR = totalInvAR + totalApAR;
       var overdue = invTotals.slice(2).reduce(function(a,b){return a+b;},0) + apTotals.slice(2).reduce(function(a,b){return a+b;},0);
       var overduePct = totalAR > 0 ? Math.round(overdue / totalAR * 100) : 0;
-      var overdueColor = overduePct > 30 ? '#dc2626' : overduePct > 15 ? '#d97706' : '#059669';
+      var overdueColor = overduePct > 30 ? '#dc2626' : overduePct > 15 ? '#FF9933' : '#059669';
       summEl.innerHTML = '<div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:12px;">AR Summary</div>' +
         '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">' +
-        '<div style="text-align:center;padding:8px;background:var(--surface2);border-radius:8px;"><div style="font-size:20px;font-weight:800;color:#3B82F6;">' + fmtK(totalInvAR) + '</div><div style="font-size:9px;color:var(--muted);">Invoice AR</div></div>' +
-        '<div style="text-align:center;padding:8px;background:var(--surface2);border-radius:8px;"><div style="font-size:20px;font-weight:800;color:#8B5CF6;">' + fmtK(totalApAR) + '</div><div style="font-size:9px;color:var(--muted);">Autopay AR</div></div>' +
+        '<div style="text-align:center;padding:8px;background:var(--surface2);border-radius:8px;"><div style="font-size:20px;font-weight:800;color:#1843AD;">' + fmtK(totalInvAR) + '</div><div style="font-size:9px;color:var(--muted);">Invoice AR</div></div>' +
+        '<div style="text-align:center;padding:8px;background:var(--surface2);border-radius:8px;"><div style="font-size:20px;font-weight:800;color:#1843AD;">' + fmtK(totalApAR) + '</div><div style="font-size:9px;color:var(--muted);">Autopay AR</div></div>' +
         '<div style="text-align:center;padding:8px;background:var(--surface2);border-radius:8px;"><div style="font-size:20px;font-weight:800;color:var(--text);">' + fmtK(totalAR) + '</div><div style="font-size:9px;color:var(--muted);">Total AR</div></div>' +
         '<div style="text-align:center;padding:8px;background:var(--surface2);border-radius:8px;"><div style="font-size:20px;font-weight:800;color:' + overdueColor + ';">' + overduePct + '%</div><div style="font-size:9px;color:var(--muted);">Overdue (>60d)</div></div>' +
         '</div>' +
@@ -6749,11 +6749,11 @@ function renderContactAlerts() {
 
   function alertCard(a) {
     const isRed = a.severity === 'red';
-    const border = isRed ? '#dc2626' : '#d97706';
+    const border = isRed ? '#dc2626' : '#FF9933';
     const bg = isRed ? '#fef2f2' : '#fffbeb';
     const icon = isRed ? '' : '';
     const typeLabel = a.alert_type;
-    const typeBg = isRed ? '#dc2626' : '#d97706';
+    const typeBg = isRed ? '#dc2626' : '#FF9933';
     const pLink = a.patient_url
       ? `<a href="${a.patient_url}" target="_blank" rel="noopener" style="text-decoration:none;color:#1e293b;font-weight:700;">${maskPHI(a.patient)}<svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-left:2px;opacity:0.4;vertical-align:middle"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>`
       : `<strong style="color:#1e293b">${maskPHI(a.patient)}</strong>`;
@@ -8159,9 +8159,9 @@ function renderFollowUpTable() {
     });
   }
   addRows(_filterRecovered(DATA.allCancels), 'cancel', 'Cancel', '#dc2626');
-  addRows(_filterRecovered(DATA.noShows), 'noshow', 'No Show', '#f97316');
-  addRows(_filterRecovered(DATA.withdrawals), 'withdrew', 'Withdrew', '#8b5cf6');
-  addRows(_filterRecovered(DATA.screenFails), 'screenfail', 'Screen Fail', '#6366f1');
+  addRows(_filterRecovered(DATA.noShows), 'noshow', 'No Show', '#FF9933');
+  addRows(_filterRecovered(DATA.withdrawals), 'withdrew', 'Withdrew', '#1843AD');
+  addRows(_filterRecovered(DATA.screenFails), 'screenfail', 'Screen Fail', '#1843AD');
   // Unscheduled — exclude pre-screening studies (no sponsor prefix or name contains "pre-screen")
   (window._unscheduledVisits || []).forEach(function(r) {
     var fullStudy = (r.study_name || '');
@@ -8179,7 +8179,7 @@ function renderFollowUpTable() {
     if (_uSk && window._subjectCurrentStatus && window._subjectCurrentStatus[String(_uSk)]) _uStatus = window._subjectCurrentStatus[String(_uSk)];
     var cuMatchU = matchClickUpPatient(name, _cuLookup);
     rows.push({
-      _name: name, _study: study, _cat: 'unsched', _catLabel: 'Not Scheduled', _catColor: '#c2410c',
+      _name: name, _study: study, _cat: 'unsched', _catLabel: 'Not Scheduled', _catColor: '#FF9933',
       url: typeof window._crioPatientUrl === 'function' ? window._crioPatientUrl(r.study_key, r.subject_key, site) : '',
       study_url: (typeof window._crioStudyUrl === 'function' ? window._crioStudyUrl(r.study_key) : '') || '',
       status: _uStatus, reason: r.last_visit_name || '',
@@ -8245,7 +8245,7 @@ function renderFollowUpTable() {
     var k = _fuKey(r);
     var act = _fuActions[k] || {};
     var hasAction = !!act.action;
-    var riskColor = r.riskLevel === 'critical' ? '#dc2626' : r.riskLevel === 'high' ? '#d97706' : r.riskLevel === 'medium' ? '#3b82f6' : r.riskLevel === 'low' ? '#059669' : '#cbd5e1';
+    var riskColor = r.riskLevel === 'critical' ? '#dc2626' : r.riskLevel === 'high' ? '#FF9933' : r.riskLevel === 'medium' ? '#1843AD' : r.riskLevel === 'low' ? '#059669' : '#cbd5e1';
     var rowBg = hasAction ? (act.action === 'lost' || act.action === 'noaction' ? '#f8fafc' : '#f0fdf4') : '';
     var rowOpacity = (act.action === 'lost' || act.action === 'noaction') ? 'opacity:0.5;' : '';
 
@@ -8261,7 +8261,7 @@ function renderFollowUpTable() {
     html += '<td style="padding:7px 6px;text-align:center;"><span style="font-size:9px;font-weight:700;padding:2px 5px;border-radius:4px;background:'+riskColor+'15;color:'+riskColor+';">'+(r.riskLevel||'—')+'</span></td>';
     // ClickUp link
     if (r.clickup_url) {
-      var cuColor = r.clickup_stage === 'Enrolled' ? '#059669' : r.clickup_stage === 'Screening' || r.clickup_stage === 'Pre-Screening' ? '#3b82f6' : r.clickup_stage === 'Lost' || r.clickup_stage === 'DNQ' || r.clickup_stage === 'Screen Fail' ? '#dc2626' : '#7c3aed';
+      var cuColor = r.clickup_stage === 'Enrolled' ? '#059669' : r.clickup_stage === 'Screening' || r.clickup_stage === 'Pre-Screening' ? '#1843AD' : r.clickup_stage === 'Lost' || r.clickup_stage === 'DNQ' || r.clickup_stage === 'Screen Fail' ? '#dc2626' : '#072061';
       html += '<td style="padding:7px 6px;text-align:center;"><a href="'+escapeHTML(r.clickup_url)+'" target="_blank" title="'+escapeHTML((r.clickup_tracker||'')+' · '+r.clickup_stage)+'" style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;background:'+cuColor+'15;color:'+cuColor+';text-decoration:none;white-space:nowrap;">'+escapeHTML(r.clickup_stage||'Open')+'</a></td>';
     } else {
       html += '<td style="padding:7px 6px;text-align:center;font-size:9px;color:#cbd5e1;">—</td>';
@@ -8375,7 +8375,7 @@ function buildActionSteps() {
     return url?`<a href="${escapeHTML(url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:inherit;font-weight:600;text-decoration:none;">${escapeHTML(name)}</a>`:`<span style="font-weight:600">${escapeHTML(name)}</span>`;
   }
   function typeBadge(type){
-    const map={'No Show':['#fef2f2','#dc2626'],'Patient Cancelled':['#fff7ed','#c2410c'],'Site Cancelled':['#eff6ff','#1843ad']};
+    const map={'No Show':['#fef2f2','#dc2626'],'Patient Cancelled':['#fff7ed','#FF9933'],'Site Cancelled':['#eff6ff','#1843ad']};
     const [bg,col]=map[type]||['#f8fafc','#64748b'];
     return type?`<span style="font-size:9px;padding:1px 5px;border-radius:3px;background:${bg};color:${col};font-weight:700;">${type}</span>`:'';
   }
@@ -8467,7 +8467,7 @@ function buildActionSteps() {
     const sid='prescr-'+study.replace(/\s+/g,'-').toLowerCase();
     steps.push({pri:3,id:sid,icon:'',tag:'PRE-SCREENER UPDATE',tagBg:'#fef3c7',tagColor:'#b45309',
       title:`Protocol criteria changed · ${sLink(study,v.study_url)}`,
-      body:`<div style="padding:8px 10px;background:#fef3c7;border-radius:6px;border-left:3px solid #f59e0b;font-size:11px;margin:6px 0;">
+      body:`<div style="padding:8px 10px;background:#fef3c7;border-radius:6px;border-left:3px solid #FF9933;font-size:11px;margin:6px 0;">
         Revise pre-screening script to reflect updated inclusion/exclusion criteria before booking new patients
       </div><div style="margin-top:4px;">${pts.map(p=>patRow(p,true,sid)).join('')}</div>`,
       action:''
@@ -8492,9 +8492,9 @@ function buildActionSteps() {
     if(subs.includes('consent'))       fixes.push('Confirm willingness to sign consent before scheduling');
     if(subs.includes('condition'))     fixes.push('Add targeted medical history questions for this study\'s key exclusion conditions');
     if(subs.includes('generic'))       fixes.push('Review full eligibility checklist — multiple DNQs suggest a pre-screening gap');
-    const fixHTML=fixes.length?`<div style="padding:8px 10px;background:#fff7ed;border-radius:6px;border-left:3px solid #f97316;font-size:11px;line-height:1.9;margin:6px 0;">${fixes.map(f=>''+f).join('<br>')}</div>`:'';
+    const fixHTML=fixes.length?`<div style="padding:8px 10px;background:#fff7ed;border-radius:6px;border-left:3px solid #FF9933;font-size:11px;line-height:1.9;margin:6px 0;">${fixes.map(f=>''+f).join('<br>')}</div>`:'';
     const sid='sf-'+study.replace(/\s+/g,'-').toLowerCase();
-    steps.push({pri:4,id:sid,icon:'',tag:'SCREEN FAIL',tagBg:'#fff7ed',tagColor:'#c2410c',
+    steps.push({pri:4,id:sid,icon:'',tag:'SCREEN FAIL',tagBg:'#fff7ed',tagColor:'#FF9933',
       title:`${allPts.length} screen fail${allPts.length>1?'s':''} · ${sLink(study,data.url)}`,
       body:fixHTML+`<div style="margin-top:4px;">${allPts.map(p=>patRow(p,true,sid)).join('')}</div>`,
       action:''
@@ -8521,9 +8521,9 @@ function buildActionSteps() {
   const ns=(ad.reschedule_needed||[]).filter(p=>_isEnrolling(p.study));
   const nsWithUpcoming=ns.filter(p=>p.still_upcoming);
   const nsNoUpcoming=ns.filter(p=>!p.still_upcoming);
-  if(nsWithUpcoming.length>0){ const sid='ns-upcoming-'+nsWithUpcoming.length; steps.push({pri:7,id:sid,icon:'',tag:'NO SHOW — UPCOMING VISIT',tagBg:'#fdf4ff',tagColor:'#7e22ce',
+  if(nsWithUpcoming.length>0){ const sid='ns-upcoming-'+nsWithUpcoming.length; steps.push({pri:7,id:sid,icon:'',tag:'NO SHOW — UPCOMING VISIT',tagBg:'#fdf4ff',tagColor:'#072061',
     title:`${nsWithUpcoming.length} patients no-showed but still have visits on the books`,
-    body:`<div style="padding:6px 10px;background:#fdf4ff;border-radius:6px;border-left:3px solid #a855f7;font-size:11px;margin:6px 0;">
+    body:`<div style="padding:6px 10px;background:#fdf4ff;border-radius:6px;border-left:3px solid #1843AD;font-size:11px;margin:6px 0;">
       These patients did not show — but future visits are still scheduled. Confirm attendance now or reschedule.
     </div><div style="margin-top:4px;">${nsWithUpcoming.map(p=>patRow(p,true,sid)).join('')}</div>`,
     action:'Text + call each patient today. Confirm the upcoming visit explicitly. Log all contact attempts in CRIO.'
@@ -8578,10 +8578,10 @@ function buildActionSteps() {
   const ACTION_CATS = [
     { name: 'Urgent', pris: [1], color: '#dc2626', bg: '#fef2f2' },
     { name: 'Documentation', pris: [2], color: '#92400e', bg: '#fef3c7' },
-    { name: 'Screening Issues', pris: [3, 4], color: '#c2410c', bg: '#fff7ed' },
+    { name: 'Screening Issues', pris: [3, 4], color: '#FF9933', bg: '#fff7ed' },
     { name: 'Patient Outreach', pris: [5, 6, 7, 8], color: '#1843ad', bg: '#eff6ff' },
     { name: 'Retention', pris: [9], color: '#15803d', bg: '#f0fdf4' },
-    { name: 'Proactive', pris: [10], color: '#d97706', bg: '#fffbeb' },
+    { name: 'Proactive', pris: [10], color: '#FF9933', bg: '#fffbeb' },
     { name: 'Administrative', pris: [11, 12], color: '#475569', bg: '#f8fafc' },
   ];
 
@@ -8833,8 +8833,8 @@ function buildMedRecAlerts() {
   // Completion: records_received === 'Received' means that patient's medical records workflow is done
   const completionPct = total > 0 ? Math.round(recsComplete / total * 100) : 0;
   const releasePct = total > 0 ? Math.round(releaseRecvd / total * 100) : 0;
-  const barColor = completionPct >= 75 ? '#059669' : completionPct >= 50 ? '#f59e0b' : '#dc2626';
-  const relBarColor = releasePct >= 75 ? '#059669' : releasePct >= 50 ? '#f59e0b' : '#3b82f6';
+  const barColor = completionPct >= 75 ? '#059669' : completionPct >= 50 ? '#FF9933' : '#dc2626';
+  const relBarColor = releasePct >= 75 ? '#059669' : releasePct >= 50 ? '#FF9933' : '#1843AD';
 
   // ── Summary dashboard ──
   let html = `<div style="padding:12px 16px;border-bottom:1px solid #e2e8f0;">
@@ -8985,8 +8985,8 @@ function buildMedRecAlerts() {
     studyArr.forEach(([name, d]) => {
       const relPct = d.total > 0 ? Math.round(d.relSigned / d.total * 100) : 0;
       const recPct = d.total > 0 ? Math.round(d.recsRecvd / d.total * 100) : 0;
-      const relColor = relPct >= 75 ? '#059669' : relPct >= 50 ? '#f59e0b' : relPct > 0 ? '#3b82f6' : '#94a3b8';
-      const recColor = recPct >= 75 ? '#059669' : recPct >= 50 ? '#f59e0b' : recPct > 0 ? '#3b82f6' : '#94a3b8';
+      const relColor = relPct >= 75 ? '#059669' : relPct >= 50 ? '#FF9933' : relPct > 0 ? '#1843AD' : '#94a3b8';
+      const recColor = recPct >= 75 ? '#059669' : recPct >= 50 ? '#FF9933' : recPct > 0 ? '#1843AD' : '#94a3b8';
       html += `<tr style="border-bottom:1px solid #f8fafc;cursor:pointer;" onclick="showMedRecDetailModal('${jsAttr(name)}')">
         <td style="padding:3px 6px;font-weight:600;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;" title="${escapeHTML(name)}">${escapeHTML(name)}</td>
         <td style="padding:3px 6px;text-align:center;font-weight:700;">${d.total}</td>
@@ -9027,7 +9027,7 @@ function buildMedRecAlerts() {
   // 1. Referrals with no medical records entry
   const refsNoMR = findReferralsWithoutMedRecords();
   if (refsNoMR.length > 0) {
-    alerts.push({ icon: '', color: '#d97706', bg: '#fffbeb',
+    alerts.push({ icon: '', color: '#FF9933', bg: '#fffbeb',
       title: refsNoMR.length + ' active referral' + (refsNoMR.length>1?'s':'') + ' missing medical records entry',
       detail: refsNoMR.slice(0, 5).map(r => '<div style="font-size:11px;padding:2px 0;">' + maskPHI(r.name) + ' — ' + escapeHTML(r.study||'') + '</div>').join('') + (refsNoMR.length > 5 ? '<div style="font-size:10px;color:#94a3b8;">+' + (refsNoMR.length-5) + ' more</div>' : ''),
       action: 'Create medical records entries in ClickUp for these patients.'
@@ -9047,7 +9047,7 @@ function buildMedRecAlerts() {
   // 3. Pending medical releases (Step 1 bottleneck)
   if (releasePending > 0) {
     const relPendList = active.filter(r => r.medical_release === 'Pending');
-    alerts.push({ icon: '', color: '#f59e0b', bg: '#fffbeb',
+    alerts.push({ icon: '', color: '#FF9933', bg: '#fffbeb',
       title: releasePending + ' patient' + (releasePending>1?'s':'') + ' awaiting medical release signature',
       detail: relPendList.slice(0, 5).map(r => '<div style="font-size:11px;padding:2px 0;">' + maskPHI(r.name) + ' — ' + escapeHTML(r.study||'') + '</div>').join('') + (releasePending > 5 ? '<div style="font-size:10px;color:#94a3b8;">+' + (releasePending-5) + ' more</div>' : ''),
       action: 'Send Jotform release links to these patients. Records cannot be requested without a signed release.'
@@ -9057,7 +9057,7 @@ function buildMedRecAlerts() {
   // 3b. Patients still being contacted for release
   if (releaseContact > 0) {
     const contactList = active.filter(r => (r.medical_release||'').indexOf('Contact') !== -1);
-    alerts.push({ icon: '', color: '#8b5cf6', bg: '#f5f3ff',
+    alerts.push({ icon: '', color: '#1843AD', bg: '#f5f3ff',
       title: releaseContact + ' patient' + (releaseContact>1?'s':'') + ' being contacted for release',
       detail: contactList.slice(0, 5).map(r => '<div style="font-size:11px;padding:2px 0;">' + maskPHI(r.name) + ' — ' + escapeHTML(r.medical_release) + ' — ' + escapeHTML(r.study||'') + '</div>').join(''),
       action: 'Continue outreach — these patients have been contacted but release not yet signed.'
@@ -9072,7 +9072,7 @@ function buildMedRecAlerts() {
     pendingByPortal[portal].push(r);
   });
   Object.entries(pendingByPortal).sort((a,b) => b[1].length - a[1].length).forEach(([portal, pts]) => {
-    alerts.push({ icon: '', color: '#f59e0b', bg: '#fffbeb',
+    alerts.push({ icon: '', color: '#FF9933', bg: '#fffbeb',
       title: pts.length + ' pending record' + (pts.length>1?'s':'') + ' via ' + escapeHTML(portal),
       detail: pts.slice(0, 4).map(r => '<div style="font-size:11px;padding:2px 0;">' + maskPHI(r.name) + ' — ' + escapeHTML(r.study||'') + '</div>').join('') + (pts.length > 4 ? '<div style="font-size:10px;color:#94a3b8;">+' + (pts.length-4) + ' more</div>' : ''),
       action: 'Follow up with ' + escapeHTML(portal) + ' to obtain pending medical records.'
@@ -9092,7 +9092,7 @@ function buildMedRecAlerts() {
   // 6. Stale records (active but not updated in 14+ days)
   const stale = MED_RECORDS_DATA.filter(r => r.is_active && r.days_since_update > 14);
   if (stale.length > 0) {
-    alerts.push({ icon: '⏰', color: '#f59e0b', bg: '#fffbeb',
+    alerts.push({ icon: '⏰', color: '#FF9933', bg: '#fffbeb',
       title: stale.length + ' active patient' + (stale.length>1?'s':'') + ' with no update in 14+ days',
       detail: stale.sort((a,b) => b.days_since_update - a.days_since_update).slice(0, 5).map(r => '<div style="font-size:11px;padding:2px 0;">' + maskPHI(r.name) + ' — ' + r.days_since_update + 'd — ' + escapeHTML(r.study||'') + '</div>').join(''),
       action: 'Review and update status. Stale records may indicate lost patients.'
@@ -9102,7 +9102,7 @@ function buildMedRecAlerts() {
   // 7. Pending investigator approval
   if (piPending > 0) {
     const piList = active.filter(r => r.investigator_approval && r.investigator_approval.indexOf('Confirmed') === -1 && r.investigator_approval !== 'Not Applicable' && r.investigator_approval !== '');
-    alerts.push({ icon: '', color: '#8b5cf6', bg: '#f5f3ff',
+    alerts.push({ icon: '', color: '#1843AD', bg: '#f5f3ff',
       title: piPending + ' patient' + (piPending>1?'s':'') + ' pending investigator approval',
       detail: piList.slice(0, 5).map(r => '<div style="font-size:11px;padding:2px 0;">' + maskPHI(r.name) + ' — ' + escapeHTML(r.investigator_approval) + ' — ' + escapeHTML(r.study||'') + '</div>').join(''),
       action: 'Follow up with PI to approve these patients for study enrollment.'
@@ -9354,12 +9354,12 @@ function siteBadge(site){
   return `<span style="font-size:9px;font-weight:700;padding:2px 5px;border-radius:3px;background:${pnj?'#059669':'#072061'}20;color:${pnj?'#059669':'#072061'}">${pnj?'PNJ':'PHL'}</span>`;
 }
 function statusBadge(s){
-  const map={'Enrolled':['#059669',''],'Screening':['#d97706',''],'Screen Fail':['#dc2626',''],'Prequalified':['#7c3aed','']};
+  const map={'Enrolled':['#059669',''],'Screening':['#FF9933',''],'Screen Fail':['#dc2626',''],'Prequalified':['#072061','']};
   const [col]=map[s]||['#94a3b8'];
   return `<span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:${col}20;color:${col}">${s||'—'}</span>`;
 }
 function typeBadge2(t){
-  const map={'No Show':['#dc2626','#fef2f2'],'Patient Cancelled':['#c2410c','#fff7ed'],'Site Cancelled':['#1843ad','#eff6ff']};
+  const map={'No Show':['#dc2626','#fef2f2'],'Patient Cancelled':['#FF9933','#fff7ed'],'Site Cancelled':['#1843ad','#eff6ff']};
   const [col,bg]=map[t]||['#64748b','#f8fafc'];
   return `<span style="font-size:9px;font-weight:700;padding:2px 5px;border-radius:3px;background:${bg};color:${col}">${t||'—'}</span>`;
 }
@@ -9425,7 +9425,7 @@ function showUpcoming(filterFn, title, sub) {
     <td style="font-size:11px;color:#64748b">${r.visit||'—'}</td>
     <td>${statusBadge(r.status)}</td>
     <td style="font-size:11px">${r.coord||'—'}</td>
-    <td style="font-size:11px;color:${r.investigator?'#7c3aed':'#cbd5e1'}">${r.investigator||'—'}</td>
+    <td style="font-size:11px;color:${r.investigator?'#072061':'#cbd5e1'}">${r.investigator||'—'}</td>
     <td>${siteBadge(r.site)}</td>
   </tr>`).join('') +
   `</tbody></table>`;
@@ -9451,7 +9451,7 @@ function showPrescrModal(studyName) {
   rows.forEach(function(r) {
     var vn = (r.visit_name||'').toLowerCase();
     var type = vn.indexOf('call') !== -1 ? 'Call' : (vn.indexOf('fibro') !== -1 || vn.indexOf('liver') !== -1 || vn.indexOf('scan') !== -1) ? 'FibroScan' : 'Pre-Screen';
-    var typeColor = type === 'FibroScan' ? '#7c3aed' : type === 'Call' ? '#0369a1' : '#3b82f6';
+    var typeColor = type === 'FibroScan' ? '#072061' : type === 'Call' ? '#1843AD' : '#1843AD';
     h += '<tr><td>'+patientLink(r.subject_full_name||'—', null)+'</td>';
     h += '<td><span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:'+typeColor+'15;color:'+typeColor+'">'+type+'</span></td>';
     h += '<td>'+escapeHTML(r.scheduled_date||'—')+'</td>';
@@ -9515,7 +9515,7 @@ function showUnscheduledModal(studyFilter) {
 function showRiskFlags(title) {
   const flags = DATA.riskFlags||[];
   const sevBadge = s => {
-    const m = {critical:['#dc2626','#fef2f2'],high:['#ea580c','#fff7ed'],medium:['#d97706','#fffbeb']};
+    const m = {critical:['#dc2626','#fef2f2'],high:['#FF9933','#fff7ed'],medium:['#FF9933','#fffbeb']};
     const [c,b] = m[s]||m.medium;
     return `<span style="font-size:9px;font-weight:800;padding:2px 6px;border-radius:3px;background:${b};color:${c};border:1px solid ${c}30;">${(s||'medium').toUpperCase()}</span>`;
   };
@@ -9524,7 +9524,7 @@ function showRiskFlags(title) {
   </tr></thead><tbody>` +
   flags.map(f=>{
     let signals = [];
-    if (f.crossStudyCount > 1) signals.push(`<span style="font-size:9px;padding:1px 4px;border-radius:3px;background:#fdf4ff;color:#7e22ce;">Cross-study (${f.crossStudyCount})</span>`);
+    if (f.crossStudyCount > 1) signals.push(`<span style="font-size:9px;padding:1px 4px;border-radius:3px;background:#fdf4ff;color:#072061;">Cross-study (${f.crossStudyCount})</span>`);
     if (f.velocity >= 3) signals.push(`<span style="font-size:9px;padding:1px 4px;border-radius:3px;background:#fef2f2;color:#dc2626;">${f.velocity}/mo</span>`);
     if (f.daysSinceLast != null && f.daysSinceLast <= 7) signals.push(`<span style="font-size:9px;padding:1px 4px;border-radius:3px;background:#fef2f2;color:#dc2626;">Recent</span>`);
     const breakdown = [f.noShowCount?f.noShowCount+' NS':'',f.cancelCount?f.cancelCount+' CX':'',f.rescheduleCount?f.rescheduleCount+' RS':''].filter(Boolean).join(', ');
@@ -9713,7 +9713,7 @@ function showContactAlerts(severity) {
   }
   var body = '<table class="detail-table"><thead><tr><th>Patient</th><th>Alert Type</th><th>Detail</th><th>Studies</th><th>Contact</th></tr></thead><tbody>' +
     alerts.map(function(a) {
-      var color = severity === 'red' ? '#dc2626' : '#d97706';
+      var color = severity === 'red' ? '#dc2626' : '#FF9933';
       var studies = (a.studies||[a.study]).join(', ');
       var contact = [];
       if (a.email) contact.push(a.email);
@@ -9743,7 +9743,7 @@ function showPatientDB() {
   var body = '<div style="max-width:500px;margin:0 auto;">';
   statuses.forEach(function(s) {
     var pct = Math.max(Math.round(s[1]/maxCount*100), 4);
-    var color = s[0]==='Available'?'#059669':s[0]==='Do Not Solicit'||s[0]==='Do Not Enroll'||s[0]==='Deceased'?'#dc2626':'#3b82f6';
+    var color = s[0]==='Available'?'#059669':s[0]==='Do Not Solicit'||s[0]==='Do Not Enroll'||s[0]==='Deceased'?'#dc2626':'#1843AD';
     body += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">' +
       '<div style="width:140px;font-size:12px;font-weight:600;color:#475569;text-align:right">' + escapeHTML(s[0]) + '</div>' +
       '<div style="flex:1;background:#f1f5f9;border-radius:4px;height:24px;position:relative;overflow:hidden;">' +
@@ -9799,7 +9799,7 @@ function showStudyDetail(studyName, studyUrl) {
       <td style="font-size:11px;color:#64748b">${escapeHTML(r.visit)}</td>
       <td>${statusBadge(r.status)}</td>
       <td style="font-size:11px">${escapeHTML(r.coord)}</td>
-      <td style="font-size:11px;color:${r.investigator?'#7c3aed':'#cbd5e1'}">${escapeHTML(r.investigator||'—')}</td>
+      <td style="font-size:11px;color:${r.investigator?'#072061':'#cbd5e1'}">${escapeHTML(r.investigator||'—')}</td>
     </tr>`).join('') + `</tbody></table>`;
   }
   if(allCancelRows.length) {
@@ -9907,11 +9907,11 @@ function showStudyUnifiedModal(studyName) {
       if (activePatients.length > 0) {
         body += '<table class="detail-table" style="margin-bottom:12px;"><thead><tr><th>Patient</th><th>Status</th><th>Records</th><th>Approval</th><th>Updated</th></tr></thead><tbody>';
         activePatients.slice(0,8).forEach(function(p) {
-          var statusColors = {'Enrolled':'#059669','In Screening':'#8b5cf6','Visit Scheduled':'#06b6d4','Ready to Schedule':'#f59e0b','Pending Release':'#94a3b8','Under Review':'#64748b'};
+          var statusColors = {'Enrolled':'#059669','In Screening':'#1843AD','Visit Scheduled':'#A2DCEB','Ready to Schedule':'#FF9933','Pending Release':'#94a3b8','Under Review':'#64748b'};
           var sc = statusColors[p.status] || '#94a3b8';
           var recBadge = p.records_received === 'Received' ? '<span style="color:#059669;font-weight:700;"></span>' : p.records_received === 'Pending' ? '<span style="color:#FF9933;">⏳</span>' : '<span style="color:#94a3b8;">—</span>';
           var appBadge = (p.investigator_approval||'').indexOf('Confirmed') !== -1 ? '<span style="color:#059669;"></span>' : (p.investigator_approval ? '<span style="color:#FF9933;">' + escapeHTML(p.investigator_approval) + '</span>' : '—');
-          var staleColor = p.days_since_update > 14 ? '#dc2626' : p.days_since_update > 7 ? '#f59e0b' : '#64748b';
+          var staleColor = p.days_since_update > 14 ? '#dc2626' : p.days_since_update > 7 ? '#FF9933' : '#64748b';
           body += '<tr><td><a href="' + escapeHTML(p.crio_link || p.url) + '" target="_blank" style="color:#1e293b;text-decoration:none;font-weight:600;">' + maskPHI(p.name) + '</a></td>';
           body += '<td><span style="font-size:10px;padding:2px 6px;border-radius:4px;background:' + sc + '22;color:' + sc + ';font-weight:600;">' + escapeHTML(p.status) + '</span></td>';
           body += '<td style="text-align:center;">' + recBadge + '</td>';
@@ -9963,7 +9963,7 @@ function showStudyUnifiedModal(studyName) {
         return matchesStudy(m.study, studyName) && m.name.toLowerCase().trim() === r.name.toLowerCase().trim();
       });
     });
-    if (refsNoMed.length > 0) alerts.push({icon: '', text: refsNoMed.length + ' referral(s) with no medical records entry', color: '#d97706'});
+    if (refsNoMed.length > 0) alerts.push({icon: '', text: refsNoMed.length + ' referral(s) with no medical records entry', color: '#FF9933'});
   }
   if (medRec && medRec.readySched > 0) {
     var readyNoVisit = MED_RECORDS_DATA.filter(function(m) {
@@ -9979,7 +9979,7 @@ function showStudyUnifiedModal(studyName) {
     var pendingApproval = MED_RECORDS_DATA.filter(function(m) {
       return matchesStudy(m.study, studyName) && m.is_active && m.investigator_approval && m.investigator_approval !== 'Approved';
     });
-    if (pendingApproval.length > 0) alerts.push({icon: '', text: pendingApproval.length + ' patient(s) pending investigator approval', color: '#f59e0b'});
+    if (pendingApproval.length > 0) alerts.push({icon: '', text: pendingApproval.length + ' patient(s) pending investigator approval', color: '#FF9933'});
   }
   if (alerts.length > 0) {
     body += '<h4 style="' + sectionStyle + '">Integration Alerts</h4>';
@@ -9992,7 +9992,7 @@ function showStudyUnifiedModal(studyName) {
   var studyDocs = (window._actionDocs||[]).find(function(d){ return d.study_name && (d.study_name.includes(studyName) || studyName.includes(d.study_name.split(' - ').pop())); });
   if (studyDocs && parseInt(studyDocs.total_documents) > 0) {
     var pct = parseFloat(studyDocs.completion_pct) || 0;
-    var pctColor = pct >= 95 ? '#059669' : pct >= 80 ? '#d97706' : '#dc2626';
+    var pctColor = pct >= 95 ? '#059669' : pct >= 80 ? '#FF9933' : '#dc2626';
     body += '<h4 style="' + sectionStyle + '">Documents</h4>';
     body += '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px;">';
     body += '<div style="font-size:11px;"><strong>Total:</strong> ' + studyDocs.total_documents + '</div>';
@@ -10074,11 +10074,11 @@ function showRecruiterDetail(recruiterName) {
   if (!stats) { openModal(recruiterName, 'Recruiter', '<p style="color:#94a3b8;padding:20px;text-align:center">No interaction data found</p>'); return; }
   var h = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:16px;">';
   var kpi = function(label, val, color) { return '<div style="padding:8px;border-radius:8px;text-align:center;background:'+color+'15"><div style="font-size:18px;font-weight:800;color:'+color+'">'+val+'</div><div style="font-size:9px;color:'+color+';font-weight:600">'+label+'</div></div>'; };
-  h += kpi('Interactions', stats.total_interactions||0, '#3b82f6');
+  h += kpi('Interactions', stats.total_interactions||0, '#1843AD');
   h += kpi('Phone Calls', stats.phone_calls||0, '#059669');
-  h += kpi('Texts', stats.texts||0, '#8b5cf6');
-  h += kpi('Emails', stats.emails||0, '#d97706');
-  h += kpi('Patients', stats.unique_patients||0, '#7c3aed');
+  h += kpi('Texts', stats.texts||0, '#1843AD');
+  h += kpi('Emails', stats.emails||0, '#FF9933');
+  h += kpi('Patients', stats.unique_patients||0, '#072061');
   h += kpi('Interested', stats.interested_responses||0, '#059669');
   h += kpi('Scheduled V1', stats.scheduled_v1||0, '#1843ad');
   h += kpi('Screen/Enroll', stats.screening_enrolled||0, '#059669');
@@ -10093,7 +10093,7 @@ function showRecruiterDetail(recruiterName) {
   h += '<tr><td>Total Call Duration</td><td class="r">'+durationMin+' min</td></tr>';
   h += '<tr><td>Studies Touched</td><td class="r">'+(stats.studies||0)+'</td></tr>';
   var convRate = (parseInt(stats.unique_patients)||0) > 0 ? Math.round((parseInt(stats.interested_responses)||0) / (parseInt(stats.unique_patients)||0) * 100) : 0;
-  h += '<tr><td>Interest Rate</td><td class="r" style="font-weight:700;color:'+(convRate>10?'#059669':'#d97706')+'">'+convRate+'%</td></tr>';
+  h += '<tr><td>Interest Rate</td><td class="r" style="font-weight:700;color:'+(convRate>10?'#059669':'#FF9933')+'">'+convRate+'%</td></tr>';
   h += '</tbody></table>';
   openModal(recruiterName + ' — Recruiter Performance', (stats.total_interactions||0) + ' interactions · ' + (stats.unique_patients||0) + ' patients (30 days)', h);
 }
@@ -10114,7 +10114,7 @@ function showCoordDetail(coordName) {
       <td style="font-size:11px">${extLink(r.study,r.study_url)}</td>
       <td style="font-size:11px;color:#64748b">${escapeHTML(r.visit)}</td>
       <td>${statusBadge(r.status)}</td>
-      <td style="font-size:11px;color:${r.investigator?'#7c3aed':'#cbd5e1'}">${escapeHTML(r.investigator||'—')}</td>
+      <td style="font-size:11px;color:${r.investigator?'#072061':'#cbd5e1'}">${escapeHTML(r.investigator||'—')}</td>
     </tr>`).join('') + `</tbody></table>`;
   }
   if(allCancelRows.length) {
@@ -10372,7 +10372,7 @@ function crioStatusBadge(patientName, phone) {
   var match = matchCrioPatient(patientName, phone);
   if (!match) return '<span style="font-size:9px;color:#dc2626;font-weight:600;">Not in CRIO</span>';
   var st = match.status || 'In DB';
-  var colors = {'Enrolled':'#059669','Screening':'#8b5cf6','Prequalified':'#3b82f6','Scheduled V1':'#06b6d4','Screen Fail':'#dc2626','Discontinued':'#94a3b8','Completed':'#059669','Not Interested':'#94a3b8','Not Eligible':'#dc2626','Available':'#3b82f6','Do Not Solicit':'#dc2626','Deceased':'#dc2626'};
+  var colors = {'Enrolled':'#059669','Screening':'#1843AD','Prequalified':'#1843AD','Scheduled V1':'#A2DCEB','Screen Fail':'#dc2626','Discontinued':'#94a3b8','Completed':'#059669','Not Interested':'#94a3b8','Not Eligible':'#dc2626','Available':'#1843AD','Do Not Solicit':'#dc2626','Deceased':'#dc2626'};
   var c = colors[st] || '#64748b';
   var link = match.crio_url ? '<a href="'+escapeHTML(match.crio_url)+'" target="_blank" style="text-decoration:none;color:'+c+';" title="Open in CRIO">' : '';
   var linkEnd = match.crio_url ? '</a>' : '';
@@ -10650,7 +10650,7 @@ function renderReferralDashboard() {
   }
   var sortedRows = _sortRefRows(unifiedRows, _refSort, _refSortDir);
 
-  var vendorColors = {'Physician':'#072061','Meta':'#3b82f6','SubjectWell':'#8b5cf6','Study Teams':'#059669','StudyMax':'#d97706','StudyKik':'#f59e0b','iConnect':'#06b6d4','ClinLife':'#ec4899','Trial Partners':'#7c3aed'};
+  var vendorColors = {'Physician':'#072061','Meta':'#1843AD','SubjectWell':'#1843AD','Study Teams':'#059669','StudyMax':'#FF9933','StudyKik':'#FF9933','iConnect':'#A2DCEB','ClinLife':'#ec4899','Trial Partners':'#072061'};
   var _sortIcon = function(col) { return col === _refSort ? (_refSortDir === 'desc' ? ' ▼' : ' ▲') : ''; };
   var _sortClick = function(col) { return 'onclick="sortRefTable(\''+col+'\')"'; };
   trackerEl.innerHTML = `<table class="fin-table" style="width:100%;font-size:11px;">
@@ -10683,7 +10683,7 @@ function renderReferralDashboard() {
         return '<td style="text-align:center;' + (style||'') + '">' + count + '</td>';
       }
       const nameHtml = r.url ? '<a href="'+escapeHTML(r.url)+'" target="_blank" style="color:#1e293b;text-decoration:none;font-weight:600;" onclick="event.stopPropagation()">'+escapeHTML(r.name)+'</a>' : '<span style="font-weight:600;">'+escapeHTML(r.name)+'</span>';
-      var erColor = enrollRate >= 15 ? '#059669' : enrollRate >= 5 ? '#d97706' : enrollRate > 0 ? '#dc2626' : '#cbd5e1';
+      var erColor = enrollRate >= 15 ? '#059669' : enrollRate >= 5 ? '#FF9933' : enrollRate > 0 ? '#dc2626' : '#cbd5e1';
       return `<tr style="border-bottom:1px solid #f1f5f9;${r.clickId||r.isCampaign||_isCrioOnly?'cursor:pointer;':''}"${r.clickId ? ' onclick="showTrackerStageDetail(\''+tn+'\',\'all\')"' : r.isCampaign ? ' onclick="showCampaignDetailModal(\''+_campSafe+'\')"' : _isCrioOnly ? ' onclick="showCrioSourceDetail(\''+_crioSrcSafe+'\',\'all\')"' : ''}>
         <td style="padding:8px 12px;">${nameHtml}</td>
         <td style="text-align:center;"><span style="font-size:9px;font-weight:600;padding:2px 6px;border-radius:4px;background:${vc}15;color:${vc};">${escapeHTML(r.vendor||r.type)}</span></td>
@@ -10693,7 +10693,7 @@ function renderReferralDashboard() {
         ${_td(r.screening,'Screening')}
         ${_td(r.enrolled,'Enrolled','color:#059669;font-weight:700;')}
         ${_td((r.sf||0)+(r.notEligible||0)+(r.notInterested||0),'DNQ','color:#dc2626;')}
-        <td style="text-align:center;color:${!_isCrioOnly&&r.stale>0?'#d97706':'#cbd5e1'};font-weight:${!_isCrioOnly&&r.stale>0?'700':'400'};">${_isCrioOnly?'—':(r.stale||'—')}</td>
+        <td style="text-align:center;color:${!_isCrioOnly&&r.stale>0?'#FF9933':'#cbd5e1'};font-weight:${!_isCrioOnly&&r.stale>0?'700':'400'};">${_isCrioOnly?'—':(r.stale||'—')}</td>
         <td style="text-align:center;font-weight:700;color:${erColor};">${enrollRate > 0 ? enrollRate+'%' : '—'}</td>
       </tr>`;
     }).join('')}
@@ -10734,7 +10734,7 @@ function renderReferralDashboard() {
       var enrollRate = r.total > 0 ? Math.round(r.enrolled / r.total * 100) : 0;
       r.enrollRate = enrollRate;
       var dnqT = (r.sf||0)+(r.notEligible||0)+(r.notInterested||0);
-      var erColor = enrollRate >= 15 ? '#059669' : enrollRate >= 5 ? '#d97706' : enrollRate > 0 ? '#dc2626' : '#cbd5e1';
+      var erColor = enrollRate >= 15 ? '#059669' : enrollRate >= 5 ? '#FF9933' : enrollRate > 0 ? '#dc2626' : '#cbd5e1';
       var tn = r.clickId ? jsAttr(r.clickId) : '';
       var _campSafe = r.isCampaign ? jsAttr(r.name) : '';
       var _isCrioOnly = !r.clickId && !r.isCampaign && r.crioData;
@@ -10802,7 +10802,7 @@ function renderReferralDashboard() {
 
     // KPI banner
     var dh = '<div style="display:flex;gap:16px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid #f1f5f9;">';
-    dh += '<div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#f97316;">'+_totSF+'</div><div style="font-size:10px;color:#94a3b8;">Screen Fail ('+Math.round(_totSF/_totAll*100)+'%)</div></div>';
+    dh += '<div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#FF9933;">'+_totSF+'</div><div style="font-size:10px;color:#94a3b8;">Screen Fail ('+Math.round(_totSF/_totAll*100)+'%)</div></div>';
     dh += '<div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#dc2626;">'+_totNE.toLocaleString()+'</div><div style="font-size:10px;color:#94a3b8;">Not Eligible ('+Math.round(_totNE/_totAll*100)+'%)</div></div>';
     dh += '<div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#94a3b8;">'+_totNI.toLocaleString()+'</div><div style="font-size:10px;color:#94a3b8;">Not Interested ('+Math.round(_totNI/_totAll*100)+'%)</div></div>';
     dh += '<div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#059669;">'+Math.round((_totScr+_totEnr)/_totAll*100)+'%</div><div style="font-size:10px;color:#94a3b8;">Qualified Rate</div></div>';
@@ -10813,28 +10813,28 @@ function renderReferralDashboard() {
     dh += '<th style="text-align:left;padding:8px 12px;">Source</th>';
     dh += '<th style="text-align:center;">Total</th>';
     dh += '<th style="text-align:center;color:#059669;">Qualified %</th>';
-    dh += '<th style="text-align:center;color:#f97316;">SF %</th>';
+    dh += '<th style="text-align:center;color:#FF9933;">SF %</th>';
     dh += '<th style="text-align:center;color:#dc2626;">Not Elig %</th>';
     dh += '<th style="text-align:center;color:#94a3b8;">Not Int %</th>';
     dh += '<th style="text-align:center;">Total DNQ %</th>';
     dh += '<th style="text-align:center;min-width:150px;">Outcome Breakdown</th>';
     dh += '</tr></thead><tbody>';
     dnqRows.forEach(function(r) {
-      var qColor = r.qualRate >= 20 ? '#059669' : r.qualRate >= 10 ? '#d97706' : '#dc2626';
-      var dnqColor = r.dnqRate >= 60 ? '#dc2626' : r.dnqRate >= 40 ? '#d97706' : '#059669';
+      var qColor = r.qualRate >= 20 ? '#059669' : r.qualRate >= 10 ? '#FF9933' : '#dc2626';
+      var dnqColor = r.dnqRate >= 60 ? '#dc2626' : r.dnqRate >= 40 ? '#FF9933' : '#059669';
       // Stacked bar: qualified (green) | SF (orange) | NE (red) | NI (gray) | other (light)
       var otherPct = 100 - r.qualRate - r.sfRate - r.neRate - r.niRate;
       dh += '<tr style="border-bottom:1px solid #f1f5f9;">';
       dh += '<td style="padding:7px 12px;font-weight:600;">'+escapeHTML(r.name)+'</td>';
       dh += '<td style="text-align:center;font-weight:700;">'+r.total+'</td>';
       dh += '<td style="text-align:center;font-weight:700;color:'+qColor+';">'+r.qualRate+'%</td>';
-      dh += '<td style="text-align:center;color:#f97316;font-weight:'+(r.sfRate>5?'700':'400')+';">'+r.sfRate+'%</td>';
+      dh += '<td style="text-align:center;color:#FF9933;font-weight:'+(r.sfRate>5?'700':'400')+';">'+r.sfRate+'%</td>';
       dh += '<td style="text-align:center;color:#dc2626;font-weight:'+(r.neRate>30?'700':'400')+';">'+r.neRate+'%</td>';
       dh += '<td style="text-align:center;color:#94a3b8;">'+r.niRate+'%</td>';
       dh += '<td style="text-align:center;font-weight:700;color:'+dnqColor+';">'+r.dnqRate+'%</td>';
       dh += '<td style="padding:4px 8px;"><div style="display:flex;gap:1px;height:14px;border-radius:3px;overflow:hidden;">';
       if (r.qualRate > 0) dh += '<div style="width:'+r.qualRate+'%;background:#059669;" title="Qualified '+r.qualRate+'%"></div>';
-      if (r.sfRate > 0) dh += '<div style="width:'+r.sfRate+'%;background:#f97316;" title="Screen Fail '+r.sfRate+'%"></div>';
+      if (r.sfRate > 0) dh += '<div style="width:'+r.sfRate+'%;background:#FF9933;" title="Screen Fail '+r.sfRate+'%"></div>';
       if (r.neRate > 0) dh += '<div style="width:'+r.neRate+'%;background:#dc2626;" title="Not Eligible '+r.neRate+'%"></div>';
       if (r.niRate > 0) dh += '<div style="width:'+r.niRate+'%;background:#94a3b8;" title="Not Interested '+r.niRate+'%"></div>';
       if (otherPct > 0) dh += '<div style="width:'+Math.max(otherPct,0)+'%;background:#e2e8f0;" title="Other/New"></div>';
@@ -10901,7 +10901,7 @@ function renderReferralDashboard() {
       dh += '<th style="text-align:left;">Top Sources</th>';
       dh += '<th style="text-align:center;min-width:100px;">Volume</th>';
       dh += '</tr></thead><tbody>';
-      var _statusColors = {'Screen Fail':'#f97316','Not Eligible':'#dc2626','Not Interested':'#94a3b8','Discontinued':'#64748b'};
+      var _statusColors = {'Screen Fail':'#FF9933','Not Eligible':'#dc2626','Not Interested':'#94a3b8','Discontinued':'#64748b'};
       _reasonRows.forEach(function(r) {
         if (r.reason === 'Data Entry Error') return; // skip noise
         var pct = _totalDnqReasons > 0 ? Math.round(r.count / _totalDnqReasons * 100) : 0;
@@ -10955,7 +10955,7 @@ function renderReferralDashboard() {
     months.forEach(function(m) { var label = m.substring(5)+'/'+m.substring(2,4); th += '<th style="text-align:center;padding:4px 6px;">'+label+'</th>'; });
     th += '<th style="text-align:center;padding:4px 8px;font-weight:700;">Total</th>';
     th += '</tr></thead><tbody>';
-    var srcColors2 = ['#3b82f6','#059669','#d97706','#8b5cf6','#dc2626','#06b6d4','#f97316','#64748b'];
+    var srcColors2 = ['#1843AD','#059669','#FF9933','#1843AD','#dc2626','#A2DCEB','#FF9933','#64748b'];
     topSources.forEach(function(src, i) {
       var total = months.reduce(function(s,m){return s+(_monthData[src][m]||0);},0);
       th += '<tr style="border-bottom:1px solid #f1f5f9;">';
@@ -11014,7 +11014,7 @@ function renderReferralDashboard() {
     vh += '</tr></thead><tbody>';
     var maxAvg = _velRows.length > 0 ? Math.max.apply(null, _velRows.map(function(r){return r.avg;})) : 1;
     _velRows.forEach(function(r) {
-      var speedColor = r.median <= 7 ? '#059669' : r.median <= 30 ? '#d97706' : r.median <= 90 ? '#f97316' : '#dc2626';
+      var speedColor = r.median <= 7 ? '#059669' : r.median <= 30 ? '#FF9933' : r.median <= 90 ? '#FF9933' : '#dc2626';
       var barW = maxAvg > 0 ? Math.round(r.avg / maxAvg * 100) : 0;
       vh += '<tr style="border-bottom:1px solid #f1f5f9;">';
       vh += '<td style="padding:7px 12px;font-weight:600;">'+escapeHTML(r.source)+'</td>';
@@ -11064,7 +11064,7 @@ function renderReferralDashboard() {
     _studyRows.forEach(function(e) {
       var name = e[0], d = e[1];
       var conv = d.total > 0 ? Math.round(d.enrolled / d.total * 100) : 0;
-      var convColor = conv >= 5 ? '#059669' : conv > 0 ? '#d97706' : '#cbd5e1';
+      var convColor = conv >= 5 ? '#059669' : conv > 0 ? '#FF9933' : '#cbd5e1';
       var topSrcs = Object.entries(d.sources).sort(function(a,b){return b[1].total-a[1].total;}).slice(0,4).map(function(s) {
         var srcConv = s[1].enrolled > 0 ? ' <span style="color:#059669;font-weight:700;">'+s[1].enrolled+'enr</span>' : s[1].screening > 0 ? ' <span style="color:#1843AD;">'+s[1].screening+'scr</span>' : '';
         return '<span style="font-size:10px;">'+escapeHTML(s[0])+' ('+s[1].total+')'+srcConv+'</span>';
@@ -11206,7 +11206,7 @@ function showStudyPipelineModal(studyName) {
       ? `<span style="color:#059669;font-weight:600;">${escapeHTML(upcoming[0].date)}</span> <span style="font-size:9px;color:#94a3b8;">${escapeHTML(upcoming[0].visit)}</span>`
       : r.next_appt ? `<span style="color:#1843AD;">${escapeHTML(r.next_appt)}</span>` : '<span style="color:#cbd5e1;">—</span>';
 
-    const staleColor = r.days_since_update >= 14 ? '#dc2626' : r.days_since_update >= 7 ? '#d97706' : '#059669';
+    const staleColor = r.days_since_update >= 14 ? '#dc2626' : r.days_since_update >= 7 ? '#FF9933' : '#059669';
     table += `<tr>
       <td style="padding:6px 8px;"><a href="${escapeHTML(r.url)}" target="_blank" style="font-weight:600;color:#1e293b;text-decoration:none;">${maskPHI(r.name)}</a></td>
       <td style="padding:6px 8px;text-align:center;"><span style="padding:2px 6px;border-radius:3px;font-size:10px;font-weight:600;background:${(STAGE_COLORS[r.stage]||'#94a3b8')}22;color:${STAGE_COLORS[r.stage]||'#94a3b8'}">${escapeHTML(r.stage)}</span></td>
@@ -11259,7 +11259,7 @@ function showCampaignDetailModal(studyName) {
       <div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#1843AD;">${campaign.third_contact.toLocaleString()}</div><div style="font-size:10px;color:#94a3b8;">3rd Contact</div></div>
       <div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#059669;">${campaign.new_referrals}</div><div style="font-size:10px;color:#94a3b8;">New Referrals</div></div>
       <div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#1843ad;">${referrals.length}</div><div style="font-size:10px;color:#94a3b8;">In Pipeline</div></div>
-      <div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#06b6d4;">${upcoming.length}</div><div style="font-size:10px;color:#94a3b8;">Upcoming Visits</div></div>
+      <div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#A2DCEB;">${upcoming.length}</div><div style="font-size:10px;color:#94a3b8;">Upcoming Visits</div></div>
     </div>`;
   }
 
@@ -11277,9 +11277,9 @@ function showCampaignDetailModal(studyName) {
         ? `<span style="color:#059669;font-weight:700;">${escapeHTML(pVisits[0].date)}</span><div style="font-size:9px;color:#94a3b8;">${escapeHTML(pVisits[0].visit)}</div>`
         : r.next_appt ? `<span style="color:#1843AD;">${escapeHTML(r.next_appt)}</span>` : '<span style="color:#ef4444;font-size:10px;">No appt</span>';
       const pStatus = dbMatch
-        ? `<span style="padding:2px 6px;border-radius:3px;font-size:10px;font-weight:600;background:${dbMatch.status==='Available'?'#dcfce7':dbMatch.status==='Do Not Solicit'||dbMatch.status==='Deceased'?'#fef2f2':'#fffbeb'};color:${dbMatch.status==='Available'?'#059669':dbMatch.status==='Do Not Solicit'||dbMatch.status==='Deceased'?'#dc2626':'#d97706'}">${escapeHTML(dbMatch.status)}</span>`
+        ? `<span style="padding:2px 6px;border-radius:3px;font-size:10px;font-weight:600;background:${dbMatch.status==='Available'?'#dcfce7':dbMatch.status==='Do Not Solicit'||dbMatch.status==='Deceased'?'#fef2f2':'#fffbeb'};color:${dbMatch.status==='Available'?'#059669':dbMatch.status==='Do Not Solicit'||dbMatch.status==='Deceased'?'#dc2626':'#FF9933'}">${escapeHTML(dbMatch.status)}</span>`
         : '<span style="color:#94a3b8;font-size:10px;">Not in DB</span>';
-      const staleColor = r.days_since_update >= 14 ? '#dc2626' : r.days_since_update >= 7 ? '#d97706' : '#059669';
+      const staleColor = r.days_since_update >= 14 ? '#dc2626' : r.days_since_update >= 7 ? '#FF9933' : '#059669';
       const _cm = matchCrioPatient(r.name, r.phone);
       const _nUrl = _cm && _cm.crio_url ? _cm.crio_url : r.url;
       const _nSt = _cm && _cm.crio_url ? 'font-weight:600;color:#1843AD;text-decoration:none;' : 'font-weight:600;color:#1e293b;text-decoration:none;';
@@ -11314,7 +11314,7 @@ function showCampaignDetailModal(studyName) {
       var _csByStatus = {};
       _crioSubjects.forEach(function(s) { _csByStatus[s.status] = (_csByStatus[s.status]||0)+1; });
       var _csStatusOrder = ['ENROLLED','SCREENING','SCHEDULED_V1','PREQUALIFIED','INTERESTED','SCREEN_FAIL','DISCONTINUED','COMPLETED','NOT_INTERESTED','NOT_ELIGIBLE'];
-      var _csColors = {'ENROLLED':'#059669','SCREENING':'#8b5cf6','SCHEDULED_V1':'#06b6d4','PREQUALIFIED':'#3b82f6','INTERESTED':'#64748b','SCREEN_FAIL':'#dc2626','DISCONTINUED':'#94a3b8','COMPLETED':'#059669','NOT_INTERESTED':'#94a3b8','NOT_ELIGIBLE':'#dc2626'};
+      var _csColors = {'ENROLLED':'#059669','SCREENING':'#1843AD','SCHEDULED_V1':'#A2DCEB','PREQUALIFIED':'#1843AD','INTERESTED':'#64748b','SCREEN_FAIL':'#dc2626','DISCONTINUED':'#94a3b8','COMPLETED':'#059669','NOT_INTERESTED':'#94a3b8','NOT_ELIGIBLE':'#dc2626'};
       html += `<div style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px;margin-top:16px;">CRIO Subjects (${_crioSubjects.length} across ${_matchedStudies.length} studies: ${_matchedStudies.map(function(s){return escapeHTML(s.protocol_number);}).join(', ')})</div>`;
       html += '<div style="display:flex;gap:10px;flex-wrap:wrap;padding:0 0 12px;">';
       _csStatusOrder.forEach(function(st) {
@@ -11446,7 +11446,7 @@ function showCrioSourceDetail(sourceName, statusFilter) {
   var byStatus = {};
   recs.forEach(function(r) { byStatus[r.recruiting_status] = (byStatus[r.recruiting_status]||0)+1; });
   var statusOrder = ['Prospect','Contacting','Interested','Screening','Success','Screen Fail','Not Eligible','Not Interested','In Another Study','Give Up','Do Not Solicit','Bad Contact Info','Discontinued','Deceased'];
-  var statusColors = {'Prospect':'#64748b','Contacting':'#3b82f6','Interested':'#8b5cf6','Screening':'#d97706','Success':'#059669','Screen Fail':'#f97316','Not Eligible':'#dc2626','Not Interested':'#94a3b8','In Another Study':'#06b6d4','Give Up':'#64748b','Do Not Solicit':'#dc2626','Bad Contact Info':'#94a3b8'};
+  var statusColors = {'Prospect':'#64748b','Contacting':'#1843AD','Interested':'#1843AD','Screening':'#FF9933','Success':'#059669','Screen Fail':'#FF9933','Not Eligible':'#dc2626','Not Interested':'#94a3b8','In Another Study':'#A2DCEB','Give Up':'#64748b','Do Not Solicit':'#dc2626','Bad Contact Info':'#94a3b8'};
   html += '<div style="display:flex;gap:8px;flex-wrap:wrap;padding:12px 0;border-bottom:1px solid #f1f5f9;">';
   statusOrder.forEach(function(st) {
     if (!byStatus[st]) return;
@@ -11513,7 +11513,7 @@ function showReferralDetailModal(filterFn, title, subtitle) {
     const nameKey = r.name.toLowerCase().trim();
     const pVisits = (DATA.allVisitDetail || []).filter(v => v.patient.toLowerCase().trim() === nameKey);
     const apptCell = pVisits.length > 0 ? `<span style="color:#059669;font-weight:600;">${escapeHTML(pVisits[0].date)}</span>` : escapeHTML(r.next_appt) || '<span style="color:#cbd5e1;">—</span>';
-    const staleColor = r.days_since_update >= 14 ? '#dc2626' : r.days_since_update >= 7 ? '#d97706' : '#059669';
+    const staleColor = r.days_since_update >= 14 ? '#dc2626' : r.days_since_update >= 7 ? '#FF9933' : '#059669';
     // Link to CRIO if matched, otherwise ClickUp
     const _crioMatch = matchCrioPatient(r.name, r.phone);
     const _nameUrl = _crioMatch && _crioMatch.crio_url ? _crioMatch.crio_url : r.url;
@@ -12022,7 +12022,7 @@ function renderCrioStudies() {
     + '<div style="font-size:20px;font-weight:700;color:#dc2626">' + totalWinback + '</div>'
     + '<div style="font-size:10px;color:#64748b">V1 No-Shows</div>'
     + '<div style="font-size:9px;color:#dc2626">Win-back</div></div>';
-  html += '<div style="background:#d9770612;padding:6px 12px;border-radius:8px;flex:1;min-width:90px;text-align:center">'
+  html += '<div style="background:#FF993312;padding:6px 12px;border-radius:8px;flex:1;min-width:90px;text-align:center">'
     + '<div style="font-size:20px;font-weight:700;color:#FF9933">' + totalQualNS + '</div>'
     + '<div style="font-size:10px;color:#64748b">In Screening</div>'
     + '<div style="font-size:9px;color:#FF9933">Schedule V1</div></div>';
@@ -12109,16 +12109,16 @@ function renderCrioStudies() {
     });
     var prStudies = Object.keys(prByStudy).sort(function(a,b) { return prByStudy[b].length - prByStudy[a].length; });
     html += '<div style="margin-bottom:14px">'
-      + '<div style="font-size:12px;font-weight:700;color:#c2410c;margin-bottom:6px">Recent Cancels — Not Rebooked (' + pendingReschedules.length + ' patients)</div>'
+      + '<div style="font-size:12px;font-weight:700;color:#FF9933;margin-bottom:6px">Recent Cancels — Not Rebooked (' + pendingReschedules.length + ' patients)</div>'
       + '<div style="font-size:10px;color:#64748b;margin-bottom:8px">Cancelled in the last 2 months and said they would reschedule, but no new appointment found. Follow up to rebook.</div>';
     prStudies.forEach(function(study) {
       var pts = prByStudy[study];
       var studyUrl = pts[0].study_url || '';
       var studyLink = studyUrl
-        ? '<a href="' + esc(studyUrl) + '" target="_blank" style="color:#c2410c;font-weight:600;text-decoration:none">' + esc(study) + '</a>'
+        ? '<a href="' + esc(studyUrl) + '" target="_blank" style="color:#FF9933;font-weight:600;text-decoration:none">' + esc(study) + '</a>'
         : '<b>' + esc(study) + '</b>';
-      html += '<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;margin-bottom:3px;border-left:3px solid #c2410c;background:#c2410c08;border-radius:0 6px 6px 0;font-size:11px">'
-        + '<span style="font-size:16px;font-weight:800;color:#c2410c;min-width:28px;text-align:right">' + pts.length + '</span>'
+      html += '<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;margin-bottom:3px;border-left:3px solid #FF9933;background:#FF993308;border-radius:0 6px 6px 0;font-size:11px">'
+        + '<span style="font-size:16px;font-weight:800;color:#FF9933;min-width:28px;text-align:right">' + pts.length + '</span>'
         + '<div style="flex:1">'
         + studyLink
         + ' <span style="font-size:9px;color:#94a3b8">'
@@ -12138,7 +12138,7 @@ function renderCrioStudies() {
       + '<div style="font-size:10px;color:#64748b;margin-bottom:8px">Patients currently in Screening who could be moved to Scheduled V1. Review and schedule where ready.</div>';
     qualNotSched.forEach(function(q) {
       var url = 'https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/' + q.key + '/subjects';
-      html += '<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;margin-bottom:3px;border-left:3px solid #d97706;background:#d9770608;border-radius:0 6px 6px 0;font-size:11px">'
+      html += '<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;margin-bottom:3px;border-left:3px solid #FF9933;background:#FF993308;border-radius:0 6px 6px 0;font-size:11px">'
         + '<span style="font-size:16px;font-weight:800;color:#FF9933;min-width:28px;text-align:right">' + q.screening + '</span>'
         + '<div style="flex:1">'
         + '<a href="' + esc(url) + '" target="_blank" style="color:#FF9933;font-weight:600;text-decoration:none">' + esc(q.study) + '</a>'
@@ -12188,7 +12188,7 @@ function renderCrioStudies() {
       + '<div style="font-size:10px;color:#64748b;margin-bottom:8px">These studies have enrolled patients but few or no visits on the calendar. Patients may have quietly dropped out.</div>';
     enrolledNoVisit.forEach(function(e) {
       var url = 'https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa/study/' + e.key + '/subjects';
-      html += '<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;margin-bottom:3px;border-left:3px solid #7c3aed;background:#7c3aed08;border-radius:0 6px 6px 0;font-size:11px">'
+      html += '<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;margin-bottom:3px;border-left:3px solid #072061;background:#07206108;border-radius:0 6px 6px 0;font-size:11px">'
         + '<span style="font-size:16px;font-weight:800;color:#072061;min-width:28px;text-align:right">' + e.gap + '</span>'
         + '<div style="flex:1">'
         + '<a href="' + esc(url) + '" target="_blank" style="color:#072061;font-weight:600;text-decoration:none">' + esc(e.study) + '</a>'
@@ -12205,7 +12205,7 @@ function renderCrioStudies() {
   if (corrections.length > 0) {
     html += '<details style="margin-bottom:14px"><summary style="font-size:11px;font-weight:600;color:#64748b;cursor:pointer;margin-bottom:4px">Data Corrections — ' + corrections.length + ' auto-fixed (CRIO → Dashboard)</summary>';
     corrections.forEach(function(c) {
-      html += '<div style="font-size:11px;padding:3px 8px;margin-bottom:2px;background:#fef2f220;border-left:2px solid #d97706;border-radius:0 4px 4px 0">'
+      html += '<div style="font-size:11px;padding:3px 8px;margin-bottom:2px;background:#fef2f220;border-left:2px solid #FF9933;border-radius:0 4px 4px 0">'
         + '<b>' + esc(c.study) + '</b> ' + esc(c.field) + ': '
         + '<span style="color:#dc2626;text-decoration:line-through">' + esc(c.old) + '</span>'
         + ' → <span style="color:#059669;font-weight:600">' + esc(c.new_val) + '</span></div>';
@@ -12229,9 +12229,9 @@ function renderCrioStudies() {
         + '<span style="font-size:10px;color:#64748b">' + esc(ps.coordinator) + '</span></div>';
 
       var stages = [
-        { label: 'Prequalified', count: ps.prequalified, color: '#3b82f6' },
-        { label: 'Screening', count: ps.screening, color: '#d97706' },
-        { label: 'Scheduled V1', count: ps.scheduled_v1 || 0, color: '#7c3aed' },
+        { label: 'Prequalified', count: ps.prequalified, color: '#1843AD' },
+        { label: 'Screening', count: ps.screening, color: '#FF9933' },
+        { label: 'Scheduled V1', count: ps.scheduled_v1 || 0, color: '#072061' },
         { label: 'Enrolled', count: ps.enrolled, color: '#059669' },
         { label: 'Screen Fail', count: ps.screen_fail, color: '#dc2626' },
         { label: 'No Show', count: ps.noshow, color: '#ef4444' },
@@ -12443,7 +12443,7 @@ function buildEnrollmentKPIs() {
   var overallPct = totalTarget > 0 ? Math.round((totalEnrolled / totalTarget) * 100) : 0;
   var screened = enrolled + screenFail + discontinued + completed;
   var sfRate = screened > 0 ? Math.round((screenFail / screened) * 100) : 0;
-  var sfColor = sfRate > 40 ? '#dc2626' : sfRate > 25 ? '#d97706' : '#059669';
+  var sfColor = sfRate > 40 ? '#dc2626' : sfRate > 25 ? '#FF9933' : '#059669';
 
   // Populate KPIs
   var elEnr = document.getElementById('ov-kpi-enrolled');
@@ -12451,7 +12451,7 @@ function buildEnrollmentKPIs() {
   if (elEnr) {
     if (totalTarget > 0) {
       elEnr.textContent = totalEnrolled + ' / ' + totalTarget;
-      elEnr.style.color = overallPct >= 75 ? '#059669' : overallPct >= 50 ? '#d97706' : '#dc2626';
+      elEnr.style.color = overallPct >= 75 ? '#059669' : overallPct >= 50 ? '#FF9933' : '#dc2626';
       elEnrSub.textContent = overallPct + '% of target · enrolling studies';
     } else {
       elEnr.textContent = enrolled;
@@ -12820,21 +12820,21 @@ function showMedRecDetailModal(studyName) {
   html += '<thead><tr style="border-bottom:2px solid #e2e8f0;text-align:left;">';
   html += '<th style="padding:6px 8px;">Patient</th><th style="padding:6px 8px;">Status</th><th style="padding:6px 8px;">Records</th><th style="padding:6px 8px;">Release</th><th style="padding:6px 8px;">PI Approval</th><th style="padding:6px 8px;">Portal</th><th style="padding:6px 8px;">Next Visit</th><th style="padding:6px 8px;">Assignee</th><th style="padding:6px 8px;">Updated</th></tr></thead><tbody>';
   patients.sort((a,b) => (a.is_active===b.is_active ? 0 : a.is_active ? -1 : 1));
-  const recColors = {'Received':'#059669','Pending':'#f59e0b','Not applicable':'#94a3b8','Unavailable':'#dc2626'};
-  const relColors = {'Recieved':'#059669','Pending':'#f59e0b','Not Applicable ( Link to proxy in collum E)':'#94a3b8','Contact 1':'#3b82f6','Contact 2':'#8b5cf6','Contact 3':'#dc2626'};
-  const piColors = {'Confirmed - (ready to schedule)':'#059669','Pending Submission':'#f59e0b','Under Review':'#8b5cf6','DNQ':'#dc2626','Not Applicable':'#94a3b8'};
+  const recColors = {'Received':'#059669','Pending':'#FF9933','Not applicable':'#94a3b8','Unavailable':'#dc2626'};
+  const relColors = {'Recieved':'#059669','Pending':'#FF9933','Not Applicable ( Link to proxy in collum E)':'#94a3b8','Contact 1':'#1843AD','Contact 2':'#1843AD','Contact 3':'#dc2626'};
+  const piColors = {'Confirmed - (ready to schedule)':'#059669','Pending Submission':'#FF9933','Under Review':'#1843AD','DNQ':'#dc2626','Not Applicable':'#94a3b8'};
   function badge(val, colorMap) {
     if (!val) return '<span style="color:#cbd5e1;">—</span>';
     const c = colorMap[val] || '#64748b';
     return '<span style="padding:1px 5px;border-radius:3px;font-size:9px;font-weight:600;background:' + c + '18;color:' + c + ';">' + escapeHTML(val) + '</span>';
   }
   patients.forEach(r => {
-    const staleColor = r.days_since_update > 14 ? '#dc2626' : r.days_since_update > 7 ? '#f59e0b' : '#64748b';
-    const statusColor = r.is_active ? '#8b5cf6' : r.is_closed ? '#94a3b8' : '#64748b';
+    const staleColor = r.days_since_update > 14 ? '#dc2626' : r.days_since_update > 7 ? '#FF9933' : '#64748b';
+    const statusColor = r.is_active ? '#1843AD' : r.is_closed ? '#94a3b8' : '#64748b';
     const patLink = r.crio_link ? r.crio_link : r.url;
     html += '<tr style="border-bottom:1px solid #f1f5f9;">';
     html += '<td style="padding:4px 8px;"><a href="' + escapeHTML(patLink) + '" target="_blank" style="font-weight:600;color:#1e293b;text-decoration:none;">' + maskPHI(r.name) + '</a></td>';
-    html += '<td style="padding:4px 8px;">' + badge(r.status, {Enrolled:'#059669','In Screening':'#8b5cf6','Visit Scheduled':'#06b6d4','Ready to Schedule':'#f59e0b','Pending Release':'#94a3b8','Under Review':'#64748b',DNQ:'#dc2626','Screen Fail':'#dc2626'}) + '</td>';
+    html += '<td style="padding:4px 8px;">' + badge(r.status, {Enrolled:'#059669','In Screening':'#1843AD','Visit Scheduled':'#A2DCEB','Ready to Schedule':'#FF9933','Pending Release':'#94a3b8','Under Review':'#64748b',DNQ:'#dc2626','Screen Fail':'#dc2626'}) + '</td>';
     html += '<td style="padding:4px 8px;">' + badge(r.records_received, recColors) + '</td>';
     html += '<td style="padding:4px 8px;">' + badge(r.medical_release, relColors) + '</td>';
     html += '<td style="padding:4px 8px;">' + badge(r.investigator_approval, piColors) + '</td>';
@@ -12865,7 +12865,7 @@ function showMedRecSlaModal(type) {
   var rows = list.map(function(r) {
     var appt = new Date(r.next_appointment);
     var days = Math.floor((appt - today) / 86400000);
-    var color = days < 0 ? '#dc2626' : days <= 3 ? '#f59e0b' : '#059669';
+    var color = days < 0 ? '#dc2626' : days <= 3 ? '#FF9933' : '#059669';
     return '<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:6px 8px;">' + esc(maskPHI(r.name)) + '</td><td style="padding:6px 8px;">' + esc(r.study||'') + '</td><td style="padding:6px 8px;font-weight:700;color:' + color + ';">' + days + 'd</td><td style="padding:6px 8px;font-size:11px;color:#64748b;">' + esc(r.next_appointment) + '</td><td style="padding:6px 8px;">' + esc(r.records_received||'Not Set') + '</td><td style="padding:6px 8px;">' + esc(r.assignee||'') + '</td></tr>';
   }).join('');
   openModal(title, '', '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;"><thead><tr style="border-bottom:2px solid #e2e8f0;text-align:left;"><th style="padding:6px 8px;">Patient</th><th style="padding:6px 8px;">Study</th><th style="padding:6px 8px;">Days</th><th style="padding:6px 8px;">Appointment</th><th style="padding:6px 8px;">Records</th><th style="padding:6px 8px;">Assignee</th></tr></thead><tbody>' + rows + '</tbody></table></div>');
@@ -12902,8 +12902,8 @@ function showMedRecFilteredModal(filterKey) {
   if (!fn) return;
   var patients = MED_RECORDS_DATA.filter(fn);
   var title = labels[filterKey] || filterKey;
-  var recColors = {'Received':'#059669','Pending':'#f59e0b','Not applicable':'#94a3b8','Unavailable':'#dc2626'};
-  var relColors = {'Recieved':'#059669','Pending':'#f59e0b','Not Applicable ( Link to proxy in collum E)':'#94a3b8','Contact 1':'#3b82f6','Contact 2':'#8b5cf6','Contact 3':'#dc2626'};
+  var recColors = {'Received':'#059669','Pending':'#FF9933','Not applicable':'#94a3b8','Unavailable':'#dc2626'};
+  var relColors = {'Recieved':'#059669','Pending':'#FF9933','Not Applicable ( Link to proxy in collum E)':'#94a3b8','Contact 1':'#1843AD','Contact 2':'#1843AD','Contact 3':'#dc2626'};
   function badge(val, colorMap) {
     if (!val) return '<span style="color:#cbd5e1;">—</span>';
     var c = colorMap[val] || '#64748b';
@@ -12913,7 +12913,7 @@ function showMedRecFilteredModal(filterKey) {
   html += '<thead><tr style="border-bottom:2px solid #e2e8f0;text-align:left;">';
   html += '<th style="padding:6px 8px;">Patient</th><th style="padding:6px 8px;">Study</th><th style="padding:6px 8px;">Release</th><th style="padding:6px 8px;">Records</th><th style="padding:6px 8px;">Portal</th><th style="padding:6px 8px;">Assignee</th><th style="padding:6px 8px;">Updated</th></tr></thead><tbody>';
   patients.forEach(function(r) {
-    var staleColor = r.days_since_update > 14 ? '#dc2626' : r.days_since_update > 7 ? '#f59e0b' : '#64748b';
+    var staleColor = r.days_since_update > 14 ? '#dc2626' : r.days_since_update > 7 ? '#FF9933' : '#64748b';
     var patLink = r.crio_link || r.url || '#';
     html += '<tr style="border-bottom:1px solid #f1f5f9;">';
     html += '<td style="padding:4px 8px;"><a href="' + escapeHTML(patLink) + '" target="_blank" style="font-weight:600;color:#1e293b;text-decoration:none;">' + maskPHI(r.name) + '</a></td>';
@@ -12987,9 +12987,9 @@ function renderMedRecTab() {
   }
 
   // Status colors
-  var SC = {'Enrolled':'#059669','In Screening':'#8b5cf6','Visit Scheduled':'#06b6d4','Ready to Schedule':'#f59e0b','Pending Release':'#94a3b8','Under Review':'#64748b','DNQ':'#dc2626','Screen Fail':'#dc2626','No Show':'#dc2626','Not Interested':'#94a3b8','Complete':'#059669'};
-  var RC = {'Received':'#059669','Pending':'#f59e0b','Not applicable':'#94a3b8','Unavailable':'#dc2626'};
-  var PC = {'Confirmed - (ready to schedule)':'#059669','Pending Submission':'#f59e0b','Under Review':'#8b5cf6','DNQ':'#dc2626','Not Applicable':'#94a3b8'};
+  var SC = {'Enrolled':'#059669','In Screening':'#1843AD','Visit Scheduled':'#A2DCEB','Ready to Schedule':'#FF9933','Pending Release':'#94a3b8','Under Review':'#64748b','DNQ':'#dc2626','Screen Fail':'#dc2626','No Show':'#dc2626','Not Interested':'#94a3b8','Complete':'#059669'};
+  var RC = {'Received':'#059669','Pending':'#FF9933','Not applicable':'#94a3b8','Unavailable':'#dc2626'};
+  var PC = {'Confirmed - (ready to schedule)':'#059669','Pending Submission':'#FF9933','Under Review':'#1843AD','DNQ':'#dc2626','Not Applicable':'#94a3b8'};
   function bdg(val, map) {
     if (!val) return '<span style="color:#cbd5e1">—</span>';
     var c = map[val] || '#64748b';
@@ -13002,14 +13002,14 @@ function renderMedRecTab() {
   filtered.sort(function(a,b){ return (a.days_since_update||999) < (b.days_since_update||999) ? 1 : -1; });
   var html = '';
   filtered.forEach(function(r) {
-    var staleColor = r.days_since_update > 14 ? '#dc2626' : r.days_since_update > 7 ? '#f59e0b' : '#64748b';
+    var staleColor = r.days_since_update > 14 ? '#dc2626' : r.days_since_update > 7 ? '#FF9933' : '#64748b';
     var patLink = r.crio_link || r.url || '#';
     html += '<tr style="border-bottom:1px solid var(--border);">';
     html += '<td style="padding:8px;"><a href="'+escapeHTML(patLink)+'" target="_blank" style="font-weight:600;color:#1e293b;text-decoration:none;">'+maskPHI(r.name)+'</a></td>';
     html += '<td style="padding:8px;font-size:11px;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+escapeHTML(r.study||'')+'">'+escapeHTML(r.study||'—')+'</td>';
     html += '<td style="padding:8px;text-align:center;">'+bdg(r.status, SC)+'</td>';
     html += '<td style="padding:8px;text-align:center;">'+bdg(r.records_received, RC)+'</td>';
-    html += '<td style="padding:8px;text-align:center;">'+bdg(r.medical_release, {'Recieved':'#059669','Pending':'#f59e0b','Contact 1':'#3b82f6','Contact 2':'#8b5cf6','Contact 3':'#dc2626'})+'</td>';
+    html += '<td style="padding:8px;text-align:center;">'+bdg(r.medical_release, {'Recieved':'#059669','Pending':'#FF9933','Contact 1':'#1843AD','Contact 2':'#1843AD','Contact 3':'#dc2626'})+'</td>';
     html += '<td style="padding:8px;text-align:center;">'+bdg(r.investigator_approval, PC)+'</td>';
     html += '<td style="padding:8px;text-align:center;font-size:11px;color:var(--muted);">'+escapeHTML(r.next_visit_date||r.next_appointment||'—')+'</td>';
     html += '<td style="padding:8px;font-size:11px;">'+escapeHTML(r.assignee||'—')+'</td>';
@@ -13036,7 +13036,7 @@ function renderMedRecTab() {
       var pct = Math.round(s.active / maxActive * 100);
       sHtml += '<div style="display:grid;grid-template-columns:1fr 60px 60px;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showMedRecDetailModal(\''+jsAttr(name)+'\')">';
       sHtml += '<div><div style="font-size:11px;font-weight:600;margin-bottom:3px;">'+escapeHTML(name)+'</div>';
-      sHtml += '<div style="height:5px;background:#e2e8f0;border-radius:3px;overflow:hidden;"><div style="width:'+pct+'%;height:100%;background:#8b5cf6;border-radius:3px;"></div></div></div>';
+      sHtml += '<div style="height:5px;background:#e2e8f0;border-radius:3px;overflow:hidden;"><div style="width:'+pct+'%;height:100%;background:#1843AD;border-radius:3px;"></div></div></div>';
       sHtml += '<div style="text-align:center;font-size:12px;font-weight:700;color:#1843AD;">'+s.active+'</div>';
       sHtml += '<div style="text-align:center;font-size:11px;color:#94a3b8;">'+s.closed+' closed</div>';
       sHtml += '</div>';
@@ -13220,9 +13220,9 @@ function renderFacebookCRM() {
       <div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:8px;">Status Distribution</div>
       ${topStatuses.map(([status, count]) => {
         const pct = Math.round(count / FB_CRM_DATA.length * 100);
-        const colors = {'scheduled':'#059669','contacted':'#3b82f6','no answer':'#f59e0b','not interested':'#94a3b8','voicemail':'#d97706','dnq':'#ef4444'};
+        const colors = {'scheduled':'#059669','contacted':'#1843AD','no answer':'#FF9933','not interested':'#94a3b8','voicemail':'#FF9933','dnq':'#ef4444'};
         const matched = Object.keys(colors).find(k => status.toLowerCase().includes(k));
-        const color = matched ? colors[matched] : '#6366f1';
+        const color = matched ? colors[matched] : '#1843AD';
         return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">
           <div style="width:80px;font-size:11px;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${status}">${status}</div>
           <div style="flex:1;background:#f1f5f9;border-radius:3px;height:16px;overflow:hidden;">
@@ -13241,7 +13241,7 @@ function renderFacebookCRM() {
         return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">
           <div style="width:100px;font-size:11px;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${study}">${study}</div>
           <div style="flex:1;background:#f1f5f9;border-radius:3px;height:16px;overflow:hidden;">
-            <div style="width:${Math.max(pct,3)}%;background:#3b82f6;height:100%;border-radius:3px;"></div>
+            <div style="width:${Math.max(pct,3)}%;background:#1843AD;height:100%;border-radius:3px;"></div>
           </div>
           <div style="font-size:10px;font-weight:600;color:#1e293b;min-width:35px;text-align:right;">${count}</div>
         </div>`;
@@ -13251,7 +13251,7 @@ function renderFacebookCRM() {
   if (delfaCount > 0) {
     html += `<div style="min-width:120px;text-align:center;padding:8px;">
       <div style="font-size:11px;font-weight:700;color:var(--navy);margin-bottom:4px;">Delfa AI</div>
-      <div style="font-size:24px;font-weight:800;color:#7C3AED;">${delfaCount}</div>
+      <div style="font-size:24px;font-weight:800;color:#072061;">${delfaCount}</div>
       <div style="font-size:10px;color:#94a3b8;">AI pre-screened</div>
     </div>`;
   }
@@ -13461,7 +13461,7 @@ function renderMetaAlerts() {
   var html = '';
   alerts.forEach(function(a) {
     var bg = a.type === 'warning' ? '#FEF3C7' : a.type === 'opportunity' ? '#ECFDF5' : '#EFF6FF';
-    var border = a.type === 'warning' ? '#F59E0B' : a.type === 'opportunity' ? '#10B981' : '#3B82F6';
+    var border = a.type === 'warning' ? '#FF9933' : a.type === 'opportunity' ? '#10B981' : '#1843AD';
     html += '<div style="padding:8px 12px;margin-bottom:6px;border-radius:6px;background:' + bg + ';border-left:3px solid ' + border + ';font-size:11px;line-height:1.5;">' + a.icon + ' ' + a.msg + '</div>';
   });
   el.innerHTML = html;
@@ -13549,12 +13549,12 @@ function renderMetaFunnel() {
   // Funnel KPI bar
   var html = '<div style="display:flex;gap:4px;padding:12px 16px;border-bottom:1px solid #f1f5f9;align-items:center;flex-wrap:wrap;">';
   var stages = [
-    { label: 'Meta Leads', val: totals.meta, color: '#3b82f6' },
-    { label: 'In CRM', val: totals.crm, color: '#6366f1' },
-    { label: 'Pipeline', val: totals.pipeline, color: '#8b5cf6' },
-    { label: 'CRIO Screening', val: totals.crioScr, color: '#d97706' },
+    { label: 'Meta Leads', val: totals.meta, color: '#1843AD' },
+    { label: 'In CRM', val: totals.crm, color: '#1843AD' },
+    { label: 'Pipeline', val: totals.pipeline, color: '#1843AD' },
+    { label: 'CRIO Screening', val: totals.crioScr, color: '#FF9933' },
     { label: 'CRIO Enrolled', val: totals.crioEnr, color: '#059669' },
-    { label: 'CTMS Visits', val: totals.visits, color: '#06b6d4' },
+    { label: 'CTMS Visits', val: totals.visits, color: '#A2DCEB' },
   ];
   stages.forEach(function(s, i) {
     if (i > 0) html += '<div style="color:#cbd5e1;font-size:14px;">\u2192</div>';
@@ -13568,7 +13568,7 @@ function renderMetaFunnel() {
   html += '<thead><tr><th style="text-align:left;padding:6px 10px;">Campaign</th><th style="text-align:center;">Meta Leads</th><th style="text-align:center;">CRM</th><th style="text-align:center;">Pipeline</th><th style="text-align:center;color:#FF9933;">CRIO Scr</th><th style="text-align:center;color:#059669;">CRIO Enr</th><th style="text-align:center;">Visits</th><th style="text-align:center;">Conv %</th></tr></thead><tbody>';
   funnelRows.forEach(function(r) {
     var conv = r.metaLeads > 0 ? Math.round(r.crioEnrolled / r.metaLeads * 100) : 0;
-    var convColor = conv >= 5 ? '#059669' : conv >= 2 ? '#d97706' : '#94a3b8';
+    var convColor = conv >= 5 ? '#059669' : conv >= 2 ? '#FF9933' : '#94a3b8';
     html += '<tr style="transition:background .1s" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'\'">';
     html += '<td style="padding:5px 10px;font-weight:600;">' + escapeHTML(r.campaign) + '<div style="font-size:8px;color:#94a3b8;">' + (r.studies.length > 0 ? r.studies.join(', ') : 'No study mapped') + '</div></td>';
     html += '<td style="text-align:center;font-weight:700;color:#1843AD;">' + r.metaLeads + '</td>';
@@ -13576,7 +13576,7 @@ function renderMetaFunnel() {
     html += '<td style="text-align:center;color:#1843AD;">' + r.inPipeline + '</td>';
     html += '<td style="text-align:center;color:#FF9933;font-weight:' + (r.crioScreening > 0 ? '700' : '400') + ';">' + (r.crioScreening || '—') + '</td>';
     html += '<td style="text-align:center;font-weight:700;color:#059669;">' + (r.crioEnrolled || '—') + '</td>';
-    html += '<td style="text-align:center;color:#06b6d4;">' + r.ctmsVisits + '</td>';
+    html += '<td style="text-align:center;color:#A2DCEB;">' + r.ctmsVisits + '</td>';
     html += '<td style="text-align:center;font-weight:700;color:' + convColor + ';">' + conv + '%</td>';
     html += '</tr>';
   });
@@ -13607,8 +13607,8 @@ function renderMetaAds() {
   html += '<div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#1843AD;">' + totalLeads.toLocaleString() + '</div><div style="font-size:10px;color:#94a3b8;">Total Leads</div></div>';
   html += '<div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#1843AD;">' + totalImpressions.toLocaleString() + '</div><div style="font-size:10px;color:#94a3b8;">Impressions</div></div>';
   html += '<div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#1843AD;">' + totalClicks.toLocaleString() + '</div><div style="font-size:10px;color:#94a3b8;">Clicks</div></div>';
-  html += '<div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:' + (parseFloat(avgCtr) >= 2 ? '#059669' : '#d97706') + ';">' + avgCtr + '%</div><div style="font-size:10px;color:#94a3b8;">Avg CTR</div></div>';
-  html += '<div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#06b6d4;">' + totalEngagement.toLocaleString() + '</div><div style="font-size:10px;color:#94a3b8;">Engagement</div></div>';
+  html += '<div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:' + (parseFloat(avgCtr) >= 2 ? '#059669' : '#FF9933') + ';">' + avgCtr + '%</div><div style="font-size:10px;color:#94a3b8;">Avg CTR</div></div>';
+  html += '<div style="text-align:center;min-width:80px;"><div style="font-size:20px;font-weight:800;color:#A2DCEB;">' + totalEngagement.toLocaleString() + '</div><div style="font-size:10px;color:#94a3b8;">Engagement</div></div>';
   html += '</div>';
 
   html += '<div style="padding:4px 16px 0;font-size:9px;color:#94a3b8;">Data: Meta Marketing API \u00B7 Last 30 days \u00B7 Live</div>';
@@ -13627,13 +13627,13 @@ function renderMetaAds() {
   var maxLeads = camps.length > 0 ? camps[0].leads : 1;
   camps.forEach(function(c) {
     var pct = maxLeads > 0 ? Math.round(c.leads / maxLeads * 100) : 0;
-    var ctrColor = c.ctr >= 2.5 ? '#059669' : c.ctr >= 1.5 ? '#d97706' : '#dc2626';
+    var ctrColor = c.ctr >= 2.5 ? '#059669' : c.ctr >= 1.5 ? '#FF9933' : '#dc2626';
     var meta = campMeta[c.campaign] || {};
     var statusColor = meta.status === 'ACTIVE' ? '#059669' : '#94a3b8';
     var statusLabel = meta.status === 'ACTIVE' ? 'Active' : 'Paused';
     var weeks = (weeklyByCamp[c.campaign] || []).sort(function(a,b) { return a.date_start < b.date_start ? -1 : 1; });
     var weekLeads = weeks.map(function(w) { return w.leads; });
-    var spark = _sparkline(weekLeads, 70, 20, c.ctr >= 2 ? '#059669' : '#d97706');
+    var spark = _sparkline(weekLeads, 70, 20, c.ctr >= 2 ? '#059669' : '#FF9933');
 
     html += '<tr style="transition:background .1s" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'\'">';
     html += '<td style="padding:7px 12px;font-weight:600;">' + escapeHTML(c.campaign) + '</td>';
@@ -13642,7 +13642,7 @@ function renderMetaAds() {
     html += '<td style="text-align:center;font-weight:600;color:' + ctrColor + ';">' + c.ctr.toFixed(2) + '%</td>';
     html += '<td style="text-align:center;">' + c.engagement.toLocaleString() + '</td>';
     html += '<td style="text-align:center;">' + spark + '</td>';
-    html += '<td style="padding:7px 12px;"><div style="background:linear-gradient(90deg,#3b82f6,#6366f1);height:18px;border-radius:4px;width:' + pct + '%;min-width:2px;display:flex;align-items:center;justify-content:flex-end;padding-right:4px;"><span style="font-size:9px;font-weight:700;color:' + (pct > 25 ? '#fff' : '#1e293b') + ';">' + c.leads + '</span></div></td>';
+    html += '<td style="padding:7px 12px;"><div style="background:linear-gradient(90deg,#1843AD,#1843AD);height:18px;border-radius:4px;width:' + pct + '%;min-width:2px;display:flex;align-items:center;justify-content:flex-end;padding-right:4px;"><span style="font-size:9px;font-weight:700;color:' + (pct > 25 ? '#fff' : '#1e293b') + ';">' + c.leads + '</span></div></td>';
     html += '</tr>';
   });
   html += '</tbody></table></div>';
@@ -13660,11 +13660,11 @@ function renderMetaAds() {
       });
       var tm = crossRef.reduce(function(s,x){return s+x.metaLeads;},0), tc = crossRef.reduce(function(s,x){return s+x.crmLeads;},0);
       var oc = tm > 0 ? Math.round(tc/tm*100) : 0;
-      html += '<div style="border-top:2px solid #e2e8f0;margin-top:4px;"><div style="padding:8px 16px 4px;font-size:12px;font-weight:700;">Lead Capture Gap <span style="font-weight:400;color:#64748b;font-size:10px;">Meta vs CRM \u00B7 Overall: <strong style="color:'+(oc>=80?'#059669':oc>=50?'#d97706':'#dc2626')+'">'+oc+'%</strong></span></div>';
+      html += '<div style="border-top:2px solid #e2e8f0;margin-top:4px;"><div style="padding:8px 16px 4px;font-size:12px;font-weight:700;">Lead Capture Gap <span style="font-weight:400;color:#64748b;font-size:10px;">Meta vs CRM \u00B7 Overall: <strong style="color:'+(oc>=80?'#059669':oc>=50?'#FF9933':'#dc2626')+'">'+oc+'%</strong></span></div>';
       html += '<table style="width:100%;font-size:10px;border-collapse:collapse;"><thead><tr style="background:#f8fafc;"><th style="text-align:left;padding:4px 12px;">Campaign</th><th style="text-align:center;padding:4px 6px;">Meta</th><th style="text-align:center;padding:4px 6px;">CRM</th><th style="text-align:center;padding:4px 6px;">Gap</th><th style="text-align:center;padding:4px 6px;">Capture</th></tr></thead><tbody>';
       crossRef.forEach(function(x) {
         var p = x.metaLeads > 0 ? Math.round(x.crmLeads/x.metaLeads*100) : 0;
-        html += '<tr style="border-top:1px solid #f1f5f9;"><td style="padding:4px 12px;font-weight:600;">'+escapeHTML(x.campaign)+'</td><td style="text-align:center;color:#1843AD;font-weight:600;">'+x.metaLeads+'</td><td style="text-align:center;color:#059669;font-weight:600;">'+x.crmLeads+'</td><td style="text-align:center;color:'+(x.gap>50?'#dc2626':x.gap>10?'#d97706':'#059669')+';font-weight:700;">'+(x.gap>0?'-'+x.gap:'\u2713')+'</td><td style="text-align:center;font-weight:700;color:'+(p>=80?'#059669':p>=50?'#d97706':'#dc2626')+';">'+p+'%</td></tr>';
+        html += '<tr style="border-top:1px solid #f1f5f9;"><td style="padding:4px 12px;font-weight:600;">'+escapeHTML(x.campaign)+'</td><td style="text-align:center;color:#1843AD;font-weight:600;">'+x.metaLeads+'</td><td style="text-align:center;color:#059669;font-weight:600;">'+x.crmLeads+'</td><td style="text-align:center;color:'+(x.gap>50?'#dc2626':x.gap>10?'#FF9933':'#059669')+';font-weight:700;">'+(x.gap>0?'-'+x.gap:'\u2713')+'</td><td style="text-align:center;font-weight:700;color:'+(p>=80?'#059669':p>=50?'#FF9933':'#dc2626')+';">'+p+'%</td></tr>';
       });
       html += '</tbody></table></div>';
     }
@@ -13775,10 +13775,10 @@ function renderMetaAlignment() {
   rows.sort(function(a, b) { return b.totalLeads - a.totalLeads; }).forEach(function(r) {
     var signal = '', signalColor = '#059669';
     if (r.noCampaign && r.pipelineVolume < 5) { signal = 'Untapped \u2014 needs campaign'; signalColor = '#dc2626'; }
-    else if (r.noCampaign) { signal = 'No campaign'; signalColor = '#d97706'; }
+    else if (r.noCampaign) { signal = 'No campaign'; signalColor = '#FF9933'; }
     else if (r.maintenance > 0 && r.hasActive) { signal = 'Study in maintenance'; signalColor = '#dc2626'; }
-    else if (r.noStudy) { signal = 'No study mapped'; signalColor = '#d97706'; }
-    else if (!r.hasActive && r.enrolling > 0) { signal = 'Campaign paused'; signalColor = '#d97706'; }
+    else if (r.noStudy) { signal = 'No study mapped'; signalColor = '#FF9933'; }
+    else if (!r.hasActive && r.enrolling > 0) { signal = 'Campaign paused'; signalColor = '#FF9933'; }
     else if (r.hasActive && r.enrolling > 0) { signal = 'Aligned'; signalColor = '#059669'; }
     else { signal = '\u2014'; signalColor = '#94a3b8'; }
     var campNames = r.campaigns.map(function(c) { return escapeHTML(c.campaign); }).join(', ') || '<span style="color:#dc2626;font-weight:600;">None</span>';
@@ -13791,7 +13791,7 @@ function renderMetaAlignment() {
     html += '<td style="text-align:center;font-size:10px;">' + campNames + '</td>';
     html += '<td style="text-align:center;"><span style="font-size:10px;padding:2px 8px;border-radius:10px;background:' + (r.hasActive ? '#ECFDF5' : '#F1F5F9') + ';color:' + (r.hasActive ? '#059669' : '#94a3b8') + ';font-weight:600;">' + (r.hasActive ? 'Active' : 'Paused') + '</span></td>';
     html += '<td style="text-align:center;font-weight:700;color:#1843AD;">' + r.totalLeads + '</td>';
-    var pipColor = r.pipelineVolume < 5 ? '#dc2626' : r.pipelineVolume < 15 ? '#d97706' : '#059669';
+    var pipColor = r.pipelineVolume < 5 ? '#dc2626' : r.pipelineVolume < 15 ? '#FF9933' : '#059669';
     html += '<td style="text-align:center;font-weight:600;color:' + pipColor + ';">' + (r.pipelineVolume || 0) + '</td>';
     html += '<td style="padding:5px 10px;">' + studyHtml + '</td>';
     html += '<td style="text-align:center;font-weight:600;color:' + signalColor + ';font-size:10px;">' + signal + '</td>';
@@ -13963,13 +13963,13 @@ function renderEnrollmentVelocity() {
 
   rows.forEach(function(r) {
     var barPct = Math.min(100, r.pctDone);
-    var barColor = r.pctDone >= 80 ? '#059669' : r.pctDone >= 50 ? '#3b82f6' : '#d97706';
+    var barColor = r.pctDone >= 80 ? '#059669' : r.pctDone >= 50 ? '#1843AD' : '#FF9933';
     var signal = '', sigColor = '#059669';
     if (r.risk) { signal = 'At Risk'; sigColor = '#dc2626'; }
     else if (r.weeksToTarget === null) { signal = 'Need data'; sigColor = '#94a3b8'; }
-    else if (r.weeksLeft === null) { signal = 'No deadline'; sigColor = '#d97706'; }
+    else if (r.weeksLeft === null) { signal = 'No deadline'; sigColor = '#FF9933'; }
     else if (r.pctDone >= 80) { signal = 'On Track'; sigColor = '#059669'; }
-    else { signal = 'OK'; sigColor = '#3b82f6'; }
+    else { signal = 'OK'; sigColor = '#1843AD'; }
 
     html += '<tr style="border-top:1px solid #f1f5f9;' + (r.risk ? 'background:#fef2f2;' : '') + '">';
     html += '<td style="padding:5px 8px;"><div style="font-weight:600;font-size:10px;">' + escapeHTML(r.study) + '</div><div style="font-size:9px;color:#64748b;">' + escapeHTML(r.indication) + '</div></td>';
@@ -14170,13 +14170,13 @@ async function compareBQvLegacy(bqUrl) {
     }));
   }
   if (onlyInBQ.length) {
-    console.log('%c Only in BQ (' + onlyInBQ.length + ') ', 'background:#2563eb;color:#fff');
+    console.log('%c Only in BQ (' + onlyInBQ.length + ') ', 'background:#1843AD;color:#fff');
     console.table(onlyInBQ.slice(0, 25).map(function(r) {
       return {Patient: r['Subject Full Name'], Study: r['Study Name'], Cancel: r['Cancel Date']||r['Scheduled Date'], Reason: r['Cancel Reason']};
     }));
   }
   if (diffs.length) {
-    console.log('%c Field Diffs (' + diffs.length + ' rows) ', 'background:#d97706;color:#fff');
+    console.log('%c Field Diffs (' + diffs.length + ' rows) ', 'background:#FF9933;color:#fff');
     diffs.slice(0, 30).forEach(function(d) {
       console.groupCollapsed(d.patient + ' / ' + d.study);
       console.table(d.diffs);
@@ -14189,7 +14189,7 @@ async function compareBQvLegacy(bqUrl) {
   html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">';
   html += '<div style="background:#f0fdf4;padding:12px;border-radius:8px;text-align:center"><div style="font-size:24px;font-weight:700;color:#059669">' + matched.length + '</div><div style="color:#065f46">Matched</div></div>';
   html += '<div style="background:#fef2f2;padding:12px;border-radius:8px;text-align:center"><div style="font-size:24px;font-weight:700;color:#dc2626">' + onlyInLegacy.length + '</div><div style="color:#991b1b">Only in Legacy</div></div>';
-  html += '<div style="background:#eff6ff;padding:12px;border-radius:8px;text-align:center"><div style="font-size:24px;font-weight:700;color:#2563eb">' + onlyInBQ.length + '</div><div style="color:#1e40af">Only in BQ</div></div>';
+  html += '<div style="background:#eff6ff;padding:12px;border-radius:8px;text-align:center"><div style="font-size:24px;font-weight:700;color:#1843AD">' + onlyInBQ.length + '</div><div style="color:#1e40af">Only in BQ</div></div>';
   html += '<div style="background:#fffbeb;padding:12px;border-radius:8px;text-align:center"><div style="font-size:24px;font-weight:700;color:#FF9933">' + diffs.length + '</div><div style="color:#92400e">Field Diffs</div></div>';
   html += '</div>';
   html += '<div style="font-size:12px;color:#64748b;margin-bottom:8px">Legacy: ' + legacyLatest.length + ' rows | BQ: ' + bqLatest.length + ' rows | Match rate: ' + (matched.length ? Math.round(matched.length / Math.max(legacyLatest.length, bqLatest.length) * 100) : 0) + '%</div>';
@@ -14203,7 +14203,7 @@ async function compareBQvLegacy(bqUrl) {
     html += '</table></details>';
   }
   if (onlyInBQ.length) {
-    html += '<details style="margin:8px 0"><summary style="cursor:pointer;font-weight:600;color:#2563eb">Extra in BQ (' + onlyInBQ.length + ')</summary><table style="width:100%;font-size:11px;border-collapse:collapse;margin-top:4px">';
+    html += '<details style="margin:8px 0"><summary style="cursor:pointer;font-weight:600;color:#1843AD">Extra in BQ (' + onlyInBQ.length + ')</summary><table style="width:100%;font-size:11px;border-collapse:collapse;margin-top:4px">';
     html += '<tr style="background:#dbeafe"><th style="padding:4px;text-align:left">Patient</th><th style="padding:4px;text-align:left">Study</th><th style="padding:4px;text-align:left">Date</th></tr>';
     onlyInBQ.slice(0, 50).forEach(function(r) {
       html += '<tr><td style="padding:3px;border-top:1px solid #bfdbfe">' + escapeHTML(r['Subject Full Name']||'') + '</td><td style="padding:3px;border-top:1px solid #bfdbfe">' + escapeHTML(r['Study Name']||'') + '</td><td style="padding:3px;border-top:1px solid #bfdbfe">' + escapeHTML(r['Cancel Date']||r['Scheduled Date']||'') + '</td></tr>';
@@ -14215,7 +14215,7 @@ async function compareBQvLegacy(bqUrl) {
     html += '<tr style="background:#fef3c7"><th style="padding:4px;text-align:left">Patient</th><th style="padding:4px;text-align:left">Field</th><th style="padding:4px;text-align:left">Legacy</th><th style="padding:4px;text-align:left">BQ</th></tr>';
     diffs.slice(0, 40).forEach(function(d) {
       d.diffs.forEach(function(fd, i) {
-        html += '<tr><td style="padding:3px;border-top:1px solid #fde68a">' + (i===0 ? escapeHTML(d.patient||'') : '') + '</td><td style="padding:3px;border-top:1px solid #fde68a;font-weight:600">' + escapeHTML(fd.field) + '</td><td style="padding:3px;border-top:1px solid #fde68a;color:#dc2626">' + escapeHTML(fd.legacy||'(empty)') + '</td><td style="padding:3px;border-top:1px solid #fde68a;color:#2563eb">' + escapeHTML(fd.bq||'(empty)') + '</td></tr>';
+        html += '<tr><td style="padding:3px;border-top:1px solid #fde68a">' + (i===0 ? escapeHTML(d.patient||'') : '') + '</td><td style="padding:3px;border-top:1px solid #fde68a;font-weight:600">' + escapeHTML(fd.field) + '</td><td style="padding:3px;border-top:1px solid #fde68a;color:#dc2626">' + escapeHTML(fd.legacy||'(empty)') + '</td><td style="padding:3px;border-top:1px solid #fde68a;color:#1843AD">' + escapeHTML(fd.bq||'(empty)') + '</td></tr>';
       });
     });
     html += '</table></details>';
@@ -14264,7 +14264,7 @@ function renderCoordTrendChart() {
   schedCoords.forEach(function(n) { schedSet[n.toLowerCase()] = n; });
   var allCoords = new Set();
   trends.forEach(function(t) { Object.keys(t.byCoord).forEach(function(c) { if (schedSet[c.toLowerCase()]) allCoords.add(c); }); });
-  var coordColors = ['#dc2626','#2563eb','#059669','#d97706','#7c3aed'];
+  var coordColors = ['#dc2626','#1843AD','#059669','#FF9933','#072061'];
   var topCoords = Array.from(allCoords).slice(0, 5);
   mkChart('trendsCoordChart', {
     type: 'line',
@@ -14341,7 +14341,7 @@ function renderTrendsCharts() {
           type: 'bar',
           data: trends.map(t => t.cancelled),
           backgroundColor: trends.map(t => t.cancelled >= 30 ? '#fca5a5' : t.cancelled >= 18 ? '#fde68a' : '#bfdbfe'),
-          borderColor: trends.map(t => t.cancelled >= 30 ? '#dc2626' : t.cancelled >= 18 ? '#d97706' : '#072061'),
+          borderColor: trends.map(t => t.cancelled >= 30 ? '#dc2626' : t.cancelled >= 18 ? '#FF9933' : '#072061'),
           borderWidth: 1.5, borderRadius: 4,
           yAxisID: 'y',
           order: 2
@@ -14398,7 +14398,7 @@ function renderTrendsCharts() {
     studyTotals[s] = (studyTotals[s] || 0) + d.cancelled + d.upcoming;
   }));
   const topStudies = Object.entries(studyTotals).sort((a, b) => b[1] - a[1]).slice(0, 6).map(e => e[0]);
-  const studyColors = ['#2563eb','#dc2626','#059669','#d97706','#7c3aed','#0891b2'];
+  const studyColors = ['#1843AD','#dc2626','#059669','#FF9933','#072061','#A2DCEB'];
   mkChart('trendsStudyChart', {
     type: 'line',
     data: {
@@ -14554,7 +14554,7 @@ function findReadyNoVisit() {
 function buildPipelineCell(studyName, safeStudy) {
   const refData = getStudyReferralPipeline(studyName);
   if (!refData || refData.total === 0) return '<span style="font-size:10px;color:#cbd5e1;">\u2014</span>';
-  const activeColor = refData.active > 5 ? '#059669' : refData.active > 0 ? '#3b82f6' : '#94a3b8';
+  const activeColor = refData.active > 5 ? '#059669' : refData.active > 0 ? '#1843AD' : '#94a3b8';
   return '<div style="cursor:pointer;text-align:center;" onclick="showStudyPipelineModal(\''+safeStudy+'\')">' +
     '<div style="font-size:12px;font-weight:700;color:'+activeColor+';">'+refData.active+'</div>' +
     '<div style="font-size:9px;color:#94a3b8;">'+refData.total+' total</div>' +
@@ -14564,7 +14564,7 @@ function buildPipelineCell(studyName, safeStudy) {
 function buildMedRecCell(studyName, safeStudy) {
   var medRec = getStudyMedRecords(studyName);
   if (!medRec || medRec.total === 0) return '<span style="font-size:10px;color:#cbd5e1;">\u2014</span>';
-  var activeColor = medRec.active > 0 ? '#8b5cf6' : '#94a3b8';
+  var activeColor = medRec.active > 0 ? '#1843AD' : '#94a3b8';
   return '<div style="cursor:pointer;text-align:center;" onclick="showMedRecDetailModal(\'' + safeStudy + '\')">' +
     '<div style="font-size:12px;font-weight:700;color:' + activeColor + ';">' + medRec.active + '</div>' +
     '<div style="font-size:9px;color:#94a3b8;">' + medRec.total + ' total</div>' +
@@ -14574,7 +14574,7 @@ function buildMedRecCell(studyName, safeStudy) {
 function buildFBLeadCell(studyName) {
   var d = getStudyFBLeads(studyName);
   if (d.count === 0) return '<span style="font-size:10px;color:#cbd5e1;">\u2014</span>';
-  var color = d.recent > 0 ? '#3b82f6' : '#94a3b8';
+  var color = d.recent > 0 ? '#1843AD' : '#94a3b8';
   return '<div style="text-align:center;">' +
     '<div style="font-size:11px;font-weight:700;color:' + color + ';">' + d.count + '</div>' +
     (d.recent > 0 ? '<div style="font-size:9px;color:#1843AD;">' + d.recent + ' new</div>' : '') +
@@ -14588,7 +14588,7 @@ function buildTotalLeadsCell(studyName, safeStudy) {
   var fbCount = fbData ? fbData.count : 0;
   var total = refCount + fbCount;
   if (total === 0) return '<span style="font-size:10px;color:#cbd5e1;">\u2014</span>';
-  var color = total > 5 ? '#059669' : total > 0 ? '#3b82f6' : '#94a3b8';
+  var color = total > 5 ? '#059669' : total > 0 ? '#1843AD' : '#94a3b8';
   return '<div style="text-align:center;">' +
     '<div style="font-size:12px;font-weight:700;color:' + color + ';">' + total + '</div>' +
     '<div style="font-size:9px;color:#94a3b8;">' + refCount + ' ref + ' + fbCount + ' FB</div>' +
@@ -14647,7 +14647,7 @@ function renderMilestoneTimeline() {
   html += '</tr></thead><tbody>';
 
   rows.forEach(function(r) {
-    var statusColor = r.status === 'Enrolling' ? '#1843ad' : r.status === 'Maintenance' ? '#059669' : r.status === 'Startup' ? '#d97706' : '#94a3b8';
+    var statusColor = r.status === 'Enrolling' ? '#1843ad' : r.status === 'Maintenance' ? '#059669' : r.status === 'Startup' ? '#FF9933' : '#94a3b8';
     var statusBg = r.status === 'Enrolling' ? '#e8eeff' : r.status === 'Maintenance' ? '#f0fdf4' : r.status === 'Startup' ? '#fffbeb' : '#f1f5f9';
     html += '<tr style="border-bottom:1px solid var(--border);">';
     html += '<td style="padding:5px 8px;font-weight:600;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + escapeHTML(r.study||'') + '">' + escapeHTML(r.study||'') + '</td>';
@@ -14773,7 +14773,7 @@ function renderStudiesTable() {
   const tbody = document.getElementById('merged-study-tbody');
   if (!tbody) return;
 
-  const LEVEL_COLOR = {critical:'#dc2626',high:'#d97706',medium:'#2563eb',low:'#059669','n/a':'#94a3b8',''  :'#94a3b8'};
+  const LEVEL_COLOR = {critical:'#dc2626',high:'#FF9933',medium:'#1843AD',low:'#059669','n/a':'#94a3b8',''  :'#94a3b8'};
   const LEVEL_BG    = {critical:'#fef2f2',high:'#fffbeb',medium:'#eff6ff',low:'#f0fdf4','n/a':'#f8fafc',''  :'#f8fafc'};
 
   const allRows = studies.map(s => {
@@ -14782,14 +14782,14 @@ function renderStudiesTable() {
     const hasTarget = s.target !== null && s.target !== undefined;
     const pct = hasTarget ? (s.pct || 0) : null;
     const barColor = !hasTarget ? '#94a3b8' :
-      pct >= 100 ? '#059669' : pct >= 75 ? '#1843ad' : pct >= 50 ? '#d97706' : pct >= 25 ? '#f97316' : '#dc2626';
+      pct >= 100 ? '#059669' : pct >= 75 ? '#1843ad' : pct >= 50 ? '#FF9933' : pct >= 25 ? '#FF9933' : '#dc2626';
 
     const safeStudy = jsAttr(s.study);
     const studyCell = `<span style="font-weight:700;color:var(--navy);cursor:pointer;text-decoration:none;text-underline-offset:3px;" data-action="studyUnified" data-study="${escapeHTML(s.study)}">${escapeHTML(s.study)}</span>` +
       (s.study_url ? `<a href="${escapeHTML(s.study_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="margin-left:4px;opacity:0.4;vertical-align:middle"><svg xmlns="http://www.w3.org/2000/svg" width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>` : '');
     const _sb = s.enroll_status||'';
     const _sbBg = _sb==='Enrolling'?'#e8eeff':_sb==='Maintenance'?'#f0fdf4':_sb==='Startup'?'#fffbeb':_sb==='Pre-Closed'?'#fef2f2':_sb==='Suspended'?'#fef2f2':_sb==='Withdrawn'?'#f1f5f9':'#f1f5f9';
-    const _sbFg = _sb==='Enrolling'?'#1843ad':_sb==='Maintenance'?'#059669':_sb==='Startup'?'#d97706':_sb==='Pre-Closed'?'#dc2626':_sb==='Suspended'?'#dc2626':_sb==='Withdrawn'?'#64748b':'#94a3b8';
+    const _sbFg = _sb==='Enrolling'?'#1843ad':_sb==='Maintenance'?'#059669':_sb==='Startup'?'#FF9933':_sb==='Pre-Closed'?'#dc2626':_sb==='Suspended'?'#dc2626':_sb==='Withdrawn'?'#64748b':'#94a3b8';
     const statusBadge = _sb
       ? `<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;margin-left:5px;background:${_sbBg};color:${_sbFg}">${_sb}</span>` : '';
     const indicationTag = s.crio_indication ? `<div style="font-size:9px;color:#94a3b8;margin-top:1px">${escapeHTML(s.crio_indication)}${s.crio_end_date ? ' · End: '+escapeHTML(s.crio_end_date) : ''}</div>` : (s.crio_end_date ? `<div style="font-size:9px;color:#94a3b8;margin-top:1px">End: ${escapeHTML(s.crio_end_date)}</div>` : '');
@@ -14797,7 +14797,7 @@ function renderStudiesTable() {
     const _divData = (window._studyDiversity || {})[s.crio_study_key || ''];
     const diversityBadge = _divData && _divData.total > 0 ? (() => {
       const pct = Math.round(_divData.diverse / _divData.total * 100);
-      const color = pct >= 40 ? '#059669' : pct >= 20 ? '#d97706' : '#dc2626';
+      const color = pct >= 40 ? '#059669' : pct >= 20 ? '#FF9933' : '#dc2626';
       return `<span style="font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px;margin-left:4px;background:${color}15;color:${color}" title="${_divData.diverse}/${_divData.total} diverse patients">${pct}% diverse</span>`;
     })() : '';
 
@@ -14811,15 +14811,15 @@ function renderStudiesTable() {
     if (isEnrolling && s.screening === 0 && s.enrolled === 0 && s.upcoming > 0) tags.push({text:'No Enrollment', color:'#dc2626', bg:'#fef2f2'});
     if (isEnrolling && s.screening === 0 && s.screened > 0) tags.push({text:'No Screening', color:'#dc2626', bg:'#fef2f2'});
     // Warning alerts (amber)
-    if (s.screen_fail_pct > 40) tags.push({text:'High SF Rate', color:'#d97706', bg:'#fffbeb'});
-    if (isEnrolling && s.upcoming === 0 && s.enrolled > 0) tags.push({text:'No Visits', color:'#d97706', bg:'#fffbeb'});
+    if (s.screen_fail_pct > 40) tags.push({text:'High SF Rate', color:'#FF9933', bg:'#fffbeb'});
+    if (isEnrolling && s.upcoming === 0 && s.enrolled > 0) tags.push({text:'No Visits', color:'#FF9933', bg:'#fffbeb'});
     // Enrollment close date warnings
     if (s.enrollment_close) {
       var _ecDays = Math.round((_parseDate(s.enrollment_close) - new Date()) / 86400000);
       if (_ecDays < 0) tags.push({text:'Enroll Closed', color:'#94a3b8', bg:'#f1f5f9'});
       else if (_ecDays <= 14) tags.push({text:'Closing ' + _ecDays + 'd', color:'#dc2626', bg:'#fef2f2'});
-      else if (_ecDays <= 30) tags.push({text:'Closing ' + _ecDays + 'd', color:'#d97706', bg:'#fffbeb'});
-      else if (_ecDays <= 60) tags.push({text:'Closing ' + _ecDays + 'd', color:'#3b82f6', bg:'#eff6ff'});
+      else if (_ecDays <= 30) tags.push({text:'Closing ' + _ecDays + 'd', color:'#FF9933', bg:'#fffbeb'});
+      else if (_ecDays <= 60) tags.push({text:'Closing ' + _ecDays + 'd', color:'#1843AD', bg:'#eff6ff'});
     }
     // Closeout date warnings
     if (s.closeout_date) {
@@ -14828,10 +14828,10 @@ function renderStudiesTable() {
     }
     // Opportunity alerts (green/blue)
     if (hasTarget && pct >= 80 && pct < 100) tags.push({text:'Close to Goal', color:'#059669', bg:'#f0fdf4'});
-    if (s.screening > 3 && s.enrolled === 0) tags.push({text:'Screen→Enroll Gap', color:'#3b82f6', bg:'#eff6ff'});
+    if (s.screening > 3 && s.enrolled === 0) tags.push({text:'Screen→Enroll Gap', color:'#1843AD', bg:'#eff6ff'});
     var _refPipeline = typeof getStudyReferralPipeline === 'function' ? getStudyReferralPipeline(s.study) : null;
     var totalLeads = (_refPipeline ? _refPipeline.total : 0);
-    if (totalLeads > 5 && s.screening === 0) tags.push({text:'Leads Unused', color:'#8b5cf6', bg:'#f5f3ff'});
+    if (totalLeads > 5 && s.screening === 0) tags.push({text:'Leads Unused', color:'#1843AD', bg:'#f5f3ff'});
     var alertTags = tags.length > 0 ? '<div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:2px;">' + tags.map(function(t) {
       return '<span style="font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px;background:'+t.bg+';color:'+t.color+';">'+t.text+'</span>';
     }).join('') + '</div>' : '';
@@ -14871,13 +14871,13 @@ function renderStudiesTable() {
       ? `<span style="font-size:12px;font-weight:700;color:#1843ad;cursor:pointer" data-action="studyUpcoming" data-study="${escapeHTML(s.study)}">${_siteUpcoming}</span>`
       : `<span style="font-size:11px;color:var(--muted)">0</span>`;
 
-    const sfColor = s.screen_fail_pct > 60 ? '#dc2626' : s.screen_fail_pct > 40 ? '#d97706' : 'var(--muted)';
+    const sfColor = s.screen_fail_pct > 60 ? '#dc2626' : s.screen_fail_pct > 40 ? '#FF9933' : 'var(--muted)';
 
     // Enrollment close display — flag approaching dates, show estimated
     const _ecDisplay = (() => {
       if (!s.enrollment_close) return '—';
       var d = Math.round((_parseDate(s.enrollment_close) - new Date()) / 86400000);
-      var color = d < 0 ? '#94a3b8' : d <= 30 ? '#dc2626' : d <= 60 ? '#d97706' : 'var(--muted)';
+      var color = d < 0 ? '#94a3b8' : d <= 30 ? '#dc2626' : d <= 60 ? '#FF9933' : 'var(--muted)';
       var weight = d <= 60 && d >= 0 ? '700' : '600';
       var est = s.enrollment_close_estimated ? '<span style="font-size:8px;color:#94a3b8;"> est</span>' : '';
       var warn = isEnrolling && d >= 0 && d <= 60 ? '<div style="font-size:8px;color:'+color+';font-weight:700;">'+d+'d left</div>' : '';
@@ -14903,7 +14903,7 @@ function renderStudiesTable() {
     var _unschedAll = (window._unschedByStudyKey || {})[s.crio_study_key] || (window._unschedByStudy || {})[s.study] || [];
     var _unschedList = s._site ? _unschedAll.filter(function(r) { return ((r.site_name||'').indexOf('Penn') !== -1 ? 'PNJ' : 'PHL') === s._site; }) : _unschedAll;
     var _unschedCell = _unschedList.length > 0
-      ? '<span style="font-size:12px;font-weight:700;color:#c2410c;cursor:pointer" onclick="showUnscheduledModal(\''+jsAttr(s.study)+'\')">' + _unschedList.length + '</span>'
+      ? '<span style="font-size:12px;font-weight:700;color:#FF9933;cursor:pointer" onclick="showUnscheduledModal(\''+jsAttr(s.study)+'\')">' + _unschedList.length + '</span>'
       : '<span style="font-size:11px;color:#cbd5e1">0</span>';
 
     return `<tr style="border-bottom:1px solid var(--border);transition:background .1s" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''" data-ta="${escapeHTML(s.therapeutic_area||'')}">
@@ -14911,12 +14911,12 @@ function renderStudiesTable() {
       <td style="padding:10px 8px;text-align:center;cursor:pointer" data-action="studyUnified" data-study="${escapeHTML(s.study)}"><span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:${_sbBg};color:${_sbFg}">${_sb||'—'}</span></td>
       <td style="padding:10px 8px;text-align:center">${riskScoreCell}</td>
       <td style="padding:10px 6px;text-align:center">${_cancelWd > 0 ? '<span style="font-size:12px;font-weight:700;color:#dc2626;cursor:pointer" data-action="studyCategoryClick" data-study="'+escapeHTML(s.study)+'" data-cat="cancel">'+_cancelWd+'</span>' : '<span style="font-size:11px;color:#cbd5e1">0</span>'}</td>
-      <td style="padding:10px 6px;text-align:center">${_countCell(_bd.noShows, '#f97316', 'noshow')}</td>
+      <td style="padding:10px 6px;text-align:center">${_countCell(_bd.noShows, '#FF9933', 'noshow')}</td>
       <td style="padding:10px 6px;text-align:center">${_countCell(_bd.screenFails, '#ef4444', 'screenfail')}</td>
       <td style="padding:10px 8px;text-align:center">${upcomingCell}</td>
       <td style="padding:10px 6px;text-align:center">${_unschedCell}</td>
       <td style="padding:10px 8px;min-width:140px;cursor:pointer" data-action="studyUnified" data-study="${escapeHTML(s.study)}">${enrollCell}</td>
-      <td style="padding:10px 8px;text-align:center;font-size:11px;color:${s.screening>0?'#7c3aed':'var(--muted)'};font-weight:${s.screening>0?'700':'400'};cursor:pointer" data-action="studyUnified" data-study="${escapeHTML(s.study)}">${s.screening||0}</td>
+      <td style="padding:10px 8px;text-align:center;font-size:11px;color:${s.screening>0?'#072061':'var(--muted)'};font-weight:${s.screening>0?'700':'400'};cursor:pointer" data-action="studyUnified" data-study="${escapeHTML(s.study)}">${s.screening||0}</td>
       <td style="padding:10px 8px;text-align:center;font-size:11px;color:var(--muted);cursor:pointer" data-action="studyUnified" data-study="${escapeHTML(s.study)}">${s.screened||0}</td>
       <td style="padding:10px 8px;text-align:center">${siteTags}</td>
       <td style="padding:10px 6px;text-align:center">${(() => {
@@ -15059,7 +15059,7 @@ function generateDailyEmail(type) {
   // 2. Undocumented
   const undoc = ad.undocumented || [];
   if (undoc.length) {
-    html += '<div style="background:#fef3c7;border-left:4px solid #f59e0b;padding:12px 16px;margin-bottom:12px;border-radius:0 6px 6px 0;">';
+    html += '<div style="background:#fef3c7;border-left:4px solid #FF9933;padding:12px 16px;margin-bottom:12px;border-radius:0 6px 6px 0;">';
     html += '<h4 style="margin:0 0 8px;color:#92400e;font-size:13px;">DOCUMENTATION REQUIRED — ' + undoc.length + ' cancellation' + (undoc.length > 1 ? 's' : '') + ' missing reasons</h4>';
     html += '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
     html += '<tr style="border-bottom:1px solid #fde68a;"><th style="text-align:left;padding:4px 6px;">Patient</th><th style="text-align:left;padding:4px 6px;">Study</th><th style="text-align:left;padding:4px 6px;">Coordinator</th><th style="text-align:left;padding:4px 6px;">Date</th></tr>';
@@ -15074,7 +15074,7 @@ function generateDailyEmail(type) {
   // 3. Reschedule Follow-ups
   const rp = ad.open_reschedule_promises || [];
   if (rp.length) {
-    html += '<div style="background:#eff6ff;border-left:4px solid #2563eb;padding:12px 16px;margin-bottom:12px;border-radius:0 6px 6px 0;">';
+    html += '<div style="background:#eff6ff;border-left:4px solid #1843AD;padding:12px 16px;margin-bottom:12px;border-radius:0 6px 6px 0;">';
     html += '<h4 style="margin:0 0 8px;color:#1e40af;font-size:13px;">FOLLOW UP — ' + rp.length + ' patient' + (rp.length > 1 ? 's' : '') + ' said they\'d call back</h4>';
     html += '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
     rp.forEach(p => {
@@ -15089,7 +15089,7 @@ function generateDailyEmail(type) {
   const ns = ad.reschedule_needed || [];
   const nsu = ad.no_show_unreachable || [];
   if (ns.length || nsu.length) {
-    html += '<div style="background:#fdf4ff;border-left:4px solid #7c3aed;padding:12px 16px;margin-bottom:12px;border-radius:0 6px 6px 0;">';
+    html += '<div style="background:#fdf4ff;border-left:4px solid #072061;padding:12px 16px;margin-bottom:12px;border-radius:0 6px 6px 0;">';
     html += '<h4 style="margin:0 0 8px;color:#5b21b6;font-size:13px;">NO-SHOWS & UNREACHABLE — ' + (ns.length + nsu.length) + ' patient' + ((ns.length + nsu.length) > 1 ? 's' : '') + '</h4>';
     html += '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
     ns.concat(nsu).slice(0, 15).forEach(p => {
@@ -15105,13 +15105,13 @@ function generateDailyEmail(type) {
   const sfGroups = ad.screen_fail_groups || {};
   const sfEntries = Object.entries(sfGroups);
   if (sfEntries.length) {
-    html += '<div style="background:#fff7ed;border-left:4px solid #f97316;padding:12px 16px;margin-bottom:12px;border-radius:0 6px 6px 0;">';
-    html += '<h4 style="margin:0 0 8px;color:#c2410c;font-size:13px;">SCREEN FAILS — review pre-screening criteria</h4>';
+    html += '<div style="background:#fff7ed;border-left:4px solid #FF9933;padding:12px 16px;margin-bottom:12px;border-radius:0 6px 6px 0;">';
+    html += '<h4 style="margin:0 0 8px;color:#FF9933;font-size:13px;">SCREEN FAILS — review pre-screening criteria</h4>';
     sfEntries.forEach(([key, v]) => {
       const study = key.split('|')[1] || key;
       html += '<div style="margin-bottom:6px;"><strong>' + sUrl(study, v.study_url) + '</strong>: ' + v.patients.length + ' patient' + (v.patients.length > 1 ? 's' : '') + '</div>';
     });
-    html += '<p style="font-size:11px;color:#c2410c;margin:8px 0 0;font-style:italic;">Revise pre-screening scripts. Add targeted questions to prevent repeat screen fails.</p>';
+    html += '<p style="font-size:11px;color:#FF9933;margin:8px 0 0;font-style:italic;">Revise pre-screening scripts. Add targeted questions to prevent repeat screen fails.</p>';
     html += '</div>';
   }
 
@@ -15122,7 +15122,7 @@ function generateDailyEmail(type) {
     return Math.round((new Date(today.getFullYear(), m[p[0]], parseInt(p[1])) - today) / 86400000) > 14;
   });
   if (proactive.length) {
-    html += '<div style="background:#fffbeb;border-left:4px solid #d97706;padding:12px 16px;margin-bottom:12px;border-radius:0 6px 6px 0;">';
+    html += '<div style="background:#fffbeb;border-left:4px solid #FF9933;padding:12px 16px;margin-bottom:12px;border-radius:0 6px 6px 0;">';
     html += '<h4 style="margin:0 0 8px;color:#FF9933;font-size:13px;">PROACTIVE OUTREACH — ' + proactive.length + ' at-risk patient' + (proactive.length > 1 ? 's' : '') + ' (visit >14 days out)</h4>';
     html += '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
     proactive.slice(0, 10).forEach(f => {
@@ -15159,7 +15159,7 @@ function generateDailyEmail(type) {
       html += '<table style="width:100%;border-collapse:collapse;text-align:center;margin-bottom:16px;"><tr>';
       if (s.totalAR !== undefined) html += '<td style="padding:8px;"><div style="font-size:20px;font-weight:700;color:#072061;">$' + Number(s.totalAR).toLocaleString() + '</div><div style="font-size:11px;color:#64748b;">Outstanding AR</div></td>';
       if (s.collected !== undefined) html += '<td style="padding:8px;"><div style="font-size:20px;font-weight:700;color:#059669;">$' + Number(s.collected).toLocaleString() + '</div><div style="font-size:11px;color:#64748b;">Collected</div></td>';
-      if (s.collectionPct !== undefined) html += '<td style="padding:8px;"><div style="font-size:20px;font-weight:700;color:#2563eb;">' + s.collectionPct + '%</div><div style="font-size:11px;color:#64748b;">Collection Rate</div></td>';
+      if (s.collectionPct !== undefined) html += '<td style="padding:8px;"><div style="font-size:20px;font-weight:700;color:#1843AD;">' + s.collectionPct + '%</div><div style="font-size:11px;color:#64748b;">Collection Rate</div></td>';
       html += '</tr></table>';
     }
     if (FIN_DATA.aging && FIN_DATA.aging.length) {
@@ -15176,7 +15176,7 @@ function generateDailyEmail(type) {
 
   // Footer
   html += '<div style="background:#f1f5f9;padding:12px 24px;border-radius:0 0 8px 8px;font-size:11px;color:#64748b;text-align:center;">';
-  html += '<a href="' + dashUrl + '" style="color:#2563eb;font-weight:600;">Open Live Dashboard</a> · Generated ' + today.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  html += '<a href="' + dashUrl + '" style="color:#1843AD;font-weight:600;">Open Live Dashboard</a> · Generated ' + today.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
   html += ' · CRP Dashboard';
   html += '</div>';
 
@@ -15329,7 +15329,7 @@ function renderPatientFunnel() {
       '<td style="padding:6px;text-align:right">' + (r.eligible || 0) + '</td>' +
       '<td style="padding:6px;text-align:right;font-weight:700;color:#059669">' + v1 + '</td>' +
       '<td style="padding:6px;text-align:right"><div style="display:inline-block;width:50px;background:#e5e7eb;border-radius:3px;height:14px;position:relative;">' +
-      '<div style="width:' + barW + '%;background:linear-gradient(90deg,#3b82f6,#8b5cf6);height:100%;border-radius:3px;"></div>' +
+      '<div style="width:' + barW + '%;background:linear-gradient(90deg,#1843AD,#1843AD);height:100%;border-radius:3px;"></div>' +
       '<span style="position:absolute;right:2px;top:0;font-size:9px;color:#374151;line-height:14px;">' + conv + '%</span></div></td></tr>';
   });
   html += '</table>';
@@ -15356,7 +15356,7 @@ function renderRetention() {
     var enrolled = parseInt(r.enrolled) || 0;
     var sf = parseInt(r.screen_fail) || 0;
     var sfRate = ((sf / Math.max(enrolled + sf, 1)) * 100).toFixed(0);
-    var sfColor = parseInt(sfRate) > 50 ? '#dc2626' : parseInt(sfRate) > 30 ? '#d97706' : '#059669';
+    var sfColor = parseInt(sfRate) > 50 ? '#dc2626' : parseInt(sfRate) > 30 ? '#FF9933' : '#059669';
     html += '<tr><td style="padding:6px 8px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHTML(r.study_name || '') + '</td>' +
       '<td style="padding:6px;text-align:right">' + total + '</td>' +
       '<td style="padding:6px;text-align:right;font-weight:700;color:#059669">' + enrolled + '</td>' +
@@ -15402,7 +15402,7 @@ function renderCoordProductivity() {
     html += '<tr style="border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showCoordDetail(\''+jsAttr(r.name)+'\')">';
     html += '<td style="padding:8px;font-weight:700;color:#1e293b;">' + escapeHTML(r.name.split(' ')[0]) + '</td>';
     html += '<td style="padding:8px;"><div style="background:#e2e8f0;border-radius:5px;height:18px;position:relative;">';
-    html += '<div style="width:' + barW + '%;background:linear-gradient(90deg,#3b82f6,#8b5cf6);height:100%;border-radius:5px;"></div>';
+    html += '<div style="width:' + barW + '%;background:linear-gradient(90deg,#1843AD,#1843AD);height:100%;border-radius:5px;"></div>';
     html += '<span style="position:absolute;left:8px;top:0;font-size:11px;font-weight:700;color:' + (barW>30?'#fff':'#374151') + ';line-height:18px;">' + r.total + '</span></div></td>';
     html += '<td style="padding:8px;text-align:center;font-weight:600;color:#475569;">' + r.total + '</td>';
     html += '<td style="padding:8px;text-align:center;font-weight:600;color:#475569;">' + r.patients + '</td>';
@@ -15687,7 +15687,7 @@ function _updateFreshnessBadge() {
   var label = mins < 1 ? 'Updated just now' : 'Updated ' + mins + 'min ago';
   badge.textContent = label;
   if (mins < 5) { badge.style.color = '#059669'; }
-  else if (mins < 15) { badge.style.color = '#d97706'; }
+  else if (mins < 15) { badge.style.color = '#FF9933'; }
   else { badge.style.color = '#dc2626'; }
 }
 var _freshnessIntervalId = setInterval(_updateFreshnessBadge, CRP_CONFIG.FRESHNESS_INTERVAL);
@@ -15747,7 +15747,7 @@ function _updateHealthButton() {
     else loading++;
   });
   if (fail > 0) { btn.textContent = '\u2717 ' + fail + ' failed'; btn.style.background = '#fef2f2'; btn.style.color = '#dc2626'; btn.style.borderColor = '#fecaca'; }
-  else if (warn > 0) { btn.textContent = '\u26A0 ' + warn + ' warning'; btn.style.background = '#fffbeb'; btn.style.color = '#d97706'; btn.style.borderColor = '#fde68a'; }
+  else if (warn > 0) { btn.textContent = '\u26A0 ' + warn + ' warning'; btn.style.background = '#fffbeb'; btn.style.color = '#FF9933'; btn.style.borderColor = '#fde68a'; }
   else if (loading > 0) { btn.textContent = '\u23F3 Loading...'; btn.style.background = 'var(--surface2)'; btn.style.color = 'var(--muted)'; btn.style.borderColor = 'var(--border)'; }
   else { btn.textContent = '\u2713 All OK'; btn.style.background = '#f0fdf4'; btn.style.color = '#059669'; btn.style.borderColor = '#bbf7d0'; }
 }
