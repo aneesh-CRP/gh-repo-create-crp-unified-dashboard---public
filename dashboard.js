@@ -3618,18 +3618,32 @@ function buildReasonBreakdown() {
   if (reasons.length === 0) { el.innerHTML = '<div style="padding:20px;color:#94a3b8;font-size:12px;text-align:center;">No data</div>'; return; }
   var total = reasons.reduce(function(s, r) { return s + r.count; }, 0);
   var catColors = { 'Patient Cancelled': '#dc2626', 'Site Cancelled': '#FF9933', 'No Show': '#FF9933', 'Screen Fail / DNQ': '#1843AD',
-    'Patient Withdrew': '#1843AD', 'Rescheduled': '#059669', 'Weather': '#A2DCEB', 'BMI / Labs': '#d946ef',
+    'Patient Withdrew': '#072061', 'Rescheduled': '#059669', 'Weather': '#A2DCEB', 'BMI / Labs': '#828282',
     'Admin Error': '#64748b', 'Undocumented': '#94a3b8', 'Other': '#475569' };
-  el.innerHTML = reasons.map(function(r) {
+  // Horizontal stacked bar (like Site Breakdown)
+  var html = '<div style="display:flex;height:18px;border-radius:4px;overflow:hidden;margin-bottom:10px;">';
+  reasons.forEach(function(r) {
+    var cat = r.reason || r.category || '—';
+    var pct = total > 0 ? (r.count / total * 100) : 0;
+    if (pct < 1) return;
+    var color = catColors[cat] || '#94a3b8';
+    html += '<div style="width:' + pct.toFixed(1) + '%;background:' + color + ';cursor:pointer;" title="' + escapeHTML(cat) + ': ' + r.count + ' (' + Math.round(pct) + '%)" onclick="showCancelsByReason(\'' + jsAttr(cat) + '\')"></div>';
+  });
+  html += '</div>';
+  // Legend rows
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;">';
+  reasons.forEach(function(r) {
     var cat = r.reason || r.category || '—';
     var pct = total > 0 ? Math.round(r.count / total * 100) : 0;
     var color = catColors[cat] || '#94a3b8';
-    return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f8fafc;cursor:pointer;" onclick="showCancelsByReason(\'' + jsAttr(cat) + '\')">' +
-      '<span style="display:inline-block;width:10px;height:10px;background:' + color + ';border-radius:2px;flex-shrink:0;"></span>' +
-      '<span style="font-size:11px;color:#475569;flex:1;">' + escapeHTML(cat) + '</span>' +
-      '<span style="font-size:11px;font-weight:700;color:' + color + ';">' + r.count + '</span>' +
-      '<span style="font-size:10px;color:#94a3b8;width:30px;text-align:right;">' + pct + '%</span></div>';
-  }).join('');
+    html += '<div style="display:flex;align-items:center;gap:6px;padding:3px 0;cursor:pointer;" onclick="showCancelsByReason(\'' + jsAttr(cat) + '\')">' +
+      '<span style="display:inline-block;width:8px;height:8px;background:' + color + ';border-radius:2px;flex-shrink:0;"></span>' +
+      '<span style="font-size:10px;color:#475569;flex:1;">' + escapeHTML(cat) + '</span>' +
+      '<span style="font-size:10px;font-weight:700;color:' + color + ';">' + r.count + '</span>' +
+      '<span style="font-size:9px;color:#94a3b8;width:26px;text-align:right;">' + pct + '%</span></div>';
+  });
+  html += '</div>';
+  el.innerHTML = html;
 }
 
 function buildSiteStackedBars() {
@@ -10726,8 +10740,10 @@ function renderReferralDashboard() {
     if (rows.length === 0) { tEl.innerHTML = '<div style="text-align:center;padding:20px;color:#94a3b8;font-size:12px;">No '+label+' data</div>'; if (bEl) bEl.textContent = '0'; return; }
     if (bEl) bEl.textContent = rows.length + ' sources · ' + rows.reduce(function(s,r){return s+r.total;},0) + ' total';
     var sorted = _sortRefRows(rows, _refSort, _refSortDir);
+    var isCampaignTable = label === 'campaign';
     var h = '<table class="fin-table" style="width:100%;font-size:11px;"><thead><tr>';
-    h += '<th style="text-align:left;padding:8px 12px;cursor:pointer;" '+_sortClick('name')+'>Source'+_sortIcon('name')+'</th>';
+    if (isCampaignTable) h += '<th style="text-align:left;padding:8px 8px;">Vendor</th>';
+    h += '<th style="text-align:left;padding:8px 12px;cursor:pointer;" '+_sortClick('name')+'>'+(isCampaignTable?'Study':'Source')+_sortIcon('name')+'</th>';
     h += '<th style="text-align:center;cursor:pointer;" '+_sortClick('total')+'>Total'+_sortIcon('total')+'</th>';
     h += '<th style="text-align:center;">New</th>';
     h += '<th style="text-align:center;">Contacted</th>';
@@ -10746,8 +10762,14 @@ function renderReferralDashboard() {
       var _isCrioOnly = !r.clickId && !r.isCampaign && r.crioData;
       var _crioSrcSafe = _isCrioOnly ? jsAttr(r.name) : '';
       var rowClick = r.clickId ? ' onclick="showTrackerStageDetail(\''+tn+'\',\'all\')"' : r.isCampaign ? ' onclick="showCampaignDetailModal(\''+_campSafe+'\')"' : _isCrioOnly ? ' onclick="showCrioSourceDetail(\''+_crioSrcSafe+'\',\'all\')"' : '';
-      var nameHtml = r.url ? '<a href="'+escapeHTML(r.url)+'" target="_blank" style="color:#1e293b;text-decoration:none;font-weight:600;" onclick="event.stopPropagation()">'+escapeHTML(r.name)+'</a>' : '<span style="font-weight:600;">'+escapeHTML(r.name)+'</span>';
+      // For campaign rows, show study name without vendor prefix
+      var displayName = isCampaignTable && r.isCampaign ? r.name.replace(/^[^:]+:\s*/, '') : r.name;
+      var nameHtml = r.url ? '<a href="'+escapeHTML(r.url)+'" target="_blank" style="color:#1e293b;text-decoration:none;font-weight:600;" onclick="event.stopPropagation()">'+escapeHTML(displayName)+'</a>' : '<span style="font-weight:600;">'+escapeHTML(displayName)+'</span>';
       h += '<tr style="border-bottom:1px solid #f1f5f9;cursor:pointer;"'+rowClick+'>';
+      if (isCampaignTable) {
+        var vc = vendorColors[r.vendor] || '#64748b';
+        h += '<td style="padding:8px 8px;"><span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;background:'+vc+'15;color:'+vc+';">'+escapeHTML(r.vendor||'—')+'</span></td>';
+      }
       h += '<td style="padding:8px 12px;">'+nameHtml+'</td>';
       h += '<td style="text-align:center;font-weight:700;">'+r.total+'</td>';
       h += '<td style="text-align:center;color:'+(r.newLead?'#374151':'#cbd5e1')+';">'+(r.newLead||'—')+'</td>';
@@ -10763,6 +10785,7 @@ function renderReferralDashboard() {
     var totE = rows.reduce(function(s,r){return s+r.enrolled;},0);
     var totS = rows.reduce(function(s,r){return s+r.screening;},0);
     h += '<tr style="border-top:2px solid var(--border);background:var(--surface2);font-weight:700;">';
+    if (isCampaignTable) h += '<td></td>';
     h += '<td style="padding:8px 12px;">TOTAL</td>';
     h += '<td style="text-align:center;">'+totT+'</td>';
     h += '<td style="text-align:center;">'+rows.reduce(function(s,r){return s+r.newLead;},0)+'</td>';
@@ -10777,7 +10800,12 @@ function renderReferralDashboard() {
 
   var providerRows = unifiedRows.filter(function(r) { return r.vendor === 'Physician' || r.type === 'Provider'; });
   var metaRows = unifiedRows.filter(function(r) { return r.vendor === 'Meta' || (r.vendor||'').toLowerCase() === 'facebook'; });
-  var campaignRows = unifiedRows.filter(function(r) { return r.vendor !== 'Physician' && r.vendor !== 'Meta' && (r.vendor||'').toLowerCase() !== 'facebook' && r.type !== 'Provider'; });
+  var campaignRows = unifiedRows.filter(function(r) {
+    if (r.vendor === 'Physician' || r.vendor === 'Meta' || (r.vendor||'').toLowerCase() === 'facebook' || r.type === 'Provider') return false;
+    // Filter stale: must have at least 1 total referral or any activity
+    if (r.total <= 0 && r.enrolled <= 0 && r.screening <= 0) return false;
+    return true;
+  });
 
   _buildRefSubTable('ref-provider-table', 'ref-provider-badge', providerRows, 'provider tracker');
   _buildRefSubTable('ref-campaign-table', 'ref-campaign-badge', campaignRows, 'campaign');
