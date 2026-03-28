@@ -324,9 +324,9 @@ body {
 .nav {
   background: var(--surface);
   border-bottom: 1px solid var(--border);
-  padding: 0 16px;
-  display: flex; align-items: center; gap: 5px;
-  min-height: 50px; height: auto;
+  padding: 0 10px;
+  display: flex; align-items: center; gap: 3px;
+  min-height: 40px; height: auto;
   position: sticky; top: 0; z-index: 100;
   box-shadow: 0 1px 3px rgba(0,0,0,0.05);
 }
@@ -336,7 +336,7 @@ body {
 .nav-logo { width:32px; height:32px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
 .nav-title { font-size: 14px; font-weight: 700; color: var(--text); }
 .nav-sub { font-size: 11px; color: var(--muted); }
-.nav-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.nav-right { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
 .nav-tab {
   padding: 4px 8px; border-radius: 5px; font-size: 11px; font-weight: 500;
   cursor: pointer; color: var(--muted); transition: all 0.15s;
@@ -367,7 +367,7 @@ body {
 }
 
 /* ── LAYOUT ────────────────────────────────── */
-.main { max-width: 1480px; margin: 0 auto; padding: 20px 24px; }
+.main { max-width: 1800px; margin: 0 auto; padding: 12px 16px; }
 
 /* ── TAB VIEWS ─────────────────────────────── */
 .view { display: none; }
@@ -405,24 +405,24 @@ body {
 }
 
 /* ── GRID LAYOUTS ─────────────────────────── */
-.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
-.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
-.grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
-.grid-65 { display: grid; grid-template-columns: 3fr 2fr; gap: 16px; margin-bottom: 16px; }
-.grid-56 { display: grid; grid-template-columns: 2fr 3fr; gap: 16px; margin-bottom: 16px; }
-.mb16 { margin-bottom: 16px; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+.grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+.grid-65 { display: grid; grid-template-columns: 3fr 2fr; gap: 12px; margin-bottom: 12px; }
+.grid-56 { display: grid; grid-template-columns: 2fr 3fr; gap: 12px; margin-bottom: 12px; }
+.mb16 { margin-bottom: 12px; }
 .span2 { grid-column: span 2; }
 
 /* ── CARD ──────────────────────────────────── */
 .card {
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: 10px; padding: 18px;
+  border-radius: 10px; padding: 14px;
   box-shadow: 0 1px 3px rgba(0,0,0,0.04);
   contain: layout style;
 }
 .card-header {
   display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 .card-title { font-size: 13px; font-weight: 700; color: var(--text); text-transform: uppercase; letter-spacing: 0.3px; }
 .card-meta { font-size: 11px; color: var(--muted); }
@@ -570,7 +570,7 @@ body {
 .section-title {
   font-size: 11px; font-weight: 700; text-transform: uppercase;
   letter-spacing: 1.2px; color: var(--muted);
-  margin: 20px 0 10px;
+  margin: 14px 0 8px;
   display: flex; align-items: center; gap: 8px;
 }
 .section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
@@ -715,15 +715,15 @@ body {
 .study-card:hover{box-shadow:0 6px 20px rgba(7,32,97,.12);transform:translateY(-1px);}
 
     .hero-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:20px}
-    .hero-cell{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;text-align:center;cursor:pointer;transition:all 0.2s}
+    .hero-cell{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center;cursor:pointer;transition:all 0.2s}
     .hero-cell:hover{border-color:var(--blue);box-shadow:0 4px 16px rgba(45,90,135,0.1);transform:translateY(-1px)}
     .hero-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted)}
-    .hero-val{font-size:32px;font-weight:800;letter-spacing:-1px;margin:6px 0 4px}
+    .hero-val{font-size:28px;font-weight:800;letter-spacing:-1px;margin:4px 0 2px}
     .hero-sub{font-size:11px;color:var(--light)}
-    .group-panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:20px}
-    .group-title{font-size:13px;font-weight:700;color:var(--text);padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+    .group-panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:14px}
+    .group-title{font-size:13px;font-weight:700;color:var(--text);padding:10px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
     .gt-icon{width:8px;height:8px;border-radius:50%;display:inline-block}
-    .group-body{padding:20px}
+    .group-body{padding:14px}
     .group-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
     .gkpi{text-align:center;cursor:pointer;padding:12px;border-radius:8px;transition:background 0.2s}
     .gkpi:hover{background:var(--surface2)}
@@ -757,8 +757,8 @@ body {
     .pill-escalated{background:var(--orange-light);color:var(--orange)}
     .pill-disputed{background:var(--red-bg);color:var(--red)}
     .pill-resolved{background:var(--green-bg);color:var(--green)}
-    .kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:20px}
-    .kpi{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 20px;position:relative;overflow:hidden}
+    .kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:14px}
+    .kpi{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 14px;position:relative;overflow:hidden}
     .kpi.click{cursor:pointer}
     .kpi.click:hover{border-color:var(--blue);box-shadow:0 4px 16px rgba(45,90,135,0.1);transform:translateY(-1px)}
     .kpi-stripe{position:absolute;left:0;top:0;bottom:0;width:4px;border-radius:10px 0 0 10px}
