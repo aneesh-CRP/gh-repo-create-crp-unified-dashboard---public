@@ -1850,9 +1850,10 @@ async function clickupPut(path, body) {
 
 // ── Follow-Up → ClickUp Sync ──
 const FOLLOWUP_LIST_ID = '901414925909';
+// List statuses: selected (open), start up, recruiting, maintenance, feasibility, terminated/ended/haulted (done), complete (closed)
 const FU_ACTION_TO_STATUS = {
-  'reschedule': 'reschedule', 'call': 'contact', 'recruit': 'recruit',
-  'rescreen': 're-screen', 'waitlist': 'waitlist', 'lost': 'lost', 'noaction': 'n/a'
+  'reschedule': 'recruiting', 'call': 'recruiting', 'recruit': 'recruiting',
+  'rescreen': 'recruiting', 'waitlist': 'maintenance', 'lost': 'complete', 'noaction': 'complete'
 };
 const FU_ACTION_LABELS = {
   'reschedule': 'Reschedule Visit', 'call': 'Call Patient', 'recruit': 'Send to Recruitment',
@@ -1863,13 +1864,20 @@ async function syncFollowUpToClickUp(payload) {
   const { patient, study, category, action, reason, coord, site, crio_url, status, source, risk } = payload;
   if (!patient || !action) throw new Error('patient and action are required');
 
-  const statusName = FU_ACTION_TO_STATUS[action] || 'new';
+  const statusName = FU_ACTION_TO_STATUS[action] || 'selected';
   const actionLabel = FU_ACTION_LABELS[action] || action;
 
-  // Search for existing task by name in the follow-up list
-  const existing = await clickupFetch('/list/' + FOLLOWUP_LIST_ID + '/task?page=0&limit=100&include_closed=true');
+  // Search for existing task by name in the follow-up list (paginate through all)
+  let allTasks = [];
+  let page = 0;
+  while (true) {
+    const batch = await clickupFetch('/list/' + FOLLOWUP_LIST_ID + '/task?page=' + page + '&limit=100&include_closed=true');
+    allTasks = allTasks.concat(batch.tasks || []);
+    if (!batch.tasks || batch.tasks.length < 100) break;
+    page++;
+  }
   const nameLower = patient.toLowerCase().trim();
-  const match = (existing.tasks || []).find(t => (t.name || '').toLowerCase().trim() === nameLower);
+  const match = allTasks.find(t => (t.name || '').toLowerCase().trim() === nameLower);
 
   if (match) {
     // Update existing task status + add comment
@@ -1884,20 +1892,24 @@ async function syncFollowUpToClickUp(payload) {
       `*Updated from CRP Dashboard at ${new Date().toISOString().replace('T', ' ').substring(0, 19)}*`
     ].filter(Boolean).join('\n');
     await clickupPost('/task/' + match.id + '/comment', { comment_text: commentLines });
-    return { updated: true, task_id: match.id, url: match.url || 'https://app.clickup.com/t/' + match.id };
+    return { updated: true, task_id: match.id, url: 'https://app.clickup.com/t/' + match.id };
   }
 
   // Create new task with full context
   const description = [
     `## Patient Follow-Up`,
     ``,
-    `**Category:** ${category || '—'}`,
-    `**Current CRIO Status:** ${status || '—'}`,
-    `**Reason:** ${reason || '—'}`,
-    `**Coordinator:** ${coord || '—'}`,
-    `**Site:** ${site || '—'}`,
-    `**Referral Source:** ${source || '—'}`,
-    `**Risk Level:** ${risk || '—'}`,
+    `| Field | Value |`,
+    `|-------|-------|`,
+    `| **Category** | ${category || '—'} |`,
+    `| **CRIO Status** | ${status || '—'} |`,
+    `| **Study** | ${study || '—'} |`,
+    `| **Reason** | ${reason || '—'} |`,
+    `| **Coordinator** | ${coord || '—'} |`,
+    `| **Site** | ${site || '—'} |`,
+    `| **Referral Source** | ${source || '—'} |`,
+    `| **Risk Level** | ${risk || '—'} |`,
+    `| **Action** | ${actionLabel} |`,
     ``,
     crio_url ? `### CRIO Link\n${crio_url}` : '',
     ``,
@@ -1905,14 +1917,20 @@ async function syncFollowUpToClickUp(payload) {
     `*Created from CRP Dashboard at ${new Date().toISOString().replace('T', ' ').substring(0, 19)}*`
   ].filter(Boolean).join('\n');
 
-  const task = await clickupPost('/list/' + FOLLOWUP_LIST_ID + '/task', {
+  const taskBody = {
     name: patient,
     description,
     status: statusName,
-    tags: [category || 'follow-up'],
-  });
+    tags: [category || 'follow-up', actionLabel.toLowerCase()],
+  };
 
-  return { created: true, task_id: task.id, url: task.url || 'https://app.clickup.com/t/' + task.id };
+  const task = await clickupPost('/list/' + FOLLOWUP_LIST_ID + '/task', taskBody);
+  if (!task || !task.id) {
+    console.error('ClickUp task creation failed:', JSON.stringify(task));
+    throw new Error('ClickUp returned no task ID: ' + JSON.stringify(task).substring(0, 200));
+  }
+
+  return { created: true, task_id: task.id, url: 'https://app.clickup.com/t/' + task.id };
 }
 
 async function fetchAllClickUpTasks(listId) {
