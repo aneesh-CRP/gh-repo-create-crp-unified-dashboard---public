@@ -370,8 +370,8 @@ body {
 .main { max-width: 1800px; margin: 0 auto; padding: 12px 16px; }
 
 /* ── TAB VIEWS ─────────────────────────────── */
-.view { display: none; }
-.view.active { display: block; }
+.view { display: none; content-visibility: hidden; contain-intrinsic-size: auto 600px; }
+.view.active { display: block; content-visibility: visible; contain-intrinsic-size: auto; }
 
 /* ── TIME BANNER ──────────────────────────── */
 .time-banner {

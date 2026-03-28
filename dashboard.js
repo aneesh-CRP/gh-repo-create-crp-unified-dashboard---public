@@ -7874,7 +7874,7 @@ async function refreshData() {
     } else {
       DATA = newData;
       window._lastLiveData = DATA;
-      renderAll();
+      scheduleRender();
       if (typeof _updateHealthButton === 'function') _updateHealthButton();
       if (badge) badge.textContent = 'Updated: ' + new Date().toLocaleTimeString();
     }
@@ -15290,17 +15290,15 @@ async function fetchBQExpansionData() {
   if (!CRP_CONFIG.USE_CLOUD_FUNCTION || !CRP_CONFIG.CF_BASE) return;
   var base = CRP_CONFIG.CF_BASE;
   try {
-    var [funnel, retention, coords, compliance] = await Promise.all([
-      fetchCSV(base + '?feed=funnel&format=csv').catch(function() { return []; }),
-      fetchCSV(base + '?feed=retention&format=csv').catch(function() { return []; }),
-      fetchCSV(base + '?feed=coordinators&format=csv').catch(function() { return []; }),
-      fetchCSV(base + '?feed=compliance&format=csv').catch(function() { return []; }),
-    ]);
-    BQ_FUNNEL_DATA = funnel;
-    BQ_RETENTION_DATA = retention;
-    BQ_COORDINATOR_DATA = coords;
-    BQ_COMPLIANCE_DATA = compliance;
-    _log('CRP BQ Expansion: funnel=' + funnel.length + ' retention=' + retention.length + ' coords=' + coords.length + ' compliance=' + compliance.length);
+    // Single batch request instead of 4 individual HTTP calls
+    var resp = await fetch(base + '?feed=batch&feeds=funnel,retention,coordinators,compliance&format=json');
+    var json = await resp.json();
+    var results = json.results || {};
+    BQ_FUNNEL_DATA = (results.funnel || {}).data || [];
+    BQ_RETENTION_DATA = (results.retention || {}).data || [];
+    BQ_COORDINATOR_DATA = (results.coordinators || {}).data || [];
+    BQ_COMPLIANCE_DATA = (results.compliance || {}).data || [];
+    _log('CRP BQ Expansion: funnel=' + BQ_FUNNEL_DATA.length + ' retention=' + BQ_RETENTION_DATA.length + ' coords=' + BQ_COORDINATOR_DATA.length + ' compliance=' + BQ_COMPLIANCE_DATA.length);
     safe(renderPatientFunnel, 'renderPatientFunnel');
     safe(renderRetention, 'renderRetention');
     safe(renderCoordProductivity, 'renderCoordProductivity');
@@ -15916,55 +15914,46 @@ async function _crpInit() {
       }
     }
 
-    // ── Phase 2: Finance data (staggered — waits for Phase 1 to finish) ──
-    _log('CRP: Phase 2 — loading finance data...');
-    try {
-      const ok = await fetchFinanceLive();
+    // ── Phase 2-4: Fire all in parallel (no blocking between phases) ──
+    _log('CRP: Phases 2-4 — loading finance, supplemental, referral data in parallel...');
+
+    // Phase 2: Finance (fire-and-forget — renders into locked finance tabs)
+    fetchFinanceLive().then(ok => {
       if (ok) {
         _log('CRP Finance: Live data applied');
         window._financeLastFetch = new Date().toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
         setHealthChip('dh-finance','ok','Finance (' + window._financeLastFetch + ')');
-        // initFinanceDashboard(true) inside fetchFinanceLive already rendered everything
-      } else {
-        setHealthChip('dh-finance','warn','Finance (no data)');
-      }
-    } catch(e) {
+      } else { setHealthChip('dh-finance','warn','Finance (no data)'); }
+    }).catch(e => {
       console.warn('CRP Finance fetch failed:', e);
-      showToast('Finance data fetch failed', 'warning');
       setHealthChip('dh-finance','fail','Finance (failed)');
-    }
+    });
 
-    // ── Phase 3: Supplemental data (Patient DB + Facebook CRM — lowest priority) ──
-    _log('CRP: Phase 3 — loading supplemental data...');
-    // Action Required banner — fetch pending items for Overview
+    // Phase 3: Supplemental data (Action Required + Patient DB + Meta Ads)
     if (typeof fetchActionRequiredData === 'function') fetchActionRequiredData();
     fetchPatientDB().then(ok => {
       if (ok) {
         _log('CRP: Patient DB cross-reference complete');
         setHealthChip('dh-patientdb','ok','Patient DB');
-        // Re-render views that depend on Patient DB
         if (typeof renderStudiesTable === 'function') try { renderStudiesTable(); } catch(e) { _log('renderStudiesTable: ' + e.message); }
       }
       else setHealthChip('dh-patientdb','warn','Patient DB (empty)');
     }).catch(e => { console.warn('CRP: Patient DB fetch failed:', e); setHealthChip('dh-patientdb','fail','Patient DB (failed)'); });
 
-    setTimeout(() => {
-      fetchFacebookCRM().then(() => {
-        setHealthChip('dh-fbcrm','ok','FB CRM (' + (FB_CRM_DATA||[]).length + ')');
-        // Re-render views that depend on FB CRM data
-        safe(buildRecruitmentKPIs, 'buildRecruitmentKPIs');
-        if (typeof renderStudiesTable === 'function') try { renderStudiesTable(); } catch(e) { _log('renderStudiesTable: ' + e.message); }
-      }).catch(e => { console.warn('CRP: Facebook CRM initial load failed:', e); setHealthChip('dh-fbcrm','fail','FB CRM (failed)'); });
-      fetchMetaAds().then(() => {
-        setHealthChip('dh-metaads','ok','Meta Ads (' + (META_ADS_DATA||[]).length + ')');
-      }).catch(e => { console.warn('CRP: Meta Ads initial load failed:', e); setHealthChip('dh-metaads','fail','Meta Ads (failed)'); });
-    }, 1500);
+    fetchFacebookCRM().then(() => {
+      setHealthChip('dh-fbcrm','ok','FB CRM (' + (FB_CRM_DATA||[]).length + ')');
+      safe(buildRecruitmentKPIs, 'buildRecruitmentKPIs');
+      if (typeof renderStudiesTable === 'function') try { renderStudiesTable(); } catch(e) { _log('renderStudiesTable: ' + e.message); }
+    }).catch(e => { console.warn('CRP: Facebook CRM initial load failed:', e); setHealthChip('dh-fbcrm','fail','FB CRM (failed)'); });
+    fetchMetaAds().then(() => {
+      setHealthChip('dh-metaads','ok','Meta Ads (' + (META_ADS_DATA||[]).length + ')');
+    }).catch(e => { console.warn('CRP: Meta Ads initial load failed:', e); setHealthChip('dh-metaads','fail','Meta Ads (failed)'); });
 
-    // ── Phase 4: Referral data from Google Sheets CSV — populates Overview KPIs ──
+    // Phase 4: Referrals (slight delay to let critical data start first)
     setTimeout(() => {
-      _log('CRP: Phase 4 — loading referral data from Google Sheets...');
+      _log('CRP: Phase 4 — loading referral data...');
       try { initReferrals(); } catch(e) { console.warn('CRP: Auto-init referrals failed:', e); }
-    }, 3000);
+    }, 500);
   }
 
   // Kick off staggered loading

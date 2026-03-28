@@ -87,7 +87,15 @@ function httpGet(url, token) {
   });
 }
 
+// In-memory query cache (2-min TTL, max 100 entries)
+const _queryCache = new Map();
+const _CACHE_TTL = 120000;
+function _cachePrune() { if (_queryCache.size > 100) { const oldest = [..._queryCache.entries()].sort((a,b) => a[1].t - b[1].t); for (let i = 0; i < 20; i++) _queryCache.delete(oldest[i][0]); } }
+
 async function runQuery(sql) {
+  const cacheKey = sql.trim();
+  const cached = _queryCache.get(cacheKey);
+  if (cached && Date.now() - cached.t < _CACHE_TTL) return cached.rows;
   if (OAUTH.refreshToken) {
     // Use REST API with user token + pagination
     const token = await getAccessToken();
@@ -112,11 +120,13 @@ async function runQuery(sql) {
       allRows = allRows.concat(parseRows(p.rows));
       pageToken = p.pageToken;
     }
+    _queryCache.set(cacheKey, { rows: allRows, t: Date.now() }); _cachePrune();
     return allRows;
   }
   // Fallback: use default SA
   const bq = new BigQuery({ projectId: PROJECT });
   const [rows] = await bq.query({ query: sql, location: 'US' });
+  _queryCache.set(cacheKey, { rows, t: Date.now() }); _cachePrune();
   return rows;
 }
 
