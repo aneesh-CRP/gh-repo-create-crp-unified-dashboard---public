@@ -6244,14 +6244,14 @@ function renderRegulatoryPerformance() {
 
 // Detail modal — per-study breakdown with CRIO links
 function showRegPerfDetail(userName, metric) {
-  var userData = null;
-  // Rebuild from raw data
+  // Name normalization — match normalized name to raw BQ names (case-insensitive)
+  var userNameLo = userName.toLowerCase();
   var byStudy = {};
   (window._regPerfData || []).forEach(function(r) {
-    if ((r.user_name || '').trim() !== userName) return;
+    if ((r.user_name || '').trim().toLowerCase() !== userNameLo) return;
     var sk = r.study_key || '';
     if (!sk) return;
-    if (!byStudy[sk]) byStudy[sk] = { study_name: displayStudyName(r.study_name || ''), study_key: sk, docs_uploaded: 0, docs_signed: 0, comments: 0, open_comments: 0, signoffs: 0, pending_docs: 0, };
+    if (!byStudy[sk]) byStudy[sk] = { study_name: displayStudyName(r.study_name || ''), study_key: sk, docs_uploaded: 0, docs_signed: 0, comments: 0, open_comments: 0, signoffs: 0, pending_docs: 0 };
     var s = byStudy[sk];
     s.docs_uploaded += parseInt(r.docs_uploaded) || 0;
     s.docs_signed += parseInt(r.docs_signed) || 0;
@@ -6259,7 +6259,6 @@ function showRegPerfDetail(userName, metric) {
     s.open_comments += parseInt(r.open_comments) || 0;
     s.signoffs += parseInt(r.signoffs) || 0;
     s.pending_docs += parseInt(r.pending_docs) || 0;
-    s.pending_duties += parseInt(r.pending_duties) || 0;
   });
 
   var studies = Object.values(byStudy).filter(function(s) {
