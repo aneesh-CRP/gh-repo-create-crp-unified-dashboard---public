@@ -1833,7 +1833,7 @@ const FEEDS = {
           svi.window_start_date,
           svi.window_end_date,
           svi.subject_visit_appointment_status,
-          ROW_NUMBER() OVER (PARTITION BY svi.subject_key, svi.study_key ORDER BY svi.window_start_date ASC, sv.sort_order ASC) AS rn
+          ROW_NUMBER() OVER (PARTITION BY svi.subject_key, svi.study_key ORDER BY svi.window_start_date ASC) AS rn
         FROM ${tbl('fact_subject_visit')} svi
         LEFT JOIN ${tbl('study_visit')} sv ON svi.study_visit_key = sv.study_visit_key
         WHERE svi.subject_visit_appointment_status = 0
