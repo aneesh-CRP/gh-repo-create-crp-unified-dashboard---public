@@ -3684,9 +3684,11 @@ let finInitDone = false;
 // ═══ REVENUE PER USER (Productivity Tab) ═══
 var _rpuData = null;
 var _rpuDays = 365;
+var _rpuCostData = null;
 
 async function loadRevenuePerUser(days, btn) {
   if (days) _rpuDays = days;
+  _rpuCostData = null; // reset cost cache on period change
   if (btn) {
     btn.closest('div').querySelectorAll('.filter-btn').forEach(function(b){b.classList.remove('active');});
     btn.classList.add('active');
@@ -3694,13 +3696,40 @@ async function loadRevenuePerUser(days, btn) {
   var badge = document.getElementById('rpu-badge');
   if (badge) badge.textContent = 'Loading...';
   try {
-    var url = (CRP_CONFIG.USE_CLOUD_FUNCTION && CRP_CONFIG.CF_BASE) ? CRP_CONFIG.CF_BASE + '?feed=revenuePerUser&format=json&days=' + _rpuDays : null;
-    if (!url) { if (badge) badge.textContent = 'No cloud function'; return; }
-    var resp = await fetch(url);
-    var json = await resp.json();
-    _rpuData = json.data || [];
+    var cfBase = (CRP_CONFIG.USE_CLOUD_FUNCTION && CRP_CONFIG.CF_BASE) ? CRP_CONFIG.CF_BASE : null;
+    if (!cfBase) { if (badge) badge.textContent = 'No cloud function'; return; }
+    var now = new Date();
+    var startDate = new Date(now.getTime() - _rpuDays * 86400000).toISOString().split('T')[0];
+    var endDate = now.toISOString().split('T')[0];
+
+    var fetches = [fetch(cfBase + '?feed=revenuePerUser&format=json&days=' + _rpuDays).then(function(r){return r.json();})];
+    fetches.push(fetch(cfBase + '?feed=qbEmployees&format=json').then(function(r){return r.json();}));
+    fetches.push(fetch(cfBase + '?feed=qbTimeActivity&start_date=' + startDate + '&end_date=' + endDate + '&format=json').then(function(r){return r.json();}));
+
+    var results = await Promise.all(fetches);
+    _rpuData = results[0].data || [];
+
+    var employees = results[1].data || [];
+    var timeAct = results[2].data || [];
+    var costRates = {};
+    employees.forEach(function(e) { if (e.cost_rate > 0) costRates[e.name] = e.cost_rate; });
+    var costByPerson = {};
+    timeAct.forEach(function(t) {
+      var emp = (t.employee || '').trim();
+      var person = typeof canonicalStaffName === 'function' ? canonicalStaffName(emp) : emp;
+      var hrs = (parseFloat(t.hours) || 0) + (parseFloat(t.minutes) || 0) / 60;
+      if (!person || hrs <= 0) return;
+      var rate = costRates[emp] || 0;
+      if (!costByPerson[person]) costByPerson[person] = { cost: 0, hours: 0, rate: 0 };
+      costByPerson[person].cost += hrs * rate;
+      costByPerson[person].hours += hrs;
+      if (rate > 0) costByPerson[person].rate = rate;
+    });
+    _rpuCostData = costByPerson;
+
     if (badge) badge.textContent = _rpuData.length + ' visits · $' + Math.round(_rpuData.reduce(function(s,r){return s+parseFloat(r.visit_revenue||0);},0)/1000) + 'K';
     renderRevenuePerUser();
+    try { renderProdCancelChart(); } catch(e2) { console.error('renderProdCancelChart:', e2); }
   } catch(e) {
     console.error('loadRevenuePerUser:', e);
     if (badge) badge.textContent = 'Failed: ' + e.message;
@@ -3761,12 +3790,32 @@ function renderRevenuePerUser() {
   _kpi('rpu-kpi-revenue-sub', _rpuData.filter(function(r){return r.revenue_type==='Actual';}).length + ' actual + ' + _rpuData.filter(function(r){return r.revenue_type==='Contracted';}).length + ' contracted' + (_noRate > 0 ? ' + ' + _noRate + ' no rate' : ''));
   _kpi('rpu-kpi-visits', totalVisits.toLocaleString());
   _kpi('rpu-kpi-avg', '$' + avg.toLocaleString());
-  _kpi('rpu-kpi-sites', sites.size);
+  if (_rpuCostData) {
+    var totalCostAll = Object.values(_rpuCostData).reduce(function(s,d){return s+d.cost;},0);
+    var totalHrsAll = Object.values(_rpuCostData).reduce(function(s,d){return s+d.hours;},0);
+    var marginAll = totalRev - totalCostAll;
+    _kpi('rpu-kpi-cost', '$' + Math.round(totalCostAll/1000).toLocaleString() + 'K');
+    var costSub = el('rpu-kpi-cost-sub'); if (costSub) costSub.textContent = Math.round(totalHrsAll).toLocaleString() + 'h tracked';
+    _kpi('rpu-kpi-margin', '$' + Math.round(marginAll/1000).toLocaleString() + 'K');
+    var marginSub = el('rpu-kpi-margin-sub'); if (marginSub) marginSub.textContent = (totalRev > 0 ? Math.round(marginAll/totalRev*100) : 0) + '% margin';
+    var marginEl = el('rpu-kpi-margin'); if (marginEl) marginEl.style.color = marginAll >= 0 ? '#059669' : '#dc2626';
+  }
 
   // Helper: build user table
-  function buildUserTable(data, labelBadgeId, label) {
-    var rows = Object.entries(data).filter(function(e){return e[0]!=='Unassigned';}).sort(function(a,b){return b[1].revenue-a[1].revenue;});
-    var unassigned = data['Unassigned'];
+  function buildUserTable(data, labelBadgeId, label, opts) {
+    opts = opts || {};
+    var showCost = opts.showCost !== false && _rpuCostData && Object.keys(_rpuCostData).length > 0;
+    // Filter: only show specific role names if provided
+    var allowList = opts.allowList || null;
+    var blockList = opts.blockList || null;
+
+    var rows = Object.entries(data).filter(function(e){
+      if (e[0]==='Unassigned') return false;
+      if (e[1].visits === 0 && e[1].revenue === 0) return false; // remove stale/empty
+      if (allowList && !allowList.some(function(a){return e[0].toLowerCase().includes(a.toLowerCase().split(' ').pop());})) return false;
+      if (blockList && blockList.some(function(b){return e[0].toLowerCase().includes(b.toLowerCase().split(' ').pop());})) return false;
+      return true;
+    }).sort(function(a,b){return b[1].revenue-a[1].revenue;});
     var maxRev = rows.length > 0 ? rows[0][1].revenue : 1;
     var badge = el(labelBadgeId);
     if (badge) badge.textContent = rows.length + ' ' + label + 's · $' + Math.round(rows.reduce(function(s,r){return s+r[1].revenue;},0)/1000) + 'K';
@@ -3775,10 +3824,15 @@ function renderRevenuePerUser() {
     h += '<th style="text-align:left;padding:8px 12px;">' + escapeHTML(label) + '</th>';
     h += '<th style="text-align:center;">Visits</th>';
     h += '<th style="text-align:center;">Revenue</th>';
+    if (showCost) {
+      h += '<th style="text-align:center;">$/hr</th>';
+      h += '<th style="text-align:center;">Hours</th>';
+      h += '<th style="text-align:center;">Cost</th>';
+      h += '<th style="text-align:center;">Margin</th>';
+    }
     h += '<th style="text-align:center;">Avg/Visit</th>';
-    h += '<th style="text-align:center;">eSource Q</th>';
     h += '<th style="text-align:left;">Top Study</th>';
-    h += '<th style="text-align:center;min-width:120px;">Revenue</th>';
+    h += '<th style="text-align:center;min-width:100px;">Revenue</th>';
     h += '</tr></thead><tbody>';
     rows.forEach(function(e) {
       var name = e[0], d = e[1];
@@ -3786,51 +3840,68 @@ function renderRevenuePerUser() {
       var barW = maxRev > 0 ? Math.round(d.revenue / maxRev * 100) : 0;
       var topStudy = Object.entries(d.studies).sort(function(a,b){return b[1]-a[1];})[0];
       var siteInfo = d.site ? Object.entries(d.site).map(function(s){return s[0].replace(', PA','').replace(', NJ','')+'($'+Math.round(s[1]/1000)+'K)';}).join(' ') : '';
+      var cName = typeof canonicalStaffName === 'function' ? canonicalStaffName(name) : name;
+      var costInfo = _rpuCostData ? (_rpuCostData[cName] || _rpuCostData[name] || null) : null;
+      var pCost = costInfo ? costInfo.cost : 0;
+      var pHrs = costInfo ? costInfo.hours : 0;
+      var pRate = costInfo ? costInfo.rate : 0;
+      var margin = d.revenue - pCost;
+      var mColor = margin >= 0 ? '#059669' : '#dc2626';
+
       h += '<tr class="clickable" style="border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showRPUUserModal(\''+jsAttr(name)+'\',\''+jsAttr(label)+'\')">';
       h += '<td style="padding:7px 12px;"><span style="font-weight:600;">'+escapeHTML(name)+'</span>';
       if (siteInfo) h += '<div style="font-size:9px;color:#94a3b8;">'+escapeHTML(siteInfo)+'</div>';
       h += '</td>';
       h += '<td style="text-align:center;font-weight:700;">'+d.visits+'</td>';
       h += '<td style="text-align:center;font-weight:700;color:#059669;">$'+Math.round(d.revenue).toLocaleString()+'</td>';
+      if (showCost) {
+        h += '<td style="text-align:center;color:#64748b;font-size:10px;">'+(pRate>0?'$'+pRate.toFixed(0):'—')+'</td>';
+        h += '<td style="text-align:center;color:#64748b;font-size:10px;">'+(pHrs>0?Math.round(pHrs).toLocaleString()+'h':'—')+'</td>';
+        h += '<td style="text-align:center;color:#dc2626;font-weight:'+(pCost>0?'600':'400')+';">'+(pCost>0?'$'+Math.round(pCost).toLocaleString():'—')+'</td>';
+        h += '<td style="text-align:center;font-weight:700;color:'+mColor+';">'+(pCost>0?'$'+Math.round(margin).toLocaleString():'—')+'</td>';
+      }
       h += '<td style="text-align:center;">$'+avgV.toLocaleString()+'</td>';
-      h += '<td style="text-align:center;color:#1843AD;">'+d.questions.toLocaleString()+'</td>';
       h += '<td style="padding:5px 8px;font-size:10px;">'+escapeHTML(topStudy ? topStudy[0] : '—')+'<div style="font-size:9px;color:#94a3b8;">$'+Math.round((topStudy?topStudy[1]:0)/1000)+'K</div></td>';
       h += '<td style="padding:4px 8px;"><div style="background:#e2e8f0;border-radius:4px;height:18px;position:relative;overflow:hidden;">';
       h += '<div style="width:'+barW+'%;background:linear-gradient(90deg,#1843AD,#059669);height:100%;border-radius:4px;"></div>';
       h += '<span style="position:absolute;left:6px;top:0;font-size:10px;font-weight:700;color:'+(barW>30?'#fff':'#374151')+';line-height:18px;">$'+Math.round(d.revenue/1000)+'K</span></div></td>';
       h += '</tr>';
     });
-    if (unassigned && unassigned.visits > 0) {
-      h += '<tr style="border-bottom:1px solid #f1f5f9;color:#94a3b8;">';
-      h += '<td style="padding:7px 12px;font-style:italic;">Unassigned (no eSource)</td>';
-      h += '<td style="text-align:center;">'+unassigned.visits+'</td>';
-      h += '<td style="text-align:center;">$'+Math.round(unassigned.revenue).toLocaleString()+'</td>';
-      h += '<td colspan="4"></td></tr>';
-    }
     // Total
-    var totRev = Object.values(data).reduce(function(s,d){return s+d.revenue;},0);
-    var totVis = Object.values(data).reduce(function(s,d){return s+d.visits;},0);
+    var totRev = rows.reduce(function(s,e){return s+e[1].revenue;},0);
+    var totVis = rows.reduce(function(s,e){return s+e[1].visits;},0);
+    var totCost = 0, totHrs = 0;
+    if (showCost) { rows.forEach(function(e) { var cn = typeof canonicalStaffName === 'function' ? canonicalStaffName(e[0]) : e[0]; var ci = _rpuCostData ? (_rpuCostData[cn] || _rpuCostData[e[0]] || null) : null; if (ci) { totCost += ci.cost; totHrs += ci.hours; } }); }
     h += '<tr style="border-top:2px solid var(--border);background:var(--surface2);font-weight:700;">';
     h += '<td style="padding:8px 12px;">TOTAL</td>';
     h += '<td style="text-align:center;">'+totVis+'</td>';
     h += '<td style="text-align:center;color:#059669;">$'+Math.round(totRev).toLocaleString()+'</td>';
+    if (showCost) {
+      h += '<td></td><td style="text-align:center;">'+Math.round(totHrs).toLocaleString()+'h</td>';
+      h += '<td style="text-align:center;color:#dc2626;">$'+Math.round(totCost).toLocaleString()+'</td>';
+      h += '<td style="text-align:center;color:'+(totRev-totCost>=0?'#059669':'#dc2626')+';">$'+Math.round(totRev-totCost).toLocaleString()+'</td>';
+    }
     h += '<td style="text-align:center;">$'+(totVis>0?Math.round(totRev/totVis):0).toLocaleString()+'</td>';
-    h += '<td colspan="3"></td></tr>';
+    h += '<td colspan="2"></td></tr>';
     h += '</tbody></table>';
     return h;
   }
 
   // Render coordinator table
   var coordEl = el('rpu-coord-table');
-  if (coordEl) coordEl.innerHTML = buildUserTable(byCoord, 'rpu-coord-badge', 'Coordinator');
+  // Coordinators = SCHEDULE_COORDINATORS only, with cost
+  var schedCoords = CRP_CONFIG.SCHEDULE_COORDINATORS || [];
+  if (coordEl) coordEl.innerHTML = buildUserTable(byCoord, 'rpu-coord-badge', 'Coordinator', { showCost: true, allowList: schedCoords });
 
-  // Render investigator table
+  // Investigators with cost
   var invEl = el('rpu-inv-table');
-  if (invEl) invEl.innerHTML = buildUserTable(byInv, 'rpu-inv-badge', 'Investigator');
+  var invList = CRP_CONFIG.INVESTIGATORS || [];
+  if (invEl) invEl.innerHTML = buildUserTable(byInv, 'rpu-inv-badge', 'Investigator', { showCost: true, allowList: invList });
 
-  // Render recruiter table
+  // Recruiters only — exclude coordinators and investigators
   var recEl = el('rpu-rec-table');
-  if (recEl) recEl.innerHTML = buildUserTable(byRecruiter, 'rpu-rec-badge', 'Recruiter');
+  var allBlockList = schedCoords.concat(invList);
+  if (recEl) recEl.innerHTML = buildUserTable(byRecruiter, 'rpu-rec-badge', 'Recruiter', { showCost: false, blockList: allBlockList });
 
   // Make KPI sections clickable
   var kpiSections = document.querySelectorAll('#view-fin-productivity .tb-section');
@@ -3864,6 +3935,75 @@ function renderRevenuePerUser() {
     });
     th += '</tbody></table></div>';
     trendEl.innerHTML = th;
+  }
+}
+
+function renderProdCancelChart() {
+  var canvas = document.getElementById('prodCancelChart');
+  var tableEl = document.getElementById('prod-cancel-table');
+  var badge = document.getElementById('prod-cancel-badge');
+  if (!canvas || !DATA.allCancels || DATA.allCancels.length === 0) return;
+
+  var COORDS = CRP_CONFIG.SCHEDULE_COORDINATORS || [];
+  if (COORDS.length === 0) return;
+
+  var coordStats = [];
+  COORDS.forEach(function(name) {
+    var cx = DATA.allCancels.filter(function(c) { return c.coord === name && !_patientRecovered(c.name,c.study,c.subject_key); });
+    coordStats.push({ name: name, total: cx.length,
+      noShow: cx.filter(function(c){return c.type==='No Show';}).length,
+      site: cx.filter(function(c){return c.type==='Site Cancelled';}).length,
+      patient: cx.filter(function(c){return c.type==='Patient Cancelled';}).length
+    });
+  });
+
+  var sorted = coordStats.slice().sort(function(a,b){return b.total-a.total;});
+  var totalAll = sorted.reduce(function(s,r){return s+r.total;},0);
+  if (badge) badge.textContent = totalAll + ' cancellations';
+
+  mkChart('prodCancelChart', {
+    type: 'bar',
+    data: {
+      labels: sorted.map(function(r){return r.name.split(' ')[0];}),
+      datasets: [
+        { label: 'No Show', data: sorted.map(function(r){return r.noShow;}), backgroundColor: '#dc2626', borderRadius: 3 },
+        { label: 'Site', data: sorted.map(function(r){return r.site;}), backgroundColor: '#1843ad', borderRadius: 3 },
+        { label: 'Patient', data: sorted.map(function(r){return r.patient;}), backgroundColor: '#FF9933', borderRadius: 3 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10, family: 'IBM Plex Sans' } } } },
+      scales: { x: { stacked: true, ticks: { font: { size: 10 } } }, y: { stacked: true, beginAtZero: true, ticks: { font: { size: 10 }, stepSize: 1 } } }
+    }
+  });
+
+  if (tableEl) {
+    var h = '<table class="fin-table" style="width:100%;font-size:11px;"><thead><tr>';
+    h += '<th style="text-align:left;padding:8px 12px;">Coordinator</th><th style="text-align:center;">Total</th>';
+    h += '<th style="text-align:center;color:#dc2626;">No Show</th><th style="text-align:center;color:#1843ad;">Site</th>';
+    h += '<th style="text-align:center;color:#FF9933;">Patient</th><th style="text-align:center;min-width:100px;">Breakdown</th>';
+    h += '</tr></thead><tbody>';
+    sorted.forEach(function(r) {
+      if (r.total === 0) return;
+      var nsPct = r.total>0?Math.round(r.noShow/r.total*100):0;
+      var scPct = r.total>0?Math.round(r.site/r.total*100):0;
+      var pcPct = r.total>0?Math.round(r.patient/r.total*100):0;
+      h += '<tr style="border-bottom:1px solid #f1f5f9;">';
+      h += '<td style="padding:7px 12px;font-weight:600;">'+escapeHTML(r.name.split(' ')[0])+'</td>';
+      h += '<td style="text-align:center;font-weight:700;">'+r.total+'</td>';
+      h += '<td style="text-align:center;color:#dc2626;">'+(r.noShow||'—')+'</td>';
+      h += '<td style="text-align:center;color:#1843ad;">'+(r.site||'—')+'</td>';
+      h += '<td style="text-align:center;color:#FF9933;">'+(r.patient||'—')+'</td>';
+      h += '<td style="padding:4px 8px;"><div style="display:flex;gap:1px;height:14px;border-radius:3px;overflow:hidden;">';
+      if (nsPct>0) h+='<div style="width:'+nsPct+'%;background:#dc2626;"></div>';
+      if (scPct>0) h+='<div style="width:'+scPct+'%;background:#1843ad;"></div>';
+      if (pcPct>0) h+='<div style="width:'+pcPct+'%;background:#FF9933;"></div>';
+      var rem=100-nsPct-scPct-pcPct; if(rem>0) h+='<div style="width:'+rem+'%;background:#e2e8f0;"></div>';
+      h += '</div></td></tr>';
+    });
+    h += '</tbody></table>';
+    tableEl.innerHTML = h;
   }
 }
 
