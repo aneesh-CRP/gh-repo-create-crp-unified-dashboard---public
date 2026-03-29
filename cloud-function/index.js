@@ -1826,6 +1826,18 @@ const FEEDS = {
         WHERE svi.status IN (21, 22, 23)
           AND svi._fivetran_deleted = false
         GROUP BY svi.subject_key, svi.study_key
+      ),
+      next_visit AS (
+        SELECT svi.subject_key, svi.study_key,
+          sv.name AS next_visit_name,
+          svi.window_start_date,
+          svi.window_end_date,
+          svi.subject_visit_appointment_status,
+          ROW_NUMBER() OVER (PARTITION BY svi.subject_key, svi.study_key ORDER BY svi.window_start_date ASC, sv.sort_order ASC) AS rn
+        FROM ${tbl('fact_subject_visit')} svi
+        LEFT JOIN ${tbl('study_visit')} sv ON svi.study_visit_key = sv.study_visit_key
+        WHERE svi.subject_visit_appointment_status = 0
+          AND svi.window_start_date IS NOT NULL
       )
       SELECT
         CAST(a.study_key AS STRING) AS study_key,
@@ -1835,19 +1847,30 @@ const FEEDS = {
         a.subject_status,
         COALESCE(FORMAT_DATETIME('%Y-%m-%d', lv.last_visit_date), 'None') AS last_visit_date,
         COALESCE(lv.last_visit_name, 'No visits yet') AS last_visit_name,
+        COALESCE(nv.next_visit_name, '') AS next_visit_name,
+        COALESCE(FORMAT_DATETIME('%Y-%m-%d', nv.window_start_date), '') AS window_start,
+        COALESCE(FORMAT_DATETIME('%Y-%m-%d', nv.window_end_date), '') AS window_end,
+        CASE WHEN nv.window_end_date < CURRENT_DATETIME() THEN 'overdue'
+             WHEN nv.window_start_date <= CURRENT_DATETIME() THEN 'in_window'
+             ELSE 'upcoming' END AS window_status,
         COALESCE(si.name, '') AS site_name
       FROM active_subjects a
       JOIN ${tbl('study')} st ON a.study_key = st.study_key
       LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
       LEFT JOIN ${tbl('site')} si ON st.site_key = si.site_key
       LEFT JOIN last_visit lv ON a.subject_key = lv.subject_key AND a.study_key = lv.study_key
+      LEFT JOIN next_visit nv ON a.subject_key = nv.subject_key AND a.study_key = nv.study_key AND nv.rn = 1
       WHERE NOT EXISTS (
         SELECT 1 FROM ${tbl('calendar_appointment')} ca
         WHERE ca.subject_key = a.subject_key AND ca.study_key = a.study_key
           AND ca.status != 0 AND ca.start >= CURRENT_DATETIME()
           AND ca._fivetran_deleted = false
       )
-      ORDER BY study_name, a.subject_name`
+      ORDER BY
+        CASE WHEN nv.window_end_date < CURRENT_DATETIME() THEN 0
+             WHEN nv.window_start_date <= CURRENT_DATETIME() THEN 1
+             ELSE 2 END,
+        nv.window_end_date ASC, study_name, a.subject_name`
   },
 };
 
