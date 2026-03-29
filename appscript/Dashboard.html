@@ -1765,6 +1765,30 @@ body {
     <button onclick="switchAdmin('connect',this)" class="sched-filter" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Connect & Setup</button>
     <button onclick="switchAdmin('auditlog',this)" class="sched-filter" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Audit Log</button>
     <button onclick="switchAdmin('email',this)" class="sched-filter" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Daily Email</button>
+    <button onclick="switchAdmin('staffperf',this)" class="sched-filter" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Staff Performance</button>
+  </div>
+
+  <!-- Staff Performance Panel -->
+  <div id="admin-staffperf" style="display:none;">
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
+      <span style="font-size:11px;font-weight:600;color:var(--muted)">Period:</span>
+      <button onclick="setStaffPerfPeriod('3m',this)" class="sched-filter active" style="padding:4px 10px;border-radius:16px;font-size:10px;font-weight:600;border:1px solid #1843ad;background:#e8eeff;color:#1843ad;cursor:pointer">Last 3 Mo</button>
+      <button onclick="setStaffPerfPeriod('6m',this)" class="sched-filter" style="padding:4px 10px;border-radius:16px;font-size:10px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Last 6 Mo</button>
+      <button onclick="setStaffPerfPeriod('ytd',this)" class="sched-filter" style="padding:4px 10px;border-radius:16px;font-size:10px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">YTD 2026</button>
+      <button onclick="setStaffPerfPeriod('2025',this)" class="sched-filter" style="padding:4px 10px;border-radius:16px;font-size:10px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">2025</button>
+      <button onclick="setStaffPerfPeriod('all',this)" class="sched-filter" style="padding:4px 10px;border-radius:16px;font-size:10px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">All Time</button>
+    </div>
+    <div id="staffperf-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:14px;"></div>
+    <div class="card fade-in">
+      <div class="card-header">
+        <span class="card-title">Coordinator & Investigator Revenue vs Cost</span>
+        <span class="badge badge-gray" id="staffperf-badge">Loading...</span>
+      </div>
+      <div id="staffperf-table" style="padding:0 12px 12px;overflow-x:auto;">
+        <p style="color:var(--muted);font-size:12px">Loading staff performance data...</p>
+      </div>
+    </div>
+    <div id="staffperf-detail" style="margin-top:12px;"></div>
   </div>
 
   <!-- Audit Log Panel -->
