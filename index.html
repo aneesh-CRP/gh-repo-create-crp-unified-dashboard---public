@@ -1765,7 +1765,6 @@ body {
     <button onclick="switchAdmin('connect',this)" class="sched-filter" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Connect & Setup</button>
     <button onclick="switchAdmin('auditlog',this)" class="sched-filter" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Audit Log</button>
     <button onclick="switchAdmin('email',this)" class="sched-filter" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Daily Email</button>
-    <button onclick="switchAdmin('staffperf',this)" class="sched-filter" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Staff Performance</button>
   </div>
 
   <!-- Staff Performance Panel -->
@@ -18876,19 +18875,25 @@ document.addEventListener('click', function(e) {
     </div>
     <div class="tb-divider"></div>
     <div class="tb-section kpi-clickable" style="cursor:pointer">
-      <div class="tb-label">Sites</div>
-      <div class="tb-value" style="color:#64748b" id="rpu-kpi-sites">—</div>
-      <div class="tb-sub">PHL + NJ</div>
+      <div class="tb-label">Staff Cost</div>
+      <div class="tb-value" style="color:#dc2626" id="rpu-kpi-cost">—</div>
+      <div class="tb-sub" id="rpu-kpi-cost-sub">QB time × rate</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer">
+      <div class="tb-label">Margin</div>
+      <div class="tb-value green" id="rpu-kpi-margin">—</div>
+      <div class="tb-sub" id="rpu-kpi-margin-sub">Revenue - Cost</div>
     </div>
   </div>
 
-  <!-- Coordinator Revenue -->
+  <!-- Coordinator Revenue & Cost -->
   <div class="card fade-in" style="margin-bottom:12px;">
     <div class="card-header">
-      <span class="card-title">Coordinator Revenue</span>
+      <span class="card-title">Coordinator Revenue & Cost</span>
       <span class="badge badge-blue" id="rpu-coord-badge">—</span>
     </div>
-    <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Attribution: coordinator who answered the most eSource questions per visit</div>
+    <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Revenue: primary eSource performer · Cost: QB time activity × hourly rate</div>
     <div style="padding:0;" id="rpu-coord-table"></div>
   </div>
 
@@ -18902,14 +18907,25 @@ document.addEventListener('click', function(e) {
     <div style="padding:0;" id="rpu-rec-table"></div>
   </div>
 
-  <!-- Investigator Revenue -->
+  <!-- Investigator Revenue & Cost -->
   <div class="card fade-in" style="margin-bottom:12px;">
     <div class="card-header">
-      <span class="card-title">Investigator Revenue</span>
+      <span class="card-title">Investigator Revenue & Cost</span>
       <span class="badge badge-purple" id="rpu-inv-badge">—</span>
     </div>
-    <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Attribution: investigator who answered the most eSource questions per visit</div>
+    <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Revenue: primary eSource performer · Cost: QB time activity × hourly rate</div>
     <div style="padding:0;" id="rpu-inv-table"></div>
+  </div>
+
+  <!-- Cancel Breakdown -->
+  <div class="card fade-in" style="margin-bottom:12px;">
+    <div class="card-header">
+      <span class="card-title">Coordinator Cancel Breakdown</span>
+      <span class="badge badge-yellow" id="prod-cancel-badge">—</span>
+    </div>
+    <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">No Show / Site / Patient cancellations by schedule coordinator</div>
+    <div style="padding:8px;"><canvas id="prodCancelChart" height="200"></canvas></div>
+    <div id="prod-cancel-table" style="padding:0;"></div>
   </div>
 
   <!-- Monthly Revenue Trend -->
