@@ -2442,10 +2442,108 @@ async function fetchQBCustomers() {
   }));
 }
 
+async function qbReport(reportName, params) {
+  const token = await getQBAccessToken();
+  const qs = Object.entries(params || {}).map(([k,v]) => `${k}=${encodeURIComponent(v)}`).join('&');
+  const url = `/v3/company/${QB.realmId}/reports/${reportName}?${qs}&minorversion=75`;
+  return new Promise((resolve, reject) => {
+    const req = https.request({
+      hostname: 'quickbooks.api.intuit.com', path: url, method: 'GET',
+      headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json' }
+    }, res => {
+      let d = ''; res.on('data', c => d += c);
+      res.on('end', () => {
+        try { resolve(JSON.parse(d)); }
+        catch (e) { reject(new Error('QB report parse error')); }
+      });
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+function parsePnLRows(rows, depth) {
+  const results = [];
+  if (!rows) return results;
+  for (const row of rows) {
+    const header = row.Header || {};
+    const colData = header.ColData || row.ColData || [];
+    const name = colData[0] ? colData[0].value || '' : '';
+    const amount = colData[1] ? parseFloat(colData[1].value) || 0 : 0;
+    if (name) results.push({ name, amount, depth: depth || 0 });
+    const subRows = (row.Rows || {}).Row || [];
+    if (subRows.length) results.push(...parsePnLRows(subRows, (depth || 0) + 1));
+  }
+  return results;
+}
+
+async function fetchQBContractorCosts() {
+  const params = arguments[0] || {};
+  const startDate = params.start_date || new Date(Date.now() - 365*86400000).toISOString().split('T')[0];
+  const endDate = params.end_date || new Date().toISOString().split('T')[0];
+
+  const report = await qbReport('ProfitAndLoss', { start_date: startDate, end_date: endDate });
+  const allItems = parsePnLRows((report.Rows || {}).Row || [], 0);
+
+  // Find items under "Contractor and Professional Services"
+  let inContractor = false;
+  const contractors = [];
+  for (const item of allItems) {
+    if (item.name.toLowerCase().includes('contractor and professional')) { inContractor = true; continue; }
+    if (inContractor && item.depth <= 2 && !item.name.toLowerCase().includes('contractor')) { inContractor = false; }
+    if (inContractor && item.amount > 0 && item.depth >= 3) {
+      contractors.push({ name: item.name, cost: item.amount, type: 'contractor' });
+    }
+  }
+
+  // Also get payroll totals
+  const payroll = allItems.filter(i => i.name.toLowerCase() === 'wages' && i.amount > 0);
+  const totalPayroll = payroll.reduce((s, i) => s + i.amount, 0);
+
+  return { contractors, totalPayroll, period: `${startDate} to ${endDate}` };
+}
+
+async function fetchQBStaffCosts() {
+  const params = arguments[0] || {};
+  const startDate = params.start_date || new Date(Date.now() - 90*86400000).toISOString().split('T')[0];
+  const endDate = params.end_date || new Date().toISOString().split('T')[0];
+
+  // Get employee time activity costs + contractor P&L costs in parallel
+  const [employees, timeActivity, pnlData] = await Promise.all([
+    fetchQBEmployees(),
+    fetchQBTimeActivity(params),
+    fetchQBContractorCosts(params),
+  ]);
+
+  const costRates = {};
+  employees.forEach(e => { if (e.cost_rate > 0) costRates[e.name] = e.cost_rate; });
+
+  // Build employee costs from time activity
+  const staffCosts = {};
+  timeActivity.forEach(t => {
+    const emp = t.employee || '';
+    const hrs = (parseFloat(t.hours) || 0) + (parseFloat(t.minutes) || 0) / 60;
+    if (!emp || hrs <= 0) return;
+    const rate = costRates[emp] || 0;
+    if (!staffCosts[emp]) staffCosts[emp] = { name: emp, cost: 0, hours: hrs, rate, type: 'employee' };
+    else { staffCosts[emp].cost += hrs * rate; staffCosts[emp].hours += hrs; }
+    staffCosts[emp].cost = staffCosts[emp].hours * rate;
+  });
+
+  // Add contractor costs from P&L
+  pnlData.contractors.forEach(c => {
+    if (!staffCosts[c.name]) staffCosts[c.name] = { name: c.name, cost: c.cost, hours: 0, rate: 0, type: 'contractor' };
+    else staffCosts[c.name].cost += c.cost; // add to any existing time-based cost
+  });
+
+  return Object.values(staffCosts);
+}
+
 const QB_FEEDS = {
   qbEmployees: fetchQBEmployees,
   qbTimeActivity: fetchQBTimeActivity,
   qbCustomers: fetchQBCustomers,
+  qbStaffCosts: fetchQBStaffCosts,
 };
 
 // ═══════════════════════════════════════════════════════════

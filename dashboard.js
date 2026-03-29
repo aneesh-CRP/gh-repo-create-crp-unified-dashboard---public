@@ -1656,28 +1656,24 @@ async function loadRevenuePerUser(days, btn) {
     var startDate = new Date(now.getTime() - _rpuDays * 86400000).toISOString().split('T')[0];
     var endDate = now.toISOString().split('T')[0];
 
-    var fetches = [fetch(cfBase + '?feed=revenuePerUser&format=json&days=' + _rpuDays).then(function(r){return r.json();})];
-    fetches.push(fetch(cfBase + '?feed=qbEmployees&format=json').then(function(r){return r.json();}));
-    fetches.push(fetch(cfBase + '?feed=qbTimeActivity&start_date=' + startDate + '&end_date=' + endDate + '&format=json').then(function(r){return r.json();}));
+    var fetches = [
+      fetch(cfBase + '?feed=revenuePerUser&format=json&days=' + _rpuDays).then(function(r){return r.json();}),
+      fetch(cfBase + '?feed=qbStaffCosts&start_date=' + startDate + '&end_date=' + endDate + '&format=json').then(function(r){return r.json();})
+    ];
 
     var results = await Promise.all(fetches);
     _rpuData = results[0].data || [];
 
-    var employees = results[1].data || [];
-    var timeAct = results[2].data || [];
-    var costRates = {};
-    employees.forEach(function(e) { if (e.cost_rate > 0) costRates[e.name] = e.cost_rate; });
+    // qbStaffCosts returns both employee time costs AND contractor P&L costs
+    var staffCosts = results[1].data || [];
     var costByPerson = {};
-    timeAct.forEach(function(t) {
-      var emp = (t.employee || '').trim();
-      var person = typeof canonicalStaffName === 'function' ? canonicalStaffName(emp) : emp;
-      var hrs = (parseFloat(t.hours) || 0) + (parseFloat(t.minutes) || 0) / 60;
-      if (!person || hrs <= 0) return;
-      var rate = costRates[emp] || 0;
-      if (!costByPerson[person]) costByPerson[person] = { cost: 0, hours: 0, rate: 0 };
-      costByPerson[person].cost += hrs * rate;
-      costByPerson[person].hours += hrs;
-      if (rate > 0) costByPerson[person].rate = rate;
+    staffCosts.forEach(function(s) {
+      var person = typeof canonicalStaffName === 'function' ? canonicalStaffName(s.name) : s.name;
+      if (!costByPerson[person]) costByPerson[person] = { cost: 0, hours: 0, rate: 0, type: '' };
+      costByPerson[person].cost += s.cost || 0;
+      costByPerson[person].hours += s.hours || 0;
+      if (s.rate > 0) costByPerson[person].rate = s.rate;
+      costByPerson[person].type = s.type || 'employee';
     });
     _rpuCostData = costByPerson;
 
