@@ -1507,7 +1507,7 @@ const FEEDS = {
       const days = parseInt(params.days) || 365;
       // Coordinator list and investigator list for role classification
       const coordinators = "'Mario Castellanos','Stacey scott','Stacey Scott','Ruby Pereira','Cady Chilensky','Angelina McMullen','Ema Gunic','Vlado Draganic','Gabrijela Ateljevic','Ana Lambic','Jana Milankovic'";
-      const investigators = "'Taher Modarressi','Eugene Andruczyk','Lolita Vaughan','Michael Tomeo','Joseph Heether','Jason Schoenfeld','Donna Gavarone','Lawrence Leventhal','Brian Shaffer','Hal Ganzman','Savita Singh','Christina Olney','Parth Patel','Brent Thomas'";
+      const investigators = "'Taher Modarressi','Eugene Andruczyk','Lolita Vaughan','Michael Tomeo','Joseph Heether','Jason Schoenfeld','Donna Gavarone','Lawrence Leventhal','Brian Shaffer','Hal Ganzman','Savita Singh','Parth Patel'";
       return `
       WITH procedure_revenue AS (
         SELECT subject_visit_key,
