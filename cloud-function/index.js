@@ -2482,10 +2482,15 @@ async function fetchQBContractorCosts() {
   const startDate = params.start_date || new Date(Date.now() - 365*86400000).toISOString().split('T')[0];
   const endDate = params.end_date || new Date().toISOString().split('T')[0];
 
-  const report = await qbReport('ProfitAndLoss', { start_date: startDate, end_date: endDate });
+  // Get P&L with employee breakdown for individual payroll
+  const [report, empReport] = await Promise.all([
+    qbReport('ProfitAndLoss', { start_date: startDate, end_date: endDate }),
+    qbReport('ProfitAndLoss', { start_date: startDate, end_date: endDate, summarize_column_by: 'Employees' }),
+  ]);
+
   const allItems = parsePnLRows((report.Rows || {}).Row || [], 0);
 
-  // Find items under "Contractor and Professional Services"
+  // Find contractor items
   let inContractor = false;
   const contractors = [];
   for (const item of allItems) {
@@ -2496,11 +2501,32 @@ async function fetchQBContractorCosts() {
     }
   }
 
-  // Also get payroll totals
-  const payroll = allItems.filter(i => i.name.toLowerCase() === 'wages' && i.amount > 0);
-  const totalPayroll = payroll.reduce((s, i) => s + i.amount, 0);
+  // Parse employee payroll from the by-employee P&L
+  const payrollByEmployee = [];
+  const empCols = (empReport.Columns || {}).Column || [];
+  const empColNames = empCols.map(c => c.ColTitle || '');
 
-  return { contractors, totalPayroll, period: `${startDate} to ${endDate}` };
+  function parseEmpRows(rows) {
+    for (const row of (rows || [])) {
+      const colData = (row.Header || {}).ColData || row.ColData || [];
+      const rowName = colData[0] ? colData[0].value || '' : '';
+      if (rowName.toLowerCase() === 'wages' && colData.length > 1) {
+        for (let i = 1; i < colData.length && i < empColNames.length; i++) {
+          const empName = empColNames[i];
+          const amount = parseFloat(colData[i].value) || 0;
+          if (empName && amount > 0 && empName !== 'Total' && empName !== 'TOTAL'
+              && empName !== 'Not Specified' && empName !== '') {
+            payrollByEmployee.push({ name: empName, cost: amount, type: 'payroll' });
+          }
+        }
+      }
+      const sub = (row.Rows || {}).Row || [];
+      if (sub.length) parseEmpRows(sub);
+    }
+  }
+  parseEmpRows((empReport.Rows || {}).Row || []);
+
+  return { contractors, payrollByEmployee, period: `${startDate} to ${endDate}` };
 }
 
 async function fetchQBStaffCosts() {
@@ -2533,7 +2559,21 @@ async function fetchQBStaffCosts() {
   // Add contractor costs from P&L
   pnlData.contractors.forEach(c => {
     if (!staffCosts[c.name]) staffCosts[c.name] = { name: c.name, cost: c.cost, hours: 0, rate: 0, type: 'contractor' };
-    else staffCosts[c.name].cost += c.cost; // add to any existing time-based cost
+    else staffCosts[c.name].cost += c.cost;
+  });
+
+  // Add payroll costs for employees who don't track time (from P&L by Employee)
+  (pnlData.payrollByEmployee || []).forEach(p => {
+    if (!staffCosts[p.name]) {
+      // Employee doesn't track time — use payroll as their cost
+      staffCosts[p.name] = { name: p.name, cost: p.cost, hours: 0, rate: 0, type: 'payroll' };
+    }
+    // If they already have time-based cost, don't double-count — payroll IS the wages from time
+    // But for employees with $0 time cost (no time entries), use payroll
+    else if (staffCosts[p.name].cost === 0) {
+      staffCosts[p.name].cost = p.cost;
+      staffCosts[p.name].type = 'payroll';
+    }
   });
 
   return Object.values(staffCosts);
