@@ -2289,6 +2289,143 @@ const CLICKUP_FEEDS = {
 };
 
 // ═══════════════════════════════════════════════════════════
+// QUICKBOOKS API FEEDS — Employees, Time Activity, Payroll
+// ═══════════════════════════════════════════════════════════
+
+const QB = {
+  clientId: process.env.QB_CLIENT_ID || '',
+  clientSecret: process.env.QB_CLIENT_SECRET || '',
+  refreshToken: process.env.QB_REFRESH_TOKEN || '',
+  realmId: process.env.QB_REALM_ID || '',
+};
+
+let _qbToken = null;
+let _qbTokenExpiry = 0;
+let _qbRefreshToken = QB.refreshToken; // Track refreshed tokens
+
+async function getQBAccessToken() {
+  if (_qbToken && Date.now() < _qbTokenExpiry - 60000) return _qbToken;
+  const auth = Buffer.from(QB.clientId + ':' + QB.clientSecret).toString('base64');
+  const params = new URLSearchParams({
+    grant_type: 'refresh_token',
+    refresh_token: _qbRefreshToken || QB.refreshToken,
+  });
+  return new Promise((resolve, reject) => {
+    const req = https.request('https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer', {
+      method: 'POST',
+      headers: { 'Authorization': 'Basic ' + auth, 'Content-Type': 'application/x-www-form-urlencoded' }
+    }, res => {
+      let d = ''; res.on('data', c => d += c);
+      res.on('end', () => {
+        try {
+          const j = JSON.parse(d);
+          if (j.error) { reject(new Error('QB token error: ' + j.error)); return; }
+          _qbToken = j.access_token;
+          _qbTokenExpiry = Date.now() + (j.expires_in || 3600) * 1000;
+          if (j.refresh_token) _qbRefreshToken = j.refresh_token; // QB rotates refresh tokens
+          resolve(_qbToken);
+        } catch (e) { reject(new Error('QB token parse failed: ' + d)); }
+      });
+    });
+    req.on('error', reject);
+    req.write(params.toString());
+    req.end();
+  });
+}
+
+async function qbQuery(sql) {
+  const token = await getQBAccessToken();
+  const encoded = encodeURIComponent(sql);
+  const url = `/v3/company/${QB.realmId}/query?query=${encoded}`;
+  return new Promise((resolve, reject) => {
+    const req = https.request({
+      hostname: 'quickbooks.api.intuit.com', path: url, method: 'GET',
+      headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/json' }
+    }, res => {
+      let d = ''; res.on('data', c => d += c);
+      res.on('end', () => {
+        try {
+          const j = JSON.parse(d);
+          if (j.Fault) { reject(new Error('QB query error: ' + JSON.stringify(j.Fault))); return; }
+          resolve(j.QueryResponse || {});
+        } catch (e) { reject(new Error('QB parse error: ' + d.substring(0, 200))); }
+      });
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+async function qbQueryAll(entity, where) {
+  const rows = [];
+  let startPos = 1;
+  const pageSize = 1000;
+  while (true) {
+    const sql = `SELECT * FROM ${entity}${where ? ' WHERE ' + where : ''} STARTPOSITION ${startPos} MAXRESULTS ${pageSize}`;
+    const resp = await qbQuery(sql);
+    const items = resp[entity] || [];
+    rows.push(...items);
+    if (items.length < pageSize) break;
+    startPos += pageSize;
+  }
+  return rows;
+}
+
+async function fetchQBEmployees() {
+  const emps = await qbQueryAll('Employee');
+  return emps.map(e => ({
+    id: e.Id,
+    name: e.DisplayName || ((e.GivenName || '') + ' ' + (e.FamilyName || '')).trim(),
+    active: e.Active ? 'Yes' : 'No',
+    cost_rate: e.CostRate || 0,
+    bill_rate: e.BillRate || 0,
+    hired_date: e.HiredDate || '',
+    released_date: e.ReleasedDate || '',
+    email: (e.PrimaryEmailAddr || {}).Address || '',
+    phone: (e.PrimaryPhone || {}).FreeFormNumber || '',
+  }));
+}
+
+async function fetchQBTimeActivity() {
+  const params = arguments[0] || {};
+  let where = '';
+  if (params.start_date) where += `TxnDate >= '${params.start_date}'`;
+  if (params.end_date) where += (where ? ' AND ' : '') + `TxnDate <= '${params.end_date}'`;
+
+  const items = await qbQueryAll('TimeActivity', where || null);
+  return items.map(t => ({
+    date: t.TxnDate || '',
+    employee: (t.EmployeeRef || t.VendorRef || {}).name || '',
+    employee_id: (t.EmployeeRef || t.VendorRef || {}).value || '',
+    customer: (t.CustomerRef || {}).name || '',
+    customer_id: (t.CustomerRef || {}).value || '',
+    hours: t.Hours || 0,
+    minutes: t.Minutes || 0,
+    description: t.Description || '',
+    billable: t.BillableStatus === 'Billable' ? 'Yes' : 'No',
+    hourly_rate: t.HourlyRate || 0,
+    cost_rate: t.CostRate || 0,
+  }));
+}
+
+async function fetchQBCustomers() {
+  const custs = await qbQueryAll('Customer', "Active = true");
+  return custs.map(c => ({
+    id: c.Id,
+    name: c.DisplayName || c.CompanyName || '',
+    balance: c.Balance || 0,
+    active: c.Active ? 'Yes' : 'No',
+    parent: (c.ParentRef || {}).name || '',
+  }));
+}
+
+const QB_FEEDS = {
+  qbEmployees: fetchQBEmployees,
+  qbTimeActivity: fetchQBTimeActivity,
+  qbCustomers: fetchQBCustomers,
+};
+
+// ═══════════════════════════════════════════════════════════
 // HTTP HANDLER
 // ═══════════════════════════════════════════════════════════
 
@@ -2340,7 +2477,7 @@ functions.http('crpBqApi', async (req, res) => {
   // List available feeds
   if (!feed) {
     res.json({
-      feeds: [...Object.keys(FEEDS), ...Object.keys(CLICKUP_FEEDS)],
+      feeds: [...Object.keys(FEEDS), ...Object.keys(CLICKUP_FEEDS), ...Object.keys(QB_FEEDS)],
       usage: '?feed=visits&format=csv',
       formats: ['csv', 'json'],
       note: 'BQ feeds + ClickUp feeds (referrals, campaigns, medRecords)'
@@ -2376,10 +2513,39 @@ functions.http('crpBqApi', async (req, res) => {
     return;
   }
 
+  // ── QB feeds ──
+  const qbHandler = QB_FEEDS[feed];
+  if (qbHandler) {
+    try {
+      if (!QB.clientId || !QB.refreshToken) { res.status(500).json({ error: 'QB credentials not configured' }); return; }
+      console.log(`Feed ${feed}: fetching from QuickBooks API`);
+      const rows = await qbHandler(req.query);
+      console.log(`Feed ${feed}: ${rows.length} rows from QuickBooks`);
+      if (format === 'json') {
+        res.json({ feed, rows: rows.length, data: rows, source: 'quickbooks', timestamp: new Date().toISOString() });
+      } else {
+        if (rows.length === 0) { res.type('text/csv').send(''); return; }
+        const fields = Object.keys(rows[0]);
+        const csvLines = [fields.join(',')];
+        for (const row of rows) {
+          csvLines.push(fields.map(f => {
+            const val = (row[f] == null ? '' : String(row[f])).replace(/"/g, '""');
+            return val.includes(',') || val.includes('"') || val.includes('\n') ? `"${val}"` : val;
+          }).join(','));
+        }
+        res.type('text/csv').send(csvLines.join('\n'));
+      }
+    } catch (err) {
+      console.error(`QB feed ${feed} failed:`, err.message);
+      res.status(500).json({ error: err.message, feed, source: 'quickbooks' });
+    }
+    return;
+  }
+
   // ── BQ feeds ──
   const feedDef = FEEDS[feed];
   if (!feedDef) {
-    res.status(404).json({ error: `Unknown feed: ${feed}`, available: [...Object.keys(FEEDS), ...Object.keys(CLICKUP_FEEDS)] });
+    res.status(404).json({ error: `Unknown feed: ${feed}`, available: [...Object.keys(FEEDS), ...Object.keys(CLICKUP_FEEDS), ...Object.keys(QB_FEEDS)] });
     return;
   }
 
