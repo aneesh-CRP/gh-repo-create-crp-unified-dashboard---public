@@ -1640,6 +1640,27 @@ var _rpuData = null;
 var _rpuDays = 365;
 var _rpuCostData = null;
 
+var STAFF_NAME_MAP = {
+  'mario d. castellanos membreno': 'Mario Castellanos', 'mario castellanos': 'Mario Castellanos',
+  'stacey scott': 'Stacey Scott', 'angelina mcmullen': 'Angelina McMullen',
+  'ruby pereira': 'Ruby Pereira', 'joanna pereira': 'Ruby Pereira',
+  'cady chilensky': 'Cady Chilensky', 'lolita vaughan': 'Lolita Vaughan',
+  'eugene andruczyk': 'Eugene Andruczyk', 'joseph heether': 'Joseph Heether',
+  'michael tomeo': 'Michael Tomeo', 'taher modarressi': 'Taher Modarressi',
+  'jason schoenfeld': 'Jason Schoenfeld', 'donna gavarone': 'Donna Gavarone',
+  'donna  gavarone': 'Donna Gavarone', 'lawrence leventhal': 'Lawrence Leventhal',
+  'brian shaffer': 'Brian Shaffer', 'hal ganzman': 'Hal Ganzman',
+  'christina olney': 'Christina Olney', 'savita singh': 'Savita Singh',
+  'brent thomas': 'Brent Thomas', 'parth patel': 'Parth Patel',
+  'nicole decicco': 'Nicole DeCicco', 'sophia  werbo': 'Sophia Werbo',
+  'emily  gillam': 'Emily Gillam', 'ivette  vazquez': 'Ivette Vazquez',
+  'angel arroyo': 'Angel Arroyo', 'wendy seidman': 'Wendy Seidman',
+};
+function canonicalStaffName(name) {
+  var n = (name || '').trim().toLowerCase();
+  return STAFF_NAME_MAP[n] || name.trim();
+}
+
 async function loadRevenuePerUser(days, btn) {
   if (days) _rpuDays = days;
   _rpuCostData = null; // reset cost cache on period change
