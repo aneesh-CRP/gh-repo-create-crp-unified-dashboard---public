@@ -6713,13 +6713,12 @@ function renderOpsPipeline() {
 
     // Build checklist lookup by normalized study name
     var clMap = {};
+    function normStudy(s) { return (s || '').toLowerCase().replace(/[\s\-_]/g, '').replace(/0/g, 'o').replace(/1/g, 'l'); }
     checklist.forEach(function(c) {
-      var key = (c.study || '').toLowerCase().replace(/[\s\-_]/g, '');
-      clMap[key] = c;
+      clMap[normStudy(c.study)] = c;
     });
     function findChecklist(studyName) {
-      var key = (studyName || '').toLowerCase().replace(/[\s\-_]/g, '');
-      // Exact match first
+      var key = normStudy(studyName);
       if (clMap[key]) return clMap[key];
       // Partial match — study name contains checklist name or vice versa
       var keys = Object.keys(clMap);
@@ -13412,9 +13411,17 @@ function renderReferralDashboard() {
   const _ninetyDaysAgoT = Date.now() - 90 * 86400000;
 
   // Build campaign rows (active only)
+  var _excludedVendors = ['autorecruit','oxford circle','acurian','x-factor','brian stein','murray brand','frankford','burstein','woodhaven','huntington gi','huntergton gi','us recruitment','tsang','sjogrens foundation','santoro','james','stoltz','power'];
+  function _isExcludedSource(name) {
+    var lo = (name||'').toLowerCase();
+    for (var i = 0; i < _excludedVendors.length; i++) { if (lo.indexOf(_excludedVendors[i]) >= 0) return true; }
+    return false;
+  }
   const activeCampaigns = CAMPAIGN_DATA.filter(c =>
     (c.vendor||'').toLowerCase() !== 'not active' &&
     (c.vendor||'').toLowerCase() !== 'complete' &&
+    !_isExcludedSource(c.vendor) &&
+    !_isExcludedSource(c.study) &&
     (c.first_contact > 0 || c.new_referrals > 0)
   );
 
@@ -13517,6 +13524,7 @@ function renderReferralDashboard() {
   // ── Add remaining CRIO sources not covered by ClickUp trackers or campaigns ──
   Object.keys(_crioSourceRows).forEach(function(srcName) {
     if (_crioUsed.has(srcName)) return;
+    if (_isExcludedSource(srcName)) return;
     var crio = _crioSourceRows[srcName];
     if (crio.total < 1) return;
     var _type = srcName === 'CRIO Database' ? 'Database' : 'CRIO';
@@ -13678,10 +13686,14 @@ function renderReferralDashboard() {
 
   var providerRows = unifiedRows.filter(function(r) { return r.vendor === 'Physician' || r.type === 'Provider'; });
   var metaRows = unifiedRows.filter(function(r) { return r.vendor === 'Meta' || (r.vendor||'').toLowerCase() === 'facebook'; });
+  var _excludedCampaigns = ['autorecruit','oxford circle','acurian','x-factor','brian stein','murray brand','frankford','burstein','woodhaven','huntington gi','huntergton gi','us recruitment','tsang','sjogrens foundation','santoro','james','stoltz','power'];
   var campaignRows = unifiedRows.filter(function(r) {
     if (r.vendor === 'Physician' || r.vendor === 'Meta' || (r.vendor||'').toLowerCase() === 'facebook' || r.type === 'Provider') return false;
     // Filter stale: must have at least 1 total referral or any activity
     if (r.total <= 0 && r.enrolled <= 0 && r.screening <= 0) return false;
+    // Exclude inactive/irrelevant campaign sources
+    var srcLo = ((r.name || '') + ' ' + (r.source || '') + ' ' + (r.vendor || '')).toLowerCase();
+    for (var _ei = 0; _ei < _excludedCampaigns.length; _ei++) { if (srcLo.indexOf(_excludedCampaigns[_ei]) >= 0) return false; }
     return true;
   });
 
