@@ -2283,7 +2283,7 @@ function switchTab(name, el) {
   if (navWrap) navWrap.classList.remove('open');
 
   // Performance tabs → delegate to switchView (handles lazy building)
-  const PERF_TABS = ['overview','studies','referrals','actions','admin'];
+  const PERF_TABS = ['overview','studies','referrals','actions','operations','admin'];
   if (PERF_TABS.includes(name)) {
     // Hide finance+insights views first
     document.querySelectorAll('[id^="view-fin-"], #view-insights').forEach(v => {
@@ -4392,9 +4392,9 @@ function loadRegulatoryPerformance() {
     .catch(function(e) { _log('Regulatory Performance failed: ' + e.message); });
 }
 
-function renderRegulatoryPerformance() {
-  var el = document.getElementById('regPerfContainer');
-  var badge = document.getElementById('reg-perf-badge');
+function renderRegulatoryPerformance(containerId, badgeId) {
+  var el = document.getElementById(containerId || 'regPerfContainer');
+  var badge = document.getElementById(badgeId || 'reg-perf-badge');
   if (!el || !window._regPerfData || window._regPerfData.length === 0) {
     if (el) el.innerHTML = '<div style="padding:16px;color:#94a3b8;font-size:12px;text-align:center;">No data</div>';
     return;
@@ -4621,6 +4621,117 @@ function showRegPerfDetail(userName, metric) {
 
   body += '</tbody></table>';
   openModal(title + ' (' + total + ')', '', body);
+}
+
+// ═══ OPERATIONS TAB ═══
+var _monitoringData = [];
+
+function renderOperationsTab() {
+  // Load monitoring data if not loaded
+  if (!_monitoringData.length) {
+    var base = CRP_CONFIG.CF_BASE;
+    if (base) {
+      fetch(base + '?feed=monitoringVisits&format=json').then(function(r){return r.json();}).then(function(json) {
+        _monitoringData = json.data || [];
+        _renderOpsContent();
+      }).catch(function(e) { _log('Monitoring data failed: ' + e.message); });
+    }
+  } else {
+    _renderOpsContent();
+  }
+  // Also render regulatory performance in the ops container
+  renderRegulatoryPerformance('opsRegPerfContainer', 'ops-reg-perf-badge');
+}
+
+function _renderOpsContent() {
+  // KPIs
+  var open = _monitoringData.filter(function(r) { return (r.status||'').toLowerCase().indexOf('open') >= 0; });
+  var deviations = _monitoringData.filter(function(r) { return (r.observation_category||'').toLowerCase().indexOf('protocol deviation') >= 0 || (r.observation_category||'').toLowerCase().indexOf('pd ') >= 0 || (r.observation_category||'').toLowerCase().indexOf('pd-') >= 0; });
+  var openDevs = deviations.filter(function(r) { return (r.status||'').toLowerCase().indexOf('open') >= 0; });
+
+  var _sk = function(id, v) { var e = document.getElementById(id); if (e) e.textContent = v; };
+  _sk('ops-monitoring', open.length);
+  _sk('ops-deviations', deviations.length);
+  // Sync with Action Required KPIs
+  _sk('ops-queries', document.getElementById('ar-queries') ? document.getElementById('ar-queries').textContent : '—');
+  _sk('ops-docs', document.getElementById('ar-docs') ? document.getElementById('ar-docs').textContent : '—');
+  _sk('ops-todos', document.getElementById('ar-todos') ? document.getElementById('ar-todos').textContent : '—');
+  _sk('ops-ereg', document.getElementById('ar-ereg') ? document.getElementById('ar-ereg').textContent : '—');
+
+  var badge = document.getElementById('ops-monitoring-badge');
+  if (badge) badge.textContent = _monitoringData.length + ' observations · ' + open.length + ' open · ' + deviations.length + ' deviations';
+
+  renderOpsMonitoringTable('all');
+}
+
+function renderOpsMonitoringTable(filter) {
+  var el = document.getElementById('opsMonitoringTable');
+  if (!el) return;
+
+  var data = _monitoringData;
+  if (filter === 'open') data = data.filter(function(r) { return (r.status||'').toLowerCase().indexOf('open') >= 0; });
+  else if (filter === 'deviations') data = data.filter(function(r) {
+    var cat = (r.observation_category||'').toLowerCase();
+    return cat.indexOf('protocol deviation') >= 0 || cat.indexOf('pd ') >= 0 || cat.indexOf('pd-') >= 0;
+  });
+  else if (filter === 'completed') data = data.filter(function(r) { return (r.status||'').toLowerCase() === 'completed'; });
+
+  // Sort: open first, then by date desc
+  data.sort(function(a, b) {
+    var aOpen = (a.status||'').toLowerCase().indexOf('open') >= 0 ? 0 : 1;
+    var bOpen = (b.status||'').toLowerCase().indexOf('open') >= 0 ? 0 : 1;
+    if (aOpen !== bOpen) return aOpen - bOpen;
+    return (b.visit_date||'').localeCompare(a.visit_date||'');
+  });
+
+  var h = '<table class="fin-table" style="width:100%;font-size:11px;"><thead><tr>';
+  h += '<th style="text-align:left;padding:6px 8px;">Study</th>';
+  h += '<th style="text-align:left;">Category</th>';
+  h += '<th style="text-align:left;">Notes</th>';
+  h += '<th style="text-align:center;">Status</th>';
+  h += '<th style="text-align:left;">Monitor</th>';
+  h += '<th style="text-align:center;">Visit Date</th>';
+  h += '<th style="text-align:center;">Type</th>';
+  h += '<th></th>';
+  h += '</tr></thead><tbody>';
+
+  data.forEach(function(r) {
+    var isOpen = (r.status||'').toLowerCase().indexOf('open') >= 0;
+    var isDev = (r.observation_category||'').toLowerCase().indexOf('protocol deviation') >= 0 || (r.observation_category||'').toLowerCase().indexOf('pd') >= 0;
+    var statusColor = isOpen ? '#dc2626' : '#059669';
+    var statusBg = isOpen ? '#fef2f2' : '#ecfdf5';
+    var catColor = isDev ? '#dc2626' : '#1843AD';
+    var catBg = isDev ? '#fef2f220' : '#1843AD10';
+    var rowBg = isOpen ? 'background:#fef2f2;' : '';
+
+    h += '<tr style="border-bottom:1px solid #f1f5f9;' + rowBg + '">';
+    h += '<td style="padding:6px 8px;font-weight:600;">' + escapeHTML(r.study || '—') + '</td>';
+    h += '<td style="padding:6px 4px;"><span style="font-size:10px;font-weight:600;padding:2px 6px;border-radius:4px;background:' + catBg + ';color:' + catColor + '">' + escapeHTML(r.observation_category || '—') + '</span></td>';
+    h += '<td style="padding:6px 4px;font-size:10px;max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + escapeHTML(r.notes || '') + '">' + escapeHTML((r.notes || '').substring(0, 80)) + '</td>';
+    h += '<td style="text-align:center;"><span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:' + statusBg + ';color:' + statusColor + '">' + escapeHTML(r.status || '—') + '</span></td>';
+    h += '<td style="padding:6px 4px;font-size:10px;color:#64748b">' + escapeHTML(r.monitor || '—') + '</td>';
+    h += '<td style="text-align:center;font-size:10px;">' + escapeHTML(r.visit_date || '—') + '</td>';
+    h += '<td style="text-align:center;"><span style="font-size:9px;font-weight:600;padding:1px 4px;border-radius:3px;background:' + ((r.visit_type||'').toLowerCase() === 'onsite' ? '#07206115' : '#FF993315') + ';color:' + ((r.visit_type||'').toLowerCase() === 'onsite' ? '#072061' : '#FF9933') + '">' + escapeHTML(r.visit_type || '—') + '</span></td>';
+    h += '<td>' + (r.url ? '<a href="' + escapeHTML(r.url) + '" target="_blank" style="font-size:10px;color:#1843AD;text-decoration:none;font-weight:600">Open</a>' : '') + '</td>';
+    h += '</tr>';
+  });
+
+  h += '</tbody></table>';
+  if (data.length === 0) h = '<p style="color:#94a3b8;font-size:12px;padding:12px;">No items found for this filter.</p>';
+  el.innerHTML = h;
+}
+
+function filterOpsMonitoring(filter, btn) {
+  if (btn) {
+    btn.parentElement.querySelectorAll('.filter-btn').forEach(function(b){b.classList.remove('active');});
+    btn.classList.add('active');
+  }
+  renderOpsMonitoringTable(filter);
+}
+
+function showOpsMonitoring(filter) {
+  switchTab('operations');
+  setTimeout(function() { filterOpsMonitoring(filter, null); }, 200);
 }
 
 function renderCoordCancelTypeChart() {
@@ -5809,6 +5920,11 @@ function switchView(name, el) {
         safe(buildSiteStackedBars, 'buildSiteStackedBars');
         _tabDirty.studies = false;
       }
+    }, 50);
+  }
+  if (name === 'operations') {
+    setTimeout(function() {
+      safe(renderOperationsTab, 'renderOperationsTab');
     }, 50);
   }
   if (name === 'admin') {
@@ -16451,7 +16567,7 @@ async function _crpInit() {
   if (location.hash) {
     var _hashTab = location.hash.replace('#', '');
     if (_hashTab === 'schedule') _hashTab = 'overview'; // Schedule merged into Overview
-    var _allTabs = ['overview','studies','referrals','actions','admin','fin-overview','fin-collections','fin-aging','fin-revenue','fin-qb','fin-productivity','insights'];
+    var _allTabs = ['overview','studies','referrals','actions','operations','admin','fin-overview','fin-collections','fin-aging','fin-revenue','fin-qb','fin-productivity','insights'];
     if (_allTabs.indexOf(_hashTab) !== -1) _initTab = _hashTab;
   }
   var _initTabEl = document.querySelector(".nav-tab[onclick*='" + _initTab + "'], .nav-tab[data-tab='" + _initTab + "']");

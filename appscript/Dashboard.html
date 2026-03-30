@@ -1059,6 +1059,7 @@ body {
     <span class="nav-tab" onclick="switchTab('studies', this)" role="tab">Studies</span>
     <span class="nav-tab" onclick="switchTab('referrals', this)" role="tab">Referrals</span>
     <span class="nav-tab" onclick="switchTab('actions', this)" role="tab">Actions</span>
+    <span class="nav-tab" onclick="switchTab('operations', this)" role="tab">Operations</span>
     <span class="nav-tab" onclick="switchTab('admin', this)" role="tab"><svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.5;vertical-align:-1px;margin-right:2px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Admin</span>
     <span style="width:1px;background:#CBD5E0;margin:8px 2px"></span>
     <span class="nav-tab fin-tab" data-tab="fin-overview" onclick="switchTab('fin-overview', this)" role="tab"><svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.5;vertical-align:-1px;margin-right:2px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Finance</span>
@@ -1758,6 +1759,73 @@ body {
 
 
 <!-- ══ VIEW: CONNECT ══════════════════════ -->
+<!-- ═══════════════════════════════════════ OPERATIONS TAB ═══════════════════════════════════════ -->
+<div id="view-operations" class="view">
+
+  <div style="margin-bottom:4px"><span class="card-title" style="font-size:16px;">Operations & Compliance</span>
+    <div style="font-size:10px;color:#94a3b8;margin-top:2px;">Monitoring visits, protocol deviations, regulatory performance, document status</div>
+  </div>
+
+  <!-- Operations KPIs -->
+  <div class="time-banner fade-in" style="margin-bottom:12px;" id="ops-kpi-strip">
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showActionModal('queries')">
+      <div class="tb-label">Open Queries</div>
+      <div class="tb-value" style="color:#dc2626" id="ops-queries">—</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showActionModal('docs')">
+      <div class="tb-label">Unsigned Docs</div>
+      <div class="tb-value" style="color:#FF9933" id="ops-docs">—</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showActionModal('todos')">
+      <div class="tb-label">Overdue Todos</div>
+      <div class="tb-value" style="color:#FF9933" id="ops-todos">—</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showActionModal('ereg')">
+      <div class="tb-label">eReg Pending</div>
+      <div class="tb-value" style="color:#072061" id="ops-ereg">—</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showOpsMonitoring('open')">
+      <div class="tb-label">Open Findings</div>
+      <div class="tb-value" style="color:#dc2626" id="ops-monitoring">—</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showOpsMonitoring('deviations')">
+      <div class="tb-label">Protocol Deviations</div>
+      <div class="tb-value" style="color:#dc2626" id="ops-deviations">—</div>
+    </div>
+  </div>
+
+  <!-- Regulatory Performance (moved from Overview) -->
+  <div class="card fade-in" style="margin-bottom:12px;">
+    <div class="card-header">
+      <span class="card-title">Regulatory Performance</span>
+      <span class="badge badge-gray" id="ops-reg-perf-badge">Loading...</span>
+    </div>
+    <div style="font-size:10px;color:#94a3b8;padding:2px 12px 0;">Documents signed/uploaded, comments, sign-offs, pending items · last 90 days</div>
+    <div id="opsRegPerfContainer" style="padding:8px 12px;"></div>
+  </div>
+
+  <!-- Monitoring Visits -->
+  <div class="card fade-in" style="margin-bottom:12px;">
+    <div class="card-header">
+      <span class="card-title">Monitoring Visits & Observations</span>
+      <span class="badge badge-blue" id="ops-monitoring-badge">Loading...</span>
+    </div>
+    <div style="display:flex;gap:4px;padding:4px 12px;flex-wrap:wrap;">
+      <button class="filter-btn active" onclick="filterOpsMonitoring('all',this)" style="font-size:10px;padding:2px 8px;">All</button>
+      <button class="filter-btn" onclick="filterOpsMonitoring('open',this)" style="font-size:10px;padding:2px 8px;">Open</button>
+      <button class="filter-btn" onclick="filterOpsMonitoring('deviations',this)" style="font-size:10px;padding:2px 8px;">Deviations</button>
+      <button class="filter-btn" onclick="filterOpsMonitoring('completed',this)" style="font-size:10px;padding:2px 8px;">Completed</button>
+    </div>
+    <div id="opsMonitoringTable" style="padding:0 12px 12px;overflow-x:auto;max-height:500px;overflow-y:auto;"></div>
+  </div>
+
+</div><!-- /view-operations -->
+
 <div id="view-admin" class="view">
 
   <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;" id="admin-filter-bar">
