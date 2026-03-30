@@ -5809,13 +5809,13 @@ function injectRideshareButtons() {
     var patName = patLink ? (patLink.dataset.phiOriginal || patCell.textContent || '').trim().toLowerCase() : '';
     var crioRide = patName ? ridePatients[patName] : null;
 
-    // Auto-populate from CRIO if found, otherwise use localStorage
-    // Rideshare states: not_requested → requested → ordered (or auto from CRIO)
-    var rideState = _rideshareData[key] || (crioRide ? 'requested' : 'not_requested');
-    var tooltip = crioRide ? crioRide.note || '' : '';
+    // Migrate legacy boolean values to string states
+    if (_rideshareData[key] === true) _rideshareData[key] = 'requested';
 
+    // Auto-populate from CRIO if found, otherwise use localStorage
+    var tooltip = crioRide ? crioRide.note || '' : '';
     var btn = document.createElement('button');
-    var fromCrio = !!crioRide && !_rideshareData[key];
+    var fromCrio = !!crioRide;
 
     function _updateRideBtn() {
       var st = _rideshareData[key] || (crioRide ? 'requested' : 'not_requested');
@@ -6794,11 +6794,11 @@ function renderOpsPipeline() {
   fetch(base + '?feed=studyMasterList&format=json').then(function(r){return r.json();}).then(function(json) {
     var data = (json.data || []).filter(function(r) {
       var s = (r.status || '').toLowerCase();
-      return s === 'feasibility' || s === 'selected' || s === 'start up' || s === 'recruiting';
+      return s !== 'ended' && s !== 'terminated' && s !== 'recruiting' && s !== 'maintenance';
     });
 
     // Sort by pipeline stage
-    var stageOrder = { 'feasibility': 0, 'selected': 1, 'start up': 2, 'recruiting': 3 };
+    var stageOrder = { 'feasibility': 0, 'selected': 1, 'start up': 2 };
     data.sort(function(a, b) { return (stageOrder[(a.status||'').toLowerCase()] || 9) - (stageOrder[(b.status||'').toLowerCase()] || 9); });
 
     if (badge) badge.textContent = data.length + ' active studies';
