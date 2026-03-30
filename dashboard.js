@@ -3388,7 +3388,14 @@ function _readinessBadge(mr, idx, crioStatus) {
   var r = _medReadiness(mr, crioStatus);
   var colors = { 'complete':'#059669', 'pending':'#FF9933', 'needs-action':'#dc2626' };
   var c = colors[r.level] || '#94a3b8';
-  return '<span onclick="showVisitReadiness(' + idx + ')" style="cursor:pointer;display:inline-block;margin-left:6px;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:' + c + '20;color:' + c + ';vertical-align:middle;border:1px solid ' + c + '40" title="Click for details">' + escapeHTML(r.label) + '</span>';
+  // Show platform abbreviation if available
+  var portal = (mr.records_portal || '').trim();
+  var portalAbbr = {'Pre-doc':'PD','Proxy':'PX','SiteRx':'SRx','Physician Directly':'Dr','JotForm':'JF'};
+  var allNotes = ((mr.notes||'') + ' ' + (mr.ops_notes||'')).toLowerCase();
+  var hasJotform = allNotes.indexOf('jotform') >= 0 || allNotes.indexOf('jot form') >= 0;
+  var platformTag = portalAbbr[portal] || (hasJotform ? 'JF' : '');
+  var label = r.label + (platformTag ? ' · ' + platformTag : '');
+  return '<span onclick="showVisitReadiness(' + idx + ')" style="cursor:pointer;display:inline-block;margin-left:6px;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:' + c + '20;color:' + c + ';vertical-align:middle;border:1px solid ' + c + '40" title="Click for details · Platform: ' + escapeHTML(portal || (hasJotform ? 'JotForm' : 'Not set')) + '">' + escapeHTML(label) + '</span>';
 }
 
 function showVisitReadiness(idx) {
@@ -3396,37 +3403,33 @@ function showVisitReadiness(idx) {
   if (!mr) return;
   var r = _medReadiness(mr);
   var dot = function(ok) { return ok ? '<span style="color:#059669;font-weight:700">\u2713</span>' : '<span style="color:#dc2626;font-weight:700">\u2717</span>'; };
-  var ref = (typeof REFERRAL_DATA !== 'undefined') ? REFERRAL_DATA.find(function(x){ return (x.name||'').toLowerCase().trim() === (mr.name||'').toLowerCase().trim(); }) : null;
+
+  // Platform badge
+  var portal = (mr.records_portal || '').trim();
+  var portalColors = {'Pre-doc':'#1843AD','Proxy':'#8b5cf6','SiteRx':'#059669','Physician Directly':'#FF9933','JotForm':'#dc2626'};
+  var portalBadge = portal ? '<span style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:4px;background:'+(portalColors[portal]||'#64748b')+'20;color:'+(portalColors[portal]||'#64748b')+';border:1px solid '+(portalColors[portal]||'#64748b')+'40">'+escapeHTML(portal)+'</span>' : '<span style="color:#94a3b8">Not set</span>';
+
+  // Check notes for JotForm mentions
+  var allNotes = ((mr.notes||'') + ' ' + (mr.ops_notes||'')).toLowerCase();
+  var hasJotform = allNotes.indexOf('jotform') >= 0 || allNotes.indexOf('jot form') >= 0;
+  if (hasJotform && !portal) portalBadge = '<span style="font-size:11px;font-weight:700;padding:3px 8px;border-radius:4px;background:#dc262620;color:#dc2626;border:1px solid #dc262640">JotForm</span>';
+
   var rows = '';
-  rows += '<tr><td style="font-weight:600">Medical Release</td><td>' + dot(r.relOk) + ' ' + escapeHTML(mr.medical_release || 'Not set') + '</td></tr>';
-  rows += '<tr><td style="font-weight:600">Records Received</td><td>' + dot(r.recOk) + ' ' + escapeHTML(mr.records_received || 'Not set') + '</td></tr>';
-  rows += '<tr><td colspan="2" style="border-top:2px solid #e2e8f0;padding-top:8px;font-weight:700;color:#64748b">Additional Details</td></tr>';
-  rows += '<tr><td>Status</td><td>' + escapeHTML(mr.status || '—') + '</td></tr>';
-  rows += '<tr><td>Assignee</td><td>' + escapeHTML(mr.assignee || '—') + '</td></tr>';
-  rows += '<tr><td>Records Portal</td><td>' + escapeHTML(mr.records_portal || '—') + '</td></tr>';
-  rows += '<tr><td>Retrieval Deadline</td><td>' + escapeHTML(mr.retrieval_deadline || '—') + '</td></tr>';
+  // Platform first
+  rows += '<tr><td style="font-weight:600;padding:8px">Tracking Platform</td><td style="padding:8px">' + portalBadge + '</td></tr>';
+  rows += '<tr><td style="font-weight:600;padding:8px">Medical Release</td><td style="padding:8px">' + dot(r.relOk) + ' ' + escapeHTML(mr.medical_release || 'Not set') + '</td></tr>';
+  rows += '<tr><td style="font-weight:600;padding:8px">Records Received</td><td style="padding:8px">' + dot(r.recOk) + ' ' + escapeHTML(mr.records_received || 'Not set') + '</td></tr>';
+  rows += '<tr><td style="font-weight:600;padding:8px">Records in CRIO</td><td style="padding:8px">' + dot(mr.records_in_crio === 'Yes') + ' ' + escapeHTML(mr.records_in_crio || 'No') + '</td></tr>';
   if (mr.same_day_cancel && mr.same_day_cancel.toLowerCase() !== 'false' && mr.same_day_cancel.toLowerCase() !== 'no')
-    rows += '<tr><td>Same-Day Cancel</td><td style="color:#dc2626;font-weight:700">\u26a0 ' + escapeHTML(mr.same_day_cancel) + '</td></tr>';
-  rows += '<tr><td>Last Contact</td><td>' + escapeHTML(mr.last_contact_date || '—') + '</td></tr>';
-  rows += '<tr><td>Days Since Update</td><td>' + (mr.days_since_update > 14 ? '<span style="color:#dc2626;font-weight:600">' + mr.days_since_update + ' days</span>' : mr.days_since_update + ' days') + '</td></tr>';
-  if (mr.pre_screening_date) rows += '<tr><td>Pre-Screening</td><td>' + escapeHTML(mr.pre_screening_date) + '</td></tr>';
-  if (mr.screening_date) rows += '<tr><td>Screening</td><td>' + escapeHTML(mr.screening_date) + '</td></tr>';
-  if (mr.randomization_date) rows += '<tr><td>Randomization</td><td>' + escapeHTML(mr.randomization_date) + '</td></tr>';
-  if (mr.next_visit_date) rows += '<tr><td>Next Visit (ClickUp)</td><td>' + escapeHTML(mr.next_visit_date) + '</td></tr>';
-  if (ref) {
-    rows += '<tr><td colspan="2" style="border-top:2px solid #e2e8f0;padding-top:8px;font-weight:700;color:#64748b">Referral Info</td></tr>';
-    rows += '<tr><td>Referral Stage</td><td>' + escapeHTML(ref.stage || '—') + '</td></tr>';
-    rows += '<tr><td>Source</td><td>' + escapeHTML(ref.source || '—') + '</td></tr>';
-    if (ref.referring_physician) rows += '<tr><td>Referring Physician</td><td>' + escapeHTML(ref.referring_physician) + '</td></tr>';
-    rows += '<tr><td>Referral Updated</td><td>' + escapeHTML(ref.date_updated || '—') + '</td></tr>';
-  }
-  if (mr.notes) rows += '<tr><td colspan="2" style="border-top:2px solid #e2e8f0;padding-top:8px"><strong>Notes:</strong> ' + escapeHTML(mr.notes) + '</td></tr>';
-  if (mr.ops_notes) rows += '<tr><td colspan="2"><strong>Ops Notes:</strong> ' + escapeHTML(mr.ops_notes) + '</td></tr>';
+    rows += '<tr><td style="font-weight:600;padding:8px">Same-Day Cancel</td><td style="padding:8px;color:#dc2626;font-weight:700">\u26a0 ' + escapeHTML(mr.same_day_cancel) + '</td></tr>';
+  if (mr.notes) rows += '<tr><td colspan="2" style="border-top:1px solid #e2e8f0;padding:8px"><strong>Notes:</strong> ' + escapeHTML(mr.notes) + '</td></tr>';
+  if (mr.ops_notes) rows += '<tr><td colspan="2" style="padding:8px"><strong>Ops Notes:</strong> ' + escapeHTML(mr.ops_notes) + '</td></tr>';
+
   var crioBtn = mr.crio_link ? ' <a href="' + escapeHTML(mr.crio_link) + '" target="_blank" style="font-size:11px;color:#072061;text-decoration:none;font-weight:600">[CRIO]</a>' : '';
   var cuBtn = mr.url ? ' <a href="' + escapeHTML(mr.url) + '" target="_blank" style="font-size:11px;color:#072061;text-decoration:none;font-weight:600">[ClickUp]</a>' : '';
   var body = '<div style="margin-bottom:8px">' + crioBtn + cuBtn + '</div>'
     + '<table class="detail-table" style="width:100%"><tbody>' + rows + '</tbody></table>';
-  openModal(maskPHI(mr.name), 'Visit Readiness — ' + escapeHTML(mr.study), body);
+  openModal(maskPHI(mr.name), 'Medical Records — ' + escapeHTML(mr.study), body);
 }
 
 // Legacy wrapper — delegates to improved fuzzyNameMatch()
