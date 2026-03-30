@@ -776,7 +776,17 @@ body {
     .alert-bar{padding:10px 16px;border-radius:8px;font-size:12px;font-weight:500;display:flex;align-items:center;gap:8px;margin-bottom:12px}
     .alert-warn{background:var(--yellow-bg);border:1px solid var(--yellow);color:var(--yellow)}
     .alert-crit{background:var(--red-bg);border:1px solid var(--red);color:var(--red)}
+    .alert-info{background:#E8EEFF;border:1px solid #1843AD;color:#1843AD}
     .section-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);margin:28px 0 14px}
+    .pill-enrolling{background:#dcfce7;color:#059669}
+    .pill-maintenance{background:#E8EEFF;color:#1843AD}
+    .pill-pre-closed{background:#fef3c7;color:#b45309}
+    .cs-card{background:var(--surface2);border-radius:8px;padding:12px 16px;text-align:center}
+    .cs-label{font-size:11px;font-weight:600;color:var(--muted);margin-bottom:4px}
+    .cs-val{font-size:22px;font-weight:800}
+    .fin-table{width:100%;border-collapse:collapse;font-size:12px}
+    .fin-table th{padding:8px 10px;text-align:left;font-weight:700;color:var(--text);background:var(--surface2);border-bottom:2px solid var(--border)}
+    .fin-table td{padding:6px 10px;border-bottom:1px solid #f1f5f9}
     .coll-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:12px}
     .filter-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
     .fbtn{padding:6px 14px;border-radius:16px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer}
@@ -1063,8 +1073,6 @@ body {
     <span class="nav-tab" onclick="switchTab('admin', this)" role="tab"><svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.5;vertical-align:-1px;margin-right:2px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Admin</span>
     <span style="width:1px;background:#CBD5E0;margin:8px 2px"></span>
     <span class="nav-tab fin-tab" data-tab="fin-overview" onclick="switchTab('fin-overview', this)" role="tab"><svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.5;vertical-align:-1px;margin-right:2px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Finance</span>
-    <span class="nav-tab fin-tab" data-tab="fin-collections" onclick="switchTab('fin-collections', this)"><svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.5;vertical-align:-1px;margin-right:2px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Collect</span>
-    <span class="nav-tab fin-tab" data-tab="fin-aging" onclick="switchTab('fin-aging', this)"><svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.5;vertical-align:-1px;margin-right:2px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Aging</span>
     <span class="nav-tab fin-tab" data-tab="fin-revenue" onclick="switchTab('fin-revenue', this)"><svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.5;vertical-align:-1px;margin-right:2px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Billing</span>
     <span class="nav-tab fin-tab" data-tab="fin-qb" onclick="switchTab('fin-qb', this)"><svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.5;vertical-align:-1px;margin-right:2px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>QB</span>
     <span class="nav-tab fin-tab" data-tab="fin-productivity" onclick="switchTab('fin-productivity', this)"><svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.5;vertical-align:-1px;margin-right:2px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Productivity</span>
@@ -1159,6 +1167,12 @@ body {
       <div class="tb-value" style="color:var(--yellow)" id="sched-kpi-april">0</div>
       <div class="tb-sub">Visits next month</div>
     </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showPrescrModal('all')">
+      <div class="tb-label">Calls / FibroScan</div>
+      <div class="tb-value" style="color:#1843AD" id="kpi-prescr-total">—</div>
+      <div class="tb-sub">Pre-screening appts</div>
+    </div>
   </div>
 
   <!-- Visit Table -->
@@ -1189,34 +1203,8 @@ body {
     </div>
   </div>
 
-  <!-- Schedule KPIs (operational KPIs moved to Operations tab) -->
-  <div class="time-banner fade-in" style="margin-bottom:12px;" id="recruitment-kpi-banner">
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showRiskFlags('At-Risk Patients')">
-      <div class="tb-label">At-Risk</div>
-      <div class="tb-value" style="color:#dc2626" id="kpi-risk">0</div>
-      <div class="tb-sub">2+ cancels w/ upcoming</div>
-    </div>
-    <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showUnscheduledModal()">
-      <div class="tb-label">Not Scheduled</div>
-      <div class="tb-value" style="color:#FF9933" id="kpi-unsched">—</div>
-      <div class="tb-sub">Active patients, no appt</div>
-    </div>
-    <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="switchTab('referrals',document.querySelector('.nav-tab[onclick*=referrals]'))">
-      <div class="tb-label">Active Leads</div>
-      <div class="tb-value blue" id="kpi-marketing-leads">—</div>
-      <div class="tb-sub" id="kpi-marketing-sub"></div>
-    </div>
-    <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="switchTab('operations')">
-      <div class="tb-label">Operations</div>
-      <div class="tb-value" style="color:#072061" id="kpi-ops-link">→</div>
-      <div class="tb-sub">Queries, docs, deviations</div>
-    </div>
-  </div>
   <!-- Hidden elements for backward compat (JS still writes to these IDs) -->
-  <div style="display:none"><span id="ar-queries">—</span><span id="ar-queries-sub"></span><span id="ar-docs">—</span><span id="ar-docs-sub"></span><span id="ar-todos">—</span><span id="ar-todos-sub"></span><span id="ar-ereg">—</span><span id="ar-ereg-sub"></span></div>
+  <div style="display:none"><span id="kpi-risk">0</span><span id="kpi-unsched">—</span><span id="kpi-marketing-leads">—</span><span id="kpi-marketing-sub"></span><span id="ar-queries">—</span><span id="ar-queries-sub"></span><span id="ar-docs">—</span><span id="ar-docs-sub"></span><span id="ar-todos">—</span><span id="ar-todos-sub"></span><span id="ar-ereg">—</span><span id="ar-ereg-sub"></span></div>
 
   <!-- ═══ SECTION 3: STAFF PERFORMANCE ═══ -->
   <div class="section-title" style="margin-top:14px;margin-bottom:8px;">Staff Performance</div>
@@ -1252,38 +1240,19 @@ body {
     </div>
   </div>
 
-  <!-- Investigator + Recruiter side by side -->
-  <div class="grid-2 mb16 fade-in">
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title">Investigator Workload</span>
-      </div>
-      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Upcoming visits per PI · utilization = days with visits / available days</div>
-      <div id="invCapacityContainer" style="padding:12px 16px;">
-        <p style="color:#94a3b8;font-size:12px">Loading investigator data...</p>
-      </div>
+  <!-- Investigator Workload -->
+  <div class="card mb16 fade-in">
+    <div class="card-header">
+      <span class="card-title">Investigator Workload</span>
     </div>
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title">Recruiter Performance</span>
-        <span class="badge badge-gray" id="recruiter-perf-badge">Loading...</span>
-      </div>
-      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Outreach activity · calls, texts, emails (last 30 days)</div>
-      <div id="recruiterPerfContainer" style="padding:0 16px 4px;">
-        <p style="color:#94a3b8;font-size:12px">Loading recruiter data...</p>
-      </div>
+    <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Upcoming visits per PI · utilization = days with visits / available days</div>
+    <div id="invCapacityContainer" style="padding:12px 16px;">
+      <p style="color:#94a3b8;font-size:12px">Loading investigator data...</p>
     </div>
   </div>
 
-  <!-- Regulatory Performance -->
-  <div class="card fade-in" style="margin-bottom:12px;">
-    <div class="card-header">
-      <span class="card-title">Regulatory Performance</span>
-      <span class="badge badge-gray" id="reg-perf-badge">Loading...</span>
-    </div>
-    <div style="font-size:10px;color:#94a3b8;padding:2px 12px 0;">Documents signed/uploaded, comments, sign-offs, pending items · last 90 days · click numbers for study detail</div>
-    <div id="regPerfContainer" style="padding:8px 12px;"></div>
-  </div>
+  <!-- Regulatory Performance moved to Operations tab -->
+  <div style="display:none"><span id="reg-perf-badge"></span><div id="regPerfContainer"></div></div>
 
   <!-- Hidden containers for backward compat -->
   <div id="coord-prod-container" style="display:none"></div>
@@ -1370,68 +1339,7 @@ body {
     <div id="upcoming-study-bars" style="padding:12px 16px;max-height:280px;overflow-y:auto;"></div>
   </div>
 
-  <!-- Cancellation Analysis -->
-  <div class="section-title" style="margin-top:16px;margin-bottom:8px;">Cancellation Analysis</div>
-  <div class="time-banner fade-in" style="margin-bottom:12px;">
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showCancels(null,'Cancellations')">
-      <div class="tb-label">Cancels</div>
-      <div class="tb-value red" id="kpi-cancels">0</div>
-      <div class="tb-sub" id="kpi-cancel-range"></div>
-    </div>
-    <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showSplitPopup('noShows','No Shows')">
-      <div class="tb-label">No Shows</div>
-      <div class="tb-value" style="color:#FF9933" id="kpi-noshow">0</div>
-      <div class="tb-sub">Missed visits</div>
-    </div>
-    <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showSplitPopup('withdrawals','Withdrawals')">
-      <div class="tb-label">Withdrew</div>
-      <div class="tb-value" style="color:#1843AD" id="kpi-withdrew">0</div>
-      <div class="tb-sub">Patient withdrew</div>
-    </div>
-    <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showSplitPopup('screenFails','Screen Fails')">
-      <div class="tb-label">Screen Fail</div>
-      <div class="tb-value" style="color:#1843AD" id="kpi-screenfail">0</div>
-      <div class="tb-sub">DNQ + SF</div>
-    </div>
-    <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showRescheduled()">
-      <div class="tb-label">Rescheduled</div>
-      <div class="tb-value" style="color:#059669" id="kpi-rescheduled">0</div>
-      <div class="tb-sub">Rebooked</div>
-    </div>
-    <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showUnscheduledModal()">
-      <div class="tb-label">Not Scheduled</div>
-      <div class="tb-value" style="color:#FF9933" id="kpi-unsched-studies">—</div>
-      <div class="tb-sub">Active, no appt</div>
-    </div>
-    <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showPrescrModal('all')">
-      <div class="tb-label">Calls / FibroScan</div>
-      <div class="tb-value" style="color:#1843AD" id="kpi-prescr-total">—</div>
-      <div class="tb-sub">Pre-screening appts</div>
-    </div>
-  </div>
-  <div class="grid-2 mb16 fade-in">
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title">Reasons by Category</span>
-        <span class="badge badge-gray">Last 2 months · excludes rescheduled</span>
-      </div>
-      <div id="reason-breakdown" style="padding:8px 12px;"></div>
-    </div>
-    <div class="card">
-      <div class="card-header">
-        <span class="card-title">Site Breakdown · PHL vs PNJ</span>
-        <span class="badge badge-gray">All categories by site</span>
-      </div>
-      <div id="site-stacked-bars"></div>
-    </div>
-  </div>
-  <div id="horizon-grid" class="time-banner fade-in" style="margin-bottom:12px;"></div>
+  <!-- Cancellation Analysis moved to Actions tab -->
 
 </div><!-- /view-studies -->
 
@@ -1611,6 +1519,19 @@ body {
       <div id="meta-alerts-container" style="padding:12px 16px;"></div>
     </div>
 
+    <!-- ═══ SECTION 3: RECRUITER PERFORMANCE ═══ -->
+    <div class="section-title" style="margin-top:16px;margin-bottom:8px;">Recruiter Outreach</div>
+    <div class="card fade-in" style="margin-bottom:12px;">
+      <div class="card-header">
+        <span class="card-title">Recruiter Performance</span>
+        <span class="badge badge-gray" id="recruiter-perf-badge">Loading...</span>
+      </div>
+      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Outreach activity · calls, texts, emails (last 30 days)</div>
+      <div id="recruiterPerfContainer" style="padding:0 16px 4px;">
+        <p style="color:#94a3b8;font-size:12px">Loading recruiter data...</p>
+      </div>
+    </div>
+
     <!-- Hidden containers for unused sections -->
     <div style="display:none" id="pipeline-site-content"></div>
     <div style="display:none" id="ref-funnel-container"></div>
@@ -1666,6 +1587,12 @@ body {
       <div class="tb-sub">Active, no appt</div>
     </div>
     <div class="tb-divider"></div>
+    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showRescheduled()">
+      <div class="tb-label">Rescheduled</div>
+      <div class="tb-value" style="color:#059669" id="fu-kpi-rescheduled">0</div>
+      <div class="tb-sub">Rebooked</div>
+    </div>
+    <div class="tb-divider"></div>
     <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="filterFollowUp('actioned')">
       <div class="tb-label">Actioned</div>
       <div class="tb-value green" id="fu-kpi-actioned">0</div>
@@ -1717,6 +1644,28 @@ body {
       </table>
     </div>
   </div>
+
+  <!-- ═══ CANCELLATION ANALYSIS — charts only (KPIs merged into Follow-Up strip above) ═══ -->
+  <div class="section-title" style="margin-top:16px;margin-bottom:8px;">Cancellation Analysis</div>
+  <!-- Hidden compat IDs for JS that writes to old cancel KPIs -->
+  <div style="display:none"><span id="kpi-cancels">0</span><span id="kpi-cancel-range"></span><span id="kpi-noshow">0</span><span id="kpi-withdrew">0</span><span id="kpi-screenfail">0</span><span id="kpi-rescheduled">0</span><span id="kpi-unsched-studies">—</span></div>
+  <div class="grid-2 mb16 fade-in">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Reasons by Category</span>
+        <span class="badge badge-gray">Last 2 months · excludes rescheduled</span>
+      </div>
+      <div id="reason-breakdown" style="padding:8px 12px;"></div>
+    </div>
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Site Breakdown · PHL vs PNJ</span>
+        <span class="badge badge-gray">All categories by site</span>
+      </div>
+      <div id="site-stacked-bars"></div>
+    </div>
+  </div>
+  <div id="horizon-grid" class="time-banner fade-in" style="margin-bottom:12px;"></div>
 
   <!-- Hidden containers for backward compatibility with existing render functions -->
   <div style="display:none" id="risk-flag-cards"></div>
@@ -1828,28 +1777,6 @@ body {
   </div>
 
   <!-- Staff Performance Panel -->
-  <div id="admin-staffperf" style="display:none;">
-    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
-      <span style="font-size:11px;font-weight:600;color:var(--muted)">Period:</span>
-      <button onclick="setStaffPerfPeriod('3m',this)" class="sched-filter active" style="padding:4px 10px;border-radius:16px;font-size:10px;font-weight:600;border:1px solid #1843ad;background:#e8eeff;color:#1843ad;cursor:pointer">Last 3 Mo</button>
-      <button onclick="setStaffPerfPeriod('6m',this)" class="sched-filter" style="padding:4px 10px;border-radius:16px;font-size:10px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Last 6 Mo</button>
-      <button onclick="setStaffPerfPeriod('ytd',this)" class="sched-filter" style="padding:4px 10px;border-radius:16px;font-size:10px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">YTD 2026</button>
-      <button onclick="setStaffPerfPeriod('2025',this)" class="sched-filter" style="padding:4px 10px;border-radius:16px;font-size:10px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">2025</button>
-      <button onclick="setStaffPerfPeriod('all',this)" class="sched-filter" style="padding:4px 10px;border-radius:16px;font-size:10px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">All Time</button>
-    </div>
-    <div id="staffperf-kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:14px;"></div>
-    <div class="card fade-in">
-      <div class="card-header">
-        <span class="card-title">Coordinator & Investigator Revenue vs Cost</span>
-        <span class="badge badge-gray" id="staffperf-badge">Loading...</span>
-      </div>
-      <div id="staffperf-table" style="padding:0 12px 12px;overflow-x:auto;">
-        <p style="color:var(--muted);font-size:12px">Loading staff performance data...</p>
-      </div>
-    </div>
-    <div id="staffperf-detail" style="margin-top:12px;"></div>
-  </div>
-
   <!-- Audit Log Panel -->
   <div id="admin-auditlog" style="display:none;">
     <div class="card fade-in">
@@ -2244,24 +2171,8 @@ body {
     </div>
   </div>
 
-  <!-- ── MARKETING ROI (Meta Ads — spend visible only in Finance) ── -->
-  <div class="group-panel" id="fin-marketing-roi" style="display:none;">
-    <div class="group-title"><span class="gt-icon" style="background:#1843AD"></span> Marketing ROI &mdash; Meta Ads (Last 30 Days)</div>
-    <div id="fin-meta-ads-kpi" style="display:flex;gap:16px;flex-wrap:wrap;padding:12px 16px;border-bottom:1px solid #f1f5f9;"></div>
-    <div id="fin-meta-ads-table" style="overflow-x:auto;"></div>
-  </div>
-
-  <!-- ── CHARTS: Compact overview linking to detail tab ── -->
-  <div class="charts-row">
-    <div class="panel" style="cursor:pointer" onclick="switchTab('fin-revenue',document.querySelector('.nav-tab[data-tab=fin-revenue]'))">
-      <div class="panel-head">Revenue Trend <span style="font-size:10px;color:var(--muted);font-weight:400">→ click for detail</span></div>
-      <div class="chart-wrap"><svg id="revChart" viewBox="0 0 1000 310" style="width:100%;height:200px"></svg></div>
-    </div>
-    <div class="panel" style="cursor:pointer" onclick="switchTab('fin-revenue',document.querySelector('.nav-tab[data-tab=fin-revenue]'))">
-      <div class="panel-head">Payments Collected <span style="font-size:10px;color:var(--muted);font-weight:400">→ click for detail</span></div>
-      <div class="chart-wrap"><svg id="payChartOverview" viewBox="0 0 1000 310" style="width:100%;height:200px"></svg></div>
-    </div>
-  </div>
+  <!-- Hidden compat for JS that draws to these SVGs -->
+  <div style="display:none"><div id="fin-marketing-roi"><div id="fin-meta-ads-kpi"></div><div id="fin-meta-ads-table"></div></div><svg id="revChart"></svg><svg id="payChartOverview"></svg></div>
 
   <!-- ── TOP STUDIES TABLE ── -->
   <div class="group-panel">
@@ -2278,65 +2189,16 @@ body {
 <!-- ═══════════ COLLECTIONS ═══════════ -->
 
 <!-- ═════ Finance Collections View (Lines 2940-2966) ═════ -->
-<div id="view-fin-collections" class="view">
-  <div class="section-label">Collection Status Summary</div>
-  <div class="coll-summary" id="collSummary"></div>
-
-  <div class="filter-bar">
-    <span style="font-size:11px;font-weight:600;color:#718096;margin-right:4px">Filter:</span>
-    <div id="statusFilters"></div>
-    <span style="margin-left:auto;font-size:11px;font-weight:600;color:#718096">Sort:</span>
-    <select class="sort-sel" onchange="collSort=this.value;renderCollections()">
-      <option value="days">Days Overdue</option>
-      <option value="amount">Amount</option>
-      <option value="status">Status</option>
-    </select>
-  </div>
-
-  <div class="panel">
-    <div class="panel-head"><span id="coll-panel-count">All Unpaid Invoices</span></div>
-    <div class="panel-body" style="overflow-x:auto">
-      <table class="tbl">
-        <thead><tr><th>Study</th><th>Invoice</th><th class="r">Days</th><th class="r">Amount</th><th>Status</th><th>Notes</th></tr></thead>
-        <tbody id="collBody"></tbody>
-      </table>
-    </div>
-  </div>
-</div>
-
-<!-- ═══════════ AGING AR ═══════════ -->
-
-<!-- ═════ Finance Aging View (Lines 2967-2992) ═════ -->
-<div id="view-fin-aging" class="view">
-  <div class="section-label">Aging Buckets (Invoice + Autopay Combined)</div>
-  <div class="kpi-row" id="agingKPIs"></div>
-
-  <div class="section-label">Invoice AR Aging Detail</div>
-  <div class="panel">
-    <div class="panel-body" style="overflow-x:auto">
-      <table class="tbl">
-        <thead><tr><th>Study</th><th class="r">Current</th><th class="r">30-60d</th><th class="r">61-90d</th><th class="r">91-120d</th><th class="r">121-150d</th><th class="r">&gt;150d</th><th class="r">Total</th></tr></thead>
-        <tbody id="invAgingBody"></tbody>
-      </table>
-    </div>
-  </div>
-
-  <div class="section-label">Autopay AR Aging Detail</div>
-  <div class="panel">
-    <div class="panel-body" style="overflow-x:auto">
-      <table class="tbl">
-        <thead><tr><th>Study</th><th class="r">Current</th><th class="r">30-60d</th><th class="r">61-90d</th><th class="r">91-120d</th><th class="r">121-150d</th><th class="r">&gt;150d</th><th class="r">Total</th></tr></thead>
-        <tbody id="apAgingBody"></tbody>
-      </table>
-    </div>
-  </div>
-</div>
+<!-- Collect and Aging merged into Billing tab -->
+<div id="view-fin-collections" class="view" style="display:none"></div>
+<div id="view-fin-aging" class="view" style="display:none"></div>
 
 <!-- ═══════════ REVENUE ═══════════ -->
 
 <!-- ═════ Finance Revenue View (Lines 2993-3063) ═════ -->
 <div id="view-fin-revenue" class="view">
 
+  <!-- ═══ REVENUE ═══ -->
   <!-- Revenue KPIs -->
   <div class="kpi-row" id="revKpiRow">
     <div class="kpi kpi-clickable" style="cursor:pointer" onclick="showRevTotalPopup()"><div class="kpi-stripe" style="background:#1843AD"></div><div class="label">Total Revenue (12M)</div><div class="value" id="rev-total" style="color:#1843AD">--</div><div class="sub" id="rev-total-sub"></div></div>
@@ -2429,6 +2291,55 @@ body {
       <table class="tbl">
         <thead><tr><th>Study</th><th>Item</th><th>Category</th><th class="r">Amount</th></tr></thead>
         <tbody id="uninvDetailBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ═══ AGING (merged from standalone tab) ═══ -->
+  <div class="section-label" style="margin-top:20px">Aging Buckets (Invoice + Autopay Combined)</div>
+  <div class="kpi-row" id="agingKPIs"></div>
+
+  <div class="section-label">Invoice AR Aging Detail</div>
+  <div class="panel">
+    <div class="panel-body" style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>Study</th><th class="r">Current</th><th class="r">30-60d</th><th class="r">61-90d</th><th class="r">91-120d</th><th class="r">121-150d</th><th class="r">&gt;150d</th><th class="r">Total</th></tr></thead>
+        <tbody id="invAgingBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section-label">Autopay AR Aging Detail</div>
+  <div class="panel">
+    <div class="panel-body" style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>Study</th><th class="r">Current</th><th class="r">30-60d</th><th class="r">61-90d</th><th class="r">91-120d</th><th class="r">121-150d</th><th class="r">&gt;150d</th><th class="r">Total</th></tr></thead>
+        <tbody id="apAgingBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ═══ COLLECTIONS (merged from standalone tab) ═══ -->
+  <div class="section-label" style="margin-top:20px">Collection Status Summary</div>
+  <div class="coll-summary" id="collSummary"></div>
+
+  <div class="filter-bar">
+    <span style="font-size:11px;font-weight:600;color:#718096;margin-right:4px">Filter:</span>
+    <div id="statusFilters"></div>
+    <span style="margin-left:auto;font-size:11px;font-weight:600;color:#718096">Sort:</span>
+    <select class="sort-sel" onchange="collSort=this.value;renderCollections()">
+      <option value="days">Days Overdue</option>
+      <option value="amount">Amount</option>
+      <option value="status">Status</option>
+    </select>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><span id="coll-panel-count">All Unpaid Invoices</span></div>
+    <div class="panel-body" style="overflow-x:auto">
+      <table class="tbl">
+        <thead><tr><th>Study</th><th>Invoice</th><th class="r">Days</th><th class="r">Amount</th><th>Status</th><th>Notes</th></tr></thead>
+        <tbody id="collBody"></tbody>
       </table>
     </div>
   </div>
@@ -2536,29 +2447,8 @@ body {
     </div>
   </div>
 
-  <!-- AR Aging -->
-  <div class="section-label">Accounts Receivable — Aging Summary</div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:12px;">
-    <div class="panel">
-      <div class="panel-body" style="padding:12px;">
-        <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:8px;">AR Aging by Bucket</div>
-        <canvas id="qbAgingBarChart" height="220"></canvas>
-      </div>
-    </div>
-    <div class="panel">
-      <div class="panel-body" style="padding:12px;" id="qbAgingSummary">
-        <div style="color:var(--muted);font-size:11px;">Loading aging data…</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Payment Trend -->
-  <div class="section-label">Payment Trend</div>
-  <div class="panel" style="margin-bottom:12px;">
-    <div class="panel-body" style="padding:12px;">
-      <canvas id="qbPaymentTrendChart" height="200"></canvas>
-    </div>
-  </div>
+  <!-- AR Aging + Payment Trend removed (now in Billing tab) — hidden compat for JS -->
+  <div style="display:none"><canvas id="qbAgingBarChart"></canvas><div id="qbAgingSummary"></div><canvas id="qbPaymentTrendChart"></canvas></div>
 
   <div class="section-label">Staff Hours by Study (QB Time Activity)</div>
   <div class="panel">

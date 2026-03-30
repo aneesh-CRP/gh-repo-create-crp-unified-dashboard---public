@@ -578,7 +578,7 @@ const CRP_CONFIG = {
   // Tab registry — add new tabs here
   TABS: {
     PERFORMANCE: ['overview', 'studies', 'schedule', 'referrals', 'admin'],
-    FINANCE: ['fin-overview', 'fin-collections', 'fin-aging', 'fin-revenue', 'fin-qb', 'fin-productivity', 'insights'],
+    FINANCE: ['fin-overview', 'fin-revenue', 'fin-qb', 'fin-productivity', 'insights'],
     CROSS: ['insights'],
   },
 
@@ -802,6 +802,7 @@ const CRIO_LINKS = {
 // ═══ FINANCE JS (from v8) ═══
 
 // ══════════ DATA (defaults — overwritten by live fetch from Finance Master Sheet) ══════════
+var FIN_MERGED_STUDIES = [];
 let AGING_INV=[{"study":"Abbvie - M20-465","current":24232.33,"d30_60":10568.04,"d61_90":0.0,"d91_120":39894.1,"d121_150":1713.15,"d150plus":0.0},{"study":"Abbvie - M23-698","current":0.0,"d30_60":0.0,"d61_90":0.0,"d91_120":0.0,"d121_150":464.4,"d150plus":8004.02},{"study":"Abbvie - M23-714","current":4533.07,"d30_60":0.0,"d61_90":0.0,"d91_120":0.0,"d121_150":0.0,"d150plus":2641.57},{"study":"Abbvie - M24-601","current":0.0,"d30_60":0.0,"d61_90":6000.0,"d91_120":15000.0,"d121_150":0.0,"d150plus":12670.95},{"study":"Alumis Inc. - ESK-001-010","current":0.0,"d30_60":0.0,"d61_90":0.0,"d91_120":0.0,"d121_150":2000.0,"d150plus":0.0},{"study":"Amgen, Inc. - 20230222","current":21000.0,"d30_60":0.0,"d61_90":0.0,"d91_120":0.0,"d121_150":0.0,"d150plus":600.0},{"study":"Astrazeneca Pharmaceuticals - D6973C00001","current":0.0,"d30_60":3000.0,"d61_90":0.0,"d91_120":0.0,"d121_150":0.0,"d150plus":884.5},{"study":"Astrazeneca Pharmaceuticals - D7960C00015","current":0.0,"d30_60":750.0,"d61_90":17000.0,"d91_120":0.0,"d121_150":0.0,"d150plus":379.0},{"study":"Celldex Therapeutics - CDX0159-12","current":0.0,"d30_60":0.0,"d61_90":0.0,"d91_120":0.0,"d121_150":1000.0,"d150plus":397.13},{"study":"Eli Lilly and Company - I8F-MC-GPHE","current":0.0,"d30_60":1500.0,"d61_90":0.0,"d91_120":0.0,"d121_150":0.0,"d150plus":3868.0},{"study":"Eli Lilly and Company - J1G-MC-LAKI","current":83543.0,"d30_60":0.0,"d61_90":0.0,"d91_120":0.0,"d121_150":0.0,"d150plus":15450.0},{"study":"Eli Lilly and Company - J1I-MC-GZBO (TRIUMPH-OUTCOMES)","current":4600.0,"d30_60":0.0,"d61_90":0.0,"d91_120":0.0,"d121_150":0.0,"d150plus":550.0},{"study":"Eli Lilly and Company - J1I-MC-GZBY","current":0.0,"d30_60":1150.0,"d61_90":0.0,"d91_120":0.0,"d121_150":0.0,"d150plus":550.0},{"study":"Eli Lilly and Company - J2A-MC-GZGS","current":0.0,"d30_60":5750.0,"d61_90":0.0,"d91_120":0.0,"d121_150":0.0,"d150plus":0.0},{"study":"Eli Lilly and Company - J2A-MC-GZPO","current":0.0,"d30_60":2300.0,"d61_90":0.0,"d91_120":0.0,"d121_150":0.0,"d150plus":42553.0},{"study":"Eli Lilly and Company - J2A-MC-GZPS","current":0.0,"d30_60":0.0,"d61_90":0.0,"d91_120":0.0,"d121_150":0.0,"d150plus":0.0},{"study":"Eli Lilly and Company - J3F-MC-EZCC","current":0.0,"d30_60":0.0,"d61_90":19250.0,"d91_120":0.0,"d121_150":0.0,"d150plus":0.0},{"study":"Eli Lilly and Company - J3L-MC-EZEF","current":0.0,"d30_60":9200.0,"d61_90":0.0,"d91_120":0.0,"d121_150":0.0,"d150plus":68171.0},{"study":"Eli Lilly and Company - N1T-MC-MALO","current":19250.0,"d30_60":725.0,"d61_90":0.0,"d91_120":0.0,"d121_150":0.0,"d150plus":0.0},{"study":"Janssen Pharmaceuticals, Inc. - 88545223PSA2001","current":0.0,"d30_60":0.0,"d61_90":0.0,"d91_120":0.0,"d121_150":0.0,"d150plus":0.0},{"study":"Janssen Research & Development, LLC - 80202135SJS3001","current":0.0,"d30_60":3425.0,"d61_90":0.0,"d91_120":0.0,"d121_150":0.0,"d150plus":1755.0},{"study":"Johnson & Johnson - 77242113PSO3006","current":0.0,"d30_60":1000.0,"d61_90":5000.0,"d91_120":0.0,"d121_150":0.0,"d150plus":3000.0},{"study":"Johnson & Johnson - 95597528ADM2001","current":0.0,"d30_60":0.0,"d61_90":0.0,"d91_120":0.0,"d121_150":0.0,"d150plus":0.0},{"study":"Mylan Inc. - MR-130A-01-TD-3001","current":0.0,"d30_60":0.0,"d61_90":3500.0,"d91_120":0.0,"d121_150":750.0,"d150plus":10036.0},{"study":"Pfizer Inc. - C4951063","current":0.0,"d30_60":0.0,"d61_90":0.0,"d91_120":0.0,"d121_150":0.0,"d150plus":0.0},{"study":"Sanofi US Services Inc. - EFC17559","current":0.0,"d30_60":0.0,"d61_90":0.0,"d91_120":0.0,"d121_150":0.0,"d150plus":12244.0},{"study":"Sanofi US Services Inc. - EFC17599","current":0.0,"d30_60":0.0,"d61_90":0.0,"d91_120":0.0,"d121_150":0.0,"d150plus":1220.0},{"study":"Sanofi US Services Inc. - EFC17600 (ESTUARY)","current":0.0,"d30_60":2000.0,"d61_90":0.0,"d91_120":7406.0,"d121_150":1250.0,"d150plus":0.0},{"study":"Sanofi US Services Inc. - EFC18366","current":0.0,"d30_60":0.0,"d61_90":3000.0,"d91_120":0.0,"d121_150":0.0,"d150plus":0.0},{"study":"Sanofi US Services Inc. - LTS17367","current":0.0,"d30_60":1000.0,"d61_90":0.0,"d91_120":0.0,"d121_150":0.0,"d150plus":0.0}];
 
 let AGING_AP=[{"study":"Abbvie - M20-465","current":32440.26,"d30_60":22113.38,"d61_90":14723.35,"d91_120":11238.57,"d121_150":623.3,"d150plus":1246.6},{"study":"Abbvie - M23-698","current":0.0,"d30_60":3824.62,"d61_90":0.0,"d91_120":0.0,"d121_150":0.0,"d150plus":701.0},{"study":"Abbvie - M23-714","current":7093.44,"d30_60":6616.51,"d61_90":4218.05,"d91_120":0.0,"d121_150":7181.58,"d150plus":63953.42},{"study":"Abbvie - M24-601","current":0.0,"d30_60":0.0,"d61_90":0.0,"d91_120":0.0,"d121_150":0.0,"d150plus":0.0},{"study":"Amgen, Inc. - 20230222","current":19513.45,"d30_60":4849.0,"d61_90":0.0,"d91_120":0.0,"d121_150":0.0,"d150plus":0.0},{"study":"Astrazeneca Pharmaceuticals - D6973C00001","current":4640.3,"d30_60":3117.8,"d61_90":0.0,"d91_120":5606.1,"d121_150":0.0,"d150plus":0.0},{"study":"Astrazeneca Pharmaceuticals - D7960C00015","current":0.0,"d30_60":0.0,"d61_90":0.0,"d91_120":1557.75,"d121_150":0.0,"d150plus":0.0},{"study":"Celldex Therapeutics - CDX0159-12","current":1599.24,"d30_60":1820.31,"d61_90":1544.91,"d91_120":0.0,"d121_150":0.0,"d150plus":6939.02},{"study":"Eli Lilly and Company - I8F-MC-GPHE","current":2883.0,"d30_60":0.0,"d61_90":0.0,"d91_120":0.0,"d121_150":0.0,"d150plus":0.0},{"study":"Eli Lilly and Company - J1G-MC-LAKI","current":4964.0,"d30_60":0.0,"d61_90":6230.0,"d91_120":0.0,"d121_150":0.0,"d150plus":21124.0},{"study":"Eli Lilly and Company - J1I-MC-GZBO (TRIUMPH-OUTCOMES)","current":0.0,"d30_60":0.0,"d61_90":0.0,"d91_120":0.0,"d121_150":0.0,"d150plus":0.0},{"study":"Eli Lilly and Company - J1I-MC-GZBY","current":0.0,"d30_60":0.0,"d61_90":0.0,"d91_120":0.0,"d121_150":0.0,"d150plus":0.0},{"study":"Eli Lilly and Company - J2A-MC-GZGS","current":2978.0,"d30_60":0.0,"d61_90":0.0,"d91_120":1998.0,"d121_150":0.0,"d150plus":0.0},{"study":"Eli Lilly and Company - J2A-MC-GZPO","current":10431.0,"d30_60":0.0,"d61_90":2301.0,"d91_120":0.0,"d121_150":8257.0,"d150plus":26808.0},{"study":"Eli Lilly and Company - J2A-MC-GZPS","current":0.0,"d30_60":0.0,"d61_90":0.0,"d91_120":0.0,"d121_150":0.0,"d150plus":0.0},{"study":"Eli Lilly and Company - J3F-MC-EZCC","current":0.0,"d30_60":0.0,"d61_90":0.0,"d91_120":0.0,"d121_150":0.0,"d150plus":0.0},{"study":"Eli Lilly and Company - J3L-MC-EZEF","current":22579.0,"d30_60":0.0,"d61_90":854.0,"d91_120":854.0,"d121_150":26470.0,"d150plus":12665.0},{"study":"Eli Lilly and Company - N1T-MC-MALO","current":12307.0,"d30_60":0.0,"d61_90":0.0,"d91_120":0.0,"d121_150":0.0,"d150plus":0.0},{"study":"Janssen Research & Development, LLC - 80202135SJS3001","current":10364.0,"d30_60":5530.0,"d61_90":4623.0,"d91_120":0.0,"d121_150":0.0,"d150plus":0.0},{"study":"Johnson & Johnson - 77242113PSO3006","current":17106.0,"d30_60":11149.0,"d61_90":0.0,"d91_120":0.0,"d121_150":0.0,"d150plus":3393.0},{"study":"Mylan Inc. - MR-100A-01-TD-3001","current":0.0,"d30_60":0.0,"d61_90":0.0,"d91_120":0.0,"d121_150":0.0,"d150plus":404.3},{"study":"Mylan Inc. - MR-130A-01-TD-3001","current":6426.0,"d30_60":4382.3,"d61_90":5800.4,"d91_120":5445.2,"d121_150":9613.5,"d150plus":34597.15},{"study":"Pfizer Inc. - C4951063","current":8902.37,"d30_60":1505.25,"d61_90":5949.61,"d91_120":0.0,"d121_150":0.0,"d150plus":0.0},{"study":"Sanofi US Services Inc. - EFC17559","current":0.0,"d30_60":0.0,"d61_90":0.0,"d91_120":0.0,"d121_150":0.0,"d150plus":0.0},{"study":"Sanofi US Services Inc. - EFC17599","current":3503.0,"d30_60":5920.0,"d61_90":3512.3,"d91_120":0.0,"d121_150":0.0,"d150plus":0.0},{"study":"Sanofi US Services Inc. - EFC17600 (ESTUARY)","current":4869.6,"d30_60":3786.0,"d61_90":3769.2,"d91_120":0.0,"d121_150":0.0,"d150plus":0.0},{"study":"Sanofi US Services Inc. - LTS17367","current":1335.6,"d30_60":2488.5,"d61_90":0.0,"d91_120":0.0,"d121_150":0.0,"d150plus":0.0}];
@@ -842,7 +843,7 @@ let CONTACT_ALERTS = [];       // [{patient,study,alert_type,severity,detail,pat
 // ══════════ HELPERS ══════════
 const fmt=v=>{const a=Math.abs(v);return a%1===0?'$'+a.toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0}):'$'+a.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});};
 const fmtK=v=>v>=1000?'$'+Math.round(v/1000).toLocaleString()+'K':'$'+Math.round(v).toLocaleString();
-function pid(s){const m=s.match(/- ([A-Z0-9][A-Za-z0-9\-]+ ?(\(.+?\))?)/);return m?m[1].replace(/ \(.*/,''):null;}
+function pid(s){const i=s.indexOf(' - ');return i>=0?s.substring(i+3).trim():null;}
 function slink(s){var es=escapeHTML(s);const p=pid(s);if(p&&CRIO_LINKS[p])return'<a href="'+escapeHTML(CRIO_LINKS[p])+'" target="_blank" class="study-link">'+es+'</a>';return es;}
 
 // ══════════ MODAL ══════════
@@ -1070,7 +1071,8 @@ function renderUninvoiced(){
 // ══════════ ENHANCED REVENUE TAB ══════════
 function renderRevenueTab() {
   // KPIs
-  const total12m = Object.values(STUDY_REVENUE_12M).reduce((s,v) => s+v, 0);
+  // Use MONTHLY_REVENUE as canonical source (same as Finance Overview)
+  const total12m = MONTHLY_REVENUE ? MONTHLY_REVENUE.reduce(function(s,r){return s+(r.autopay||0)+(r.procedures||0)+(r.invoicables||0);},0) : 0;
   const monthCount = MONTHLY_REVENUE.length || 1;
   const avgMonthly = total12m / Math.min(monthCount, 12);
   const studyCount = Object.keys(STUDY_REVENUE_12M).length || 1;
@@ -1288,6 +1290,7 @@ function getCategoryColor(cat) {
 
 function renderStudies(){
   const tb=document.getElementById('studiesBody');
+  if(!tb)return;
   tb.innerHTML=FIN_MERGED_STUDIES.map(r=>{const rev=STUDY_REVENUE_12M[r.study]||0;const ar=TOP_AR_STUDIES.find(x=>x.study.includes(r.study));const arv=ar?ar.total:0;
     const pc=r.status==='Enrolling'?'pill-enrolling':r.status==='Maintenance'?'pill-maintenance':'pill-pre-closed';
     const lnk=CRIO_LINKS[r.study]?'<a href="'+escapeHTML(CRIO_LINKS[r.study])+'" target="_blank" class="study-link">'+escapeHTML(r.study)+'</a>':escapeHTML(r.study);
@@ -2347,10 +2350,8 @@ function switchTab(name, el) {
     if (!finInitDone) initFinanceDashboard();
     // Re-render the specific tab
     try {
-      if (name === 'fin-collections') { initColl(); renderCollections(); }
-      if (name === 'fin-aging') { renderAgingKPIs(); renderAgingTables(); }
-      if (name === 'fin-revenue') { renderRevenueTab(); }
-      if (name === 'fin-qb' && typeof renderQBView === 'function') { renderQBView(); }
+      if (name === 'fin-revenue') { renderRevenueTab(); renderAgingKPIs(); renderAgingTables(); initColl(); renderCollections(); }
+      if (name === 'fin-qb' && QB_DATA.loaded) { renderCRIOvsQB(); }
     } catch(e) { console.warn('Finance sub-tab render error:', e); }
   }
 
@@ -2865,6 +2866,8 @@ function chartDefaults() {
 function mkChart(id, config) {
   var el = document.getElementById(id);
   if (!el) return;
+  // Skip rendering to hidden/zero-size canvases (Chart.js creates broken 0x0 instances)
+  if (!el.offsetWidth && !el.offsetHeight) return;
   // Add explicit scale type to suppress Chart.js 4.x resolver warnings
   if (config.options && config.options.scales) {
     Object.keys(config.options.scales).forEach(function(k) {
@@ -4503,34 +4506,47 @@ function renderRegulatoryPerformance(containerId, badgeId) {
     return '<td style="text-align:center;font-weight:700;font-size:11px;cursor:pointer;color:#dc2626;" onclick="showRegPerfDetail(\''+jsAttr(userName)+'\',\'pending\')">' + val + '</td>';
   }
 
-  function buildGroup(title, users, columns) {
-    if (users.length === 0) return '';
-    var maxDone = Math.max.apply(null, users.map(totalDone).concat([1]));
-    var h = '<div style="font-size:12px;font-weight:700;color:#072061;margin:10px 0 6px;">'+title+'</div>';
-    h += '<table style="width:100%;border-collapse:collapse;font-size:11px;"><thead><tr style="background:var(--surface2);border-bottom:2px solid var(--border);">';
-    h += '<th style="text-align:left;padding:6px 8px;font-weight:700;">Name</th>';
-    h += '<th style="text-align:center;padding:4px 6px;font-weight:700;">Site</th>';
-    columns.forEach(function(c) { h += '<th style="text-align:center;padding:4px 6px;font-weight:700;color:'+c.color+';">'+c.label+'</th>'; });
-    h += '<th style="text-align:center;padding:4px 6px;font-weight:700;">Done</th>';
-    h += '<th style="text-align:center;padding:4px 6px;font-weight:700;color:#dc2626;">Pending</th>';
-    h += '<th style="padding:4px 8px;font-weight:700;">Volume</th>';
+  // All columns for unified table
+  var allCols = [
+    {key:'docs_signed',label:'Signed',color:'#1843AD'},
+    {key:'docs_uploaded',label:'Uploaded',color:'#072061'},
+    {key:'comments',label:'Comments',color:'#FF9933'},
+    {key:'signoffs',label:'Sign-Offs',color:'#059669'}
+  ];
+
+  function buildUnifiedTable(groupList) {
+    var globalMax = 1;
+    groupList.forEach(function(g) { g.users.forEach(function(u) { globalMax = Math.max(globalMax, totalDone(u)); }); });
+
+    var h = '<table style="width:100%;border-collapse:collapse;font-size:11px;"><thead><tr style="background:var(--surface2);border-bottom:2px solid var(--border);">';
+    h += '<th style="text-align:left;padding:6px 8px;font-weight:700;width:18%;">Name</th>';
+    h += '<th style="text-align:center;padding:4px 6px;font-weight:700;width:6%;">Site</th>';
+    allCols.forEach(function(c) { h += '<th style="text-align:center;padding:4px 6px;font-weight:700;color:'+c.color+';width:9%;">'+c.label+'</th>'; });
+    h += '<th style="text-align:center;padding:4px 6px;font-weight:700;width:7%;">Done</th>';
+    h += '<th style="text-align:center;padding:4px 6px;font-weight:700;color:#dc2626;width:8%;">Pending</th>';
+    h += '<th style="padding:4px 8px;font-weight:700;width:15%;">Volume</th>';
     h += '</tr></thead><tbody>';
-    users.forEach(function(u) {
-      var done = totalDone(u);
-      var pend = totalPending(u);
-      var barDone = Math.round(done / maxDone * 100);
-      var barPend = pend > 0 ? Math.min(30, Math.round(pend / (done + pend) * 100)) : 0;
-      h += '<tr style="border-bottom:1px solid #f1f5f9;">';
-      h += '<td style="padding:6px 8px;font-weight:600;">'+escapeHTML(u.name)+'</td>';
-      h += '<td style="text-align:center;padding:4px 6px;">'+siteLabel(u.site)+'</td>';
-      columns.forEach(function(c) { h += numCell(u[c.key], u.name, c.key, c.color); });
-      h += '<td style="text-align:center;font-weight:700;color:#1843AD;">'+done+'</td>';
-      h += pendCell(pend, u.name);
-      h += '<td style="padding:4px 8px;"><div style="display:flex;height:10px;border-radius:3px;overflow:hidden;background:#e2e8f0;">';
-      h += '<div style="width:'+barDone+'%;background:#1843AD;"></div>';
-      if (barPend) h += '<div style="width:'+barPend+'%;background:#dc2626;"></div>';
-      h += '</div></td>';
-      h += '</tr>';
+
+    groupList.forEach(function(g) {
+      if (g.users.length === 0) return;
+      h += '<tr><td colspan="9" style="padding:8px 8px 4px;font-size:12px;font-weight:700;color:#072061;background:#f8fafc;border-bottom:1px solid var(--border);">'+g.title+'</td></tr>';
+      g.users.forEach(function(u) {
+        var done = totalDone(u);
+        var pend = totalPending(u);
+        var barDone = Math.round(done / globalMax * 100);
+        var barPend = pend > 0 ? Math.min(30, Math.round(pend / (done + pend) * 100)) : 0;
+        h += '<tr style="border-bottom:1px solid #f1f5f9;">';
+        h += '<td style="padding:6px 8px;font-weight:600;">'+escapeHTML(u.name)+'</td>';
+        h += '<td style="text-align:center;padding:4px 6px;">'+siteLabel(u.site)+'</td>';
+        allCols.forEach(function(c) { h += numCell(u[c.key], u.name, c.key, c.color); });
+        h += '<td style="text-align:center;font-weight:700;color:#1843AD;">'+done+'</td>';
+        h += pendCell(pend, u.name);
+        h += '<td style="padding:4px 8px;"><div style="display:flex;height:10px;border-radius:3px;overflow:hidden;background:#e2e8f0;">';
+        h += '<div style="width:'+barDone+'%;background:#1843AD;"></div>';
+        if (barPend) h += '<div style="width:'+barPend+'%;background:#dc2626;"></div>';
+        h += '</div></td>';
+        h += '</tr>';
+      });
     });
     h += '</tbody></table>';
     return h;
@@ -4545,18 +4561,10 @@ function renderRegulatoryPerformance(containerId, badgeId) {
   html += '<div><div style="font-size:18px;font-weight:800;color:#dc2626;">'+totalPend+'</div><div style="font-size:9px;color:#94a3b8;">Pending</div></div>';
   html += '</div>';
 
-  html += buildGroup('Coordinators', groups.coord, [
-    {key:'docs_signed',label:'Signed',color:'#1843AD'},
-    {key:'docs_uploaded',label:'Uploaded',color:'#072061'},
-    {key:'comments',label:'Comments',color:'#FF9933'}
-  ]);
-  html += buildGroup('Remote CRCs', groups.remote, [
-    {key:'docs_uploaded',label:'Uploaded',color:'#072061'},
-    {key:'comments',label:'Comments',color:'#FF9933'}
-  ]);
-  html += buildGroup('Investigators', groups.inv, [
-    {key:'docs_signed',label:'Signed',color:'#1843AD'},
-    {key:'signoffs',label:'Sign-Offs',color:'#059669'}
+  html += buildUnifiedTable([
+    {title:'Coordinators', users: groups.coord},
+    {title:'Remote CRCs', users: groups.remote},
+    {title:'Investigators', users: groups.inv}
   ]);
 
   el.innerHTML = html;
@@ -4705,6 +4713,7 @@ function renderOpsPipeline() {
     h += '<th style="text-align:left;">Sponsor</th>';
     h += '<th style="text-align:left;">PI</th>';
     h += '<th style="text-align:left;">Coordinator</th>';
+    h += '<th style="text-align:center;">Est. Start</th>';
     h += '<th style="text-align:left;">Therapeutic Area</th>';
     h += '<th style="text-align:left;">Site</th>';
     h += '<th style="text-align:center;">eSource</th>';
@@ -4722,6 +4731,7 @@ function renderOpsPipeline() {
       h += '<td style="font-size:10px;color:#64748b">' + escapeHTML(r.sponsor || '—') + '</td>';
       h += '<td style="font-size:10px;">' + escapeHTML(r.pi || '—') + '</td>';
       h += '<td style="font-size:10px;">' + escapeHTML(r.primary_coordinator || '—') + '</td>';
+      h += '<td style="text-align:center;font-size:10px;color:#64748b">' + escapeHTML(r.start_date || '—') + '</td>';
       h += '<td style="font-size:10px;color:#64748b">' + escapeHTML(r.therapeutic_area || '—') + '</td>';
       h += '<td style="font-size:10px;">' + escapeHTML(r.site || '—') + '</td>';
       h += '<td style="text-align:center;"><span style="font-size:9px;font-weight:600;color:' + esColor + '">' + escapeHTML(r.crio_esource || '—') + '</span></td>';
@@ -5739,6 +5749,8 @@ function fetchActionRequiredData() {
     _s('ar-ereg-sub', eregRows.length > 0 ? eregStudies + ' studies' : 'All clear');
 
     _log('Action Required: queries=' + comments.length + ', unsignedDocs=' + unsignedTotal + ', overdueTodos=' + overdue.length + ', eReg=' + eregRows.length + ', recruiters=' + window._recruiterStats.length);
+    // Update Operations KPIs (they read from ar-* hidden spans)
+    if (typeof _renderOpsContent === 'function') try { _renderOpsContent(); } catch(e2) {}
     // Re-render recruiter card with BQ outreach data
     if (typeof renderRecruiterPerformance === 'function') try { renderRecruiterPerformance(); } catch(e2) {}
   }).catch(function(e) {
@@ -6835,128 +6847,125 @@ async function fetchFinanceLive() {
 let QB_DATA = { pnlMonthly: [], pnlByStudy: {}, pnlUnmatched: [], qbTotalIncome: 0, qbPeriod: '', invoiceLines: [], pnlClass: [], timeActivity: [], payments: [], empMap: {}, studyHoursAll: {}, studyBillableAll: {}, totalTrackedHours: 0, totalAllHours: 0, totalBillableHours: 0, pnlCostByName: {}, loaded: false };
 
 async function fetchQuickBooksData() {
-  const pk = CRP_CONFIG.DATA_FEEDS.FINANCE_PUB_KEY;
-  const tabs = CRP_CONFIG.FINANCE_TABS;
-  if (!pk || !tabs.QB_PNL_MONTHLY) return;
+  var base = CRP_CONFIG.CF_BASE;
+  if (!base) return;
 
-  _log('CRP QB: Fetching QuickBooks data...');
+  _log('CRP QB: Fetching live QuickBooks data from API...');
   try {
-    const fetches = [
-      fetchFinanceTab(pk, tabs.QB_PNL_MONTHLY),
-      fetchFinanceTab(pk, tabs.QB_PNL_CLASS),
-      fetchFinanceTab(pk, tabs.QB_INVOICE_LINES),
-      fetchFinanceTab(pk, tabs.QB_TIME_ACTIVITY),
-      fetchFinanceTab(pk, tabs.QB_CLASSES),
-      fetchFinanceTab(pk, tabs.QB_PAYMENTS),
-    ];
-    const results = await Promise.all(fetches);
-    const [pnlMonthly, pnlCls, invLines, timeAct, classes, payments] = results;
+    // Fetch all QB data from live cloud function feeds in parallel
+    var [pnlRes, timeRes, invRes, payRes] = await Promise.all([
+      fetch(base + '?feed=qbPnlMonthly&format=json').then(function(r){return r.json();}),
+      fetch(base + '?feed=qbTimeActivity&format=json').then(function(r){return r.json();}),
+      fetch(base + '?feed=qbInvoices&format=json').then(function(r){return r.json();}),
+      fetch(base + '?feed=qbPayments&format=json').then(function(r){return r.json();}),
+    ]);
 
-    // ── Detect QB period from PnL Monthly column headers
-    const monthCols = pnlMonthly.length > 0 ? Object.keys(pnlMonthly[0]).filter(k => k !== 'Account' && k !== 'Total') : [];
-    const qbPeriod = monthCols.length >= 2 ? monthCols[0] + ' — ' + monthCols[monthCols.length - 1] : '';
+    var pnlData = pnlRes.data || pnlRes;
+    var pnlRows = pnlData.rows || [];
+    var monthCols = pnlData.months || [];
+    var timeAct = timeRes.data || [];
+    var qbInvoices = invRes.data || [];
+    var qbPayments = payRes.data || [];
 
-    // ── Parse PnL Monthly — ONLY income rows (stop at Gross Profit/Total Income)
-    const studyCodes = typeof STUDY_REVENUE_12M !== 'undefined' ? Object.keys(STUDY_REVENUE_12M) : [];
-    const pnlByStudy = {};
-    const pnlUnmatched = [];
-    let qbTotalIncome = 0;
-    let pastIncome = false;
+    var qbPeriod = monthCols.length >= 2 ? monthCols[0] + ' — ' + monthCols[monthCols.length - 1] : '';
 
-    pnlMonthly.forEach(r => {
-      const acct = (r['Account'] || Object.values(r)[0] || '').trim();
+    // ── Parse PnL rows — match to CRIO study codes
+    var studyCodes = typeof STUDY_REVENUE_12M !== 'undefined' ? Object.keys(STUDY_REVENUE_12M) : [];
+    var pnlByStudy = {};
+    var pnlUnmatched = [];
+    var qbTotalIncome = 0;
+
+    pnlRows.forEach(function(r) {
+      var acct = (r.account || '').trim();
       if (!acct) return;
-      const acctLower = acct.toLowerCase();
+      var acctLower = acct.toLowerCase();
+      if (acctLower.startsWith('total ')) return;
 
-      // Stop at the income/expense boundary
-      if (acctLower === 'gross profit' || acctLower === 'total income') { pastIncome = true; return; }
-      if (pastIncome) return;
-      if (acctLower.startsWith('total ')) return; // skip category subtotals
-
-      const total = parseFloat(r['Total']) || 0;
-      if (total === 0) return;
-
+      var total = r.total || 0;
+      if (total <= 0) return;
       qbTotalIncome += total;
 
-      // Build monthly breakdown
-      const monthly = {};
-      Object.keys(r).forEach(k => {
-        if (k !== 'Account' && k !== 'Total') {
-          const v = parseFloat(r[k]);
-          if (!isNaN(v) && v !== 0) monthly[k] = v;
-        }
-      });
+      // Build monthly breakdown from the row
+      var monthly = {};
+      monthCols.forEach(function(m) { if (r[m] && r[m] !== 0) monthly[m] = r[m]; });
 
-      // Try to match to a CRIO study code — strip parenthetical from CRIO codes
-      const acctNorm = acctLower.replace(/[\s\-]/g, '');
-      let matched = false;
-      for (const code of studyCodes) {
-        const codeFull = code.toLowerCase().replace(/[\s\-]/g, '');
-        const codeBase = code.replace(/\s*\(.*$/, '').trim().toLowerCase().replace(/[\s\-]/g, '');
+      // Try to match to a CRIO study code
+      var acctNorm = acctLower.replace(/[\s\-]/g, '');
+      var matched = false;
+      for (var i = 0; i < studyCodes.length; i++) {
+        var code = studyCodes[i];
+        var codeFull = code.toLowerCase().replace(/[\s\-]/g, '');
+        var codeBase = code.replace(/\s*\(.*$/, '').trim().toLowerCase().replace(/[\s\-]/g, '');
         if (codeBase.length < 4) continue;
         if (acctNorm.includes(codeFull) || codeFull.includes(acctNorm) ||
             acctNorm.includes(codeBase) || codeBase.includes(acctNorm)) {
-          const activeMos = Object.values(monthly).filter(v => v > 0).length;
-          const firstMo = monthCols.find(m => (parseFloat(r[m])||0) !== 0) || '';
+          var activeMos = Object.values(monthly).filter(function(v){return v > 0;}).length;
+          var firstMo = monthCols.find(function(m){return (r[m]||0) !== 0;}) || '';
           if (pnlByStudy[code]) {
             pnlByStudy[code].total += total;
             pnlByStudy[code].activeMonths = Math.max(pnlByStudy[code].activeMonths, activeMos);
-            Object.entries(monthly).forEach(([k,v]) => { pnlByStudy[code].monthly[k] = (pnlByStudy[code].monthly[k]||0) + v; });
+            Object.entries(monthly).forEach(function(e) { pnlByStudy[code].monthly[e[0]] = (pnlByStudy[code].monthly[e[0]]||0) + e[1]; });
           } else {
-            pnlByStudy[code] = { qbAccount: acct, total, monthly, activeMonths: activeMos, firstMonth: firstMo };
+            pnlByStudy[code] = { qbAccount: acct, total: total, monthly: monthly, activeMonths: activeMos, firstMonth: firstMo };
           }
           matched = true;
           break;
         }
       }
-      if (!matched) pnlUnmatched.push({ account: acct, total, monthly });
+      if (!matched) pnlUnmatched.push({ account: acct, total: total, monthly: monthly });
     });
 
-    QB_DATA.pnlMonthly = pnlMonthly;
     QB_DATA.pnlByStudy = pnlByStudy;
     QB_DATA.pnlUnmatched = pnlUnmatched;
     QB_DATA.qbTotalIncome = qbTotalIncome;
     QB_DATA.qbPeriod = qbPeriod;
-    QB_DATA.pnlClass = pnlCls.filter(r => (r['Class (Study)']||'').trim());
-    QB_DATA.invoiceLines = invLines.filter(r => (r['Invoice #']||'').trim());
-    QB_DATA.payments = payments.filter(r => (r['Payment ID']||'').trim());
 
-    // Parse time activity — aggregate by customer/study
-    const timeMap = {};
-    timeAct.filter(r => (r['Customer/Study']||'').trim()).forEach(r => {
-      const study = (r['Customer/Study']||'').trim();
+    // ── QB Invoices (live API)
+    QB_DATA.invoiceLines = qbInvoices.flatMap(function(inv) {
+      return (inv.lines || []).map(function(l) {
+        return { 'Invoice #': inv.doc_number, 'Date': inv.date, 'Customer': inv.customer,
+          'Item': l.item, 'Description': l.description, 'Qty': l.qty, 'Rate': l.rate, 'Amount': l.amount, 'Class': l.class };
+      });
+    });
+    QB_DATA.qbInvoices = qbInvoices;
+    QB_DATA.qbPayments = qbPayments;
+
+    // ── Time Activity — aggregate by customer/study
+    var timeMap = {};
+    timeAct.filter(function(r){return (r.customer||'').trim();}).forEach(function(r) {
+      var study = (r.customer||'').trim();
       if (!timeMap[study]) timeMap[study] = { hours: 0, billableHrs: 0, amount: 0, count: 0 };
-      const hrs = (parseFloat(r['Hours'])||0) + (parseFloat(r['Minutes'])||0)/60;
+      var hrs = (parseFloat(r.hours)||0) + (parseFloat(r.minutes)||0)/60;
       timeMap[study].hours += hrs;
-      if ((r['Billable']||'').toLowerCase() === 'yes') timeMap[study].billableHrs += hrs;
-      timeMap[study].amount += parseFloat(r['Amount'])||0;
+      if (r.billable) timeMap[study].billableHrs += hrs;
+      timeMap[study].amount += (hrs * (parseFloat(r.hourly_rate)||0));
       timeMap[study].count++;
     });
-    QB_DATA.timeActivity = Object.entries(timeMap).map(([study, d]) => ({
-      study, hours: Math.round(d.hours*10)/10, billableHrs: Math.round(d.billableHrs*10)/10,
-      amount: Math.round(d.amount*100)/100, count: d.count
-    })).sort((a,b) => b.hours - a.hours);
+    QB_DATA.timeActivity = Object.entries(timeMap).map(function(e) {
+      return { study: e[0], hours: Math.round(e[1].hours*10)/10, billableHrs: Math.round(e[1].billableHrs*10)/10,
+        amount: Math.round(e[1].amount*100)/100, count: e[1].count };
+    }).sort(function(a,b){return b.hours - a.hours;});
 
-    // ── Parse time activity by EMPLOYEE — for staff economics
-    const empMap = {};
-    const studyHoursAll = {};
-    const studyBillableAll = {};
-    let totalTrackedHours = 0;
-    let totalBillableHours = 0;
-    // Count ALL employee hours (including non-study) for accurate payroll rate
-    let totalAllHours = 0;
-    timeAct.forEach(r => {
-      const emp = (r['Employee'] || r['Name'] || r['Vendor/Employee'] || r['Employee/Vendor'] || '').trim();
+    // ── Time Activity by EMPLOYEE — for staff economics (Productivity tab)
+    var empMap = {};
+    var studyHoursAll = {};
+    var studyBillableAll = {};
+    var totalTrackedHours = 0;
+    var totalBillableHours = 0;
+    var totalAllHours = 0;
+    timeAct.forEach(function(r) {
+      var emp = (r.employee||'').trim();
       if (!emp) return;
-      totalAllHours += (parseFloat(r['Hours'])||0) + (parseFloat(r['Minutes'])||0)/60;
+      var hrs = (parseFloat(r.hours)||0) + (parseFloat(r.minutes)||0)/60;
+      totalAllHours += hrs;
     });
-    timeAct.filter(r => (r['Customer/Study']||'').trim()).forEach(r => {
-      const emp = (r['Employee'] || r['Name'] || r['Vendor/Employee'] || r['Employee/Vendor'] || '').trim();
+    timeAct.filter(function(r){return (r.customer||'').trim();}).forEach(function(r) {
+      var emp = (r.employee||'').trim();
       if (!emp) return;
-      const study = (r['Customer/Study']||'').trim();
-      const hrs = (parseFloat(r['Hours'])||0) + (parseFloat(r['Minutes'])||0)/60;
-      const billable = (r['Billable']||'').toLowerCase() === 'yes';
-      const amt = parseFloat(r['Amount'])||0;
+      var study = (r.customer||'').trim();
+      var hrs = (parseFloat(r.hours)||0) + (parseFloat(r.minutes)||0)/60;
+      var billable = !!r.billable;
+      var amt = hrs * (parseFloat(r.hourly_rate)||0);
       if (!empMap[emp]) empMap[emp] = { hours: 0, billableHrs: 0, amount: 0, studyHours: {}, studyBillable: {}, studyAmount: {}, entries: 0, dailyHours: {}, dailyStudies: {} };
       empMap[emp].hours += hrs;
       if (billable) empMap[emp].billableHrs += hrs;
@@ -6965,8 +6974,7 @@ async function fetchQuickBooksData() {
       empMap[emp].studyBillable[study] = (empMap[emp].studyBillable[study]||0) + (billable ? hrs : 0);
       empMap[emp].studyAmount[study] = (empMap[emp].studyAmount[study]||0) + amt;
       empMap[emp].entries++;
-      // Daily tracking for visit economics
-      const taDate = (r['Date']||'').trim();
+      var taDate = (r.date||'').trim();
       if (taDate) {
         empMap[emp].dailyHours[taDate] = (empMap[emp].dailyHours[taDate]||0) + hrs;
         if (!empMap[emp].dailyStudies[taDate]) empMap[emp].dailyStudies[taDate] = new Set();
@@ -6978,48 +6986,15 @@ async function fetchQuickBooksData() {
       if (billable) totalBillableHours += hrs;
     });
 
-    // ── Extract payroll, contractor totals, and individual expense names from PnL
-    let totalPayroll = 0, totalContractors = 0;
-    const expenseLines = []; // all individual expense accounts
-    let inExp = false;
-    pnlMonthly.forEach(r => {
-      const acct = (r['Account'] || Object.values(r)[0] || '').trim();
-      if (!acct) return;
-      const lo = acct.toLowerCase();
-      const tot = parseFloat(r['Total']) || 0;
-      if (lo === 'gross profit' || lo === 'total income') { inExp = true; return; }
-      if (!inExp || tot === 0) return;
-      if (lo === 'net income' || lo === 'net operating income') return;
-      // Capture subtotals
-      if (lo.includes('total payroll')) totalPayroll += tot;
-      if (lo.includes('total contractor') || lo.includes('total contract ')) totalContractors = Math.max(totalContractors, tot);
-      // Capture individual (non-subtotal) expense accounts
-      if (!lo.startsWith('total ') && !lo.startsWith('net ')) {
-        expenseLines.push({ account: acct, total: tot });
-      }
-    });
-
-    // Match investigators and employees against PnL expense names for actual costs
-    const pnlCostByName = {}; // empMap key or config name -> PnL cost
-    const invConfig = CRP_CONFIG.INVESTIGATORS || [];
-    const coordConfig = CRP_CONFIG.COORDINATORS || [];
-    const allConfigNames = [...invConfig, ...coordConfig, ...Object.keys(empMap)];
-    expenseLines.forEach(ex => {
-      const exLo = ex.account.toLowerCase().replace(/[\s\-\.]/g, '');
-      allConfigNames.forEach(cfgName => {
-        const parts = cfgName.toLowerCase().trim().split(/\s+/);
-        if (parts.length < 2) return;
-        const first = parts[0], last = parts[parts.length - 1];
-        if (first.length >= 3 && last.length >= 3 && exLo.includes(first) && exLo.includes(last)) {
-          // Also check empMap keys for TA name variant
-          const empKey = Object.keys(empMap).find(k => {
-            const kLo = k.toLowerCase();
-            return kLo.includes(first) && kLo.includes(last);
-          }) || cfgName;
-          pnlCostByName[empKey] = (pnlCostByName[empKey]||0) + ex.total;
-        }
+    // ── Staff cost matching from qbStaffCosts feed (contractor + payroll data)
+    var pnlCostByName = {};
+    try {
+      var costRes = await fetch(base + '?feed=qbStaffCosts&format=json').then(function(r){return r.json();});
+      var costData = costRes.data || [];
+      costData.forEach(function(c) {
+        if (c.name && c.cost > 0) pnlCostByName[c.name] = (pnlCostByName[c.name]||0) + c.cost;
       });
-    });
+    } catch(e2) { _log('CRP QB: Staff costs fetch warning: ' + e2.message); }
 
     QB_DATA.empMap = empMap;
     QB_DATA.studyHoursAll = studyHoursAll;
@@ -7030,12 +7005,60 @@ async function fetchQuickBooksData() {
     QB_DATA.pnlCostByName = pnlCostByName;
 
     QB_DATA.loaded = true;
-    const matchedRev = Object.values(pnlByStudy).reduce((s,v) => s + v.total, 0);
-    _log('CRP QB: Loaded — ' + Object.keys(pnlByStudy).length + ' studies matched ($' + Math.round(matchedRev).toLocaleString() + '), ' + pnlUnmatched.length + ' unmatched, income: $' + Math.round(qbTotalIncome).toLocaleString() + ', ' + Object.keys(empMap).length + ' TA staff (' + Math.round(totalTrackedHours) + ' hrs)');
+    var matchedRev = Object.values(pnlByStudy).reduce(function(s,v){return s + v.total;}, 0);
+    _log('CRP QB: Live API — ' + Object.keys(pnlByStudy).length + ' studies matched ($' + Math.round(matchedRev).toLocaleString() + '), ' + pnlUnmatched.length + ' unmatched, income: $' + Math.round(qbTotalIncome).toLocaleString() + ', invoices: ' + qbInvoices.length + ', payments: ' + qbPayments.length + ', staff: ' + Object.keys(empMap).length + ' (' + Math.round(totalTrackedHours) + ' hrs)');
     renderCRIOvsQB();
   } catch(e) {
-    console.warn('CRP QB: Fetch failed:', e.message);
+    console.warn('CRP QB: Live API fetch failed:', e.message);
+    // Fallback: try legacy Sheets fetch
+    _log('CRP QB: Falling back to Sheets data...');
+    try { await _fetchQBFromSheets(); } catch(e2) { console.warn('CRP QB: Sheets fallback also failed:', e2.message); }
   }
+}
+
+// Legacy Sheets fallback (kept for resilience)
+async function _fetchQBFromSheets() {
+  var pk = CRP_CONFIG.DATA_FEEDS.FINANCE_PUB_KEY;
+  var tabs = CRP_CONFIG.FINANCE_TABS;
+  if (!pk || !tabs.QB_PNL_MONTHLY) return;
+  // Minimal fetch — just PnL Monthly for basic reconciliation
+  var pnlMonthly = await fetchFinanceTab(pk, tabs.QB_PNL_MONTHLY);
+  var monthCols = pnlMonthly.length > 0 ? Object.keys(pnlMonthly[0]).filter(function(k){return k !== 'Account' && k !== 'Total';}) : [];
+  var qbPeriod = monthCols.length >= 2 ? monthCols[0] + ' — ' + monthCols[monthCols.length - 1] : '';
+  var studyCodes = typeof STUDY_REVENUE_12M !== 'undefined' ? Object.keys(STUDY_REVENUE_12M) : [];
+  var pnlByStudy = {}, pnlUnmatched = [], qbTotalIncome = 0, pastIncome = false;
+  pnlMonthly.forEach(function(r) {
+    var acct = (r['Account'] || Object.values(r)[0] || '').trim();
+    if (!acct) return;
+    var lo = acct.toLowerCase();
+    if (lo === 'gross profit' || lo === 'total income') { pastIncome = true; return; }
+    if (pastIncome || lo.startsWith('total ')) return;
+    var total = parseFloat(r['Total']) || 0;
+    if (total === 0) return;
+    qbTotalIncome += total;
+    var monthly = {};
+    Object.keys(r).forEach(function(k) { if (k !== 'Account' && k !== 'Total') { var v = parseFloat(r[k]); if (!isNaN(v) && v !== 0) monthly[k] = v; } });
+    var acctNorm = lo.replace(/[\s\-]/g, '');
+    var matched = false;
+    for (var i = 0; i < studyCodes.length; i++) {
+      var code = studyCodes[i];
+      var codeFull = code.toLowerCase().replace(/[\s\-]/g, '');
+      var codeBase = code.replace(/\s*\(.*$/, '').trim().toLowerCase().replace(/[\s\-]/g, '');
+      if (codeBase.length < 4) continue;
+      if (acctNorm.includes(codeFull) || codeFull.includes(acctNorm) || acctNorm.includes(codeBase) || codeBase.includes(acctNorm)) {
+        var activeMos = Object.values(monthly).filter(function(v){return v > 0;}).length;
+        if (!pnlByStudy[code]) pnlByStudy[code] = { qbAccount: acct, total: total, monthly: monthly, activeMonths: activeMos, firstMonth: '' };
+        else { pnlByStudy[code].total += total; }
+        matched = true; break;
+      }
+    }
+    if (!matched) pnlUnmatched.push({ account: acct, total: total, monthly: monthly });
+  });
+  QB_DATA.pnlByStudy = pnlByStudy; QB_DATA.pnlUnmatched = pnlUnmatched;
+  QB_DATA.qbTotalIncome = qbTotalIncome; QB_DATA.qbPeriod = qbPeriod + ' (Sheets)';
+  QB_DATA.loaded = true;
+  _log('CRP QB: Sheets fallback — ' + Object.keys(pnlByStudy).length + ' studies, $' + Math.round(qbTotalIncome).toLocaleString());
+  renderCRIOvsQB();
 }
 
 function renderCRIOvsQB() {
@@ -9993,13 +10016,17 @@ function renderAll() {
   _sk('kpi-withdrew', _adjWithdrew);
   _sk('kpi-screenfail', _adjSF);
   _sk('kpi-discontinued', DATA.discontinuedTotal || 0);
+  var _reschCount = (DATA.rescheduledVisits||[]).length;
+  var _reschPending = (DATA.pendingReschedules||[]).length;
   var reschEl = document.getElementById('kpi-rescheduled');
-  if (reschEl) reschEl.textContent = (DATA.rescheduledVisits||[]).length;
+  if (reschEl) reschEl.textContent = _reschCount;
   var reschSub = reschEl ? reschEl.parentElement.querySelector('.tb-sub') : null;
-  if (reschSub) {
-    var pending = (DATA.pendingReschedules||[]).length;
-    reschSub.textContent = pending ? pending + ' pending' : 'Rebooked';
-  }
+  if (reschSub) reschSub.textContent = _reschPending ? _reschPending + ' pending' : 'Rebooked';
+  // Also update the fu- strip version
+  var fuReschEl = document.getElementById('fu-kpi-rescheduled');
+  if (fuReschEl) fuReschEl.textContent = _reschCount;
+  var fuReschSub = fuReschEl ? fuReschEl.parentElement.querySelector('.tb-sub') : null;
+  if (fuReschSub) fuReschSub.textContent = _reschPending ? _reschPending + ' pending' : 'Rebooked';
   _sk('kpi-upcoming', DATA.upcomingTotal || 0);
   _sk('kpi-next14', DATA.next14 || 0);
   _sk('kpi-risk', (DATA.riskFlags||[]).length);
@@ -16637,7 +16664,7 @@ async function _crpInit() {
   if (location.hash) {
     var _hashTab = location.hash.replace('#', '');
     if (_hashTab === 'schedule') _hashTab = 'overview'; // Schedule merged into Overview
-    var _allTabs = ['overview','studies','referrals','actions','operations','admin','fin-overview','fin-collections','fin-aging','fin-revenue','fin-qb','fin-productivity','insights'];
+    var _allTabs = ['overview','studies','referrals','actions','operations','admin','fin-overview','fin-revenue','fin-qb','fin-productivity','insights'];
     if (_allTabs.indexOf(_hashTab) !== -1) _initTab = _hashTab;
   }
   var _initTabEl = document.querySelector(".nav-tab[onclick*='" + _initTab + "'], .nav-tab[data-tab='" + _initTab + "']");

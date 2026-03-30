@@ -760,7 +760,17 @@ body {
     .alert-bar{padding:10px 16px;border-radius:8px;font-size:12px;font-weight:500;display:flex;align-items:center;gap:8px;margin-bottom:12px}
     .alert-warn{background:var(--yellow-bg);border:1px solid var(--yellow);color:var(--yellow)}
     .alert-crit{background:var(--red-bg);border:1px solid var(--red);color:var(--red)}
+    .alert-info{background:#E8EEFF;border:1px solid #1843AD;color:#1843AD}
     .section-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);margin:28px 0 14px}
+    .pill-enrolling{background:#dcfce7;color:#059669}
+    .pill-maintenance{background:#E8EEFF;color:#1843AD}
+    .pill-pre-closed{background:#fef3c7;color:#b45309}
+    .cs-card{background:var(--surface2);border-radius:8px;padding:12px 16px;text-align:center}
+    .cs-label{font-size:11px;font-weight:600;color:var(--muted);margin-bottom:4px}
+    .cs-val{font-size:22px;font-weight:800}
+    .fin-table{width:100%;border-collapse:collapse;font-size:12px}
+    .fin-table th{padding:8px 10px;text-align:left;font-weight:700;color:var(--text);background:var(--surface2);border-bottom:2px solid var(--border)}
+    .fin-table td{padding:6px 10px;border-bottom:1px solid #f1f5f9}
     .coll-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:12px}
     .filter-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
     .fbtn{padding:6px 14px;border-radius:16px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer}

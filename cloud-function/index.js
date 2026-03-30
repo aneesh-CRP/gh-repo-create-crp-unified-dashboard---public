@@ -1912,6 +1912,544 @@ const FEEDS = {
 };
 
 // ═══════════════════════════════════════════════════════════
+// CRIO RECRUITMENT API — Patient Interactions & Reminders
+// ═══════════════════════════════════════════════════════════
+
+const CRIO_TOKEN = process.env.CRIO_TOKEN || '';
+const CRIO_API_BASE = 'https://api.clinicalresearch.io';
+const CRIO_CLIENT_ID = '1329';
+const CRIO_SITE_IDS = { PHL: '1679', PNJ: '5545' };
+
+function crioFetch(path) {
+  if (!CRIO_TOKEN) throw new Error('No CRIO_TOKEN configured');
+  return new Promise((resolve, reject) => {
+    const url = CRIO_API_BASE + path + (path.includes('?') ? '&' : '?') + 'client_id=' + CRIO_CLIENT_ID;
+    const u = new URL(url);
+    const req = https.request({ hostname: u.hostname, path: u.pathname + u.search, method: 'GET',
+      headers: { 'Authorization': 'Bearer ' + CRIO_TOKEN, 'Accept': 'application/json' }
+    }, res => {
+      let d = ''; res.on('data', c => d += c);
+      res.on('end', () => resolve({ status: res.statusCode, body: d }));
+    });
+    req.on('error', reject); req.end();
+  });
+}
+
+function crioPost(path, body) {
+  if (!CRIO_TOKEN) throw new Error('No CRIO_TOKEN configured');
+  return new Promise((resolve, reject) => {
+    const url = CRIO_API_BASE + path + (path.includes('?') ? '&' : '?') + 'client_id=' + CRIO_CLIENT_ID;
+    const u = new URL(url);
+    const data = JSON.stringify(body);
+    const req = https.request({ hostname: u.hostname, path: u.pathname + u.search, method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + CRIO_TOKEN, 'Content-Type': 'application/json',
+                 'Accept': 'application/json', 'Content-Length': Buffer.byteLength(data) }
+    }, res => {
+      let d = ''; res.on('data', c => d += c);
+      res.on('end', () => resolve({ status: res.statusCode, body: d }));
+    });
+    req.on('error', reject); req.write(data); req.end();
+  });
+}
+
+function crioPut(path, body) {
+  if (!CRIO_TOKEN) throw new Error('No CRIO_TOKEN configured');
+  return new Promise((resolve, reject) => {
+    const url = CRIO_API_BASE + path + (path.includes('?') ? '&' : '?') + 'client_id=' + CRIO_CLIENT_ID;
+    const u = new URL(url);
+    const data = JSON.stringify(body);
+    const req = https.request({ hostname: u.hostname, path: u.pathname + u.search, method: 'PUT',
+      headers: { 'Authorization': 'Bearer ' + CRIO_TOKEN, 'Content-Type': 'application/json',
+                 'Accept': 'application/json', 'Content-Length': Buffer.byteLength(data) }
+    }, res => {
+      let d = ''; res.on('data', c => d += c);
+      res.on('end', () => resolve({ status: res.statusCode, body: d }));
+    });
+    req.on('error', reject); req.write(data); req.end();
+  });
+}
+
+// ── CRIO API Test Phase 3 — deep dive: fix PUT payload, brute-force interaction paths ──
+async function testCrioApiPhase3(testPatientKey, testSiteId) {
+  const results = {};
+
+  // 1. Get FULL patient object (we need to see exact structure for PUT)
+  let fullPatient = null;
+  try {
+    const pr = await crioFetch(`/api/v1/patient/${testPatientKey}/site/${testSiteId}`);
+    if (pr.status === 200) {
+      fullPatient = JSON.parse(pr.body);
+      results.fullPatientObject = fullPatient;
+    }
+  } catch (e) { results.fullPatientObject = { error: e.message }; }
+
+  // 2. Try PUT with the full patient object + updated notes (mirror what we received)
+  if (fullPatient && fullPatient.patientInfo) {
+    const pi = fullPatient.patientInfo;
+    // PUT attempts — error said "siteId : site id is required", so include siteId in body
+    const contact = pi.patientContact || {};
+    const testNote = '[CRP Dashboard reminder test ' + new Date().toISOString() + ']';
+    const baseNotes = (pi.notes || '') ? pi.notes + '\n' + testNote : testNote;
+
+    // Attempt A: siteId in body + notes only
+    try {
+      const putA = await crioPut(`/api/v1/patient/${testPatientKey}`, {
+        siteId: testSiteId, notes: baseNotes
+      });
+      results.putAttemptA = { desc: 'PUT /patient/{id} with {siteId, notes}', status: putA.status, body: putA.body.substring(0, 600) };
+    } catch (e) { results.putAttemptA = { error: e.message }; }
+
+    // Attempt B: siteId + full patientInfo wrapper
+    try {
+      const putB = await crioPut(`/api/v1/patient/${testPatientKey}`, {
+        siteId: testSiteId,
+        patientInfo: { notes: baseNotes }
+      });
+      results.putAttemptB = { desc: 'PUT /patient/{id} with {siteId, patientInfo:{notes}}', status: putB.status, body: putB.body.substring(0, 600) };
+    } catch (e) { results.putAttemptB = { error: e.message }; }
+
+    // Attempt C: siteId + firstName/lastName + notes (match create schema)
+    try {
+      const putC = await crioPut(`/api/v1/patient/${testPatientKey}`, {
+        siteId: testSiteId,
+        firstName: contact.firstName || '',
+        lastName: contact.lastName || '',
+        notes: baseNotes
+      });
+      results.putAttemptC = { desc: 'PUT /patient/{id} with {siteId, firstName, lastName, notes}', status: putC.status, body: putC.body.substring(0, 600) };
+    } catch (e) { results.putAttemptC = { error: e.message }; }
+
+    // Attempt D: siteId + patientContact wrapper + notes
+    try {
+      const putD = await crioPut(`/api/v1/patient/${testPatientKey}`, {
+        siteId: testSiteId,
+        patientContact: { firstName: contact.firstName || '', lastName: contact.lastName || '' },
+        notes: baseNotes
+      });
+      results.putAttemptD = { desc: 'PUT /patient/{id} with {siteId, patientContact, notes}', status: putD.status, body: putD.body.substring(0, 600) };
+    } catch (e) { results.putAttemptD = { error: e.message }; }
+
+    // Attempt E: full mirror of GET response with siteId
+    try {
+      const putE = await crioPut(`/api/v1/patient/${testPatientKey}`, {
+        siteId: testSiteId,
+        revision: fullPatient.revision,
+        patientInfo: { ...pi, notes: baseNotes }
+      });
+      results.putAttemptE = { desc: 'PUT /patient/{id} with {siteId, revision, patientInfo:{...full}}', status: putE.status, body: putE.body.substring(0, 600) };
+    } catch (e) { results.putAttemptE = { error: e.message }; }
+
+    // Attempt F: siteId as integer
+    try {
+      const putF = await crioPut(`/api/v1/patient/${testPatientKey}`, {
+        siteId: parseInt(testSiteId), notes: baseNotes
+      });
+      results.putAttemptF = { desc: 'PUT /patient/{id} with {siteId(int), notes}', status: putF.status, body: putF.body.substring(0, 600) };
+    } catch (e) { results.putAttemptF = { error: e.message }; }
+  }
+
+  // 3. Query BQ patient_interaction table to understand schema + interaction types
+  try {
+    const schema = await runQuery(`SELECT column_name, data_type
+      FROM \`crio-468120\`.crio_data.INFORMATION_SCHEMA.COLUMNS
+      WHERE table_name = 'patient_interaction' ORDER BY ordinal_position`);
+    results.interactionTableSchema = schema;
+  } catch (e) { results.interactionTableSchema = { error: e.message }; }
+
+  // 4. Sample recent interactions — skip (already got them in phase 3)
+
+  // 5. Get distinct interaction action_types from BQ with counts
+  try {
+    const types = await runQuery(`SELECT
+      CAST(pi.action_type AS STRING) AS action_type,
+      COUNT(*) AS cnt,
+      MAX(pi.action_details) AS sample_detail
+      FROM ${tbl('patient_interaction')} pi
+      WHERE pi.site_key IN (1679, 5545)
+      GROUP BY 1 ORDER BY cnt DESC LIMIT 30`);
+    results.interactionActionTypes = types;
+  } catch (e) { results.interactionActionTypes = { error: e.message }; }
+
+  // 5b. Communication log table — check if it exists and what's in it
+  try {
+    const clSchema = await runQuery(`SELECT column_name, data_type
+      FROM \`crio-468120\`.crio_data.INFORMATION_SCHEMA.COLUMNS
+      WHERE table_name = 'communication_log' ORDER BY ordinal_position`);
+    results.communicationLogSchema = clSchema;
+  } catch (e) { results.communicationLogSchema = { error: e.message }; }
+
+  // 5c. Sample communication_log entries
+  try {
+    const clSamples = await runQuery(`SELECT * FROM ${tbl('communication_log')}
+      WHERE site_key = 1679
+      ORDER BY last_updated DESC LIMIT 5`);
+    results.communicationLogSamples = clSamples;
+  } catch (e) { results.communicationLogSamples = { error: e.message }; }
+
+  // 5d. Find user_key 327503 (Chloe AI) — how does it log interactions?
+  try {
+    const chloeInteractions = await runQuery(`SELECT
+      CAST(pi.action_type AS STRING) AS action_type,
+      COUNT(*) AS cnt,
+      MIN(FORMAT_DATETIME('%Y-%m-%d', pi.date_created)) AS earliest,
+      MAX(FORMAT_DATETIME('%Y-%m-%d', pi.date_created)) AS latest
+      FROM ${tbl('patient_interaction')} pi
+      WHERE pi.user_key = 327503
+      GROUP BY 1 ORDER BY cnt DESC`);
+    results.chloeAiStats = chloeInteractions;
+  } catch (e) { results.chloeAiStats = { error: e.message }; }
+
+  // 5e. Check if there's a communication_log_type or action_type reference table
+  try {
+    const refTables = await runQuery(`SELECT table_name FROM \`crio-468120\`.crio_data.INFORMATION_SCHEMA.TABLES
+      WHERE LOWER(table_name) LIKE '%communication%' OR LOWER(table_name) LIKE '%interaction%'
+      OR LOWER(table_name) LIKE '%action_type%' OR LOWER(table_name) LIKE '%message%'
+      OR LOWER(table_name) LIKE '%sms%' OR LOWER(table_name) LIKE '%notification%'`);
+    results.relatedTables = refTables;
+  } catch (e) { results.relatedTables = { error: e.message }; }
+
+  // 6. Deep dive: outreach_sms table
+  try {
+    const smsSchema = await runQuery(`SELECT column_name, data_type
+      FROM \`crio-468120\`.crio_data.INFORMATION_SCHEMA.COLUMNS
+      WHERE table_name = 'outreach_sms' ORDER BY ordinal_position`);
+    results.outreachSmsSchema = smsSchema;
+  } catch (e) { results.outreachSmsSchema = { error: e.message }; }
+
+  try {
+    const smsSamples = await runQuery(`SELECT * FROM ${tbl('outreach_sms')}
+      WHERE site_key = 1679
+      ORDER BY last_updated DESC LIMIT 10`);
+    results.outreachSmsSamples = smsSamples;
+  } catch (e) { results.outreachSmsSamples = { error: e.message }; }
+
+  // Distinct statuses/types in outreach_sms
+  try {
+    const smsStats = await runQuery(`SELECT
+      CAST(status AS STRING) AS status,
+      CAST(direction AS STRING) AS direction,
+      CAST(type AS STRING) AS type,
+      COUNT(*) AS cnt
+      FROM ${tbl('outreach_sms')}
+      GROUP BY 1, 2, 3 ORDER BY cnt DESC LIMIT 30`);
+    results.outreachSmsStats = smsStats;
+  } catch (e) { results.outreachSmsStats = { error: e.message }; }
+
+  // Volume by month
+  try {
+    const smsVol = await runQuery(`SELECT
+      FORMAT_DATETIME('%Y-%m', date_created) AS month,
+      COUNT(*) AS cnt
+      FROM ${tbl('outreach_sms')}
+      WHERE date_created >= '2025-01-01'
+      GROUP BY 1 ORDER BY 1 DESC LIMIT 18`);
+    results.outreachSmsVolume = smsVol;
+  } catch (e) { results.outreachSmsVolume = { error: e.message }; }
+
+  // 7. Explore action type dimension tables
+  try {
+    const atSchema = await runQuery(`SELECT column_name, data_type
+      FROM \`crio-468120\`.crio_data.INFORMATION_SCHEMA.COLUMNS
+      WHERE table_name = 'dim_user_audit_log_action_type_name' ORDER BY ordinal_position`);
+    results.actionTypeDimSchema = atSchema;
+  } catch (e) { results.actionTypeDimSchema = { error: e.message }; }
+
+  try {
+    const atValues = await runQuery(`SELECT * FROM ${tbl('dim_user_audit_log_action_type_name')}
+      ORDER BY 1 LIMIT 50`);
+    results.actionTypeDimValues = atValues;
+  } catch (e) { results.actionTypeDimValues = { error: e.message }; }
+
+  // 8. Check outreach_sms linkage to patient_interaction
+  try {
+    const linked = await runQuery(`SELECT
+      CAST(os.outreach_sms_key AS STRING) AS sms_key,
+      CAST(os.patient_interaction_key AS STRING) AS interaction_key,
+      os.phone_number, os.message_body,
+      CAST(os.status AS STRING) AS status,
+      CAST(os.direction AS STRING) AS direction,
+      FORMAT_DATETIME('%Y-%m-%d %H:%M', os.date_created) AS created,
+      CAST(os.patient_key AS STRING) AS patient_key,
+      CAST(os.study_key AS STRING) AS study_key,
+      CAST(os.user_key AS STRING) AS user_key
+      FROM ${tbl('outreach_sms')} os
+      WHERE os.site_key = 1679
+      ORDER BY os.date_created DESC LIMIT 10`);
+    results.outreachSmsLinked = linked;
+  } catch (e) { results.outreachSmsLinked = { error: e.message }; }
+
+  // 9. CRITICAL: Explore CRIO's built-in reminder tables
+  // study_visit_reminder — reminder templates per visit type
+  try {
+    const svrSchema = await runQuery(`SELECT column_name, data_type
+      FROM \`crio-468120\`.crio_data.INFORMATION_SCHEMA.COLUMNS
+      WHERE table_name = 'study_visit_reminder' ORDER BY ordinal_position`);
+    results.studyVisitReminderSchema = svrSchema;
+  } catch (e) { results.studyVisitReminderSchema = { error: e.message }; }
+
+  try {
+    const svrData = await runQuery(`SELECT * FROM ${tbl('study_visit_reminder')}
+      WHERE _fivetran_deleted = false ORDER BY last_updated DESC LIMIT 20`);
+    results.studyVisitReminderData = svrData;
+  } catch (e) { results.studyVisitReminderData = { error: e.message }; }
+
+  // subject_visit_reminder — actual reminders sent/scheduled per subject visit
+  try {
+    const subvrSchema = await runQuery(`SELECT column_name, data_type
+      FROM \`crio-468120\`.crio_data.INFORMATION_SCHEMA.COLUMNS
+      WHERE table_name = 'subject_visit_reminder' ORDER BY ordinal_position`);
+    results.subjectVisitReminderSchema = subvrSchema;
+  } catch (e) { results.subjectVisitReminderSchema = { error: e.message }; }
+
+  try {
+    const subvrData = await runQuery(`SELECT * FROM ${tbl('subject_visit_reminder')}
+      WHERE _fivetran_deleted = false ORDER BY last_updated DESC LIMIT 20`);
+    results.subjectVisitReminderData = subvrData;
+  } catch (e) { results.subjectVisitReminderData = { error: e.message }; }
+
+  // study_reminder — study-level reminder config
+  try {
+    const srSchema = await runQuery(`SELECT column_name, data_type
+      FROM \`crio-468120\`.crio_data.INFORMATION_SCHEMA.COLUMNS
+      WHERE table_name = 'study_reminder' ORDER BY ordinal_position`);
+    results.studyReminderSchema = srSchema;
+  } catch (e) { results.studyReminderSchema = { error: e.message }; }
+
+  try {
+    const srData = await runQuery(`SELECT * FROM ${tbl('study_reminder')}
+      WHERE _fivetran_deleted = false ORDER BY last_updated DESC LIMIT 20`);
+    results.studyReminderData = srData;
+  } catch (e) { results.studyReminderData = { error: e.message }; }
+
+  // outreach_email and outreach_direct schemas
+  try {
+    const oeSchema = await runQuery(`SELECT column_name, data_type
+      FROM \`crio-468120\`.crio_data.INFORMATION_SCHEMA.COLUMNS
+      WHERE table_name = 'outreach_email' ORDER BY ordinal_position`);
+    results.outreachEmailSchema = oeSchema;
+  } catch (e) { results.outreachEmailSchema = { error: e.message }; }
+
+  try {
+    const odSchema = await runQuery(`SELECT column_name, data_type
+      FROM \`crio-468120\`.crio_data.INFORMATION_SCHEMA.COLUMNS
+      WHERE table_name = 'outreach_direct' ORDER BY ordinal_position`);
+    results.outreachDirectSchema = odSchema;
+  } catch (e) { results.outreachDirectSchema = { error: e.message }; }
+
+  // Twilio phone configuration — what numbers does CRIO have?
+  try {
+    const twilioTables = await runQuery(`SELECT table_name FROM \`crio-468120\`.crio_data.INFORMATION_SCHEMA.TABLES
+      WHERE LOWER(table_name) LIKE '%twilio%' OR LOWER(table_name) LIKE '%phone%'`);
+    results.twilioTables = twilioTables;
+  } catch (e) { results.twilioTables = { error: e.message }; }
+
+  // If twilio_phone table exists, get the numbers
+  try {
+    const twilioPhones = await runQuery(`SELECT * FROM ${tbl('twilio_phone')}
+      WHERE _fivetran_deleted = false LIMIT 10`);
+    results.twilioPhones = twilioPhones;
+  } catch (e) {
+    // Try alternate table names
+    try {
+      const tp2 = await runQuery(`SELECT table_name FROM \`crio-468120\`.crio_data.INFORMATION_SCHEMA.TABLES
+        WHERE LOWER(table_name) LIKE '%twilio%'`);
+      results.twilioPhones = { tables_found: tp2 };
+    } catch (e2) { results.twilioPhones = { error: e.message }; }
+  }
+
+  return results;
+}
+
+// ── CRIO API Test Phase 2 — deeper probing with POST and more path patterns ──
+async function testCrioApiPhase2(testPatientKey, testSiteId) {
+  const results = {};
+
+  // Find a study + subject for this patient (interactions may be study-scoped)
+  let studyKey = null, subjectKey = null;
+  try {
+    const subs = await runQuery(`SELECT CAST(s.study_key AS STRING) AS study_key,
+      CAST(s.subject_key AS STRING) AS subject_key, s.status
+      FROM ${tbl('subject')} s
+      WHERE CAST(s.patient_key AS STRING) = '${testPatientKey}'
+      AND s.status >= 1 ORDER BY s.status DESC LIMIT 1`);
+    if (subs.length) {
+      studyKey = subs[0].study_key;
+      subjectKey = subs[0].subject_key;
+      results.testSubject = { studyKey, subjectKey, status: subs[0].status };
+    }
+  } catch (e) { results.testSubject = { error: e.message }; }
+
+  // Try POST to interaction paths (some APIs only accept POST for creation)
+  const interactionBody = {
+    type: 'TEXT',
+    notes: 'CRIO API test — automated reminder system probe. Please ignore.',
+    direction: 'OUTBOUND',
+    timestamp: new Date().toISOString()
+  };
+
+  const postPaths = [
+    `/api/v1/patient/${testPatientKey}/interaction`,
+    `/api/v1/patient/${testPatientKey}/site/${testSiteId}/interaction`,
+    `/api/v1/patient/${testPatientKey}/interactions`,
+    `/api/v1/patient/${testPatientKey}/site/${testSiteId}/interactions`,
+    `/api/v1/site/${testSiteId}/patient/${testPatientKey}/interaction`,
+    `/api/v1/site/${testSiteId}/interaction`,
+    // Subject-scoped (study context)
+    ...(studyKey && subjectKey ? [
+      `/api/v1/study/${studyKey}/site/${testSiteId}/subject/${subjectKey}/interaction`,
+      `/api/v1/study/${studyKey}/site/${testSiteId}/subject/${subjectKey}/interactions`,
+      `/api/v1/subject/${subjectKey}/interaction`,
+    ] : []),
+    // Recruitment-specific
+    `/api/v1/recruitment/patient/${testPatientKey}/interaction`,
+    `/api/v1/recruitment/interaction`,
+  ];
+
+  results.postProbe = {};
+  for (const path of postPaths) {
+    try {
+      // Use OPTIONS first to check if POST is allowed (non-destructive)
+      const optR = await new Promise((resolve, reject) => {
+        const url = CRIO_API_BASE + path + '?client_id=' + CRIO_CLIENT_ID;
+        const u = new URL(url);
+        const req = https.request({ hostname: u.hostname, path: u.pathname + u.search, method: 'OPTIONS',
+          headers: { 'Authorization': 'Bearer ' + CRIO_TOKEN, 'Accept': 'application/json' }
+        }, res => { let d = ''; res.on('data', c => d += c);
+          res.on('end', () => resolve({ status: res.statusCode, allow: res.headers['allow'] || '', body: d.substring(0, 200) })); });
+        req.on('error', reject); req.end();
+      });
+      results.postProbe[path] = { options: optR };
+
+      // If OPTIONS didn't explicitly reject, try POST with a dry-run style body
+      if (optR.status !== 404) {
+        const pr = await crioPost(path, interactionBody);
+        results.postProbe[path].post = { status: pr.status, body: pr.body.substring(0, 400) };
+      }
+    } catch (e) { results.postProbe[path] = { error: e.message }; }
+  }
+
+  // Try v2 API paths
+  const v2Paths = [
+    `/api/v2/patient/${testPatientKey}/interaction`,
+    `/api/v2/patient/${testPatientKey}/site/${testSiteId}/interaction`,
+  ];
+  results.v2Probe = {};
+  for (const path of v2Paths) {
+    try {
+      const r = await crioFetch(path);
+      results.v2Probe[path] = { get: { status: r.status, body: r.body.substring(0, 200) } };
+    } catch (e) { results.v2Probe[path] = { error: e.message }; }
+  }
+
+  // Explore patient object fields — may contain interactions sub-resource
+  try {
+    const pr = await crioFetch(`/api/v1/patient/${testPatientKey}/site/${testSiteId}`);
+    if (pr.status === 200) {
+      const pData = JSON.parse(pr.body);
+      results.patientFields = Object.keys(pData.patientInfo || pData).filter(k => !['notes'].includes(k));
+      // Check if patient has any interaction-related fields
+      const interactionKeys = Object.keys(pData.patientInfo || pData).filter(k =>
+        /interact|communi|message|text|sms|email|note|call|log/i.test(k));
+      results.interactionRelatedFields = interactionKeys;
+    }
+  } catch (e) { results.patientFields = { error: e.message }; }
+
+  // Try patient update (PUT) with just a notes field — tests write capability
+  try {
+    const putR = await crioPut(`/api/v1/patient/${testPatientKey}/site/${testSiteId}`, {
+      notes: 'CRP Dashboard automated reminder test — ' + new Date().toISOString()
+    });
+    results.patientUpdate = { status: putR.status, body: putR.body.substring(0, 400) };
+  } catch (e) { results.patientUpdate = { error: e.message }; }
+
+  return results;
+}
+
+// ── CRIO API Test — probes interaction, appointment, and patient endpoints ──
+async function testCrioApi() {
+  const results = {};
+
+  // 1. Auth check — GET /sites (known working endpoint)
+  try {
+    const sites = await crioFetch('/api/v1/sites');
+    const parsed = JSON.parse(sites.body);
+    results.auth = { status: sites.status, ok: sites.status === 200,
+      sites: Array.isArray(parsed) ? parsed.map(s => ({ id: s.siteId, name: s.name, studies: (s.studies||[]).length })) : 'unexpected format' };
+  } catch (e) { results.auth = { error: e.message }; }
+
+  // 2. Get a test patient from BQ (we need a patient_key to test interaction endpoints)
+  let testPatientKey = null;
+  let testPatientSiteId = CRIO_SITE_IDS.PHL;
+  try {
+    const patients = await runQuery(`SELECT CAST(p.patient_key AS STRING) AS patient_key, p.first_name, p.last_name,
+      CAST(p.site_key AS STRING) AS site_key
+      FROM ${tbl('patient')} p WHERE p.site_key IN (1679, 5545)
+      AND p.first_name IS NOT NULL AND p.last_name IS NOT NULL
+      ORDER BY p._fivetran_synced DESC LIMIT 5`);
+    if (patients.length > 0) {
+      testPatientKey = patients[0].patient_key;
+      testPatientSiteId = patients[0].site_key;
+      results.testPatient = { key: testPatientKey, name: patients[0].first_name + ' ' + patients[0].last_name, site: testPatientSiteId };
+    } else {
+      results.testPatient = { error: 'No patients found in BQ' };
+    }
+  } catch (e) { results.testPatient = { error: e.message }; }
+
+  // 3. Test GET patient (confirm patient read works)
+  if (testPatientKey) {
+    try {
+      const pr = await crioFetch(`/api/v1/patient/${testPatientKey}/site/${testPatientSiteId}`);
+      const pBody = pr.body.substring(0, 500);
+      results.getPatient = { status: pr.status, ok: pr.status === 200, preview: pBody };
+    } catch (e) { results.getPatient = { error: e.message }; }
+  }
+
+  // 4. Probe interaction endpoints (try multiple path patterns)
+  const interactionPaths = [
+    `/api/v1/patient/${testPatientKey}/interaction`,
+    `/api/v1/patient/${testPatientKey}/site/${testPatientSiteId}/interaction`,
+    `/api/v1/interaction`,
+    `/api/v1/site/${testPatientSiteId}/patient/${testPatientKey}/interaction`,
+  ];
+
+  // First: GET each path to see which ones exist (non-destructive)
+  results.interactionProbe = {};
+  for (const path of interactionPaths) {
+    if (!testPatientKey && path.includes(testPatientKey)) continue;
+    try {
+      const r = await crioFetch(path);
+      results.interactionProbe[path] = { method: 'GET', status: r.status, body: r.body.substring(0, 300) };
+    } catch (e) { results.interactionProbe[path] = { method: 'GET', error: e.message }; }
+  }
+
+  // 5. Probe appointment-related endpoints
+  const appointmentPaths = [
+    `/api/v1/site/${testPatientSiteId}/calendar/availability`,
+    `/api/v1/site/${testPatientSiteId}/appointment`,
+    `/api/v1/appointment`,
+  ];
+  results.appointmentProbe = {};
+  for (const path of appointmentPaths) {
+    try {
+      const r = await crioFetch(path);
+      results.appointmentProbe[path] = { method: 'GET', status: r.status, body: r.body.substring(0, 300) };
+    } catch (e) { results.appointmentProbe[path] = { error: e.message }; }
+  }
+
+  // 6. API docs/swagger discovery (some CRIO instances expose this)
+  const docPaths = ['/api/v1', '/api/v1/docs', '/swagger.json', '/api/docs'];
+  results.docsProbe = {};
+  for (const path of docPaths) {
+    try {
+      const r = await crioFetch(path);
+      results.docsProbe[path] = { status: r.status, body: r.body.substring(0, 200) };
+    } catch (e) { results.docsProbe[path] = { error: e.message }; }
+  }
+
+  return results;
+}
+
+// ═══════════════════════════════════════════════════════════
 // CLICKUP API FEEDS — Referrals, Campaigns, Medical Records
 // ═══════════════════════════════════════════════════════════
 
@@ -2287,6 +2825,7 @@ async function fetchStudyMasterList() {
       crio_esource: f['CRIO eSource Build'] || '',
       site: f['Study Site'] || '', site_number: f['Site Number'] || '',
       therapeutic_area: f['Therapeutic Area'] || '',
+      start_date: f['Study start'] || '',
       url: t.url || '',
     };
   });
@@ -2616,11 +3155,137 @@ async function fetchQBStaffCosts() {
   return Object.values(staffCosts);
 }
 
+// ── P&L Monthly (live from QB API) ──
+async function fetchQBPnlMonthly() {
+  const params = arguments[0] || {};
+  const startDate = params.start_date || new Date(Date.now() - 365*86400000).toISOString().split('T')[0];
+  const endDate = params.end_date || new Date().toISOString().split('T')[0];
+  const report = await qbReport('ProfitAndLoss', {
+    start_date: startDate, end_date: endDate,
+    summarize_column_by: 'Month'
+  });
+  const cols = (report.Columns || {}).Column || [];
+  const months = cols.slice(1).map(c => c.ColTitle || '').filter(m => m && m !== 'Total' && m !== 'TOTAL');
+
+  const rows = [];
+  function walk(rRows) {
+    for (const row of (rRows || [])) {
+      const colData = (row.Header || {}).ColData || row.ColData || [];
+      const name = colData[0] ? colData[0].value || '' : '';
+      if (name && colData.length > 1) {
+        const entry = { account: name };
+        let total = 0;
+        for (let i = 0; i < months.length && i + 1 < colData.length; i++) {
+          const val = parseFloat(colData[i + 1].value) || 0;
+          entry[months[i]] = val;
+          total += val;
+        }
+        entry.total = total;
+        if (total !== 0) rows.push(entry);
+      }
+      const sub = (row.Rows || {}).Row || [];
+      if (sub.length) walk(sub);
+    }
+  }
+  walk((report.Rows || {}).Row || []);
+  return { months, rows, period: `${startDate} to ${endDate}` };
+}
+
+// ── P&L by Class/Study (live from QB API) ──
+async function fetchQBPnlByClass() {
+  const params = arguments[0] || {};
+  const startDate = params.start_date || new Date(Date.now() - 365*86400000).toISOString().split('T')[0];
+  const endDate = params.end_date || new Date().toISOString().split('T')[0];
+  const report = await qbReport('ProfitAndLoss', {
+    start_date: startDate, end_date: endDate,
+    summarize_column_by: 'Classes'
+  });
+  const cols = (report.Columns || {}).Column || [];
+  const classes = cols.slice(1).map(c => c.ColTitle || '').filter(c => c && c !== 'Total' && c !== 'TOTAL' && c !== 'Not Specified');
+
+  // Extract income rows per class
+  const byClass = {};
+  classes.forEach(c => { byClass[c] = { study: c, income: 0, expense: 0 }; });
+
+  let inIncome = false, inExpense = false;
+  function walk(rRows) {
+    for (const row of (rRows || [])) {
+      const colData = (row.Header || {}).ColData || row.ColData || [];
+      const name = colData[0] ? colData[0].value || '' : '';
+      const lo = name.toLowerCase();
+      if (lo.includes('income') && !lo.includes('net') && !lo.includes('other')) { inIncome = true; inExpense = false; }
+      if (lo.includes('expense') || lo.includes('cost of goods')) { inExpense = true; inIncome = false; }
+      if (lo.includes('net income') || lo.includes('net operating')) { inIncome = false; inExpense = false; }
+
+      if ((inIncome || inExpense) && colData.length > 1) {
+        for (let i = 0; i < classes.length && i + 1 < colData.length; i++) {
+          const val = parseFloat(colData[i + 1].value) || 0;
+          if (val !== 0 && byClass[classes[i]]) {
+            if (inIncome) byClass[classes[i]].income += val;
+            if (inExpense) byClass[classes[i]].expense += val;
+          }
+        }
+      }
+      const sub = (row.Rows || {}).Row || [];
+      if (sub.length) walk(sub);
+    }
+  }
+  walk((report.Rows || {}).Row || []);
+
+  return Object.values(byClass).filter(r => r.income > 0 || r.expense > 0)
+    .sort((a, b) => b.income - a.income);
+}
+
+// ── QB Invoices (live from QB API) ──
+async function fetchQBInvoices() {
+  const params = arguments[0] || {};
+  const startDate = params.start_date || new Date(Date.now() - 365*86400000).toISOString().split('T')[0];
+  const all = await qbQueryAll('Invoice', `TxnDate >= '${startDate}'`);
+  return all.map(inv => {
+    const lines = (inv.Line || []).filter(l => l.DetailType === 'SalesItemLineDetail').map(l => ({
+      item: (l.SalesItemLineDetail || {}).ItemRef ? l.SalesItemLineDetail.ItemRef.name : '',
+      description: l.Description || '',
+      qty: (l.SalesItemLineDetail || {}).Qty || 0,
+      rate: (l.SalesItemLineDetail || {}).UnitPrice || 0,
+      amount: l.Amount || 0,
+      class: ((l.SalesItemLineDetail || {}).ClassRef || {}).name || '',
+    }));
+    return {
+      id: inv.Id, doc_number: inv.DocNumber || '',
+      date: inv.TxnDate || '', due_date: inv.DueDate || '',
+      customer: (inv.CustomerRef || {}).name || '',
+      total: inv.TotalAmt || 0, balance: inv.Balance || 0,
+      status: inv.Balance === 0 ? 'Paid' : inv.Balance < inv.TotalAmt ? 'Partial' : 'Unpaid',
+      email_status: inv.EmailStatus || '',
+      lines, line_count: lines.length,
+    };
+  }).sort((a, b) => b.date.localeCompare(a.date));
+}
+
+// ── QB Payments (live from QB API) ──
+async function fetchQBPayments() {
+  const params = arguments[0] || {};
+  const startDate = params.start_date || new Date(Date.now() - 365*86400000).toISOString().split('T')[0];
+  const all = await qbQueryAll('Payment', `TxnDate >= '${startDate}'`);
+  return all.map(p => ({
+    id: p.Id, date: p.TxnDate || '',
+    customer: (p.CustomerRef || {}).name || '',
+    amount: p.TotalAmt || 0,
+    method: (p.PaymentMethodRef || {}).name || '',
+    memo: p.PrivateNote || '',
+    deposit_to: (p.DepositToAccountRef || {}).name || '',
+  })).sort((a, b) => b.date.localeCompare(a.date));
+}
+
 const QB_FEEDS = {
   qbEmployees: fetchQBEmployees,
   qbTimeActivity: fetchQBTimeActivity,
   qbCustomers: fetchQBCustomers,
   qbStaffCosts: fetchQBStaffCosts,
+  qbPnlMonthly: fetchQBPnlMonthly,
+  qbPnlByClass: fetchQBPnlByClass,
+  qbInvoices: fetchQBInvoices,
+  qbPayments: fetchQBPayments,
 };
 
 // ═══════════════════════════════════════════════════════════
@@ -2633,6 +3298,27 @@ functions.http('crpBqApi', async (req, res) => {
   res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.set('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
+
+  // ── GET: CRIO API Test — probe interaction/appointment endpoints ──
+  if (req.query.action === 'crio-test') {
+    res.set('Cache-Control', 'no-store');
+    try {
+      if (!CRIO_TOKEN) { res.status(500).json({ error: 'CRIO_TOKEN not configured. Set it as env var on the cloud function.' }); return; }
+      const phase1 = await testCrioApi();
+      const patientKey = phase1.testPatient?.key;
+      const siteId = phase1.testPatient?.site || CRIO_SITE_IDS.PHL;
+      // Phase 3: deep dive — fix PUT, brute-force interaction paths, BQ schema
+      let phase3 = null;
+      if (patientKey) {
+        phase3 = await testCrioApiPhase3(patientKey, siteId);
+      }
+      res.json({ success: true, timestamp: new Date().toISOString(), phase1, phase3 });
+    } catch (err) {
+      console.error('crio-test error:', err.message);
+      res.status(500).json({ success: false, error: err.message });
+    }
+    return;
+  }
 
   // ── POST: Follow-Up → ClickUp sync ──
   if (req.method === 'POST' && req.query.action === 'followup-sync') {
