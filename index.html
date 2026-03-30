@@ -5727,6 +5727,7 @@ function _rideshareKey(row) {
 
 function injectRideshareButtons() {
   _loadRideshare();
+  var ridePatients = window._rideRequestPatients || {};
   var tbody = document.getElementById('upcoming-tbody');
   if (!tbody) return;
   var rows = tbody.querySelectorAll('tr');
@@ -5736,20 +5737,34 @@ function injectRideshareButtons() {
     if (!key || key === '||') return;
     var td = row.querySelector('td.rideshare-cell');
     if (!td) return;
-    var isRequested = _rideshareData[key] === true;
+
+    // Check CRIO interactions for this patient
+    var cells = row.querySelectorAll('td');
+    var patCell = cells[6]; // Patient column (shifted for rideshare col)
+    var patLink = patCell ? (patCell.querySelector('a') || patCell) : null;
+    var patName = patLink ? (patLink.dataset.phiOriginal || patCell.textContent || '').trim().toLowerCase() : '';
+    var crioRide = patName ? ridePatients[patName] : null;
+
+    // Auto-populate from CRIO if found, otherwise use localStorage
+    var isRequested = _rideshareData[key] === true || !!crioRide;
+    var tooltip = crioRide ? crioRide.note || '' : '';
+
     var btn = document.createElement('button');
-    btn.style.cssText = 'font-size:9px;font-weight:700;padding:3px 6px;border-radius:4px;cursor:pointer;white-space:nowrap;min-width:60px;border:1.5px solid ' + (isRequested ? '#059669' : '#cbd5e1') + ';background:' + (isRequested ? '#ecfdf5' : '#fff') + ';color:' + (isRequested ? '#059669' : '#94a3b8') + ';';
-    btn.textContent = isRequested ? '✓ Requested' : 'Request';
+    var fromCrio = !!crioRide && !_rideshareData[key]; // auto-detected from CRIO
+    btn.style.cssText = 'font-size:9px;font-weight:700;padding:3px 6px;border-radius:4px;cursor:pointer;white-space:nowrap;min-width:60px;border:1.5px solid ' + (isRequested ? '#059669' : '#cbd5e1') + ';background:' + (isRequested ? (fromCrio ? '#dbeafe' : '#ecfdf5') : '#fff') + ';color:' + (isRequested ? (fromCrio ? '#1843AD' : '#059669') : '#94a3b8') + ';';
+    btn.textContent = isRequested ? (fromCrio ? '🚗 CRIO' : '✓ Requested') : '—';
+    if (tooltip) btn.title = tooltip.substring(0, 150);
     btn.onclick = function(e) {
       e.stopPropagation();
       var nowReq = !_rideshareData[key];
       if (nowReq) _rideshareData[key] = true;
       else delete _rideshareData[key];
       _saveRideshare();
-      btn.textContent = nowReq ? '✓ Requested' : 'Request';
-      btn.style.borderColor = nowReq ? '#059669' : '#cbd5e1';
-      btn.style.background = nowReq ? '#ecfdf5' : '#fff';
-      btn.style.color = nowReq ? '#059669' : '#94a3b8';
+      var isOn = nowReq || !!crioRide;
+      btn.textContent = isOn ? '✓ Requested' : '—';
+      btn.style.borderColor = isOn ? '#059669' : '#cbd5e1';
+      btn.style.background = isOn ? '#ecfdf5' : '#fff';
+      btn.style.color = isOn ? '#059669' : '#94a3b8';
     };
     td.innerHTML = '';
     td.appendChild(btn);
@@ -7320,7 +7335,7 @@ function fetchActionRequiredData() {
   var _s = function(id, val) { var e = document.getElementById(id); if (e) e.textContent = val; };
 
   // Batch fetch feeds in one request (reduces HTTP overhead)
-  fetch(base + '?feed=batch&feeds=comments,documentSummary,visitTodos,regulatory,recruiterStats,demographics,eregPending,prescrVisits,recruiting,subjectAudit,unscheduledVisits,subjects&format=json')
+  fetch(base + '?feed=batch&feeds=comments,documentSummary,visitTodos,regulatory,recruiterStats,demographics,eregPending,prescrVisits,recruiting,subjectAudit,unscheduledVisits,subjects,rideRequests,visitConfirmations&format=json')
   .then(function(r) { return r.json(); })
   .then(function(batch) {
     var results = batch.results || {};
@@ -7462,6 +7477,24 @@ function fetchActionRequiredData() {
     }
 
     // Unscheduled visits — active subjects with no upcoming appointment
+    // Ride requests — auto-populate rideshare column
+    var rideRows = (results.rideRequests || {}).data || [];
+    window._rideRequestPatients = {};
+    rideRows.forEach(function(r) {
+      var patName = (r.patient_name || '').toLowerCase().trim();
+      if (patName) window._rideRequestPatients[patName] = { date: r.last_ride_date, note: r.last_ride_note, key: r.patient_key };
+    });
+    _log('Ride requests: ' + rideRows.length + ' patients with transport needs');
+
+    // Visit confirmations — auto-populate tracking column
+    var confirmRows = (results.visitConfirmations || {}).data || [];
+    window._visitConfirmPatients = {};
+    confirmRows.forEach(function(r) {
+      var patName = (r.patient_name || '').toLowerCase().trim();
+      if (patName) window._visitConfirmPatients[patName] = { date: r.confirmed_date, note: r.confirmation_note };
+    });
+    _log('Visit confirmations: ' + confirmRows.length + ' patients confirmed');
+
     var unschedRows = (results.unscheduledVisits || {}).data || [];
     window._unscheduledVisits = unschedRows;
     if (unschedRows.length > 0) {

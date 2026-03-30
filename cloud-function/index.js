@@ -1801,6 +1801,43 @@ const FEEDS = {
   },
 
   // ── 55. Unscheduled Visits (active subjects with no upcoming appointment) ──
+  // ── Ride/Transport Requests (from patient interactions) ──
+  rideRequests: {
+    query: () => `
+      SELECT DISTINCT
+        pi.patient_key,
+        CONCAT(COALESCE(p.first_name,''), ' ', COALESCE(p.last_name,'')) AS patient_name,
+        MAX(FORMAT_DATETIME('%Y-%m-%d', pi.action_date)) AS last_ride_date,
+        MAX(pi.action_details) AS last_ride_note
+      FROM ${tbl('patient_interaction')} pi
+      LEFT JOIN ${tbl('patient')} p ON pi.patient_key = p.patient_key
+      WHERE pi._fivetran_deleted = false
+        AND pi.action_date >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 90 DAY)
+        AND (
+          REGEXP_CONTAINS(LOWER(pi.action_details), r'\\buber\\b|\\blyft\\b|\\brideshare\\b|\\bride share\\b|\\btransportation\\b|\\bcar service\\b|\\bpick.?up\\b|\\bneed.?a.?ride\\b|\\bneeds.?ride\\b|\\brides?\\b.{0,10}\\bschedul|\\bschedul.{0,10}\\brides?\\b|\\btransport.{0,10}\\brequest|\\brequest.{0,10}\\btransport|\\bride.{0,10}\\bcancel|\\bcancel.{0,10}\\bride')
+          AND NOT LOWER(pi.action_details) LIKE '%triglyceride%'
+        )
+      GROUP BY pi.patient_key, patient_name
+      ORDER BY last_ride_date DESC`
+  },
+  // ── Visit Confirmations (from patient interactions) ──
+  visitConfirmations: {
+    query: () => `
+      SELECT DISTINCT
+        pi.patient_key,
+        CONCAT(COALESCE(p.first_name,''), ' ', COALESCE(p.last_name,'')) AS patient_name,
+        MAX(FORMAT_DATETIME('%Y-%m-%d', pi.action_date)) AS confirmed_date,
+        MAX(pi.action_details) AS confirmation_note
+      FROM ${tbl('patient_interaction')} pi
+      LEFT JOIN ${tbl('patient')} p ON pi.patient_key = p.patient_key
+      WHERE pi._fivetran_deleted = false
+        AND pi.action_date >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 14 DAY)
+        AND (
+          REGEXP_CONTAINS(LOWER(pi.action_details), r'\\bconfirm.{0,20}(appt|appointment|visit)|(appt|appointment|visit).{0,20}\\bconfirm|appointment confirmation|\\bconfirmed for\\b|received email from patient confirming')
+        )
+      GROUP BY pi.patient_key, patient_name
+      ORDER BY confirmed_date DESC`
+  },
   unscheduledVisits: {
     query: () => `
       WITH active_subjects AS (
