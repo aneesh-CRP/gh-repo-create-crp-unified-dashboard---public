@@ -6895,12 +6895,13 @@ async function fetchQuickBooksData() {
 
   _log('CRP QB: Fetching live QuickBooks data from API...');
   try {
-    // Fetch all QB data from live cloud function feeds in parallel
-    var [pnlRes, timeRes, invRes, payRes] = await Promise.all([
+    // Fetch all QB data + CRIO revenue (for paid comparison) in parallel
+    var [pnlRes, timeRes, invRes, payRes, crioRevRes] = await Promise.all([
       fetch(base + '?feed=qbPnlMonthly&format=json').then(function(r){return r.json();}),
       fetch(base + '?feed=qbTimeActivity&format=json').then(function(r){return r.json();}),
       fetch(base + '?feed=qbInvoices&format=json').then(function(r){return r.json();}),
       fetch(base + '?feed=qbPayments&format=json').then(function(r){return r.json();}),
+      fetch(base + '?feed=revenue&format=json').then(function(r){return r.json();}).catch(function(){return {data:[]};}),
     ]);
 
     var pnlData = pnlRes.data || pnlRes;
@@ -7011,6 +7012,22 @@ async function fetchQuickBooksData() {
     QB_DATA.qbPeriod = qbPeriod;
     QB_DATA.monthCols = monthCols;
     QB_DATA.pnlMonthly = []; // legacy compat — charts use QB_DATA.monthCols now
+
+    // Build CRIO paid-revenue map for QB reconciliation (cash vs cash comparison)
+    var crioRevData = (crioRevRes.data || []);
+    QB_DATA.crioPaidByStudy = {};
+    QB_DATA.crioRevenueByStudy = {};
+    crioRevData.forEach(function(r) {
+      var name = (r.study_name || '').trim();
+      if (!name) return;
+      var parts = name.split(' - ');
+      var code = parts.length > 1 ? parts[parts.length - 1].trim() : name;
+      var paid = parseFloat(r.total_revenue_paid) || 0;
+      var rev = parseFloat(r.total_revenue) || 0;
+      var recv = parseFloat(r.total_receivable) || 0;
+      QB_DATA.crioPaidByStudy[code] = { paid: paid, revenue: rev, receivable: recv, name: name };
+      QB_DATA.crioRevenueByStudy[code] = rev;
+    });
 
     // ── QB Invoices (live API)
     QB_DATA.invoiceLines = qbInvoices.flatMap(function(inv) {
@@ -7158,27 +7175,37 @@ function renderCRIOvsQB() {
   const fmtD = v => '$' + Math.round(v).toLocaleString();
   const esc = escapeHTML;
 
-  const studyRevMap = typeof STUDY_REVENUE_12M !== 'undefined' ? STUDY_REVENUE_12M : {};
-  const arStudies = typeof TOP_AR_STUDIES !== 'undefined' ? TOP_AR_STUDIES : [];
   const pnlByStudy = QB_DATA.pnlByStudy || {};
+  const crioPaid = QB_DATA.crioPaidByStudy || {};
+
+  // Use CRIO paid revenue (cash received) for apples-to-apples comparison with QB P&L (cash received)
+  // Fall back to STUDY_REVENUE_12M if paid data not available
+  var studyRevMap = {};
+  if (Object.keys(crioPaid).length > 0) {
+    Object.entries(crioPaid).forEach(function(e) { if (e[1].paid > 0 || e[1].revenue > 0) studyRevMap[e[0]] = e[1]; });
+  } else {
+    var _sr = typeof STUDY_REVENUE_12M !== 'undefined' ? STUDY_REVENUE_12M : {};
+    Object.entries(_sr).forEach(function(e) { if (e[1] > 0) studyRevMap[e[0]] = { paid: 0, revenue: e[1], receivable: 0 }; });
+  }
+  const arStudies = typeof TOP_AR_STUDIES !== 'undefined' ? TOP_AR_STUDIES : [];
 
   // ── Build study-level comparison rows
   const compRows = [];
-  let totalCrio12M = 0, totalCrioBilled = 0, totalQbMatched = 0, matchedCount = 0, unmatchedCount = 0;
-  let matureCrioBilled = 0, matureQbRev = 0, matureCount = 0;
+  let totalCrioPaid = 0, totalCrioRev = 0, totalQbMatched = 0, matchedCount = 0, unmatchedCount = 0;
+  let matureCrioPaid = 0, matureQbRev = 0, matureCount = 0;
   const MIN_MONTHS = 6;
 
-  Object.entries(studyRevMap).sort((a,b) => b[1] - a[1]).forEach(([code, crioRev]) => {
-    if (crioRev <= 0) return;
-    totalCrio12M += crioRev;
+  Object.entries(studyRevMap).sort((a,b) => (b[1].paid || b[1].revenue) - (a[1].paid || a[1].revenue)).forEach(([code, crioData]) => {
+    var crioPaidAmt = crioData.paid || 0;
+    var crioRevAmt = crioData.revenue || 0;
+    var crioRecv = crioData.receivable || 0;
+    if (crioPaidAmt <= 0 && crioRevAmt <= 0) return;
+    totalCrioPaid += crioPaidAmt;
+    totalCrioRev += crioRevAmt;
 
-    // Find AR data from CRIO
+    // Find sponsor name from AR data
     const ar = arStudies.find(a => a.study.includes(code));
-    const sponsor = ar ? ar.study.split(' - ').slice(0, -1).join(' - ') : '';
-    const crioAR = ar ? ar.total : 0;
-    const crioColl = ar ? ar.collected : 0;
-    const crioBilled = crioColl + crioAR;
-    totalCrioBilled += crioBilled;
+    const sponsor = ar ? ar.study.split(' - ').slice(0, -1).join(' - ') : (crioData.name || '').split(' - ').slice(0, -1).join(' - ');
 
     // Find QB P&L match
     const qb = pnlByStudy[code];
@@ -7189,15 +7216,16 @@ function renderCRIOvsQB() {
 
     if (qb) matchedCount++; else unmatchedCount++;
 
-    // Track mature alignment (studies with ≥6 months of QB data)
+    // Track mature alignment
     if (qb && qbMonths >= MIN_MONTHS) {
-      matureCrioBilled += crioBilled;
+      matureCrioPaid += crioPaidAmt;
       matureQbRev += qbRev;
       matureCount++;
     }
 
-    const diff = crioBilled - qbRev;
-    const matchPct = crioBilled > 0 && qbRev > 0 ? Math.round(qbRev / crioBilled * 100) : (qbRev > 0 ? 999 : 0);
+    // Compare cash-to-cash: CRIO paid vs QB income
+    const diff = crioPaidAmt - qbRev;
+    const matchPct = crioPaidAmt > 0 && qbRev > 0 ? Math.round(qbRev / crioPaidAmt * 100) : (qbRev > 0 ? 999 : 0);
 
     let status;
     if (!qb) status = 'No QB Data';
@@ -7207,7 +7235,8 @@ function renderCRIOvsQB() {
     else status = 'Low Match';
 
     compRows.push({
-      code, sponsor, crioRev, crioAR, crioColl, crioBilled,
+      code, sponsor, crioRev: crioRevAmt, crioPaid: crioPaidAmt, crioRecv: crioRecv,
+      crioBilled: crioPaidAmt, // for backward compat with chart code
       qbRev, qbAccount: qb ? qb.qbAccount : '',
       qbMonths, qbFirst,
       diff, matchPct: Math.min(matchPct, 999),
@@ -7222,11 +7251,11 @@ function renderCRIOvsQB() {
 
   // ── KPIs
   const qbTotal = QB_DATA.qbTotalIncome;
-  const matureAlignPct = matureCrioBilled > 0 ? Math.round(matureQbRev / matureCrioBilled * 100) : 0;
-  const allAlignPct = totalCrioBilled > 0 ? Math.round(totalQbMatched / totalCrioBilled * 100) : 0;
+  const matureAlignPct = matureCrioPaid > 0 ? Math.round(matureQbRev / matureCrioPaid * 100) : 0;
+  const allAlignPct = totalCrioPaid > 0 ? Math.round(totalQbMatched / totalCrioPaid * 100) : 0;
 
-  document.getElementById('qb-kpi1').textContent = fmtK(totalCrioBilled);
-  document.getElementById('qb-kpi1-sub').textContent = 'Collected + AR · 12M est: ' + fmtK(totalCrio12M);
+  document.getElementById('qb-kpi1').textContent = fmtK(totalCrioPaid);
+  document.getElementById('qb-kpi1-sub').textContent = 'Cash received · Accrued: ' + fmtK(totalCrioRev);
   document.getElementById('qb-kpi2').textContent = fmtK(qbTotal);
   document.getElementById('qb-kpi2-sub').textContent = (QB_DATA.qbPeriod || 'YTD') + ' · ' + fmtK(totalQbMatched) + ' matched';
   document.getElementById('qb-kpi3').textContent = matureAlignPct + '%';
@@ -7268,7 +7297,7 @@ function renderCRIOvsQB() {
     const sColor = isLimited ? limitedColor : (statusColor[r.status] || '#9CA3AF');
     return '<tr' + (isLimited ? ' style="opacity:0.7"' : '') + '>' +
     '<td><strong>' + esc(r.code) + '</strong>' + (r.sponsor ? '<div style="font-size:10px;color:var(--muted)">' + esc(r.sponsor) + '</div>' : '') + '</td>' +
-    '<td class="r">' + (r.crioBilled ? fmtD(r.crioBilled) : '—') + '<div style="font-size:10px;color:var(--muted)">AR: ' + fmtD(r.crioAR) + ' + Coll: ' + fmtD(r.crioColl) + '</div></td>' +
+    '<td class="r">' + (r.crioPaid ? fmtD(r.crioPaid) : '—') + '<div style="font-size:10px;color:var(--muted)">Outstanding: ' + fmtD(r.crioRecv - r.crioPaid) + '</div></td>' +
     '<td class="r" style="color:var(--muted)">' + (r.crioRev ? fmtD(r.crioRev) : '—') + '</td>' +
     '<td class="r">' + (r.qbRev ? fmtD(r.qbRev) : '—') + (r.qbAccount ? '<div style="font-size:10px;color:var(--muted)">' + esc(r.qbAccount) + '</div>' : '') + '</td>' +
     '<td class="r" style="color:' + (r.diff > 5000 ? '#EF4444' : r.diff < -5000 ? '#FF9933' : '#10B981') + ';font-weight:600">' + (Math.abs(r.diff) > 100 ? (r.diff > 0 ? '+' : '') + fmtD(r.diff) : '—') + '</td>' +
@@ -7281,10 +7310,10 @@ function renderCRIOvsQB() {
   // Totals row
   tableHtml += '<tr style="border-top:2px solid var(--border);font-weight:700;background:var(--surface2)">' +
     '<td>TOTALS (' + compRows.length + ' studies)</td>' +
-    '<td class="r">' + fmtD(totalCrioBilled) + '</td>' +
-    '<td class="r" style="color:var(--muted)">' + fmtD(totalCrio12M) + '</td>' +
+    '<td class="r">' + fmtD(totalCrioPaid) + '</td>' +
+    '<td class="r" style="color:var(--muted)">' + fmtD(totalCrioRev) + '</td>' +
     '<td class="r">' + fmtD(totalQbMatched) + '</td>' +
-    '<td class="r" style="color:' + (totalCrioBilled - totalQbMatched > 0 ? '#EF4444' : '#FF9933') + '">' + (totalCrioBilled - totalQbMatched > 0 ? '+' : '') + fmtD(totalCrioBilled - totalQbMatched) + '</td>' +
+    '<td class="r" style="color:' + (totalCrioPaid - totalQbMatched > 0 ? '#EF4444' : '#FF9933') + '">' + (totalCrioPaid - totalQbMatched > 0 ? '+' : '') + fmtD(totalCrioPaid - totalQbMatched) + '</td>' +
     '<td class="r">' + allAlignPct + '%</td>' +
     '<td></td>' +
     '<td><span style="display:inline-block;padding:2px 8px;border-radius:9px;font-size:10px;font-weight:600;background:#10B98122;color:#10B981">' + matureAlignPct + '% mature</span></td></tr>';
