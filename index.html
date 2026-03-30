@@ -3927,28 +3927,53 @@ function renderRevenuePerUser() {
   if (kpiSections[2]) { kpiSections[2].style.cursor = 'pointer'; kpiSections[2].onclick = function(){ showRPUBreakdownModal('revenue'); }; }
   if (kpiSections[3]) { kpiSections[3].style.cursor = 'pointer'; kpiSections[3].onclick = function(){ showRPUBreakdownModal('sites'); }; }
 
-  // Monthly trend heatmap — coordinators + investigators
+  // Monthly trend heatmap — unified coordinator + investigator grid
   var trendEl = el('rpu-monthly-trend');
   var trendBadge = el('rpu-trend-badge');
   if (trendEl) {
-    // Build monthly data for investigators too
-    var byMonthInv = {};
+    // Build ONE unified monthly data structure: byMonthAll[month][person] = revenue
+    // Each visit credits one coordinator AND one investigator (no dedup between roles)
+    var byMonthAll = {};
+    var userRoles = {}; // person → 'Coord' or 'PI'
     _rpuData.forEach(function(r) {
-      var inv = r.investigator || '';
       var month = r.month_completed || '';
       var rev = parseFloat(r.visit_revenue || 0);
-      if (inv && inv !== 'Unassigned' && month) {
-        if (!byMonthInv[month]) byMonthInv[month] = {};
-        byMonthInv[month][inv] = (byMonthInv[month][inv]||0) + rev;
+      if (!month || rev <= 0) return;
+      if (!byMonthAll[month]) byMonthAll[month] = {};
+      // Credit coordinator
+      var coord = r.coordinator || '';
+      if (coord && coord !== 'Unassigned') {
+        byMonthAll[month][coord] = (byMonthAll[month][coord]||0) + rev;
+        if (!userRoles[coord]) userRoles[coord] = 'Coord';
+      }
+      // Credit investigator
+      var inv = r.investigator || '';
+      if (inv && inv !== 'Unassigned') {
+        byMonthAll[month][inv] = (byMonthAll[month][inv]||0) + rev;
+        if (!userRoles[inv]) userRoles[inv] = 'PI';
       }
     });
 
-    var months = Object.keys(Object.assign({}, byMonth, byMonthInv)).sort().slice(-12);
-    var coordUsers = Object.entries(byCoord).filter(function(e){return e[0]!=='Unassigned' && schedCoords.some(function(c){return e[0].toLowerCase().includes(c.toLowerCase().split(' ').pop());});}).sort(function(a,b){return b[1].revenue-a[1].revenue;}).map(function(e){return {name:e[0],role:'Coord'};});
-    var invUsers = Object.entries(byInv).filter(function(e){return e[0]!=='Unassigned' && invList.some(function(i){return e[0].toLowerCase().includes(i.toLowerCase().split(' ').pop());});}).sort(function(a,b){return b[1].revenue-a[1].revenue;}).map(function(e){return {name:e[0],role:'PI'};});
-    var allUsers = coordUsers.concat(invUsers);
+    var months = Object.keys(byMonthAll).sort().slice(-12);
 
-    if (trendBadge) trendBadge.textContent = months.length + ' months · ' + coordUsers.length + ' coords + ' + invUsers.length + ' PIs';
+    // Build user list sorted by total revenue, filtered to config lists
+    var userTotals = {};
+    months.forEach(function(m) {
+      Object.entries(byMonthAll[m] || {}).forEach(function(e) {
+        userTotals[e[0]] = (userTotals[e[0]]||0) + e[1];
+      });
+    });
+
+    var coordUsers = Object.keys(userTotals).filter(function(name) {
+      return schedCoords.some(function(c){return name.toLowerCase().includes(c.toLowerCase().split(' ').pop());});
+    }).sort(function(a,b){return (userTotals[b]||0)-(userTotals[a]||0);}).map(function(n){return {name:n,role:'Coord'};});
+
+    var invUsersList = Object.keys(userTotals).filter(function(name) {
+      return invList.some(function(i){return name.toLowerCase().includes(i.toLowerCase().split(' ').pop());});
+    }).sort(function(a,b){return (userTotals[b]||0)-(userTotals[a]||0);}).map(function(n){return {name:n,role:'PI'};});
+
+    var allUsers = coordUsers.concat(invUsersList);
+    if (trendBadge) trendBadge.textContent = months.length + ' months · ' + coordUsers.length + ' coords + ' + invUsersList.length + ' PIs';
 
     // Filter buttons
     var th = '<div style="display:flex;gap:4px;margin-bottom:8px;">';
@@ -3958,44 +3983,40 @@ function renderRevenuePerUser() {
     th += '</div>';
 
     th += '<div style="overflow-x:auto;"><table class="fin-table" style="width:100%;font-size:10px;"><thead><tr>';
-    th += '<th style="text-align:left;padding:6px 8px;">Name</th><th style="text-align:left;padding:6px 4px;font-size:9px;">Role</th>';
-    months.forEach(function(m){th+='<th style="text-align:center;padding:4px 6px;">'+m.substring(5)+'/'+m.substring(2,4)+'</th>';});
-    th += '<th style="text-align:center;padding:4px 8px;font-weight:700;">Total</th></tr></thead><tbody>';
+    th += '<th style="text-align:left;padding:6px 8px;min-width:80px;">Name</th><th style="text-align:left;padding:6px 4px;font-size:9px;min-width:40px;">Role</th>';
+    months.forEach(function(m){th+='<th style="text-align:center;padding:4px 6px;min-width:50px;">'+m.substring(5)+'/'+m.substring(2,4)+'</th>';});
+    th += '<th style="text-align:center;padding:4px 8px;font-weight:700;min-width:60px;">Total</th></tr></thead><tbody>';
     var colors = ['#1843AD','#059669','#FF9933','#dc2626','#A2DCEB','#8b5cf6','#06b6d4','#f59e0b','#10b981','#6366f1','#ec4899','#14b8a6'];
     allUsers.forEach(function(u, i) {
-      var monthData = u.role === 'Coord' ? byMonth : byMonthInv;
-      var total = months.reduce(function(s,m){return s+(monthData[m]&&monthData[m][u.name]||0);},0);
+      var total = userTotals[u.name] || 0;
       if (total <= 0) return;
-      var maxM = Math.max.apply(null, months.map(function(m){return monthData[m]&&monthData[m][u.name]||0;}))||1;
+      var maxM = Math.max.apply(null, months.map(function(m){return (byMonthAll[m]&&byMonthAll[m][u.name])||0;}))||1;
       var roleClass = u.role === 'Coord' ? 'coord-row' : 'inv-row';
       var roleLabel = u.role === 'Coord' ? 'Coord' : 'PI';
       var roleBg = u.role === 'Coord' ? '#1843AD15' : '#8b5cf615';
       var roleColor = u.role === 'Coord' ? '#1843AD' : '#8b5cf6';
+      var roleField = u.role === 'Coord' ? 'coordinator' : 'investigator';
       th += '<tr class="monthly-trend-row '+roleClass+'" style="border-bottom:1px solid #f1f5f9;">';
       th += '<td style="padding:5px 8px;font-weight:600;color:'+colors[i%colors.length]+';cursor:pointer" onclick="showRPUUserModal(\''+jsAttr(u.name)+'\',\''+(u.role==='Coord'?'Coordinator':'Investigator')+'\')">'+escapeHTML(u.name.split(' ')[0])+'</td>';
       th += '<td style="padding:5px 4px;"><span style="font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px;background:'+roleBg+';color:'+roleColor+'">'+roleLabel+'</span></td>';
       months.forEach(function(m) {
-        var v = monthData[m]&&monthData[m][u.name]||0;
+        var v = (byMonthAll[m]&&byMonthAll[m][u.name])||0;
         var bg = v > 0 ? 'background:'+colors[i%colors.length]+Math.round(v/maxM*40+10).toString(16)+';' : '';
-        th += '<td style="text-align:center;padding:4px 6px;font-weight:'+(v>0?'600':'400')+';color:'+(v>0?'#1e293b':'#cbd5e1')+';'+bg+(v>0?'cursor:pointer;':'')+'"'+(v>0?' onclick="showRPUMonthModal(\''+jsAttr(u.name)+'\',\''+m+'\',\''+(u.role==='Coord'?'coordinator':'investigator')+'\')"':'')+'>'+(v > 0 ? '$'+Math.round(v/1000)+'K' : '—')+'</td>';
+        th += '<td style="text-align:center;padding:4px 6px;font-weight:'+(v>0?'600':'400')+';color:'+(v>0?'#1e293b':'#cbd5e1')+';'+bg+(v>0?'cursor:pointer;':'')+'"'+(v>0?' onclick="showRPUMonthModal(\''+jsAttr(u.name)+'\',\''+m+'\',\''+roleField+'\')"':'')+'>'+(v > 0 ? '$'+Math.round(v/1000)+'K' : '—')+'</td>';
       });
       th += '<td style="text-align:center;padding:4px 8px;font-weight:700;color:'+colors[i%colors.length]+';cursor:pointer" onclick="showRPUUserModal(\''+jsAttr(u.name)+'\',\''+(u.role==='Coord'?'Coordinator':'Investigator')+'\')">$'+Math.round(total/1000)+'K</td></tr>';
     });
 
-    // Total row
+    // Total row — sum unique visit revenue per month (not double-counted)
     th += '<tr style="border-top:2px solid var(--border);background:var(--surface2);font-weight:700;"><td style="padding:6px 8px;">TOTAL</td><td></td>';
+    var grandTotal = 0;
     months.forEach(function(m) {
+      // Use coordinator totals only to avoid double-counting
       var mTotal = 0;
-      allUsers.forEach(function(u) {
-        var md = u.role === 'Coord' ? byMonth : byMonthInv;
-        mTotal += (md[m] && md[m][u.name]) || 0;
-      });
+      coordUsers.forEach(function(u) { mTotal += (byMonthAll[m]&&byMonthAll[m][u.name])||0; });
+      grandTotal += mTotal;
       th += '<td style="text-align:center;padding:4px 6px;cursor:pointer" onclick="showRPUMonthModal(\'ALL\',\''+m+'\')">' + (mTotal > 0 ? '$'+Math.round(mTotal/1000)+'K' : '—') + '</td>';
     });
-    var grandTotal = allUsers.reduce(function(s,u) {
-      var md = u.role === 'Coord' ? byMonth : byMonthInv;
-      return s + months.reduce(function(ms,m){return ms+((md[m]&&md[m][u.name])||0);},0);
-    }, 0);
     th += '<td style="text-align:center;padding:4px 8px;">$'+Math.round(grandTotal/1000)+'K</td></tr>';
 
     th += '</tbody></table></div>';
