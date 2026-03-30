@@ -18721,6 +18721,37 @@ async function _crpInit() {
       fetchMetaAds().catch(() => {});
     }, 2000);
 
+    // Phase 3b: Refresh ride requests + confirmations + unscheduled visits
+    var _cfBase = (CRP_CONFIG.USE_CLOUD_FUNCTION && CRP_CONFIG.CF_BASE) ? CRP_CONFIG.CF_BASE : null;
+    if (_cfBase) {
+      setTimeout(function() {
+        fetch(_cfBase + '?feed=batch&feeds=rideRequests,visitConfirmations,unscheduledVisits&format=json')
+          .then(function(r){return r.json();}).then(function(json) {
+            var results = json.results || {};
+            var rideRows = (results.rideRequests || {}).data || [];
+            window._rideRequestPatients = {};
+            rideRows.forEach(function(r) {
+              var pn = (r.patient_name || '').toLowerCase().trim();
+              if (pn) window._rideRequestPatients[pn] = { date: r.last_ride_date, note: r.last_ride_note, key: r.patient_key };
+            });
+            var confirmRows = (results.visitConfirmations || {}).data || [];
+            window._visitConfirmPatients = {};
+            confirmRows.forEach(function(r) {
+              var pn = (r.patient_name || '').toLowerCase().trim();
+              if (pn) window._visitConfirmPatients[pn] = { date: r.confirmed_date, note: r.confirmation_note };
+            });
+            var unschedRows = (results.unscheduledVisits || {}).data || [];
+            window._unscheduledVisits = unschedRows;
+            // Re-inject buttons with fresh data
+            var _rows = document.querySelectorAll('#upcoming-tbody tr');
+            _rows.forEach(function(r) { delete r.dataset.rideshareInjected; delete r.dataset.confirmInjected; });
+            safe(injectVisitConfirmButtons, 'confirmBtns-refresh');
+            safe(injectRideshareButtons, 'rideshareBtns-refresh');
+            _log('Auto-Refresh: ride/confirm/unsched updated — ' + rideRows.length + ' rides, ' + confirmRows.length + ' confirms');
+          }).catch(function(e) { _log('Auto-Refresh ride/confirm failed: ' + e.message); });
+      }, 4000);
+    }
+
     // Re-render the currently active tab with fresh data
     var _activeNow = _activeTab();
     if (_activeNow === 'actions') safe(renderFollowUpTable, 'renderFollowUpTable-refresh');
