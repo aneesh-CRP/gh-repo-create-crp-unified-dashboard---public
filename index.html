@@ -1505,16 +1505,8 @@ body {
       <div style="padding:0;" id="meta-ads-container"></div>
     </div>
 
-    <div class="card fade-in" style="margin-bottom:12px;">
-      <div class="card-header">
-        <span class="card-title">Campaign Funnel — Lead to Enrollment</span>
-        <span class="badge badge-purple" id="meta-funnel-badge">—</span>
-      </div>
-      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Meta leads → CRM → referral pipeline → CRIO screening → enrolled</div>
-      <div style="padding:0;" id="meta-funnel-container"></div>
-    </div>
-
-    <div style="display:none" id="meta-alignment-container"></div>
+    <!-- Campaign Funnel + Lead Capture Gap removed -->
+    <div style="display:none"><div id="meta-funnel-container"></div><span id="meta-funnel-badge"></span><div id="meta-alignment-container"></div></div>
 
     <div class="card fade-in" style="margin-bottom:12px;">
       <div class="card-header">
@@ -13475,7 +13467,7 @@ function renderReferralDashboard() {
     var _pipelineScreening = (msc['Pre-Screening']||0) + (msc['Screening']||0);
     // CRIO cross-ref — filter by referral source from BQ recruiting data
     // so campaign rows only count patients whose CRIO source matches the vendor
-    var crioEnr = 0, crioScr = 0, crioTotal = 0;
+    var crioEnr = 0, crioScr = 0, crioTotal = 0, crioSF = 0, crioNE = 0, crioNI = 0;
     var _resolvedProtos = resolveCampaignProtocols(sn);
     // Map campaign vendor to CRIO referral source names
     var _vendorLower = (c.vendor||'').toLowerCase();
@@ -13503,7 +13495,10 @@ function renderReferralDashboard() {
         crioTotal++;
         var st = (rec.recruiting_status||'').toLowerCase();
         if (st === 'success') crioEnr++;
-        if (st === 'screening' || st === 'interested') crioScr++;
+        else if (st === 'screening' || st === 'interested') crioScr++;
+        else if (st === 'screen fail' || st === 'screen_fail') crioSF++;
+        else if (st === 'not eligible' || st === 'not_eligible') crioNE++;
+        else if (st === 'not interested' || st === 'not_interested') crioNI++;
       });
     }
     // Use recruiting data counts (vendor-filtered) as primary, pipeline as fallback
@@ -13518,7 +13513,7 @@ function renderReferralDashboard() {
     unifiedRows.push({
       name: _campName, type: 'Campaign', total: c.first_contact + c.second_contact + c.third_contact,
       newLead: c.new_referrals, contacted: c.first_contact, screening: _screening,
-      enrolled: _enrolled, sf: 0, notEligible: 0, notInterested: 0, stale: 0,
+      enrolled: _enrolled, sf: crioSF, notEligible: crioNE, notInterested: crioNI, stale: 0,
       inCrio: crioTotal || (crioEnr + crioScr), crioEnrolled: crioEnr, crioScreening: crioScr,
       needsEntry: 0, clickId: null, isCampaign: true, url: c.url, vendor: _prefix
     });
@@ -16604,28 +16599,7 @@ function renderMetaAds() {
   });
   html += '</tbody></table></div>';
 
-  // Lead Capture Gap Analysis
-  if (FB_CRM_DATA && FB_CRM_DATA.length > 0) {
-    var fbStudyCol = Object.keys(FB_CRM_DATA[0] || {}).find(function(k) { return /study|campaign/i.test(k); });
-    if (fbStudyCol) {
-      var fbByCamp = {};
-      FB_CRM_DATA.forEach(function(r) { var cn = (r[fbStudyCol]||'').trim(); if (cn) fbByCamp[cn] = (fbByCamp[cn]||0) + 1; });
-      var crossRef = camps.map(function(c) {
-        var cl = c.campaign.toLowerCase(), matched = 0;
-        Object.keys(fbByCamp).forEach(function(k) { if (k.toLowerCase().includes(cl) || cl.includes(k.toLowerCase())) matched += fbByCamp[k]; });
-        return { campaign: c.campaign, metaLeads: c.leads, crmLeads: matched, gap: c.leads - matched, studies: _metaStudiesForCampaign(c.campaign) };
-      });
-      var tm = crossRef.reduce(function(s,x){return s+x.metaLeads;},0), tc = crossRef.reduce(function(s,x){return s+x.crmLeads;},0);
-      var oc = tm > 0 ? Math.round(tc/tm*100) : 0;
-      html += '<div style="border-top:2px solid #e2e8f0;margin-top:4px;"><div style="padding:8px 16px 4px;font-size:12px;font-weight:700;">Lead Capture Gap <span style="font-weight:400;color:#64748b;font-size:10px;">Meta vs CRM \u00B7 Overall: <strong style="color:'+(oc>=80?'#059669':oc>=50?'#FF9933':'#dc2626')+'">'+oc+'%</strong></span></div>';
-      html += '<table style="width:100%;font-size:10px;border-collapse:collapse;"><thead><tr style="background:#f8fafc;"><th style="text-align:left;padding:4px 12px;">Campaign</th><th style="text-align:center;padding:4px 6px;">Meta</th><th style="text-align:center;padding:4px 6px;">CRM</th><th style="text-align:center;padding:4px 6px;">Gap</th><th style="text-align:center;padding:4px 6px;">Capture</th></tr></thead><tbody>';
-      crossRef.forEach(function(x) {
-        var p = x.metaLeads > 0 ? Math.round(x.crmLeads/x.metaLeads*100) : 0;
-        html += '<tr style="border-top:1px solid #f1f5f9;"><td style="padding:4px 12px;font-weight:600;">'+escapeHTML(x.campaign)+'</td><td style="text-align:center;color:#1843AD;font-weight:600;">'+x.metaLeads+'</td><td style="text-align:center;color:#059669;font-weight:600;">'+x.crmLeads+'</td><td style="text-align:center;color:'+(x.gap>50?'#dc2626':x.gap>10?'#FF9933':'#059669')+';font-weight:700;">'+(x.gap>0?'-'+x.gap:'\u2713')+'</td><td style="text-align:center;font-weight:700;color:'+(p>=80?'#059669':p>=50?'#FF9933':'#dc2626')+';">'+p+'%</td></tr>';
-      });
-      html += '</tbody></table></div>';
-    }
-  }
+  // Lead Capture Gap removed
   el.innerHTML = html;
 }
 
