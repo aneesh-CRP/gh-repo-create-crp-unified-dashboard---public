@@ -4644,10 +4644,12 @@ function renderOperationsTab() {
 }
 
 function _renderOpsContent() {
+  // Filter out completed observations — only show open/in-progress
+  _monitoringData = _monitoringData.filter(function(r) { return (r.status||'').toLowerCase() !== 'completed'; });
+
   // KPIs
   var open = _monitoringData.filter(function(r) { return (r.status||'').toLowerCase().indexOf('open') >= 0; });
   var deviations = _monitoringData.filter(function(r) { return (r.observation_category||'').toLowerCase().indexOf('protocol deviation') >= 0 || (r.observation_category||'').toLowerCase().indexOf('pd ') >= 0 || (r.observation_category||'').toLowerCase().indexOf('pd-') >= 0; });
-  var openDevs = deviations.filter(function(r) { return (r.status||'').toLowerCase().indexOf('open') >= 0; });
 
   var _sk = function(id, v) { var e = document.getElementById(id); if (e) e.textContent = v; };
   _sk('ops-monitoring', open.length);
@@ -4662,6 +4664,63 @@ function _renderOpsContent() {
   if (badge) badge.textContent = _monitoringData.length + ' observations · ' + open.length + ' open · ' + deviations.length + ' deviations';
 
   renderOpsMonitoringTable('all');
+  renderOpsPipeline();
+}
+
+function renderOpsPipeline() {
+  var el = document.getElementById('opsPipelineTable');
+  var badge = document.getElementById('ops-pipeline-badge');
+  if (!el) return;
+  var base = CRP_CONFIG.CF_BASE;
+  if (!base) return;
+
+  fetch(base + '?feed=studyMasterList&format=json').then(function(r){return r.json();}).then(function(json) {
+    var data = (json.data || []).filter(function(r) {
+      var s = (r.status || '').toLowerCase();
+      return s === 'feasibility' || s === 'selected' || s === 'start up' || s === 'recruiting';
+    });
+
+    // Sort by pipeline stage
+    var stageOrder = { 'feasibility': 0, 'selected': 1, 'start up': 2, 'recruiting': 3 };
+    data.sort(function(a, b) { return (stageOrder[(a.status||'').toLowerCase()] || 9) - (stageOrder[(b.status||'').toLowerCase()] || 9); });
+
+    if (badge) badge.textContent = data.length + ' active studies';
+
+    var stageColors = { 'feasibility': '#8b5cf6', 'selected': '#FF9933', 'start up': '#1843AD', 'recruiting': '#059669' };
+
+    var h = '<table class="fin-table" style="width:100%;font-size:11px;"><thead><tr>';
+    h += '<th style="text-align:left;padding:6px 8px;">Study</th>';
+    h += '<th style="text-align:center;">Stage</th>';
+    h += '<th style="text-align:left;">Sponsor</th>';
+    h += '<th style="text-align:left;">PI</th>';
+    h += '<th style="text-align:left;">Coordinator</th>';
+    h += '<th style="text-align:left;">Therapeutic Area</th>';
+    h += '<th style="text-align:left;">Site</th>';
+    h += '<th style="text-align:center;">eSource</th>';
+    h += '<th></th>';
+    h += '</tr></thead><tbody>';
+
+    data.forEach(function(r) {
+      var stage = (r.status || '').toLowerCase();
+      var sc = stageColors[stage] || '#64748b';
+      var esColor = (r.crio_esource || '').toLowerCase() === 'completed' ? '#059669' : (r.crio_esource || '').toLowerCase() === 'not started' ? '#dc2626' : '#FF9933';
+
+      h += '<tr style="border-bottom:1px solid #f1f5f9;">';
+      h += '<td style="padding:6px 8px;font-weight:600;">' + escapeHTML(r.study || '—') + '</td>';
+      h += '<td style="text-align:center;"><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:' + sc + '20;color:' + sc + ';text-transform:uppercase">' + escapeHTML(r.status || '—') + '</span></td>';
+      h += '<td style="font-size:10px;color:#64748b">' + escapeHTML(r.sponsor || '—') + '</td>';
+      h += '<td style="font-size:10px;">' + escapeHTML(r.pi || '—') + '</td>';
+      h += '<td style="font-size:10px;">' + escapeHTML(r.primary_coordinator || '—') + '</td>';
+      h += '<td style="font-size:10px;color:#64748b">' + escapeHTML(r.therapeutic_area || '—') + '</td>';
+      h += '<td style="font-size:10px;">' + escapeHTML(r.site || '—') + '</td>';
+      h += '<td style="text-align:center;"><span style="font-size:9px;font-weight:600;color:' + esColor + '">' + escapeHTML(r.crio_esource || '—') + '</span></td>';
+      h += '<td>' + (r.url ? '<a href="' + escapeHTML(r.url) + '" target="_blank" style="font-size:10px;color:#1843AD;text-decoration:none;font-weight:600">Open</a>' : '') + '</td>';
+      h += '</tr>';
+    });
+
+    h += '</tbody></table>';
+    el.innerHTML = h;
+  }).catch(function(e) { el.innerHTML = '<p style="color:#94a3b8;font-size:12px;">Failed to load: ' + escapeHTML(e.message) + '</p>'; });
 }
 
 function renderOpsMonitoringTable(filter) {
@@ -4707,7 +4766,7 @@ function renderOpsMonitoringTable(filter) {
     h += '<tr style="border-bottom:1px solid #f1f5f9;' + rowBg + '">';
     h += '<td style="padding:6px 8px;font-weight:600;">' + escapeHTML(r.study || '—') + '</td>';
     h += '<td style="padding:6px 4px;"><span style="font-size:10px;font-weight:600;padding:2px 6px;border-radius:4px;background:' + catBg + ';color:' + catColor + '">' + escapeHTML(r.observation_category || '—') + '</span></td>';
-    h += '<td style="padding:6px 4px;font-size:10px;max-width:250px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + escapeHTML(r.notes || '') + '">' + escapeHTML((r.notes || '').substring(0, 80)) + '</td>';
+    h += '<td style="padding:6px 4px;font-size:10px;">' + escapeHTML(r.notes || '—') + (r.next_steps ? '<div style="margin-top:2px;color:#059669;font-weight:600">→ ' + escapeHTML(r.next_steps) + '</div>' : '') + '</td>';
     h += '<td style="text-align:center;"><span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:' + statusBg + ';color:' + statusColor + '">' + escapeHTML(r.status || '—') + '</span></td>';
     h += '<td style="padding:6px 4px;font-size:10px;color:#64748b">' + escapeHTML(r.monitor || '—') + '</td>';
     h += '<td style="text-align:center;font-size:10px;">' + escapeHTML(r.visit_date || '—') + '</td>';
