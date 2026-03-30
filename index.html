@@ -6354,14 +6354,14 @@ function renderCoordinatorGoals() {
     const dayBars = twoWeekDays.map((d,i) => {
       const snapCount = byDay[d] || 0;
       const detailCount = (byDetail[d] || []).length;
-      // Show actual detail count when we have patient data; fall back to snapshot count for bar height
+      // Show actual detail count when we have patient data; fall back to snapshot count
       const visits = detailCount > 0 ? detailCount : snapCount;
-      const barVisits = Math.max(visits, snapCount); // bar uses higher for visual
       const isToday = d === todayISO;
       const isPast = d < todayISO;
       const isFuture = d > todayISO;
       const barColor = visits >= 2 ? (isFuture ? '#86efac' : '#059669') : visits === 1 ? (isFuture ? '#fdba74' : '#FF9933') : (isFuture ? '#fca5a5' : '#ef4444');
-      const barH = Math.min(100, Math.round((barVisits / (weekMax * 1.2)) * 100));
+      // Bar height uses same value as displayed number — no mismatch
+      const barH = visits > 0 ? Math.min(100, Math.max(15, Math.round((visits / (weekMax || 1)) * 100))) : 0;
       const hasVisits = detailCount > 0;
       const cursor = hasVisits ? 'cursor:pointer;' : '';
       const clickAttr = hasVisits ? `onclick="toggleCoordDayDetail('${jsAttr(name)}','${d}',this)"` : '';
