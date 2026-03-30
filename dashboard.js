@@ -2286,7 +2286,7 @@ function switchTab(name, el) {
   if (navWrap) navWrap.classList.remove('open');
 
   // Performance tabs → delegate to switchView (handles lazy building)
-  const PERF_TABS = ['overview','studies','referrals','actions','operations','admin'];
+  const PERF_TABS = ['overview','studies','referrals','actions','admin'];
   if (PERF_TABS.includes(name)) {
     // Hide finance+insights views first
     document.querySelectorAll('[id^="view-fin-"], #view-insights').forEach(v => {
@@ -4853,7 +4853,7 @@ function filterOpsMonitoring(filter, btn) {
 }
 
 function showOpsMonitoring(filter) {
-  switchTab('operations');
+  switchTab('actions');
   setTimeout(function() { filterOpsMonitoring(filter, null); }, 200);
 }
 
@@ -6051,11 +6051,8 @@ function switchView(name, el) {
       }
     }, 50);
   }
-  if (name === 'operations') {
-    setTimeout(function() {
-      safe(renderOperationsTab, 'renderOperationsTab');
-    }, 50);
-  }
+  // Operations merged into Actions — redirect legacy hash
+  if (name === 'operations') { switchTab('actions'); return; }
   if (name === 'admin') {
     if (_tabDirty.admin) {
       setTimeout(() => {
@@ -6083,6 +6080,7 @@ function switchView(name, el) {
   if (name === 'actions') {
     setTimeout(() => {
       safe(renderFollowUpTable, 'renderFollowUpTable');
+      safe(renderOperationsTab, 'renderOperationsTab');
       if (_tabDirty.actions) {
         safe(buildActionSteps, 'buildActionSteps');
         safe(buildInsights, 'buildInsights');
@@ -16736,7 +16734,7 @@ async function _crpInit() {
   if (location.hash) {
     var _hashTab = location.hash.replace('#', '');
     if (_hashTab === 'schedule') _hashTab = 'overview'; // Schedule merged into Overview
-    var _allTabs = ['overview','studies','referrals','actions','operations','admin','fin-overview','fin-revenue','fin-qb','fin-productivity'];
+    var _allTabs = ['overview','studies','referrals','actions','admin','fin-overview','fin-revenue','fin-qb','fin-productivity'];
     if (_allTabs.indexOf(_hashTab) !== -1) _initTab = _hashTab;
   }
   var _initTabEl = document.querySelector(".nav-tab[onclick*='" + _initTab + "'], .nav-tab[data-tab='" + _initTab + "']");

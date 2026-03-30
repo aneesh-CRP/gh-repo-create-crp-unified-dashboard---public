@@ -1069,7 +1069,7 @@ body {
     <span class="nav-tab" onclick="switchTab('studies', this)" role="tab">Studies</span>
     <span class="nav-tab" onclick="switchTab('referrals', this)" role="tab">Referrals</span>
     <span class="nav-tab" onclick="switchTab('actions', this)" role="tab">Actions</span>
-    <span class="nav-tab" onclick="switchTab('operations', this)" role="tab">Operations</span>
+    <!-- Operations merged into Actions -->
     <span class="nav-tab" onclick="switchTab('admin', this)" role="tab"><svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.5;vertical-align:-1px;margin-right:2px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Admin</span>
     <span style="width:1px;background:#CBD5E0;margin:8px 2px"></span>
     <span class="nav-tab fin-tab" data-tab="fin-overview" onclick="switchTab('fin-overview', this)" role="tab"><svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.5;vertical-align:-1px;margin-right:2px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Finance</span>
@@ -1726,39 +1726,8 @@ body {
     </div>
   </div>
 
-  <!-- Hidden containers for backward compatibility with existing render functions -->
-  <div style="display:none" id="risk-flag-cards"></div>
-  <div style="display:none" id="crio-studies-container"></div>
-  <div style="display:none" id="perf-insight-flags"></div>
-  <div style="display:none" id="perf-insight-positive"></div>
-  <div style="display:none" id="action-steps"></div>
-  <div style="display:none" id="dormant-list"></div>
-  <div style="display:none" id="crio-recon-container"></div>
-  <div style="display:none" id="contact-alert-cards"></div>
-  <div style="display:none" id="risk-kpi-count"></div>
-  <div style="display:none" id="risk-kpi-urgent"></div>
-  <div style="display:none" id="risk-kpi-studies"></div>
-  <div style="display:none" id="crio-recon-badge"></div>
-  <div style="display:none" id="crio-studies-badge"></div>
-  <div style="display:none" id="cq-kpi-red"></div>
-  <div style="display:none" id="cq-kpi-yellow"></div>
-  <div style="display:none" id="cq-kpi-clean"></div>
-  <div style="display:none" id="cq-kpi-db-total"></div>
-  <div style="display:none" id="cq-kpi-db-sub"></div>
-  <div style="display:none" id="cq-badge"></div>
-
-</div><!-- /view-actions -->
-
-
-<!-- ══ VIEW: CONNECT ══════════════════════ -->
-<!-- ═══════════════════════════════════════ OPERATIONS TAB ═══════════════════════════════════════ -->
-<div id="view-operations" class="view">
-
-  <div style="margin-bottom:4px"><span class="card-title" style="font-size:16px;">Operations & Compliance</span>
-    <div style="font-size:10px;color:#94a3b8;margin-top:2px;">Monitoring visits, protocol deviations, regulatory performance, document status</div>
-  </div>
-
-  <!-- Operations KPIs -->
+  <!-- ═══ OPERATIONS & COMPLIANCE (merged from Operations tab) ═══ -->
+  <div class="section-title" style="margin-top:16px;margin-bottom:8px;">Operations & Compliance</div>
   <div class="time-banner fade-in" style="margin-bottom:12px;" id="ops-kpi-strip">
     <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showActionModal('queries')">
       <div class="tb-label">Open Queries</div>
@@ -1786,12 +1755,11 @@ body {
     </div>
     <div class="tb-divider"></div>
     <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showOpsMonitoring('deviations')">
-      <div class="tb-label">Protocol Deviations</div>
+      <div class="tb-label">Deviations</div>
       <div class="tb-value" style="color:#dc2626" id="ops-deviations">—</div>
     </div>
   </div>
 
-  <!-- Regulatory Performance (moved from Overview) -->
   <div class="card fade-in" style="margin-bottom:12px;">
     <div class="card-header">
       <span class="card-title">Regulatory Performance</span>
@@ -1801,7 +1769,6 @@ body {
     <div id="opsRegPerfContainer" style="padding:8px 12px;"></div>
   </div>
 
-  <!-- Monitoring Visits -->
   <div class="card fade-in" style="margin-bottom:12px;">
     <div class="card-header">
       <span class="card-title">Monitoring Visits & Observations</span>
@@ -1814,9 +1781,32 @@ body {
     <div id="opsMonitoringTable" style="padding:0 12px 12px;overflow-x:auto;max-height:500px;overflow-y:auto;"></div>
   </div>
 
-  <!-- Study Pipeline moved to Studies tab -->
+  <!-- Hidden containers for backward compatibility with existing render functions -->
+  <div style="display:none" id="risk-flag-cards"></div>
+  <div style="display:none" id="crio-studies-container"></div>
+  <div style="display:none" id="perf-insight-flags"></div>
+  <div style="display:none" id="perf-insight-positive"></div>
+  <div style="display:none" id="action-steps"></div>
+  <div style="display:none" id="dormant-list"></div>
+  <div style="display:none" id="crio-recon-container"></div>
+  <div style="display:none" id="contact-alert-cards"></div>
+  <div style="display:none" id="risk-kpi-count"></div>
+  <div style="display:none" id="risk-kpi-urgent"></div>
+  <div style="display:none" id="risk-kpi-studies"></div>
+  <div style="display:none" id="crio-recon-badge"></div>
+  <div style="display:none" id="crio-studies-badge"></div>
+  <div style="display:none" id="cq-kpi-red"></div>
+  <div style="display:none" id="cq-kpi-yellow"></div>
+  <div style="display:none" id="cq-kpi-clean"></div>
+  <div style="display:none" id="cq-kpi-db-total"></div>
+  <div style="display:none" id="cq-kpi-db-sub"></div>
+  <div style="display:none" id="cq-badge"></div>
 
-</div><!-- /view-operations -->
+</div><!-- /view-actions -->
+
+
+<!-- Operations merged into Actions tab -->
+<div id="view-operations" class="view" style="display:none"></div>
 
 <div id="view-admin" class="view">
 
@@ -4285,7 +4275,7 @@ function switchTab(name, el) {
   if (navWrap) navWrap.classList.remove('open');
 
   // Performance tabs → delegate to switchView (handles lazy building)
-  const PERF_TABS = ['overview','studies','referrals','actions','operations','admin'];
+  const PERF_TABS = ['overview','studies','referrals','actions','admin'];
   if (PERF_TABS.includes(name)) {
     // Hide finance+insights views first
     document.querySelectorAll('[id^="view-fin-"], #view-insights').forEach(v => {
@@ -6852,7 +6842,7 @@ function filterOpsMonitoring(filter, btn) {
 }
 
 function showOpsMonitoring(filter) {
-  switchTab('operations');
+  switchTab('actions');
   setTimeout(function() { filterOpsMonitoring(filter, null); }, 200);
 }
 
@@ -8050,11 +8040,8 @@ function switchView(name, el) {
       }
     }, 50);
   }
-  if (name === 'operations') {
-    setTimeout(function() {
-      safe(renderOperationsTab, 'renderOperationsTab');
-    }, 50);
-  }
+  // Operations merged into Actions — redirect legacy hash
+  if (name === 'operations') { switchTab('actions'); return; }
   if (name === 'admin') {
     if (_tabDirty.admin) {
       setTimeout(() => {
@@ -8082,6 +8069,7 @@ function switchView(name, el) {
   if (name === 'actions') {
     setTimeout(() => {
       safe(renderFollowUpTable, 'renderFollowUpTable');
+      safe(renderOperationsTab, 'renderOperationsTab');
       if (_tabDirty.actions) {
         safe(buildActionSteps, 'buildActionSteps');
         safe(buildInsights, 'buildInsights');
@@ -18735,7 +18723,7 @@ async function _crpInit() {
   if (location.hash) {
     var _hashTab = location.hash.replace('#', '');
     if (_hashTab === 'schedule') _hashTab = 'overview'; // Schedule merged into Overview
-    var _allTabs = ['overview','studies','referrals','actions','operations','admin','fin-overview','fin-revenue','fin-qb','fin-productivity'];
+    var _allTabs = ['overview','studies','referrals','actions','admin','fin-overview','fin-revenue','fin-qb','fin-productivity'];
     if (_allTabs.indexOf(_hashTab) !== -1) _initTab = _hashTab;
   }
   var _initTabEl = document.querySelector(".nav-tab[onclick*='" + _initTab + "'], .nav-tab[data-tab='" + _initTab + "']");
