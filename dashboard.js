@@ -1511,9 +1511,9 @@ function maskPHI(fullName) {
  * and any table cell with data-phi="patient".
  */
 function maskStaticPHI() {
-  // Schedule: upcoming-tbody patient column (index 4 = 5th column, after confirm cell)
+  // Schedule: upcoming-tbody patient column (index 6 = 7th column, after confirm + rideshare cells)
   var tables = [
-    { tbody: 'upcoming-tbody', col: 4 }
+    { tbody: 'upcoming-tbody', col: 6 }
   ];
   tables.forEach(function(t) {
     var tbody = document.getElementById(t.tbody);
@@ -3127,11 +3127,11 @@ function buildScheduleTable() {
     var cxCount = cancelsByPatient[patKey] || 0;
     var riskBadge = '';
     if (nsCount >= 2) {
-      riskBadge = '<span title="' + nsCount + ' prior no-shows — confirm attendance" style="font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px;margin-left:4px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;cursor:help">' + nsCount + 'x NO-SHOW</span>';
+      riskBadge = '<span title="' + nsCount + ' prior no-shows — confirm attendance" style="font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px;margin-left:4px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;cursor:help">⚠ ' + nsCount + 'x prior no-show</span>';
     } else if (nsCount === 1) {
-      riskBadge = '<span title="1 prior no-show — confirm attendance" style="font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px;margin-left:4px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;cursor:help">NO-SHOW</span>';
+      riskBadge = '<span title="1 prior no-show — confirm attendance" style="font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px;margin-left:4px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;cursor:help">⚠ prior no-show</span>';
     } else if (cxCount >= 2) {
-      riskBadge = '<span title="' + cxCount + ' prior cancellations" style="font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px;margin-left:4px;background:#fff7ed;color:#FF9933;border:1px solid #fed7aa;cursor:help">' + cxCount + 'x cancelled</span>';
+      riskBadge = '<span title="' + cxCount + ' prior cancellations" style="font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px;margin-left:4px;background:#fff7ed;color:#FF9933;border:1px solid #fed7aa;cursor:help">⚠ ' + cxCount + 'x prior cancel</span>';
     }
     // Study cell (escaped)
     var studyText = esc(v.study||'—');
@@ -3150,6 +3150,7 @@ function buildScheduleTable() {
     var invStyle = v.investigator ? 'font-size:11px;color:#072061' : 'font-size:11px;color:#cbd5e1';
     html += '<tr data-date="' + (v.date_iso||'') + '" data-site="' + esc(v.site||'') + '" data-coord="' + esc(v.coord||'') + '">'
       + '<td class="confirm-cell" style="width:90px;text-align:center;padding:4px;"></td>'
+      + '<td class="rideshare-cell" style="width:70px;text-align:center;padding:4px;"></td>'
       + '<td style="font-weight:600;color:var(--blue);white-space:nowrap">' + esc(v.date||'—') + '</td>'
       + '<td style="font-size:11px;color:#64748b;white-space:nowrap">' + esc(v.time||'—') + '</td>'
       + '<td style="font-size:11px">' + studyHtml + '</td>'
@@ -3377,16 +3378,16 @@ function injectScheduleMedRecords() {
     var dateStr = row.dataset.date;
     if (dateStr) { var parts = dateStr.split('-'); var d = new Date(parseInt(parts[0]), parseInt(parts[1])-1, parseInt(parts[2])); if (d < today) return; }
     var cells = row.querySelectorAll('td');
-    var patCell = cells[4];
+    var patCell = cells[6]; // col 7: Patient (shifted +2 for rideshare column)
     if (!patCell) return;
     var link = patCell.querySelector('a') || patCell;
     var patName = (link.dataset.phiOriginal || patCell.textContent || '').trim().toLowerCase();
     if (!patName) return;
-    // Get study name from column 2 (study cell)
-    var studyCell = cells[2];
+    // Get study name from column 4 (study cell, shifted +2)
+    var studyCell = cells[4];
     var studyName = studyCell ? (studyCell.textContent || '').trim() : '';
-    // Get CRIO subject status from column 5 (status badge)
-    var crioStatusCell = cells[5];
+    // Get CRIO subject status from column 7 (status badge, shifted +2)
+    var crioStatusCell = cells[7];
     var crioStatus = crioStatusCell ? (crioStatusCell.textContent || '').trim() : '';
     var mrIdx = _findBestMedRecord(patName, studyName);
     if (mrIdx === -1) return;
@@ -3575,6 +3576,50 @@ function _updateStatusCount() {
   });
   var badge = document.getElementById('sched-confirm-count');
   if (badge) badge.textContent = tracked + '/' + total + ' tracked';
+}
+
+// ── Rideshare tracking (localStorage) ──
+var _rideshareData = {};
+function _loadRideshare() { try { _rideshareData = JSON.parse(localStorage.getItem('crp_rideshare') || '{}'); } catch(e) { _rideshareData = {}; } }
+function _saveRideshare() { try { localStorage.setItem('crp_rideshare', JSON.stringify(_rideshareData)); } catch(e) {} }
+function _rideshareKey(row) {
+  var date = row.dataset.date || '';
+  var cells = row.querySelectorAll('td');
+  var pat = cells[6] ? (cells[6].textContent || '').trim() : '';
+  var study = cells[4] ? (cells[4].textContent || '').trim() : '';
+  return (date + '|' + pat + '|' + study).toLowerCase().replace(/\s+/g, ' ');
+}
+
+function injectRideshareButtons() {
+  _loadRideshare();
+  var tbody = document.getElementById('upcoming-tbody');
+  if (!tbody) return;
+  var rows = tbody.querySelectorAll('tr');
+  rows.forEach(function(row) {
+    if (row.dataset.rideshareInjected) return;
+    var key = _rideshareKey(row);
+    if (!key || key === '||') return;
+    var td = row.querySelector('td.rideshare-cell');
+    if (!td) return;
+    var isRequested = _rideshareData[key] === true;
+    var btn = document.createElement('button');
+    btn.style.cssText = 'font-size:9px;font-weight:700;padding:3px 6px;border-radius:4px;cursor:pointer;white-space:nowrap;min-width:60px;border:1.5px solid ' + (isRequested ? '#059669' : '#cbd5e1') + ';background:' + (isRequested ? '#ecfdf5' : '#fff') + ';color:' + (isRequested ? '#059669' : '#94a3b8') + ';';
+    btn.textContent = isRequested ? '✓ Requested' : 'Request';
+    btn.onclick = function(e) {
+      e.stopPropagation();
+      var nowReq = !_rideshareData[key];
+      if (nowReq) _rideshareData[key] = true;
+      else delete _rideshareData[key];
+      _saveRideshare();
+      btn.textContent = nowReq ? '✓ Requested' : 'Request';
+      btn.style.borderColor = nowReq ? '#059669' : '#cbd5e1';
+      btn.style.background = nowReq ? '#ecfdf5' : '#fff';
+      btn.style.color = nowReq ? '#059669' : '#94a3b8';
+    };
+    td.innerHTML = '';
+    td.appendChild(btn);
+    row.dataset.rideshareInjected = '1';
+  });
 }
 
 function injectVisitConfirmButtons() {
@@ -5672,6 +5717,7 @@ function switchView(name, el) {
       safe(renderCoordTrendChart,    'coordTrend');
       safe(hidePastVisits,           'hidePast');
       safe(injectVisitConfirmButtons,'confirmBtns');
+      safe(injectRideshareButtons,'rideshareBtns');
       if (MED_RECORDS_DATA && MED_RECORDS_DATA.length > 0) safe(injectScheduleMedRecords, 'medRec');
       safe(() => filterSchedTable('all', document.querySelector('.filter-btn.active')), 'schedTable');
       // KPIs
@@ -9656,6 +9702,7 @@ function renderAll() {
   safe(backfillInvestigators, 'backfillInvestigators');
   safe(hidePastVisits, 'hidePastVisits');
   safe(injectVisitConfirmButtons, 'injectVisitConfirmButtons');
+  safe(injectRideshareButtons, 'injectRideshareButtons');
   if (MED_RECORDS_DATA && MED_RECORDS_DATA.length > 0) safe(injectScheduleMedRecords, 'injectScheduleMedRecords');
   safe(() => filterSchedTable('all', null), 'schedFilter');
   _tabDirty.overview = false;
