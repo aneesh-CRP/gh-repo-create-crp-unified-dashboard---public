@@ -8907,6 +8907,64 @@ async function fetchQuickBooksData() {
     var pnlUnmatched = [];
     var qbTotalIncome = 0;
 
+    // Explicit QB→CRIO mapping for known mismatches
+    var _qbAlias = {
+      'tristar': 'ACT17841',
+      'kallyope': 'K-304-P001', 'kal-k304': 'K-304-P001',
+      'biohaven': 'BHV3000-405',
+      'corevitas': 'COREVITAS',
+      'inato': 'INATO',
+      'organon': 'OG-6219-P001',
+    };
+
+    // Strip common sponsor prefixes from QB account names to extract protocol code
+    var _sponsorPrefixes = ['lilly','eli lilly','abbvie','janssen research','janssen','johnson & johnson','johnson and johnson',
+      'pfizer inc','pfizer','sanofi','astrazeneca','celldex','mylan','myovant','sebela','chemo research','health decisions',
+      'kallyope','biohaven','corevitas'];
+
+    function _extractProtocol(acctName) {
+      var lo = acctName.toLowerCase().trim();
+      for (var p = 0; p < _sponsorPrefixes.length; p++) {
+        if (lo.startsWith(_sponsorPrefixes[p])) {
+          return acctName.substring(_sponsorPrefixes[p].length).trim().replace(/^[\s\-\.]+/, '');
+        }
+      }
+      return acctName.trim();
+    }
+
+    function _matchStudyCode(acct) {
+      var acctNorm = acct.toLowerCase().replace(/[\s\-]/g, '');
+      // 1. Check explicit alias
+      for (var alias in _qbAlias) {
+        if (acctNorm.indexOf(alias.replace(/[\s\-]/g, '')) >= 0) {
+          // Find the CRIO code that matches the alias target
+          var target = _qbAlias[alias].toLowerCase().replace(/[\s\-]/g, '');
+          for (var i = 0; i < studyCodes.length; i++) {
+            if (studyCodes[i].toLowerCase().replace(/[\s\-]/g, '').indexOf(target) >= 0 || target.indexOf(studyCodes[i].toLowerCase().replace(/[\s\-]/g, '')) >= 0) return studyCodes[i];
+          }
+        }
+      }
+      // 2. Extract protocol code (strip sponsor prefix) and match
+      var proto = _extractProtocol(acct).toLowerCase().replace(/[\s\-]/g, '');
+      if (proto.length >= 4) {
+        for (var i = 0; i < studyCodes.length; i++) {
+          var codeFull = studyCodes[i].toLowerCase().replace(/[\s\-]/g, '');
+          var codeBase = studyCodes[i].replace(/\s*\(.*$/, '').trim().toLowerCase().replace(/[\s\-]/g, '');
+          if (proto.indexOf(codeFull) >= 0 || codeFull.indexOf(proto) >= 0 ||
+              proto.indexOf(codeBase) >= 0 || codeBase.indexOf(proto) >= 0) return studyCodes[i];
+        }
+      }
+      // 3. Original full-string matching
+      for (var i = 0; i < studyCodes.length; i++) {
+        var codeFull = studyCodes[i].toLowerCase().replace(/[\s\-]/g, '');
+        var codeBase = studyCodes[i].replace(/\s*\(.*$/, '').trim().toLowerCase().replace(/[\s\-]/g, '');
+        if (codeBase.length < 4) continue;
+        if (acctNorm.indexOf(codeFull) >= 0 || codeFull.indexOf(acctNorm) >= 0 ||
+            acctNorm.indexOf(codeBase) >= 0 || codeBase.indexOf(acctNorm) >= 0) return studyCodes[i];
+      }
+      return null;
+    }
+
     pnlRows.forEach(function(r) {
       var acct = (r.account || '').trim();
       if (!acct) return;
@@ -8917,34 +8975,23 @@ async function fetchQuickBooksData() {
       if (total <= 0) return;
       qbTotalIncome += total;
 
-      // Build monthly breakdown from the row
       var monthly = {};
       monthCols.forEach(function(m) { if (r[m] && r[m] !== 0) monthly[m] = r[m]; });
 
-      // Try to match to a CRIO study code
-      var acctNorm = acctLower.replace(/[\s\-]/g, '');
-      var matched = false;
-      for (var i = 0; i < studyCodes.length; i++) {
-        var code = studyCodes[i];
-        var codeFull = code.toLowerCase().replace(/[\s\-]/g, '');
-        var codeBase = code.replace(/\s*\(.*$/, '').trim().toLowerCase().replace(/[\s\-]/g, '');
-        if (codeBase.length < 4) continue;
-        if (acctNorm.includes(codeFull) || codeFull.includes(acctNorm) ||
-            acctNorm.includes(codeBase) || codeBase.includes(acctNorm)) {
-          var activeMos = Object.values(monthly).filter(function(v){return v > 0;}).length;
-          var firstMo = monthCols.find(function(m){return (r[m]||0) !== 0;}) || '';
-          if (pnlByStudy[code]) {
-            pnlByStudy[code].total += total;
-            pnlByStudy[code].activeMonths = Math.max(pnlByStudy[code].activeMonths, activeMos);
-            Object.entries(monthly).forEach(function(e) { pnlByStudy[code].monthly[e[0]] = (pnlByStudy[code].monthly[e[0]]||0) + e[1]; });
-          } else {
-            pnlByStudy[code] = { qbAccount: acct, total: total, monthly: monthly, activeMonths: activeMos, firstMonth: firstMo };
-          }
-          matched = true;
-          break;
+      var matchedCode = _matchStudyCode(acct);
+      if (matchedCode) {
+        var activeMos = Object.values(monthly).filter(function(v){return v > 0;}).length;
+        var firstMo = monthCols.find(function(m){return (r[m]||0) !== 0;}) || '';
+        if (pnlByStudy[matchedCode]) {
+          pnlByStudy[matchedCode].total += total;
+          pnlByStudy[matchedCode].activeMonths = Math.max(pnlByStudy[matchedCode].activeMonths, activeMos);
+          Object.entries(monthly).forEach(function(e) { pnlByStudy[matchedCode].monthly[e[0]] = (pnlByStudy[matchedCode].monthly[e[0]]||0) + e[1]; });
+        } else {
+          pnlByStudy[matchedCode] = { qbAccount: acct, total: total, monthly: monthly, activeMonths: activeMos, firstMonth: firstMo };
         }
+      } else {
+        pnlUnmatched.push({ account: acct, total: total, monthly: monthly });
       }
-      if (!matched) pnlUnmatched.push({ account: acct, total: total, monthly: monthly });
     });
 
     QB_DATA.pnlByStudy = pnlByStudy;
