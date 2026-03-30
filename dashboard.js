@@ -3551,6 +3551,7 @@ function _visitKey(row) {
 }
 // ═══ VISIT STATUS TRACKING (real-time patient flow) ═══
 var VISIT_STATUSES = [
+  {id:'confirmed', label:'✓ Confirmed', icon:'', color:'#059669'},
   {id:'arrived',   label:'Arrived',    icon:'', color:'#1843AD'},
   {id:'consent',   label:'Consent',    icon:'', color:'#1843AD'},
   {id:'eligibility',label:'Eligibility',icon:'', color:'#A2DCEB'},
@@ -3593,7 +3594,7 @@ function _makeStatusBtn(key, row) {
       var c = _statusBtnColor(cur.status);
       btn.innerHTML = _statusLabel(cur.status);
       btn.style.cssText = 'font-size:9px;font-weight:700;padding:3px 6px;border-radius:4px;border:none;cursor:pointer;background:'+c+';color:#fff;white-space:nowrap;min-width:70px;';
-      row.style.background = cur.status === 'completed' ? '#f0fdf4' : cur.status === 'noshow' ? '#fef2f2' : '#f0f9ff';
+      row.style.background = cur.status === 'completed' ? '#f0fdf4' : cur.status === 'noshow' ? '#fef2f2' : cur.status === 'confirmed' ? '#ecfdf5' : '#f0f9ff';
       row.style.opacity = cur.status === 'completed' || cur.status === 'noshow' ? '0.6' : '1';
     } else {
       btn.innerHTML = '● Track';
@@ -3733,14 +3734,32 @@ function injectVisitConfirmButtons() {
   Object.keys(_confirmedVisits).forEach(function(k) {
     if (!_visitStatuses[k]) _visitStatuses[k] = {status:'completed', ts:_confirmedVisits[k]};
   });
+
+  // Auto-populate confirmations from CRIO interactions
+  var confirmPatients = window._visitConfirmPatients || {};
   var tbody = document.getElementById('upcoming-tbody');
   if (!tbody) return;
   var rows = tbody.querySelectorAll('tr');
-  var injected = 0;
+  var injected = 0, autoConfirmed = 0;
   rows.forEach(function(row) {
     if (row.dataset.confirmInjected) return;
     var key = _visitKey(row);
     if (!key) return;
+
+    // Check CRIO confirmations for this patient
+    if (!_visitStatuses[key]) {
+      var cells = row.querySelectorAll('td');
+      var patCell = cells[6]; // Patient column
+      if (patCell) {
+        var patLink = patCell.querySelector('a') || patCell;
+        var patName = (patLink.dataset && patLink.dataset.phiOriginal || patCell.textContent || '').trim().toLowerCase();
+        if (patName && confirmPatients[patName]) {
+          _visitStatuses[key] = { status: 'confirmed', ts: Date.now(), auto: true };
+          autoConfirmed++;
+        }
+      }
+    }
+
     var td = row.querySelector('td.confirm-cell') || row.cells[0];
     if (!td) return;
     td.innerHTML = '';
@@ -3749,6 +3768,10 @@ function injectVisitConfirmButtons() {
     row.dataset.confirmInjected = '1';
     injected++;
   });
+  if (autoConfirmed > 0) {
+    _saveVisitStatuses();
+    _log('Auto-confirmed from CRIO: ' + autoConfirmed + ' visits');
+  }
   _updateStatusCount();
   _log('injectVisitStatusBtns: injected ' + injected + '/' + rows.length);
 }
