@@ -2831,6 +2831,35 @@ async function fetchStudyMasterList() {
   });
 }
 
+// ── Study Startup Checklist (Regulatory folder) ──
+async function fetchStartupChecklist() {
+  const tasks = await fetchAllClickUpTasks('901409833304');
+  const CHECKLIST_FIELDS = [
+    'IRB Submission done?', 'DOA Received & Created?', 'CRF Guidelines received?',
+    'Study made in CRIO & Drive?', 'NTF CTA Routed?', 'NTF Submitted?',
+    'Flowchart created?', 'Mining checklist created?', 'One page overview created?',
+    'Add Site calibration in CRIO', 'Add CLIA Certification in CRIO?',
+    'Blue folders done?', 'Confi completed?', 'Pre-Screener Completed?', 'Vendor\'s List'
+  ];
+  return tasks.filter(t => !t.parent).map(t => {
+    const f = parseCustomFields(t.custom_fields);
+    let done = 0, total = 0, pending = 0, items = {};
+    CHECKLIST_FIELDS.forEach(field => {
+      const val = (f[field] || '').toLowerCase().trim();
+      if (val === 'n/a' || val === 'na' || val === '') return;
+      total++;
+      items[field] = val;
+      if (val === 'yes' || val === 'true' || val === '1') done++;
+      else if (val === 'pending') pending++;
+    });
+    return {
+      study: t.name || '', status: (t.status||{}).status || '',
+      done, total, pending, pct: total > 0 ? Math.round(done / total * 100) : 0,
+      items, url: t.url || '',
+    };
+  });
+}
+
 // ── Provider Trackers (all physician tracker lists) ──
 const PROVIDER_TRACKER_LISTS = [
   { id: '901413202462', name: 'Dr. Modarressi' },
@@ -2884,6 +2913,7 @@ const CLICKUP_FEEDS = {
   docExpiries: fetchDocExpiries,
   irbExpirations: fetchIRBExpirations,
   studyMasterList: fetchStudyMasterList,
+  startupChecklist: fetchStartupChecklist,
   providerTrackers: fetchProviderTrackers,
 };
 

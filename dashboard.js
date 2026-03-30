@@ -4693,28 +4693,51 @@ function renderOpsPipeline() {
   var base = CRP_CONFIG.CF_BASE;
   if (!base) return;
 
-  fetch(base + '?feed=studyMasterList&format=json').then(function(r){return r.json();}).then(function(json) {
-    var data = (json.data || []).filter(function(r) {
+  // Fetch pipeline + startup checklist in parallel
+  Promise.all([
+    fetch(base + '?feed=studyMasterList&format=json').then(function(r){return r.json();}),
+    fetch(base + '?feed=startupChecklist&format=json').then(function(r){return r.json();}).catch(function(){return {data:[]};})
+  ]).then(function(results) {
+    var data = (results[0].data || []).filter(function(r) {
       var s = (r.status || '').toLowerCase();
       return s !== 'ended' && s !== 'terminated' && s !== 'recruiting' && s !== 'maintenance';
     });
+    var checklist = results[1].data || [];
+
+    // Build checklist lookup by normalized study name
+    var clMap = {};
+    checklist.forEach(function(c) {
+      var key = (c.study || '').toLowerCase().replace(/[\s\-_]/g, '');
+      clMap[key] = c;
+    });
+    function findChecklist(studyName) {
+      var key = (studyName || '').toLowerCase().replace(/[\s\-_]/g, '');
+      // Exact match first
+      if (clMap[key]) return clMap[key];
+      // Partial match — study name contains checklist name or vice versa
+      var keys = Object.keys(clMap);
+      for (var i = 0; i < keys.length; i++) {
+        if (key.indexOf(keys[i]) >= 0 || keys[i].indexOf(key) >= 0) return clMap[keys[i]];
+      }
+      return null;
+    }
 
     // Sort by pipeline stage
     var stageOrder = { 'feasibility': 0, 'selected': 1, 'start up': 2 };
     data.sort(function(a, b) { return (stageOrder[(a.status||'').toLowerCase()] || 9) - (stageOrder[(b.status||'').toLowerCase()] || 9); });
 
-    if (badge) badge.textContent = data.length + ' active studies';
+    if (badge) badge.textContent = data.length + ' pipeline studies';
 
     var stageColors = { 'feasibility': '#8b5cf6', 'selected': '#FF9933', 'start up': '#1843AD', 'recruiting': '#059669' };
 
     var h = '<table class="fin-table" style="width:100%;font-size:11px;"><thead><tr>';
     h += '<th style="text-align:left;padding:6px 8px;">Study</th>';
     h += '<th style="text-align:center;">Stage</th>';
+    h += '<th style="text-align:center;">Startup Progress</th>';
     h += '<th style="text-align:left;">Sponsor</th>';
     h += '<th style="text-align:left;">PI</th>';
     h += '<th style="text-align:left;">Coordinator</th>';
     h += '<th style="text-align:center;">Est. Start</th>';
-    h += '<th style="text-align:left;">Therapeutic Area</th>';
     h += '<th style="text-align:left;">Site</th>';
     h += '<th style="text-align:center;">eSource</th>';
     h += '<th></th>';
@@ -4724,15 +4747,36 @@ function renderOpsPipeline() {
       var stage = (r.status || '').toLowerCase();
       var sc = stageColors[stage] || '#64748b';
       var esColor = (r.crio_esource || '').toLowerCase() === 'completed' ? '#059669' : (r.crio_esource || '').toLowerCase() === 'not started' ? '#dc2626' : '#FF9933';
+      var cl = findChecklist(r.study);
+
+      // Startup progress bar
+      var progressHtml = '<span style="color:#94a3b8;font-size:9px;">—</span>';
+      if (cl) {
+        var pct = cl.pct || 0;
+        var barColor = pct === 100 ? '#059669' : pct >= 75 ? '#1843AD' : pct >= 50 ? '#FF9933' : '#dc2626';
+        var pendingNote = cl.pending > 0 ? ' · ' + cl.pending + ' pending' : '';
+        var itemList = Object.entries(cl.items || {}).map(function(e) {
+          var icon = e[1] === 'yes' || e[1] === 'true' ? '&#x2713;' : e[1] === 'pending' ? '&#x23F3;' : '&#x2717;';
+          var color = e[1] === 'yes' || e[1] === 'true' ? '#059669' : e[1] === 'pending' ? '#FF9933' : '#dc2626';
+          return '<span style="color:' + color + '">' + icon + '</span> ' + escapeHTML(e[0]);
+        }).join('<br>');
+        progressHtml = '<div style="cursor:pointer" onclick="openModal(\'' + jsAttr(r.study) + ' — Startup Checklist\',\'' + cl.done + '/' + cl.total + ' complete' + pendingNote + '\',\'' + jsAttr(itemList) + '\')">';
+        progressHtml += '<div style="display:flex;align-items:center;gap:6px;">';
+        progressHtml += '<div style="flex:1;height:6px;border-radius:3px;background:#e2e8f0;min-width:50px;"><div style="width:' + pct + '%;height:100%;border-radius:3px;background:' + barColor + ';"></div></div>';
+        progressHtml += '<span style="font-size:10px;font-weight:700;color:' + barColor + ';">' + pct + '%</span>';
+        progressHtml += '</div>';
+        progressHtml += '<div style="font-size:9px;color:#94a3b8;">' + cl.done + '/' + cl.total + pendingNote + '</div>';
+        progressHtml += '</div>';
+      }
 
       h += '<tr style="border-bottom:1px solid #f1f5f9;">';
       h += '<td style="padding:6px 8px;font-weight:600;">' + escapeHTML(r.study || '—') + '</td>';
       h += '<td style="text-align:center;"><span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:' + sc + '20;color:' + sc + ';text-transform:uppercase">' + escapeHTML(r.status || '—') + '</span></td>';
+      h += '<td style="padding:4px 8px;">' + progressHtml + '</td>';
       h += '<td style="font-size:10px;color:#64748b">' + escapeHTML(r.sponsor || '—') + '</td>';
       h += '<td style="font-size:10px;">' + escapeHTML(r.pi || '—') + '</td>';
       h += '<td style="font-size:10px;">' + escapeHTML(r.primary_coordinator || '—') + '</td>';
       h += '<td style="text-align:center;font-size:10px;color:#64748b">' + escapeHTML(r.start_date || '—') + '</td>';
-      h += '<td style="font-size:10px;color:#64748b">' + escapeHTML(r.therapeutic_area || '—') + '</td>';
       h += '<td style="font-size:10px;">' + escapeHTML(r.site || '—') + '</td>';
       h += '<td style="text-align:center;"><span style="font-size:9px;font-weight:600;color:' + esColor + '">' + escapeHTML(r.crio_esource || '—') + '</span></td>';
       h += '<td>' + (r.url ? '<a href="' + escapeHTML(r.url) + '" target="_blank" style="font-size:10px;color:#1843AD;text-decoration:none;font-weight:600">Open</a>' : '') + '</td>';
