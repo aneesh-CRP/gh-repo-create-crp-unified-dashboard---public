@@ -5472,6 +5472,13 @@ function fetchActionRequiredData() {
     });
     _log('Visit confirmations: ' + confirmRows.length + ' patients confirmed');
 
+    // Re-inject rideshare + confirm buttons now that CRIO data is loaded
+    // Reset injected flags so they re-process with CRIO data
+    var _schedRows = document.querySelectorAll('#upcoming-tbody tr');
+    _schedRows.forEach(function(r) { delete r.dataset.rideshareInjected; delete r.dataset.confirmInjected; });
+    safe(injectVisitConfirmButtons, 'confirmBtns-phase5');
+    safe(injectRideshareButtons, 'rideshareBtns-phase5');
+
     var unschedRows = (results.unscheduledVisits || {}).data || [];
     window._unscheduledVisits = unschedRows;
     if (unschedRows.length > 0) {
