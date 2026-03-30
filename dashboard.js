@@ -6962,6 +6962,8 @@ async function fetchQuickBooksData() {
     QB_DATA.pnlUnmatched = pnlUnmatched;
     QB_DATA.qbTotalIncome = qbTotalIncome;
     QB_DATA.qbPeriod = qbPeriod;
+    QB_DATA.monthCols = monthCols;
+    QB_DATA.pnlMonthly = []; // legacy compat — charts use QB_DATA.monthCols now
 
     // ── QB Invoices (live API)
     QB_DATA.invoiceLines = qbInvoices.flatMap(function(inv) {
@@ -7254,15 +7256,15 @@ function renderCRIOvsQB() {
   // ── Invoice Lines Table
   document.getElementById('qbInvLinesBody').innerHTML = QB_DATA.invoiceLines.slice(0, 200).map(r =>
     '<tr>' +
-    '<td>' + esc(r['Invoice #']) + '</td>' +
-    '<td>' + esc(r['Invoice Date']) + '</td>' +
-    '<td>' + esc(r['Customer']) + '</td>' +
-    '<td>' + esc(r['Item']) + '</td>' +
-    '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(r['Description']) + '</td>' +
+    '<td>' + esc(r['Invoice #']||'') + '</td>' +
+    '<td>' + esc(r['Date']||r['Invoice Date']||'') + '</td>' +
+    '<td>' + esc(r['Customer']||'') + '</td>' +
+    '<td>' + esc(r['Item']||'') + '</td>' +
+    '<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(r['Description']||'') + '</td>' +
     '<td class="r">' + (r['Qty']||'') + '</td>' +
-    '<td class="r">' + (parseFloat(r['Unit Price']) ? fmtD(parseFloat(r['Unit Price'])) : '') + '</td>' +
+    '<td class="r">' + (parseFloat(r['Rate']||r['Unit Price']||0) ? fmtD(parseFloat(r['Rate']||r['Unit Price']||0)) : '') + '</td>' +
     '<td class="r" style="font-weight:600">' + fmtD(parseFloat(r['Amount'])||0) + '</td>' +
-    '<td>' + esc(r['Class']) + '</td>' +
+    '<td>' + esc(r['Class']||'') + '</td>' +
     '</tr>'
   ).join('');
 
@@ -7301,7 +7303,7 @@ function renderCRIOvsQB() {
   });
 
   // Line chart: Monthly QB revenue trend
-  var monthCols = QB_DATA.pnlMonthly.length > 0 ? Object.keys(QB_DATA.pnlMonthly[0]).filter(k => k !== 'Account' && k !== 'Total') : [];
+  var monthCols = QB_DATA.monthCols || [];
   if (monthCols.length > 0) {
     var monthlyTotals = monthCols.map(function(mo) {
       var total = 0;
