@@ -7556,7 +7556,7 @@ function fetchActionRequiredData() {
   var _s = function(id, val) { var e = document.getElementById(id); if (e) e.textContent = val; };
 
   // Batch fetch feeds in one request (reduces HTTP overhead)
-  fetch(base + '?feed=batch&feeds=comments,documentSummary,visitTodos,regulatory,recruiterStats,demographics,eregPending,prescrVisits,recruiting,subjectAudit,unscheduledVisits,subjects,rideRequests,visitConfirmations&format=json')
+  fetch(base + '?feed=batch&feeds=comments,documentSummary,visitTodos,regulatory,recruiterStats,demographics,eregPending,prescrVisits,recruiting,subjectAudit,unscheduledVisits,subjects,rideRequests,visitConfirmations,regulatoryPerformance&format=json')
   .then(function(r) { return r.json(); })
   .then(function(batch) {
     var results = batch.results || {};
@@ -7565,6 +7565,9 @@ function fetchActionRequiredData() {
     var todos = (results.visitTodos || {}).data || [];
     var regulatory = (results.regulatory || {}).data || [];
     window._recruiterStats = (results.recruiterStats || {}).data || [];
+    // Regulatory Performance (doc signatures, uploads, comments) — was a separate fetch
+    var _regPerfBatch = (results.regulatoryPerformance || {}).data || [];
+    if (_regPerfBatch.length > 0) { window._regPerfData = _regPerfBatch; renderRegulatoryPerformance(); renderRegulatoryPerformance('opsRegPerfContainer', 'ops-reg-perf-badge'); }
 
     // CRIO recruiting data — referral source per patient
     window._recruitingData = (results.recruiting || {}).data || [];
@@ -8783,20 +8786,15 @@ async function fetchFinanceLive() {
   // BQ provides CRIO-side finance (invoices, revenue, stipends)
   // Sheets provides the FULL picture including QuickBooks data
   // Always load Sheets so QB vs CRIO tab works; BQ supplements with fresher CRIO data
-  var bqLoaded = false;
-  if (CRP_CONFIG.USE_CLOUD_FUNCTION) {
-    bqLoaded = await fetchFinanceBQ().catch(function() { return false; });
-    if (bqLoaded) _log('CRP Finance: BQ CRIO data loaded, continuing to Sheets for QB data...');
-  }
-
   const pk = CRP_CONFIG.DATA_FEEDS.FINANCE_PUB_KEY;
   if (!pk) { _log('CRP Finance: No published key configured'); return false; }
   const tabs = CRP_CONFIG.FINANCE_TABS;
 
-  _log('CRP Finance: Fetching live data from Master Sheet...');
+  _log('CRP Finance: Fetching BQ + Sheets in parallel...');
   try {
-    // Fetch all tabs in parallel
-    const [agingInvRows, agingApRows, unpaidInvRows, unpaidApRows, uninvoicedRows, revenueRows, paymentsRows] = await Promise.all([
+    // Run BQ and Sheets in parallel (they're independent data sources)
+    var _bqPromise = CRP_CONFIG.USE_CLOUD_FUNCTION ? fetchFinanceBQ().catch(function() { return false; }) : Promise.resolve(false);
+    var _sheetsPromise = Promise.all([
       fetchFinanceTab(pk, tabs.AGING_INV),
       fetchFinanceTab(pk, tabs.AGING_AP),
       fetchFinanceTab(pk, tabs.UNPAID_INV),
@@ -8805,6 +8803,9 @@ async function fetchFinanceLive() {
       fetchFinanceTab(pk, tabs.REVENUE),
       fetchFinanceTab(pk, tabs.PAYMENTS),
     ]);
+    var [bqLoaded, sheetsResults] = await Promise.all([_bqPromise, _sheetsPromise]);
+    if (bqLoaded) _log('CRP Finance: BQ CRIO data loaded');
+    const [agingInvRows, agingApRows, unpaidInvRows, unpaidApRows, uninvoicedRows, revenueRows, paymentsRows] = sheetsResults;
 
     // Parse into dashboard data structures
     const newAgingInv = parseAgingCSV(agingInvRows);
@@ -13411,7 +13412,9 @@ function renderReferralDashboard() {
   const _ninetyDaysAgoT = Date.now() - 90 * 86400000;
 
   // Build campaign rows (active only)
-  var _excludedVendors = ['autorecruit','oxford circle','acurian','x-factor','brian stein','murray brand','frankford','burstein','woodhaven','huntington gi','huntergton gi','us recruitment','tsang','sjogrens foundation','santoro','james','stoltz','power'];
+  var _excludedVendors = ['autorecruit','oxford circle','acurian','x-factor','brian stein','murray brand','frankford','burstein','woodhaven','huntington gi','huntergton gi','hunterdon','us recruitment','tsang','sjogrens foundation','sjs foundation','santoro','james','stoltz','power'];
+  // Sources that should display as Provider Trackers, not campaigns
+  var _forceProvider = ['ashton family','gavarone','elliott frank','tri-county','tri county','brian shaffer','cpcm'];
   function _isExcludedSource(name) {
     var lo = (name||'').toLowerCase();
     for (var i = 0; i < _excludedVendors.length; i++) { if (lo.indexOf(_excludedVendors[i]) >= 0) return true; }
@@ -13522,14 +13525,41 @@ function renderReferralDashboard() {
   });
 
   // ── Add remaining CRIO sources not covered by ClickUp trackers or campaigns ──
+  // Merge map: CRIO source name → existing provider tracker name to combine into
+  var _mergeIntoProvider = {
+    'Ashton Family Medicine': 'Dr. Richard Mandel',
+    'Dr. Brian Shaffer / CPCM': 'Center For Primary Care Medicine',
+    'Dr. Brian Shaffer/ CPCM': 'Center For Primary Care Medicine',
+    'Brian Shaffer / CPCM': 'Center For Primary Care Medicine',
+    'CPCM': 'Center For Primary Care Medicine'
+  };
+  function _isForceProvider(name) {
+    var lo = (name||'').toLowerCase();
+    for (var i = 0; i < _forceProvider.length; i++) { if (lo.indexOf(_forceProvider[i]) >= 0) return true; }
+    return false;
+  }
   Object.keys(_crioSourceRows).forEach(function(srcName) {
     if (_crioUsed.has(srcName)) return;
     if (_isExcludedSource(srcName)) return;
     var crio = _crioSourceRows[srcName];
     if (crio.total < 1) return;
-    var _type = srcName === 'CRIO Database' ? 'Database' : 'CRIO';
+    // Check if this source should merge into an existing provider row
+    var mergeTarget = _mergeIntoProvider[srcName];
+    if (mergeTarget) {
+      var existing = unifiedRows.find(function(r) { return r.name === mergeTarget; });
+      if (existing) {
+        existing.total += crio.total; existing.newLead += crio.new; existing.contacted += crio.contacted;
+        existing.screening += crio.screening; existing.enrolled += crio.enrolled;
+        existing.sf += crio.sf; existing.notEligible += crio.not_eligible; existing.notInterested += crio.not_interested;
+        existing.inCrio = (existing.inCrio||0) + crio.total;
+        return;
+      }
+    }
+    // Force certain CRIO sources to appear as Provider type
+    var _type = srcName === 'CRIO Database' ? 'Database' : _isForceProvider(srcName) ? 'Provider' : 'CRIO';
+    var _vendor = _type === 'Provider' ? 'Physician' : srcName;
     unifiedRows.push({
-      name: srcName, type: _type, vendor: srcName, total: crio.total,
+      name: srcName, type: _type, vendor: _vendor, total: crio.total,
       newLead: crio.new, contacted: crio.contacted, screening: crio.screening,
       enrolled: crio.enrolled, sf: crio.sf, notEligible: crio.not_eligible, notInterested: crio.not_interested,
       stale: 0, inCrio: crio.total, needsEntry: 0, clickId: null, crioData: crio
@@ -14623,8 +14653,11 @@ async function fetchCrioStudies() {
       || (CRP_CONFIG.USE_BQ_STUDIES && CRP_CONFIG.DATA_FEEDS.BQ_SUBJECTS_CSV)
       || CRP_CONFIG.DATA_FEEDS.CRIO_SUBJECTS_CSV;
     if (!studiesUrl) { _log('CRIO Studies CSV URL not configured'); return; }
+    // Fetch studies + subjects in parallel (they're independent)
+    var _studiesPromise = fetchCSV(studiesUrl);
+    var _subjectsPromise = subjectsUrl ? fetchCSV(subjectsUrl).catch(function() { return []; }) : Promise.resolve([]);
     try {
-      var rows = await fetchCSV(studiesUrl);
+      var rows = await _studiesPromise;
       if (rows && rows.length > 0) {
         // Normalize BQ status to uppercase (BQ sends 'Enrolling', dashboard checks 'ENROLLING')
         var _bqStatusUp = {
@@ -14674,10 +14707,10 @@ async function fetchCrioStudies() {
       console.warn('fetchCrioStudies error:', e);
       setHealthChip('dh-crio-api', 'fail', 'CRIO Studies (failed)');
     }
-    // Also fetch subjects if URL is configured
+    // Subjects (already fetched in parallel above)
     if (subjectsUrl) {
       try {
-        var sRows = await fetchCSV(subjectsUrl);
+        var sRows = await _subjectsPromise;
         if (sRows && sRows.length > 0) {
           // BQ sends mixed-case statuses — normalize to uppercase keys the dashboard expects
           var _subStatusUp = {
@@ -18849,12 +18882,19 @@ async function _crpInit() {
 
     // Phase 3: Supplemental data (Action Required + Patient DB + Meta Ads)
     if (typeof fetchActionRequiredData === 'function') fetchActionRequiredData();
-    if (typeof loadRegulatoryPerformance === 'function') loadRegulatoryPerformance();
+    // regulatoryPerformance now included in the batch call above
+    // Debounce studies re-render from multiple async sources
+    var _studiesRenderPending = false;
+    function _debouncedStudiesRender() {
+      if (_studiesRenderPending) return;
+      _studiesRenderPending = true;
+      setTimeout(function() { _studiesRenderPending = false; if (typeof renderStudiesTable === 'function') try { renderStudiesTable(); } catch(e) {} }, 200);
+    }
     fetchPatientDB().then(ok => {
       if (ok) {
         _log('CRP: Patient DB cross-reference complete');
         setHealthChip('dh-patientdb','ok','Patient DB');
-        if (typeof renderStudiesTable === 'function') try { renderStudiesTable(); } catch(e) { _log('renderStudiesTable: ' + e.message); }
+        _debouncedStudiesRender();
       }
       else setHealthChip('dh-patientdb','warn','Patient DB (empty)');
     }).catch(e => { console.warn('CRP: Patient DB fetch failed:', e); setHealthChip('dh-patientdb','fail','Patient DB (failed)'); });
@@ -18862,7 +18902,7 @@ async function _crpInit() {
     fetchFacebookCRM().then(() => {
       setHealthChip('dh-fbcrm','ok','FB CRM (' + (FB_CRM_DATA||[]).length + ')');
       safe(buildRecruitmentKPIs, 'buildRecruitmentKPIs');
-      if (typeof renderStudiesTable === 'function') try { renderStudiesTable(); } catch(e) { _log('renderStudiesTable: ' + e.message); }
+      _debouncedStudiesRender();
     }).catch(e => { console.warn('CRP: Facebook CRM initial load failed:', e); setHealthChip('dh-fbcrm','fail','FB CRM (failed)'); });
     fetchMetaAds().then(() => {
       setHealthChip('dh-metaads','ok','Meta Ads (' + (META_ADS_DATA||[]).length + ')');
@@ -18933,16 +18973,16 @@ async function _crpInit() {
       }
     } catch(e) { console.warn('CRP Auto-Refresh: CRIO refresh failed:', e.message); }
 
-    // Phase 2: Finance (staggered after CRIO)
-    try {
-      const ok = await fetchFinanceLive();
-      if (ok) {
-        if (typeof renderForecast === 'function') try { renderForecast(); } catch(e) { _log('renderForecast re-render: ' + e.message); }
-        if (typeof drawPayChartOverview === 'function') try { drawPayChartOverview(); } catch(e) { _log('drawPayChartOverview: ' + e.message); }
-      }
-    } catch(e) { /* silent */ }
+    // Phase 2: Finance (fire-and-forget, skip if refreshed <1hr ago)
+    var _finAge = window._financeLastFetch ? (Date.now() - window._financeLastFetch) : Infinity;
+    if (_finAge > 3600000) {
+      fetchFinanceLive().catch(function() {});
+      // renderForecast + drawPayChartOverview already called inside initFinanceDashboard
+    } else {
+      _log('CRP Auto-Refresh: Finance skipped (refreshed ' + Math.round(_finAge/60000) + 'min ago)');
+    }
 
-    // Phase 3: Supplemental (staggered after finance)
+    // Phase 3: Supplemental (runs in parallel with finance, not blocked)
     fetchPatientDB().catch(() => {});
     fetchCrioStudies().catch(() => {});
     fetchLookerStudyStatus().catch(() => {});
