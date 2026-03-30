@@ -578,7 +578,7 @@ const CRP_CONFIG = {
   // Tab registry — add new tabs here
   TABS: {
     PERFORMANCE: ['overview', 'studies', 'schedule', 'referrals', 'admin'],
-    FINANCE: ['fin-overview', 'fin-revenue', 'fin-qb', 'fin-productivity', 'insights'],
+    FINANCE: ['fin-overview', 'fin-revenue', 'fin-qb', 'fin-productivity'],
     CROSS: ['insights'],
   },
 
@@ -2360,8 +2360,8 @@ function switchTab(name, el) {
     loadRevenuePerUser(_rpuDays);
   }
 
-  // Insights rendering
-  if (name === 'insights') {
+  // Insights rendering (risk matrix + next steps now in fin-overview)
+  if (name === 'insights' || name === 'fin-overview') {
     setTimeout(() => {
       if (typeof renderInsights === 'function') renderInsights();
     }, 50);
@@ -5993,6 +5993,7 @@ function switchView(name, el) {
   if (name === 'studies') {
     setTimeout(() => {
       buildStudiesView();
+      safe(renderOpsPipeline, 'renderOpsPipeline');
       if (_tabDirty.studies) {
         safe(buildHorizon, 'buildHorizon');
         safe(buildReasonChart, 'buildReasonChart');
@@ -16664,7 +16665,7 @@ async function _crpInit() {
   if (location.hash) {
     var _hashTab = location.hash.replace('#', '');
     if (_hashTab === 'schedule') _hashTab = 'overview'; // Schedule merged into Overview
-    var _allTabs = ['overview','studies','referrals','actions','operations','admin','fin-overview','fin-revenue','fin-qb','fin-productivity','insights'];
+    var _allTabs = ['overview','studies','referrals','actions','operations','admin','fin-overview','fin-revenue','fin-qb','fin-productivity'];
     if (_allTabs.indexOf(_hashTab) !== -1) _initTab = _hashTab;
   }
   var _initTabEl = document.querySelector(".nav-tab[onclick*='" + _initTab + "'], .nav-tab[data-tab='" + _initTab + "']");

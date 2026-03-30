@@ -1076,8 +1076,6 @@ body {
     <span class="nav-tab fin-tab" data-tab="fin-revenue" onclick="switchTab('fin-revenue', this)"><svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.5;vertical-align:-1px;margin-right:2px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Billing</span>
     <span class="nav-tab fin-tab" data-tab="fin-qb" onclick="switchTab('fin-qb', this)"><svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.5;vertical-align:-1px;margin-right:2px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>QB</span>
     <span class="nav-tab fin-tab" data-tab="fin-productivity" onclick="switchTab('fin-productivity', this)"><svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.5;vertical-align:-1px;margin-right:2px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Productivity</span>
-    <span style="width:1px;background:#CBD5E0;margin:8px 2px"></span>
-    <span class="nav-tab fin-tab" data-tab="insights" onclick="switchTab('insights', this)" role="tab"><svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.5;vertical-align:-1px;margin-right:2px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Insights</span>
   </div>
   <div class="nav-right" style="margin-left:auto;gap:4px;">
     <span class="data-badge" id="last-refresh-badge" style="font-size:10px;padding:2px 6px;">Loading...</span>
@@ -1339,7 +1337,15 @@ body {
     <div id="upcoming-study-bars" style="padding:12px 16px;max-height:280px;overflow-y:auto;"></div>
   </div>
 
-  <!-- Cancellation Analysis moved to Actions tab -->
+  <!-- ═══ STUDY PIPELINE (moved from Operations) ═══ -->
+  <div class="card fade-in" style="margin-top:16px;margin-bottom:12px;">
+    <div class="card-header">
+      <span class="card-title">Study Pipeline</span>
+      <span class="badge badge-blue" id="ops-pipeline-badge">Loading...</span>
+    </div>
+    <div style="font-size:10px;color:#94a3b8;padding:2px 12px 0;">From ClickUp Study Master List · feasibility → selected → start up</div>
+    <div id="opsPipelineTable" style="padding:0 12px 12px;overflow-x:auto;"></div>
+  </div>
 
 </div><!-- /view-studies -->
 
@@ -1392,9 +1398,9 @@ body {
       </div>
       <div class="tb-divider"></div>
       <div class="tb-section">
-        <div class="tb-label">Enrolled</div>
+        <div class="tb-label">Converted</div>
         <div class="tb-value" style="color:#059669" id="ref-kpi-enrolled">—</div>
-        <div class="tb-sub">Success in CRIO</div>
+        <div class="tb-sub">Pipeline → Enrolled</div>
       </div>
       <div class="tb-divider"></div>
       <div class="tb-section">
@@ -1667,6 +1673,67 @@ body {
   </div>
   <div id="horizon-grid" class="time-banner fade-in" style="margin-bottom:12px;"></div>
 
+  <!-- ═══ CANCEL TRENDS (moved from Admin) ═══ -->
+  <div class="section-title" style="margin-top:16px;margin-bottom:8px;">Cancel & Visit Trends</div>
+  <div class="time-banner fade-in" style="margin-bottom:12px;">
+    <div class="tb-section">
+      <div class="tb-label">Cancel Rate Trend</div>
+      <div class="tb-value" id="trends-rate-dir" style="color:var(--green)">—</div>
+      <div class="tb-sub" id="trends-rate-sub">vs. 4 weeks ago</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section">
+      <div class="tb-label">Avg Weekly Cancels</div>
+      <div class="tb-value red" id="trends-avg-cancel">—</div>
+      <div class="tb-sub">Rolling 4-week average</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section">
+      <div class="tb-label">Avg Weekly Upcoming</div>
+      <div class="tb-value green" id="trends-avg-upcoming">—</div>
+      <div class="tb-sub">Rolling 4-week average</div>
+    </div>
+    <div class="tb-divider"></div>
+    <div class="tb-section">
+      <div class="tb-label">Data Snapshots</div>
+      <div class="tb-value blue" id="trends-snapshot-count">—</div>
+      <div class="tb-sub">Weeks of data</div>
+    </div>
+  </div>
+
+  <div id="trends-charts" style="display:none;">
+    <div class="grid-2 mb16 fade-in">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Cancellations & Rate</span>
+          <span class="badge badge-gray">Bars = volume · Line = rate %</span>
+        </div>
+        <div class="chart-wrap h220"><canvas id="trendsCancelDualChart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Upcoming Visits per Week</span>
+        </div>
+        <div class="chart-wrap h220"><canvas id="trendsUpcomingVolChart"></canvas></div>
+      </div>
+    </div>
+    <div class="card mb16 fade-in">
+      <div class="card-header">
+        <span class="card-title">Study Cancel Rate Trends</span>
+        <span class="badge badge-gray">Top 6 studies by volume</span>
+      </div>
+      <div class="chart-wrap h220"><canvas id="trendsStudyChart"></canvas></div>
+    </div>
+    <div class="card fade-in" style="margin-bottom:12px;">
+      <div class="card-header">
+        <span class="card-title">Coordinator Cancel Breakdown</span>
+        <span class="badge badge-gray" id="coord-cancel-type-badge">No Show / Site / Patient</span>
+      </div>
+      <div class="chart-wrap h220"><canvas id="coordCancelTypeChart"></canvas></div>
+      <div id="coord-cancel-type-table" style="padding:0;"></div>
+    </div>
+  </div>
+
   <!-- Hidden containers for backward compatibility with existing render functions -->
   <div style="display:none" id="risk-flag-cards"></div>
   <div style="display:none" id="crio-studies-container"></div>
@@ -1755,15 +1822,7 @@ body {
     <div id="opsMonitoringTable" style="padding:0 12px 12px;overflow-x:auto;max-height:500px;overflow-y:auto;"></div>
   </div>
 
-  <!-- Study Pipeline -->
-  <div class="card fade-in" style="margin-bottom:12px;">
-    <div class="card-header">
-      <span class="card-title">Study Pipeline</span>
-      <span class="badge badge-blue" id="ops-pipeline-badge">Loading...</span>
-    </div>
-    <div style="font-size:10px;color:#94a3b8;padding:2px 12px 0;">From ClickUp Study Master List · feasibility → selected → start up → recruiting</div>
-    <div id="opsPipelineTable" style="padding:0 12px 12px;overflow-x:auto;"></div>
-  </div>
+  <!-- Study Pipeline moved to Studies tab -->
 
 </div><!-- /view-operations -->
 
@@ -1820,98 +1879,16 @@ body {
 
   <div id="admin-trends">
 
-
-  <!-- Header banner -->
-  <div class="time-banner fade-in" style="margin-bottom:12px;">
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showTrendsSummary()" title="Click to see trends summary">
-      <div class="tb-label">Data Snapshots</div>
-      <div class="tb-value blue" id="trends-snapshot-count">—</div>
-      <div class="tb-sub">Weeks of data</div>
-    </div>
-    <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showCancels(null,'All Recent Cancellations')" title="Click to see cancel rate details">
-      <div class="tb-label">Cancel Rate Trend</div>
-      <div class="tb-value" id="trends-rate-dir" style="color:var(--green)">—</div>
-      <div class="tb-sub" id="trends-rate-sub">vs. 4 weeks ago</div>
-    </div>
-    <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showCancels(null,'All Cancellations — Weekly Average')" title="Click to see cancellation details">
-      <div class="tb-label">Avg Weekly Cancels</div>
-      <div class="tb-value red" id="trends-avg-cancel">—</div>
-      <div class="tb-sub">Rolling 4-week average</div>
-    </div>
-    <div class="tb-divider"></div>
-    <div class="tb-section kpi-clickable" style="cursor:pointer" onclick="showUpcoming(null,'All Upcoming Visits — Weekly Average')" title="Click to see upcoming visit details">
-      <div class="tb-label">Avg Weekly Upcoming</div>
-      <div class="tb-value green" id="trends-avg-upcoming">—</div>
-      <div class="tb-sub">Rolling 4-week average</div>
-    </div>
-  </div>
-
-  <!-- Time range toggle -->
-  <div style="display:flex;gap:6px;margin-bottom:12px;" id="trends-range-bar">
-    <button class="sched-filter active" onclick="setTrendsRange(14,this)" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid #1843ad;background:#e8eeff;color:#1843ad;cursor:pointer">2 Weeks</button>
-    <button class="sched-filter" onclick="setTrendsRange(30,this)" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">1 Month</button>
-    <button class="sched-filter" onclick="setTrendsRange(61,this)" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">2 Months</button>
-  </div>
-
-  <!-- No data message (shown before live data loads) -->
-  <div id="trends-no-data-msg" class="card fade-in" style="text-align:center;padding:40px 24px;">
-    <div style="font-size:36px;margin-bottom:12px;"></div>
-    <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px;">Loading trends data...</div>
-    <div style="font-size:13px;color:var(--muted);max-width:500px;margin:0 auto 20px;">
-      Trends will appear automatically once live data loads from Google Sheets.
-      Charts show weekly cancel rates, visit volumes, coordinator performance, and study breakdowns.
-    </div>
-  </div>
-
-  <!-- Charts — hidden until longitudinal data available -->
-  <div id="trends-charts" style="display:none;">
-
-    <!-- Cancel volume (bars) + cancel rate (line) — dual axis -->
-    <div class="grid-2 mb16 fade-in">
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">Cancellations & Rate</span>
-          <span class="badge badge-gray">Bars = volume · Line = rate %</span>
-        </div>
-        <div class="chart-wrap h220">
-          <canvas id="trendsCancelDualChart"></canvas>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">Upcoming Visits per Week</span>
-          <span class="badge badge-gray" style="font-size:10px">Weekly scheduled visit volume from CRIO snapshots</span>
-        </div>
-        <div class="chart-wrap h220">
-          <canvas id="trendsUpcomingVolChart"></canvas>
-        </div>
-      </div>
+    <!-- Trends charts moved to Actions tab — data connection stays here -->
+    <div id="trends-no-data-msg" class="card fade-in" style="text-align:center;padding:24px;">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:12px;">Cancel & visit trend charts are now in the <strong>Actions</strong> tab. Use the panel below to connect your data source.</div>
     </div>
 
-    <!-- Study-level trends -->
-    <div class="card mb16 fade-in">
-      <div class="card-header">
-        <span class="card-title">Study Cancel Rate Trends</span>
-        <span class="badge badge-gray">Top 6 studies by volume</span>
-      </div>
-      <div class="chart-wrap h220">
-        <canvas id="trendsStudyChart"></canvas>
-      </div>
-    </div>
-
-    <!-- Coordinator Cancel Breakdown by Type -->
-    <div class="card fade-in">
-      <div class="card-header">
-        <span class="card-title">Coordinator Cancel Breakdown</span>
-        <span class="badge badge-gray" id="coord-cancel-type-badge">No Show / Site / Patient</span>
-      </div>
-      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Cancellation type distribution per coordinator — stacked by No Show, Site Cancelled, Patient Cancelled</div>
-      <div class="chart-wrap h220">
-        <canvas id="coordCancelTypeChart"></canvas>
-      </div>
-      <div id="coord-cancel-type-table" style="padding:0;"></div>
+    <!-- Time range toggle -->
+    <div style="display:flex;gap:6px;margin-bottom:12px;" id="trends-range-bar">
+      <button class="sched-filter active" onclick="setTrendsRange(14,this)" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid #1843ad;background:#e8eeff;color:#1843ad;cursor:pointer">2 Weeks</button>
+      <button class="sched-filter" onclick="setTrendsRange(30,this)" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">1 Month</button>
+      <button class="sched-filter" onclick="setTrendsRange(61,this)" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">2 Months</button>
     </div>
 
     <!-- Master sheet connection panel -->
@@ -1932,9 +1909,6 @@ body {
       </div>
       <div id="trends-load-status" style="padding:0 16px 12px;font-size:12px;color:var(--muted);"></div>
     </div>
-
-  </div>
-
 
   </div>
 
@@ -2611,7 +2585,7 @@ const CRP_CONFIG = {
   // Tab registry — add new tabs here
   TABS: {
     PERFORMANCE: ['overview', 'studies', 'schedule', 'referrals', 'admin'],
-    FINANCE: ['fin-overview', 'fin-revenue', 'fin-qb', 'fin-productivity', 'insights'],
+    FINANCE: ['fin-overview', 'fin-revenue', 'fin-qb', 'fin-productivity'],
     CROSS: ['insights'],
   },
 
@@ -4393,8 +4367,8 @@ function switchTab(name, el) {
     loadRevenuePerUser(_rpuDays);
   }
 
-  // Insights rendering
-  if (name === 'insights') {
+  // Insights rendering (risk matrix + next steps now in fin-overview)
+  if (name === 'insights' || name === 'fin-overview') {
     setTimeout(() => {
       if (typeof renderInsights === 'function') renderInsights();
     }, 50);
@@ -8026,6 +8000,7 @@ function switchView(name, el) {
   if (name === 'studies') {
     setTimeout(() => {
       buildStudiesView();
+      safe(renderOpsPipeline, 'renderOpsPipeline');
       if (_tabDirty.studies) {
         safe(buildHorizon, 'buildHorizon');
         safe(buildReasonChart, 'buildReasonChart');
@@ -18697,7 +18672,7 @@ async function _crpInit() {
   if (location.hash) {
     var _hashTab = location.hash.replace('#', '');
     if (_hashTab === 'schedule') _hashTab = 'overview'; // Schedule merged into Overview
-    var _allTabs = ['overview','studies','referrals','actions','operations','admin','fin-overview','fin-revenue','fin-qb','fin-productivity','insights'];
+    var _allTabs = ['overview','studies','referrals','actions','operations','admin','fin-overview','fin-revenue','fin-qb','fin-productivity'];
     if (_allTabs.indexOf(_hashTab) !== -1) _initTab = _hashTab;
   }
   var _initTabEl = document.querySelector(".nav-tab[onclick*='" + _initTab + "'], .nav-tab[data-tab='" + _initTab + "']");
@@ -19109,6 +19084,24 @@ document.addEventListener('click', function(e) {
       </table>
     </div>
   </div>
+
+  <!-- ═══ INSIGHTS (merged from standalone tab) ═══ -->
+  <div class="group-panel" style="margin-top:18px">
+    <div class="group-title"><span class="gt-icon" style="background:#EF4444"></span> Financial Risk Matrix</div>
+    <div class="panel-body" style="overflow-x:auto;padding:0">
+      <table class="tbl" id="insightRiskTable">
+        <thead><tr><th>Study</th><th>Status</th><th class="r">Cancels</th><th class="r">Upcoming</th><th class="r">Total AR</th><th class="r">Collection %</th><th>Risk</th></tr></thead>
+        <tbody id="insightRiskBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="group-panel" style="margin-top:12px">
+    <div class="group-title"><span class="gt-icon" style="background:#1843ad"></span> What To Do Next</div>
+    <div class="panel-body" id="ins-next-steps" style="padding:16px">
+      <div style="color:#718096;font-size:13px">Loading recommendations...</div>
+    </div>
+  </div>
 </div>
 
 <!-- ═══════════ COLLECTIONS ═══════════ -->
@@ -19475,79 +19468,11 @@ document.addEventListener('click', function(e) {
 
 </div>
 
-<!-- ═══════════ INSIGHTS ═══════════ -->
-
-<!-- ═════ Insights View (Lines 3064-3147) ═════ -->
-<div id="view-insights" class="view">
-  <div class="section-label" style="margin-top:0">Cross-Dashboard Intelligence</div>
-
-  <!-- Hero KPIs -->
-  <div class="hero-row" style="margin-bottom:12px">
-    <div class="hero-cell">
-      <div class="hero-label">Studies Tracked</div>
-      <div class="hero-val kpi-clickable" style="color:#2d5a87;cursor:pointer" id="ins-studies" onclick="showFinModal('All Tracked Studies','<table><thead><tr><th>Study</th><th>Status</th><th class=\'r\'>Enrolled</th></tr></thead><tbody>'+FIN_MERGED_STUDIES.map(r=>'<tr><td>'+slink(r.study)+'</td><td><span class=\'badge\'>'+escapeHTML(r.status)+'</span></td><td class=\'r\'>'+r.enrolled+'</td></tr>').join('')+'</tbody></table>')">--</div>
-      <div class="hero-sub">Across operations & finance</div>
-    </div>
-    <div class="hero-cell">
-      <div class="hero-label">Est. Revenue at Risk</div>
-      <div class="hero-val" style="color:#EF4444" id="ins-rev-risk">--</div>
-      <div class="hero-sub">From aging AR &amp; cancellations</div>
-    </div>
-    <div class="hero-cell">
-      <div class="hero-label">Collection Efficiency</div>
-      <div class="hero-val" style="color:#10B981" id="ins-collect-eff">--</div>
-      <div class="hero-sub">Collected vs. total billed</div>
-    </div>
-    <div class="hero-cell">
-      <div class="hero-label">Cancel Rate</div>
-      <div class="hero-val" style="color:#FF9933" id="ins-cancel-rate">--</div>
-      <div class="hero-sub">Overall patient retention</div>
-    </div>
-  </div>
-
-  <!-- Revenue Impact of Cancellations -->
-  <div class="group-panel" style="margin-bottom:18px">
-    <div class="group-title"><span class="gt-icon" style="background:#FF9933"></span> Revenue Impact of Cancellations</div>
-    <div class="panel-body" id="ins-cancel-revenue" style="padding:12px">
-      <div style="color:#718096;font-size:13px;padding:12px">Loading...</div>
-    </div>
-  </div>
-
-  <!-- Cancellation Root Cause Playbook -->
-  <div class="group-panel" style="margin-bottom:18px">
-    <div class="group-title"><span class="gt-icon" style="background:#072061"></span> Cancellation Root Cause Playbook</div>
-    <div class="panel-body" id="ins-cancel-playbook" style="padding:16px">
-      <div style="color:#718096;font-size:13px">Loading playbook...</div>
-    </div>
-  </div>
-
-  <!-- Financial Risk Matrix (cross-referenced with operational data) -->
-  <div class="group-panel" style="margin-bottom:18px">
-    <div class="group-title"><span class="gt-icon" style="background:#EF4444"></span> Financial Risk Matrix</div>
-    <div class="panel-body" style="overflow-x:auto;padding:0">
-      <table class="tbl" id="insightRiskTable">
-        <thead><tr><th>Study</th><th>Status</th><th class="r">Cancels</th><th class="r">Upcoming</th><th class="r">Total AR</th><th class="r">Collection %</th><th>Risk</th></tr></thead>
-        <tbody id="insightRiskBody"></tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- 90-Day Cash Flow Forecast -->
-  <div class="group-panel" style="margin-bottom:18px">
-    <div class="group-title"><span class="gt-icon" style="background:#10B981"></span> 90-Day Cash Flow Projection</div>
-    <div class="panel-body" id="ins-forecast" style="padding:16px">
-      <div style="color:#718096;font-size:13px">Loading forecast...</div>
-    </div>
-  </div>
-
-  <!-- What To Do Next — Actionable Recommendations -->
-  <div class="group-panel" style="margin-bottom:18px">
-    <div class="group-title"><span class="gt-icon" style="background:#1843ad"></span> What To Do Next</div>
-    <div class="panel-body" id="ins-next-steps" style="padding:16px">
-      <div style="color:#718096;font-size:13px">Loading recommendations...</div>
-    </div>
-  </div>
-
+<!-- Insights merged into Finance Overview -->
+<div id="view-insights" class="view" style="display:none">
+  <!-- Hidden compat IDs for renderInsights() -->
+  <span id="ins-studies">--</span><span id="ins-rev-risk">--</span><span id="ins-collect-eff">--</span><span id="ins-cancel-rate">--</span>
+  <div id="ins-cancel-revenue"></div><div id="ins-cancel-playbook"></div><div id="ins-forecast"></div>
 </div>
 </div><!-- /main -->
 
