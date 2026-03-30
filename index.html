@@ -6883,7 +6883,7 @@ function renderOpsMonitoringTable(filter) {
     h += '<tr style="border-bottom:1px solid #f1f5f9;' + rowBg + '">';
     h += '<td style="padding:6px 8px;font-weight:600;">' + escapeHTML(r.study || '—') + '</td>';
     h += '<td style="padding:6px 4px;"><span style="font-size:10px;font-weight:600;padding:2px 6px;border-radius:4px;background:' + catBg + ';color:' + catColor + '">' + escapeHTML(r.observation_category || '—') + '</span></td>';
-    h += '<td style="padding:6px 4px;font-size:10px;">' + escapeHTML(r.notes || '—') + (r.next_steps ? '<div style="margin-top:2px;color:#059669;font-weight:600">→ ' + escapeHTML(r.next_steps) + '</div>' : '') + '</td>';
+    h += '<td style="padding:6px 4px;font-size:10px;max-width:300px;word-wrap:break-word;" title="' + escapeHTML(r.notes || '') + '">' + escapeHTML((r.notes || '—').substring(0, 120)) + (r.notes && r.notes.length > 120 ? '…' : '') + (r.next_steps ? ' <span style="color:#059669;font-weight:600">→ ' + escapeHTML(r.next_steps.substring(0, 60)) + '</span>' : '') + '</td>';
     h += '<td style="text-align:center;"><span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:' + statusBg + ';color:' + statusColor + '">' + escapeHTML(r.status || '—') + '</span></td>';
     h += '<td style="padding:6px 4px;font-size:10px;color:#64748b">' + escapeHTML(r.monitor || '—') + '</td>';
     h += '<td style="text-align:center;font-size:10px;">' + escapeHTML(r.visit_date || '—') + '</td>';
