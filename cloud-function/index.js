@@ -3197,12 +3197,27 @@ async function fetchQBPnlMonthly() {
   const cols = (report.Columns || {}).Column || [];
   const months = cols.slice(1).map(c => c.ColTitle || '').filter(m => m && m !== 'Total' && m !== 'TOTAL');
 
-  const rows = [];
+  const incomeRows = [];
+  const expenseRows = [];
+  let inIncome = false, inExpense = false;
+
   function walk(rRows) {
     for (const row of (rRows || [])) {
       const colData = (row.Header || {}).ColData || row.ColData || [];
       const name = colData[0] ? colData[0].value || '' : '';
-      if (name && colData.length > 1) {
+      const lo = name.toLowerCase();
+
+      // Track section boundaries
+      if (row.group === 'Income' || lo === 'income' || (lo.includes('income') && !lo.includes('net') && !lo.includes('other') && !lo.includes('total'))) {
+        inIncome = true; inExpense = false;
+      }
+      if (lo === 'gross profit' || lo === 'total income') { inIncome = false; }
+      if (row.group === 'Expenses' || lo === 'expenses' || lo === 'cost of goods sold') {
+        inExpense = true; inIncome = false;
+      }
+      if (lo === 'net income' || lo === 'net operating income') { inExpense = false; }
+
+      if (name && colData.length > 1 && !lo.startsWith('total ') && !lo.startsWith('net ')) {
         const entry = { account: name };
         let total = 0;
         for (let i = 0; i < months.length && i + 1 < colData.length; i++) {
@@ -3211,14 +3226,18 @@ async function fetchQBPnlMonthly() {
           total += val;
         }
         entry.total = total;
-        if (total !== 0) rows.push(entry);
+        if (total !== 0) {
+          entry.section = inIncome ? 'income' : inExpense ? 'expense' : 'other';
+          if (inIncome) incomeRows.push(entry);
+          else if (inExpense) expenseRows.push(entry);
+        }
       }
       const sub = (row.Rows || {}).Row || [];
       if (sub.length) walk(sub);
     }
   }
   walk((report.Rows || {}).Row || []);
-  return { months, rows, period: `${startDate} to ${endDate}` };
+  return { months, rows: incomeRows, expenseRows, period: `${startDate} to ${endDate}` };
 }
 
 // ── P&L by Class/Study (live from QB API) ──
