@@ -5706,8 +5706,8 @@ function _makeStatusBtn(key, row) {
       row.style.background = cur.status === 'completed' ? '#f0fdf4' : cur.status === 'noshow' ? '#fef2f2' : cur.status === 'confirmed' ? '#ecfdf5' : '#f0f9ff';
       row.style.opacity = cur.status === 'completed' || cur.status === 'noshow' ? '0.6' : '1';
     } else {
-      btn.innerHTML = '● Track';
-      btn.style.cssText = 'font-size:9px;font-weight:700;padding:3px 6px;border-radius:4px;border:1.5px solid #cbd5e1;cursor:pointer;background:#fff;color:#94a3b8;white-space:nowrap;min-width:70px;';
+      btn.innerHTML = 'Not Confirmed';
+      btn.style.cssText = 'font-size:9px;font-weight:700;padding:3px 6px;border-radius:4px;border:1.5px solid #dc2626;cursor:pointer;background:#fef2f2;color:#dc2626;white-space:nowrap;min-width:70px;';
       row.style.background = '';
       row.style.opacity = '1';
     }
@@ -5810,25 +5810,36 @@ function injectRideshareButtons() {
     var crioRide = patName ? ridePatients[patName] : null;
 
     // Auto-populate from CRIO if found, otherwise use localStorage
-    var isRequested = _rideshareData[key] === true || !!crioRide;
+    // Rideshare states: not_requested → requested → ordered (or auto from CRIO)
+    var rideState = _rideshareData[key] || (crioRide ? 'requested' : 'not_requested');
     var tooltip = crioRide ? crioRide.note || '' : '';
 
     var btn = document.createElement('button');
-    var fromCrio = !!crioRide && !_rideshareData[key]; // auto-detected from CRIO
-    btn.style.cssText = 'font-size:9px;font-weight:700;padding:3px 6px;border-radius:4px;cursor:pointer;white-space:nowrap;min-width:60px;border:1.5px solid ' + (isRequested ? '#059669' : '#cbd5e1') + ';background:' + (isRequested ? (fromCrio ? '#dbeafe' : '#ecfdf5') : '#fff') + ';color:' + (isRequested ? (fromCrio ? '#1843AD' : '#059669') : '#94a3b8') + ';';
-    btn.textContent = isRequested ? (fromCrio ? '🚗 CRIO' : '✓ Requested') : '—';
+    var fromCrio = !!crioRide && !_rideshareData[key];
+
+    function _updateRideBtn() {
+      var st = _rideshareData[key] || (crioRide ? 'requested' : 'not_requested');
+      var styles = {
+        'not_requested': { text: 'Not Requested', border: '#cbd5e1', bg: '#fff', color: '#94a3b8' },
+        'requested':     { text: fromCrio ? '🚗 CRIO' : '✓ Requested', border: '#FF9933', bg: '#fff7ed', color: '#FF9933' },
+        'ordered':       { text: '✓ Ordered', border: '#059669', bg: '#ecfdf5', color: '#059669' }
+      };
+      var s = styles[st] || styles['not_requested'];
+      btn.textContent = s.text;
+      btn.style.cssText = 'font-size:9px;font-weight:700;padding:3px 6px;border-radius:4px;cursor:pointer;white-space:nowrap;min-width:70px;border:1.5px solid ' + s.border + ';background:' + s.bg + ';color:' + s.color + ';';
+    }
+    _updateRideBtn();
     if (tooltip) btn.title = tooltip.substring(0, 150);
+
     btn.onclick = function(e) {
       e.stopPropagation();
-      var nowReq = !_rideshareData[key];
-      if (nowReq) _rideshareData[key] = true;
-      else delete _rideshareData[key];
+      var cur = _rideshareData[key] || (crioRide ? 'requested' : 'not_requested');
+      // Cycle: not_requested → requested → ordered → not_requested
+      var next = cur === 'not_requested' ? 'requested' : cur === 'requested' ? 'ordered' : 'not_requested';
+      if (next === 'not_requested') delete _rideshareData[key];
+      else _rideshareData[key] = next;
       _saveRideshare();
-      var isOn = nowReq || !!crioRide;
-      btn.textContent = isOn ? '✓ Requested' : '—';
-      btn.style.borderColor = isOn ? '#059669' : '#cbd5e1';
-      btn.style.background = isOn ? '#ecfdf5' : '#fff';
-      btn.style.color = isOn ? '#059669' : '#94a3b8';
+      _updateRideBtn();
     };
     td.innerHTML = '';
     td.appendChild(btn);
