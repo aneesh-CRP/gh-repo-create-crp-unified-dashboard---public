@@ -1219,7 +1219,16 @@ body {
       </div>
       <div id="coordGoalsGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px"></div>
       <div style="margin-top:16px">
-        <div style="font-size:13px;font-weight:700;color:var(--navy);margin-bottom:8px">Monthly Snapshot — <span id="coord-month-label">March 2026</span></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px">
+          <div style="font-size:13px;font-weight:700;color:var(--navy)">Performance Snapshot — <span id="coord-month-label">March 2026</span></div>
+          <div style="display:flex;gap:4px;" id="coord-period-filter">
+            <button class="filter-btn active" onclick="setCoordPeriod('month',this)" style="font-size:10px;padding:2px 8px;">This Month</button>
+            <button class="filter-btn" onclick="setCoordPeriod('lastmonth',this)" style="font-size:10px;padding:2px 8px;">Last Month</button>
+            <button class="filter-btn" onclick="setCoordPeriod('2month',this)" style="font-size:10px;padding:2px 8px;">Last 2 Mo</button>
+            <button class="filter-btn" onclick="setCoordPeriod('q1',this)" style="font-size:10px;padding:2px 8px;">Q1 2026</button>
+            <button class="filter-btn" onclick="setCoordPeriod('ytd',this)" style="font-size:10px;padding:2px 8px;">YTD</button>
+          </div>
+        </div>
         <div style="overflow-x:auto">
           <table style="width:100%;border-collapse:collapse;font-size:12px" id="coordMonthTable">
             <thead><tr style="background:var(--surface2);border-bottom:2px solid var(--border)">
@@ -1240,10 +1249,17 @@ body {
 
   <!-- Investigator Workload -->
   <div class="card mb16 fade-in">
-    <div class="card-header">
+    <div class="card-header" style="flex-wrap:wrap;gap:6px">
       <span class="card-title">Investigator Workload</span>
+      <div style="display:flex;gap:4px;" id="inv-period-filter">
+        <button class="filter-btn active" onclick="setInvPeriod('month',this)" style="font-size:10px;padding:2px 8px;">This Month</button>
+        <button class="filter-btn" onclick="setInvPeriod('lastmonth',this)" style="font-size:10px;padding:2px 8px;">Last Month</button>
+        <button class="filter-btn" onclick="setInvPeriod('2month',this)" style="font-size:10px;padding:2px 8px;">Last 2 Mo</button>
+        <button class="filter-btn" onclick="setInvPeriod('q1',this)" style="font-size:10px;padding:2px 8px;">Q1 2026</button>
+        <button class="filter-btn" onclick="setInvPeriod('ytd',this)" style="font-size:10px;padding:2px 8px;">YTD</button>
+      </div>
     </div>
-    <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Upcoming visits per PI · utilization = days with visits / available days</div>
+    <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">Visits per PI · utilization = days with visits / working days</div>
     <div id="invCapacityContainer" style="padding:12px 16px;">
       <p style="color:#94a3b8;font-size:12px">Loading investigator data...</p>
     </div>
@@ -6409,37 +6425,110 @@ function renderCoordinatorGoals() {
     </div>`;
   }).join('');
 
-  // Monthly summary table — snapshot of actual counts, with Visits/Duration toggle
+  // Monthly summary table
   if (!monthBody) return;
+  window._coordGoalsData = goals;
+  window._coordsList = COORDS;
+  setCoordPeriod('month', document.querySelector('#coord-period-filter .filter-btn.active'));
+}
 
-  // Build cancel counts per coordinator for cancel rate column
-  var _coordCancels = {};
+var _coordPeriod = 'month';
+function setCoordPeriod(period, btn) {
+  _coordPeriod = period;
+  if (btn) {
+    var btns = document.querySelectorAll('#coord-period-filter .filter-btn');
+    btns.forEach(function(b){b.classList.remove('active');b.style.cssText=b.style.cssText.replace(/border-color:[^;]+;?/,'').replace(/background:[^;]+;?/,'').replace(/color:[^;]+;?/,'')+'border:1px solid var(--border);background:var(--surface);color:var(--muted);';});
+    btn.classList.add('active');
+    btn.style.cssText = btn.style.cssText.replace(/border-color:[^;]+;?/,'').replace(/background:[^;]+;?/,'').replace(/color:[^;]+;?/,'')+'border:1px solid #1843ad;background:#e8eeff;color:#1843ad;';
+  }
+  renderCoordPeriodTable();
+}
+
+function renderCoordPeriodTable() {
+  var goals = window._coordGoalsData;
+  var COORDS = window._coordsList;
+  var monthBody = document.getElementById('coordMonthBody');
+  var monthLabel = document.getElementById('coord-month-label');
+  if (!goals || !COORDS || !monthBody) return;
+
+  var now = new Date();
+  var yy = now.getFullYear();
+  var startDate, endDate, label;
+
+  if (_coordPeriod === 'month') {
+    startDate = new Date(yy, now.getMonth(), 1);
+    endDate = now;
+    label = now.toLocaleDateString('en-US',{month:'long',year:'numeric'});
+  } else if (_coordPeriod === 'lastmonth') {
+    startDate = new Date(yy, now.getMonth()-1, 1);
+    endDate = new Date(yy, now.getMonth(), 0);
+    label = startDate.toLocaleDateString('en-US',{month:'long',year:'numeric'});
+  } else if (_coordPeriod === '2month') {
+    startDate = new Date(yy, now.getMonth()-2, 1);
+    endDate = now;
+    label = startDate.toLocaleDateString('en-US',{month:'short'}) + ' — ' + now.toLocaleDateString('en-US',{month:'short',year:'numeric'});
+  } else if (_coordPeriod === 'q1') {
+    startDate = new Date(yy, 0, 1);
+    endDate = new Date(yy, 2, 31);
+    if (endDate > now) endDate = now;
+    label = 'Q1 ' + yy;
+  } else if (_coordPeriod === 'ytd') {
+    startDate = new Date(yy, 0, 1);
+    endDate = now;
+    label = 'YTD ' + yy;
+  }
+
+  if (monthLabel) monthLabel.textContent = label;
+
+  var startISO = localISO(startDate);
+  var endISO = localISO(endDate);
+  var dateLabel = startDate.toLocaleDateString('en-US',{month:'short',day:'numeric'}) + ' — ' + endDate.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+
+  // Count working days in period
+  var workDays = 0;
+  var d = new Date(startDate);
+  while (d <= endDate) {
+    if (d.getDay() > 0 && d.getDay() < 6) workDays++;
+    d.setDate(d.getDate() + 1);
+  }
+
+  // Count visits + cancels per coordinator in period
+  var visitsByCoord = {};
+  (DATA.allVisitDetail || []).forEach(function(v) {
+    var vd = v.date_iso || '';
+    if (vd >= startISO && vd <= endISO) {
+      var cn = v.coord || '';
+      if (cn) visitsByCoord[cn] = (visitsByCoord[cn] || 0) + 1;
+    }
+  });
+  var cancelsByCoord = {};
   (DATA.allCancels || []).filter(function(c){return !_patientRecovered(c.name,c.study,c.subject_key);}).forEach(function(c) {
-    var cn = c.coord || '';
-    _coordCancels[cn] = (_coordCancels[cn] || 0) + 1;
+    var cd = c.cancel_date || '';
+    if (cd >= startISO && cd <= endISO) {
+      var cn = c.coord || '';
+      if (cn) cancelsByCoord[cn] = (cancelsByCoord[cn] || 0) + 1;
+    }
   });
 
   var monthMax = 1;
-  COORDS.forEach(function(name) { var v = goals.byMonth[name] || 0; if (v > monthMax) monthMax = v; });
-  var avgPerDay = {};
-  COORDS.forEach(function(name) { avgPerDay[name] = workDaysElapsed > 0 ? (goals.byMonth[name] || 0) / workDaysElapsed : 0; });
+  COORDS.forEach(function(name) { var v = visitsByCoord[name] || 0; if (v > monthMax) monthMax = v; });
 
-  monthBody.innerHTML = COORDS.map(name => {
-    const monthVisits = goals.byMonth[name] || 0;
-    const barPct = Math.min(100, Math.round(monthVisits / (monthMax * 1.1) * 100));
-    const avg = avgPerDay[name].toFixed(1);
-    const cancels = _coordCancels[name] || 0;
-    const cancelRate = (monthVisits + cancels) > 0 ? Math.round(cancels / (monthVisits + cancels) * 100) : 0;
-    const crColor = cancelRate > 20 ? '#dc2626' : cancelRate > 10 ? '#FF9933' : '#059669';
-    return `<tr style="border-bottom:1px solid var(--border);cursor:pointer;" onclick="showCoordDetail('${jsAttr(name)}')">
-      <td style="padding:8px 12px;font-weight:600">${escapeHTML(name)}</td>
-      <td style="padding:8px 8px;text-align:center;font-weight:700">${monthVisits}</td>
-      <td style="padding:8px 8px;text-align:center;color:#FF9933;font-weight:600">${cancels}</td>
-      <td style="padding:8px 8px;text-align:center;font-weight:700;color:${crColor}">${cancelRate}%</td>
-      <td style="padding:8px 8px;text-align:center;color:#6B7280">${avg}/day</td>
-      <td style="padding:8px 12px"><div style="background:#E5E7EB;border-radius:6px;height:8px;overflow:hidden"><div style="background:#1843AD;height:100%;width:${barPct}%;border-radius:6px"></div></div></td>
-      <td style="padding:8px 8px;text-align:center;color:#6B7280;font-size:11px">${workDaysElapsed} days tracked</td>
-    </tr>`;
+  monthBody.innerHTML = COORDS.map(function(name) {
+    var visits = visitsByCoord[name] || 0;
+    var cancels = cancelsByCoord[name] || 0;
+    var barPct = Math.min(100, Math.round(visits / (monthMax * 1.1) * 100));
+    var avg = workDays > 0 ? (visits / workDays).toFixed(1) : '0.0';
+    var cancelRate = (visits + cancels) > 0 ? Math.round(cancels / (visits + cancels) * 100) : 0;
+    var crColor = cancelRate > 20 ? '#dc2626' : cancelRate > 10 ? '#FF9933' : '#059669';
+    return '<tr style="border-bottom:1px solid var(--border);cursor:pointer;" onclick="showCoordDetail(\'' + jsAttr(name) + '\')">' +
+      '<td style="padding:8px 12px;font-weight:600">' + escapeHTML(name) + '</td>' +
+      '<td style="padding:8px 8px;text-align:center;font-weight:700">' + visits + '</td>' +
+      '<td style="padding:8px 8px;text-align:center;color:#FF9933;font-weight:600">' + cancels + '</td>' +
+      '<td style="padding:8px 8px;text-align:center;font-weight:700;color:' + crColor + '">' + cancelRate + '%</td>' +
+      '<td style="padding:8px 8px;text-align:center;color:#6B7280">' + avg + '/day</td>' +
+      '<td style="padding:8px 12px"><div style="background:#E5E7EB;border-radius:6px;height:8px;overflow:hidden"><div style="background:#1843AD;height:100%;width:' + barPct + '%;border-radius:6px"></div></div></td>' +
+      '<td style="padding:8px 8px;text-align:center;color:#6B7280;font-size:10px">' + dateLabel + '</td>' +
+    '</tr>';
   }).join('');
 }
 
@@ -7014,6 +7103,18 @@ function renderCoordCancelTypeChart() {
   }
 }
 
+var _invPeriod = 'month';
+function setInvPeriod(period, btn) {
+  _invPeriod = period;
+  if (btn) {
+    var btns = document.querySelectorAll('#inv-period-filter .filter-btn');
+    btns.forEach(function(b){b.classList.remove('active');b.style.cssText=b.style.cssText.replace(/border-color:[^;]+;?/,'').replace(/background:[^;]+;?/,'').replace(/color:[^;]+;?/,'')+'border:1px solid var(--border);background:var(--surface);color:var(--muted);';});
+    btn.classList.add('active');
+    btn.style.cssText = btn.style.cssText.replace(/border-color:[^;]+;?/,'').replace(/background:[^;]+;?/,'').replace(/color:[^;]+;?/,'')+'border:1px solid #1843ad;background:#e8eeff;color:#1843ad;';
+  }
+  renderInvCapacity();
+}
+
 function renderInvCapacity() {
   var el = document.getElementById('invCapacityContainer');
   if (!el) return;
@@ -7023,12 +7124,25 @@ function renderInvCapacity() {
   if (INVS.length === 0 || allVisits.length === 0) return;
   var schedules = CRP_CONFIG.INV_SCHEDULES || {};
 
-  // Filter to next 30 days for workload view
-  var today = new Date(); today.setHours(0,0,0,0);
-  var d30 = new Date(today); d30.setDate(d30.getDate() + 30);
+  // Period-aware date range
+  var now = new Date(); var yy = now.getFullYear();
+  var startDate, endDate;
+  if (_invPeriod === 'month') { startDate = new Date(yy, now.getMonth(), 1); endDate = now; }
+  else if (_invPeriod === 'lastmonth') { startDate = new Date(yy, now.getMonth()-1, 1); endDate = new Date(yy, now.getMonth(), 0); }
+  else if (_invPeriod === '2month') { startDate = new Date(yy, now.getMonth()-2, 1); endDate = now; }
+  else if (_invPeriod === 'q1') { startDate = new Date(yy, 0, 1); endDate = new Date(yy, 2, 31); if (endDate > now) endDate = now; }
+  else if (_invPeriod === 'ytd') { startDate = new Date(yy, 0, 1); endDate = now; }
+  else { startDate = new Date(yy, now.getMonth(), 1); endDate = now; }
+  var startISO = localISO(startDate);
+  var endISO = localISO(endDate);
+
+  // Count working days
+  var workDays = 0; var dd = new Date(startDate);
+  while (dd <= endDate) { if (dd.getDay() > 0 && dd.getDay() < 6) workDays++; dd.setDate(dd.getDate() + 1); }
+
   var visits = allVisits.filter(function(v) {
-    var d = _parseDate(v.date_iso);
-    return d && d >= today && d <= d30;
+    var d = v.date_iso || '';
+    return d >= startISO && d <= endISO;
   });
 
   var invStats = INVS.map(function(name) {
@@ -7038,10 +7152,8 @@ function renderInvCapacity() {
     iv.forEach(function(v){days[v.date_iso]=((days[v.date_iso]||0)+1);});
     var dayCount = Object.keys(days).length;
     var avgPerDay = dayCount > 0 ? (iv.length / dayCount).toFixed(1) : '0';
-    var sched = schedules[name] || {};
-    var availDays = sched.daysPerWeek || 5;
-    // Utilization: days with visits / available days in 4-week window
-    var utilPct = availDays > 0 ? Math.min(100, Math.round(dayCount / (availDays * 4) * 100)) : 0;
+    // Utilization: days with visits / working days in selected period
+    var utilPct = workDays > 0 ? Math.min(100, Math.round(dayCount / workDays * 100)) : 0;
     var studies = {};
     iv.forEach(function(v){studies[v.study]=1;});
     var costPerVisit = 0;
