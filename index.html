@@ -2278,6 +2278,25 @@ const CRP_CONFIG = {
   CF_BASE: 'https://us-east1-crio-468120.cloudfunctions.net/crp-bq-feeds',
   USE_CLOUD_FUNCTION: true,
 
+  // Fasting requirements per study — 'all' = all visits, array = specific visit name matches
+  // null or missing = no fasting required
+  FASTING: {
+    'D7960C00015': { hours: 8, visits: 'all', note: 'AZURE-Outcomes — all scheduled visits' },
+    'J3F-MC-EZCC': { hours: 8, visits: 'all', note: 'SOLARIS-1 — all clinic visits' },
+    'C4951063': { hours: 8, visits: 'all', note: 'Rimegepant — all visits with blood draws' },
+    'M23-714': { hours: 8, visits: 'all', note: 'Ubrogepant — all blood draw visits' },
+    '20230222': { hours: 9, visits: ['screening','day 1','w4','w24','w48','w60','w72','w96','w120','w144','w180','w192','w204','w228','w240','w252','w276','eos','sfu','end of study','safety follow'], note: 'OCEAN(a) — specific visits (not Lp(a) pre-screening)' },
+    'N1T-MC-MALO': { hours: 8, visits: ['v3','v4','v5','v6','v7','v8','v9','v10','v12','v14','v15','v16','v17','v18','v20','v21','emv','pdtv','uv','v99','v102','v105','v107','v109','v111','early disc','final'], note: 'SYNERGY-Outcomes — 8hr blood/MRI, 4hr FibroScan' },
+    'M23-698': { hours: 8, visits: ['baseline','w16','w36','w52','w76','w104','premature','discontinuation'], note: 'Upadacitinib HS — lipid panels' },
+    'M20-465': { hours: 8, visits: ['baseline','day 1','w16','w32','w52','w68','w100','w148','w196','pd','premature'], note: 'Lutikizumab HS — lipid panels' },
+    'M24-601': { hours: 8, visits: ['baseline','day 1','w4','w8','w12','w20','w24','w32'], note: 'SWITCH-UP AD' },
+    'J2A-MC-GZPS': { hours: 8, visits: ['v3','visit 3','w0','week 0','v9','visit 9','w24','week 24','v16','visit 16','w52','week 52','early disc','ed'], note: 'Orforglipron SUI' },
+    'MR-130A': { hours: 8, visits: ['screening','eos','end of study','early term','et'], note: 'Birth Control Patch' },
+    '88545223PSA2001': { hours: 8, visits: ['w0','week 0','w12','week 12','w16','week 16'], note: 'VELOTA — lipid panels only' },
+    // No fasting required:
+    // D6973C00001 (PREVENT-HF), K-304 (Elismetrep), EFC17599 (AQUA), J3L-MC-EZEF, ATD002
+  },
+
   // Manual enrollment targets — overrides CRIO target_enrollment when CRIO has 0
   // Key: protocol_number (substring match), Value: target
   ENROLLMENT_TARGETS: {
@@ -5274,6 +5293,24 @@ function buildScheduleTable() {
     _rescheduledSet.add(((r.name||'')+'|'+(r.study||'')).toLowerCase());
   });
 
+  // Fasting badge logic
+  var _fastingConfig = CRP_CONFIG.FASTING || {};
+  function _isFasting(study, visit) {
+    var studyLo = (study||'').toLowerCase();
+    var visitLo = (visit||'').toLowerCase();
+    for (var code in _fastingConfig) {
+      if (studyLo.indexOf(code.toLowerCase()) === -1) continue;
+      var cfg = _fastingConfig[code];
+      if (cfg.visits === 'all') return cfg;
+      if (Array.isArray(cfg.visits)) {
+        for (var j = 0; j < cfg.visits.length; j++) {
+          if (visitLo.indexOf(cfg.visits[j]) >= 0) return cfg;
+        }
+      }
+    }
+    return null;
+  }
+
   var html = '';
   for (var i = 0; i < visits.length; i++) {
     var v = visits[i];
@@ -5317,7 +5354,7 @@ function buildScheduleTable() {
       + '<td style="font-weight:600;color:var(--blue);white-space:nowrap">' + esc(v.date||'—') + '</td>'
       + '<td style="font-size:11px;color:#64748b;white-space:nowrap">' + esc(v.time||'—') + '</td>'
       + '<td style="font-size:11px">' + studyHtml + '</td>'
-      + '<td style="font-size:11px;color:var(--muted)">' + esc(v.visit||'—') + '</td>'
+      + '<td style="font-size:11px;color:var(--muted)">' + esc(v.visit||'—') + (function(){ var fc = _isFasting(v.study, v.visit); return fc ? ' <span title="Fasting ' + fc.hours + 'hr — ' + esc(fc.note||'') + '" style="font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;cursor:help">&#x1F6A9; Fasting ' + fc.hours + 'hr</span>' : ''; })() + '</td>'
       + '<td style="font-weight:600">' + patHtml + riskBadge + (_rescheduledSet.has(((v.patient||'')+'|'+(v.study||'')).toLowerCase()) ? '<span style="font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px;margin-left:4px;background:#ecfdf5;color:#059669;border:1px solid #a7f3d0">Rescheduled</span>' : '') + '</td>'
       + '<td><span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:' + sc.bg + ';color:' + sc.fg + '">' + esc(v.status||'—') + '</span></td>'
       + '<td style="font-size:11px">' + esc(v.coord||'—') + '</td>'
