@@ -234,7 +234,7 @@ const FEEDS = {
 
   // ── 2. Cancellations ──
   cancels: {
-    query: () => `SELECT
+    query: (params) => `SELECT
       ${SUBJECT_NAME_SQL} AS subject_full_name,
       ${STUDY_NAME_SQL} AS study_name,
       CAST(aal.study_key AS STRING) AS study_key,
@@ -272,7 +272,7 @@ const FEEDS = {
       WHERE ua._fivetran_deleted = false AND su._fivetran_deleted = false
       QUALIFY ROW_NUMBER() OVER (PARTITION BY ua.calendar_appointment_key ORDER BY ua.date_created DESC) = 1) sp ON aal.calendar_appointment_key = sp.calendar_appointment_key
     WHERE aal.change_type = 4
-      AND aal.date_created >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 90 DAY)
+      AND aal.date_created >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL ${parseInt((params||{}).days) || 90} DAY)
       AND st.is_active = 1      ${STUDY_FILTER_SQL}
     ORDER BY aal.date_created DESC`,
     headers: {
@@ -2930,10 +2930,58 @@ const QB = {
 
 let _qbToken = null;
 let _qbTokenExpiry = 0;
-let _qbRefreshToken = QB.refreshToken; // Track refreshed tokens
+let _qbRefreshToken = QB.refreshToken;
+let _qbTokenLoaded = false;
+
+// Persist QB refresh token to Secret Manager (survives cold starts)
+const SECRET_NAME = `projects/${process.env.GCLOUD_PROJECT || 'crio-468120'}/secrets/qb-refresh-token/versions/latest`;
+const SECRET_PARENT = `projects/${process.env.GCLOUD_PROJECT || 'crio-468120'}/secrets/qb-refresh-token`;
+
+async function loadQBRefreshToken() {
+  if (_qbTokenLoaded) return;
+  _qbTokenLoaded = true;
+  try {
+    const { SecretManagerServiceClient } = require('@google-cloud/secret-manager');
+    const client = new SecretManagerServiceClient();
+    const [version] = await client.accessSecretVersion({ name: SECRET_NAME });
+    const token = version.payload.data.toString('utf8').trim();
+    if (token && token.startsWith('RT')) {
+      _qbRefreshToken = token;
+      console.log('QB: Loaded refresh token from Secret Manager');
+    }
+  } catch (e) {
+    // Secret doesn't exist yet or no access — use env var
+    console.log('QB: Secret Manager unavailable, using env var (' + e.message + ')');
+  }
+}
+
+async function saveQBRefreshToken(token) {
+  try {
+    const { SecretManagerServiceClient } = require('@google-cloud/secret-manager');
+    const client = new SecretManagerServiceClient();
+    // Try to add a new version
+    await client.addSecretVersion({
+      parent: SECRET_PARENT,
+      payload: { data: Buffer.from(token, 'utf8') },
+    });
+    console.log('QB: Saved rotated refresh token to Secret Manager');
+  } catch (e) {
+    // If secret doesn't exist, try to create it first
+    try {
+      const { SecretManagerServiceClient } = require('@google-cloud/secret-manager');
+      const client = new SecretManagerServiceClient();
+      await client.createSecret({ parent: `projects/${process.env.GCLOUD_PROJECT || 'crio-468120'}`, secretId: 'qb-refresh-token', secret: { replication: { automatic: {} } } });
+      await client.addSecretVersion({ parent: SECRET_PARENT, payload: { data: Buffer.from(token, 'utf8') } });
+      console.log('QB: Created secret and saved refresh token');
+    } catch (e2) {
+      console.warn('QB: Failed to persist token to Secret Manager:', e2.message);
+    }
+  }
+}
 
 async function getQBAccessToken() {
   if (_qbToken && Date.now() < _qbTokenExpiry - 60000) return _qbToken;
+  await loadQBRefreshToken();
   const auth = Buffer.from(QB.clientId + ':' + QB.clientSecret).toString('base64');
   const params = new URLSearchParams({
     grant_type: 'refresh_token',
@@ -2951,7 +2999,10 @@ async function getQBAccessToken() {
           if (j.error) { reject(new Error('QB token error: ' + j.error)); return; }
           _qbToken = j.access_token;
           _qbTokenExpiry = Date.now() + (j.expires_in || 3600) * 1000;
-          if (j.refresh_token) _qbRefreshToken = j.refresh_token; // QB rotates refresh tokens
+          if (j.refresh_token && j.refresh_token !== _qbRefreshToken) {
+            _qbRefreshToken = j.refresh_token;
+            saveQBRefreshToken(j.refresh_token).catch(() => {});
+          }
           resolve(_qbToken);
         } catch (e) { reject(new Error('QB token parse failed: ' + d)); }
       });
