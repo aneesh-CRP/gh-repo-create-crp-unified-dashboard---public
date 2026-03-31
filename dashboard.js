@@ -280,10 +280,10 @@ const CRP_CONFIG = {
     'J3F-MC-EZCC': { hours: 8, visits: 'all', note: 'SOLARIS-1 — all clinic visits' },
     'C4951063': { hours: 8, visits: 'all', note: 'Rimegepant — all visits with blood draws' },
     'M23-714': { hours: 8, visits: 'all', note: 'Ubrogepant — all blood draw visits' },
-    '20230222': { hours: 9, visits: ['screening','day 1','w4','w24','w48','w60','w72','w96','w120','w144','w180','w192','w204','w228','w240','w252','w276','eos','sfu','end of study','safety follow'], note: 'OCEAN(a) — specific visits (not Lp(a) pre-screening)' },
-    'N1T-MC-MALO': { hours: 8, visits: ['v3','v4','v5','v6','v7','v8','v9','v10','v12','v14','v15','v16','v17','v18','v20','v21','emv','pdtv','uv','v99','v102','v105','v107','v109','v111','early disc','final'], note: 'SYNERGY-Outcomes — 8hr blood/MRI, 4hr FibroScan' },
-    'M23-698': { hours: 8, visits: ['baseline','w16','w36','w52','w76','w104','premature','discontinuation'], note: 'Upadacitinib HS — lipid panels' },
-    'M20-465': { hours: 8, visits: ['baseline','day 1','w16','w32','w52','w68','w100','w148','w196','pd','premature'], note: 'Lutikizumab HS — lipid panels' },
+    '20230222': { hours: 9, visits: ['main screening','day 1','week 4','w4','week 24','w24','week 48','w48','week 60','w60','week 72','w72','week 96','w96','week 120','w120','week 144','w144','week 180','w180','week 192','w192','week 204','w204','week 228','w228','week 240','w240','week 252','w252','week 276','w276','eos','sfu','end of study','safety follow'], exclude: ['lp(a)','lpa'], note: 'OCEAN(a) — specific visits (not Lp(a) pre-screening)' },
+    'N1T-MC-MALO': { hours: 8, visits: ['v1','v2','v3','v4','v5','v6','v7','v8','v9','v10','v12','v14','v15','v16','v17','v18','v20','v21','screening','emv','pdtv','uv','v99','v102','v105','v107','v109','v111','early disc','final','v601'], note: 'SYNERGY-Outcomes — 8hr blood/MRI, 4hr FibroScan' },
+    'M23-698': { hours: 8, visits: ['baseline','w16','week 16','wk16','w36','week 36','wk36','w52','week 52','wk52','w76','week 76','wk76','w104','week 104','wk104','wk64','wk88','wk100','premature','discontinuation'], note: 'Upadacitinib HS — lipid panels' },
+    'M20-465': { hours: 8, visits: ['baseline','day 1','visit 2','w16','week 16','w32','week 32','visit 15','w52','week 52','visit 19','w68','week 68','w100','week 100','w148','week 148','w196','week 196','pd','premature'], note: 'Lutikizumab HS — lipid panels' },
     'M24-601': { hours: 8, visits: ['baseline','day 1','w4','w8','w12','w20','w24','w32'], note: 'SWITCH-UP AD' },
     'J2A-MC-GZPS': { hours: 8, visits: ['v3','visit 3','w0','week 0','v9','visit 9','w24','week 24','v16','visit 16','w52','week 52','early disc','ed'], note: 'Orforglipron SUI' },
     'MR-130A': { hours: 8, visits: ['screening','eos','end of study','early term','et'], note: 'Birth Control Patch' },
@@ -3296,6 +3296,12 @@ function buildScheduleTable() {
     for (var code in _fastingConfig) {
       if (studyLo.indexOf(code.toLowerCase()) === -1) continue;
       var cfg = _fastingConfig[code];
+      // Check exclusions first (e.g., Lp(a) screening for OCEAN)
+      if (cfg.exclude) {
+        var excluded = false;
+        for (var k = 0; k < cfg.exclude.length; k++) { if (visitLo.indexOf(cfg.exclude[k]) >= 0) { excluded = true; break; } }
+        if (excluded) return null;
+      }
       if (cfg.visits === 'all') return cfg;
       if (Array.isArray(cfg.visits)) {
         for (var j = 0; j < cfg.visits.length; j++) {
