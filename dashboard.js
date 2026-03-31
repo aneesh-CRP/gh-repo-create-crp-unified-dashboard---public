@@ -1929,7 +1929,7 @@ function renderRevenuePerUser() {
       return invList.some(function(i){return name.toLowerCase().includes(i.toLowerCase().split(' ').pop());});
     }).sort(function(a,b){return (userTotals[b]||0)-(userTotals[a]||0);}).map(function(n){return {name:n,role:'PI'};});
 
-    var allUsers = coordUsers.concat(invUsersList);
+    var allUsers = coordUsers.concat(invUsersList).sort(function(a,b){return (userTotals[b.name]||0)-(userTotals[a.name]||0);});
     if (trendBadge) trendBadge.textContent = months.length + ' months · ' + coordUsers.length + ' coords + ' + invUsersList.length + ' PIs';
 
     // Filter buttons
