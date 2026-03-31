@@ -3045,6 +3045,11 @@ function renderAgingKPIs(){
     const iv=AGING_INV.reduce((s,x)=>s+(x[b.k]||0),0);const ap=AGING_AP.reduce((s,x)=>s+(x[b.k]||0),0);const t=iv+ap;
     return'<div class="kpi click" onclick="showBucketModal(\''+b.k+'\')"><div class="kpi-stripe" style="background:'+b.c+'"></div><div class="label">'+b.l+'</div><div class="value" style="color:'+b.c+'">'+fmtK(t)+'</div><div class="sub">Inv '+fmtK(iv)+' + AP '+fmtK(ap)+'</div></div>';
   }).join('');
+  // Unsent invoice warning
+  var unsent = UNPAID_INVOICES ? UNPAID_INVOICES.filter(function(inv) { return !inv.date_sent; }).length : 0;
+  if (unsent > 0) {
+    _akEl.innerHTML += '<div style="margin-top:8px;padding:8px 12px;background:#FEF3C7;border:1px solid #F59E0B;border-radius:8px;font-size:11px;color:#92400E;display:flex;align-items:center;gap:6px;"><strong>&#x26A0; ' + unsent + ' invoice' + (unsent>1?'s':'') + ' never sent</strong> — these may explain aging AR</div>';
+  }
 }
 function renderRevByStudy(){
   const tb=document.getElementById('revByStudyBody');if(!tb)return;let tot=0;
@@ -3055,6 +3060,66 @@ function renderUninvoiced(){
   const tb=document.getElementById('uninvBody');if(!tb)return;let tot=0;
   tb.innerHTML=UNINVOICED.map(r=>{tot+=r.amount;return'<tr><td>'+slink(r.study)+'</td><td class="r">'+fmt(r.amount)+'</td></tr>';}).join('');
   tb.innerHTML+='<tr class="total-row"><td>TOTAL ('+UNINVOICED.length+' studies)</td><td class="r">'+fmt(tot)+'</td></tr>';
+}
+
+// ══════════ REVENUE ITEMS + PROCEDURE REVENUE (BQ feeds) ══════════
+function fetchBillingExtras() {
+  var base = CRP_CONFIG.CF_BASE;
+  if (!base || window._billingExtrasLoaded) return;
+  window._billingExtrasLoaded = true;
+
+  // Fetch revenue items + procedure revenue in parallel
+  Promise.all([
+    fetch(base + '?feed=revenueItems&format=json').then(function(r){return r.json();}).catch(function(){return {data:[]};}),
+    fetch(base + '?feed=procedureRevenue&format=json').then(function(r){return r.json();}).catch(function(){return {data:[]};})
+  ]).then(function(results) {
+    var revItems = results[0].data || [];
+    var procRev = results[1].data || [];
+
+    // Revenue Items breakdown
+    var el = document.getElementById('revItemsBreakdown');
+    var sec = document.getElementById('revItemsSection');
+    if (el && revItems.length > 0) {
+      if (sec) sec.style.display = '';
+      el.style.display = '';
+      var totalRev = 0, totalPaid = 0, totalDue = 0;
+      var byType = {};
+      revItems.forEach(function(r) {
+        var rev = parseFloat(r.revenue) || 0;
+        var paid = parseFloat(r.paid) || 0;
+        var due = parseFloat(r.due) || 0;
+        totalRev += rev; totalPaid += paid; totalDue += due;
+        var t = r.type || '?';
+        if (t === '11' || t === '12') t = 'Visit';
+        if (!byType[t]) byType[t] = {rev:0,paid:0,due:0,count:0};
+        byType[t].rev += rev; byType[t].paid += paid; byType[t].due += due; byType[t].count++;
+      });
+      var h = '<div class="kpi-row" style="margin-bottom:12px;">';
+      h += '<div class="kpi"><div class="kpi-stripe" style="background:#1843AD"></div><div class="label">Total Earned</div><div class="value" style="color:#1843AD">' + fmtK(totalRev) + '</div><div class="sub">' + revItems.length + ' line items</div></div>';
+      h += '<div class="kpi"><div class="kpi-stripe" style="background:#10B981"></div><div class="label">Collected</div><div class="value" style="color:#10B981">' + fmtK(totalPaid) + '</div><div class="sub">' + (totalRev>0?Math.round(totalPaid/totalRev*100):0) + '% of earned</div></div>';
+      h += '<div class="kpi"><div class="kpi-stripe" style="background:#EF4444"></div><div class="label">Outstanding</div><div class="value" style="color:#EF4444">' + fmtK(totalDue) + '</div><div class="sub">Awaiting payment</div></div>';
+      h += '</div>';
+      h += '<div class="panel"><div class="panel-body" style="overflow-x:auto"><table class="tbl"><thead><tr><th>Revenue Type</th><th class="r">Items</th><th class="r">Earned</th><th class="r">Collected</th><th class="r">Outstanding</th><th class="r">Collection %</th></tr></thead><tbody>';
+      Object.entries(byType).sort(function(a,b){return b[1].rev-a[1].rev;}).forEach(function(e) {
+        var pct = e[1].rev > 0 ? Math.round(e[1].paid/e[1].rev*100) : 0;
+        var pctColor = pct >= 80 ? '#10B981' : pct >= 50 ? '#FF9933' : '#EF4444';
+        h += '<tr><td><strong>' + escapeHTML(e[0]) + '</strong></td><td class="r">' + e[1].count + '</td><td class="r">' + fmt(e[1].rev) + '</td><td class="r" style="color:#10B981">' + fmt(e[1].paid) + '</td><td class="r" style="color:#EF4444">' + fmt(e[1].due) + '</td><td class="r" style="font-weight:700;color:' + pctColor + '">' + pct + '%</td></tr>';
+      });
+      h += '</tbody></table></div></div>';
+      el.innerHTML = h;
+    }
+
+    // Procedure Revenue table
+    var procEl = document.getElementById('procRevenueBody');
+    var procSec = document.getElementById('procRevenueSection');
+    if (procEl && procRev.length > 0) {
+      if (procSec) procSec.style.display = '';
+      procEl.innerHTML = procRev.filter(function(r){return parseFloat(r.total_revenue||0)>0;}).sort(function(a,b){return parseFloat(b.total_revenue||0)-parseFloat(a.total_revenue||0);}).map(function(r) {
+        var code = (r.study_name||'').split(' - ').pop().trim();
+        return '<tr><td>' + escapeHTML(code) + '</td><td>' + escapeHTML(r.procedure_name||'') + '</td><td class="r">' + (r.completions||0) + '</td><td class="r" style="font-weight:600">' + fmt(parseFloat(r.total_revenue||0)) + '</td><td class="r">' + fmt(parseFloat(r.avg_revenue_per_completion||0)) + '</td></tr>';
+      }).join('');
+    }
+  });
 }
 
 // ══════════ ENHANCED REVENUE TAB ══════════
@@ -4339,7 +4404,7 @@ function switchTab(name, el) {
     if (!finInitDone) initFinanceDashboard();
     // Re-render the specific tab
     try {
-      if (name === 'fin-revenue') { renderRevenueTab(); renderAgingKPIs(); renderAgingTables(); initColl(); renderCollections(); }
+      if (name === 'fin-revenue') { renderRevenueTab(); renderAgingKPIs(); renderAgingTables(); initColl(); renderCollections(); fetchBillingExtras(); }
       if (name === 'fin-qb' && QB_DATA.loaded) { renderCRIOvsQB(); }
     } catch(e) { console.warn('Finance sub-tab render error:', e); }
   }
@@ -4353,6 +4418,7 @@ function switchTab(name, el) {
   if (name === 'insights' || name === 'fin-overview') {
     setTimeout(() => {
       if (typeof renderInsights === 'function') renderInsights();
+      if (typeof renderFinancePnL === 'function') renderFinancePnL();
     }, 50);
   }
 
@@ -8895,6 +8961,7 @@ async function fetchQuickBooksData() {
 
     var pnlData = pnlRes.data || pnlRes;
     var pnlRows = pnlData.rows || [];
+    var pnlExpenseRows = pnlData.expenseRows || [];
     var monthCols = pnlData.months || [];
     var timeAct = timeRes.data || [];
     var qbInvoices = invRes.data || [];
@@ -9000,7 +9067,10 @@ async function fetchQuickBooksData() {
     QB_DATA.qbTotalIncome = qbTotalIncome;
     QB_DATA.qbPeriod = qbPeriod;
     QB_DATA.monthCols = monthCols;
-    QB_DATA.pnlMonthly = []; // legacy compat — charts use QB_DATA.monthCols now
+    QB_DATA.pnlMonthly = [];
+    QB_DATA.expenseRows = pnlExpenseRows;
+    QB_DATA.totalExpense = pnlExpenseRows.reduce(function(s,r){return s+(r.total||0);},0);
+    QB_DATA.netIncome = qbTotalIncome - QB_DATA.totalExpense;
 
     // Build CRIO paid-revenue map for QB reconciliation (cash vs cash comparison)
     var crioRevData = (crioRevRes.data || []);
@@ -9104,8 +9174,9 @@ async function fetchQuickBooksData() {
 
     QB_DATA.loaded = true;
     var matchedRev = Object.values(pnlByStudy).reduce(function(s,v){return s + v.total;}, 0);
-    _log('CRP QB: Live API — ' + Object.keys(pnlByStudy).length + ' studies matched ($' + Math.round(matchedRev).toLocaleString() + '), ' + pnlUnmatched.length + ' unmatched, income: $' + Math.round(qbTotalIncome).toLocaleString() + ', invoices: ' + qbInvoices.length + ', payments: ' + qbPayments.length + ', staff: ' + Object.keys(empMap).length + ' (' + Math.round(totalTrackedHours) + ' hrs)');
+    _log('CRP QB: Live API — ' + Object.keys(pnlByStudy).length + ' studies matched ($' + Math.round(matchedRev).toLocaleString() + '), ' + pnlUnmatched.length + ' unmatched, income: $' + Math.round(qbTotalIncome).toLocaleString() + ', expense: $' + Math.round(QB_DATA.totalExpense).toLocaleString() + ', net: $' + Math.round(QB_DATA.netIncome).toLocaleString());
     renderCRIOvsQB();
+    renderFinancePnL();
   } catch(e) {
     console.warn('CRP QB: Live API fetch failed:', e.message);
     // Fallback: try legacy Sheets fetch
@@ -9157,6 +9228,65 @@ async function _fetchQBFromSheets() {
   QB_DATA.loaded = true;
   _log('CRP QB: Sheets fallback — ' + Object.keys(pnlByStudy).length + ' studies, $' + Math.round(qbTotalIncome).toLocaleString());
   renderCRIOvsQB();
+}
+
+function renderFinancePnL() {
+  if (!QB_DATA.loaded || !QB_DATA.monthCols || QB_DATA.monthCols.length === 0) return;
+  var months = QB_DATA.monthCols;
+  var incomeRows = QB_DATA.pnlByStudy ? Object.values(QB_DATA.pnlByStudy) : [];
+  var expenseRows = QB_DATA.expenseRows || [];
+
+  // Net Income KPI
+  var niEl = document.getElementById('fin-hero-netincome');
+  var niSub = document.getElementById('fin-hero-netincome-sub');
+  var niCell = document.getElementById('fin-hero-netincome-cell');
+  if (niEl) {
+    var net = QB_DATA.netIncome || 0;
+    var fmtK = function(v) { return (v >= 0 ? '' : '-') + '$' + Math.abs(Math.round(v/1000)) + 'K'; };
+    niEl.textContent = fmtK(net);
+    niEl.style.color = net >= 0 ? '#10B981' : '#dc2626';
+    var margin = QB_DATA.qbTotalIncome > 0 ? Math.round(net / QB_DATA.qbTotalIncome * 100) : 0;
+    if (niSub) niSub.textContent = margin + '% margin · ' + QB_DATA.qbPeriod;
+    if (niCell) niCell.style.display = '';
+  }
+
+  // Monthly P&L chart
+  var panel = document.getElementById('fin-pnl-panel');
+  if (panel) panel.style.display = '';
+
+  var monthlyIncome = months.map(function(m) {
+    var t = 0;
+    Object.values(QB_DATA.pnlByStudy || {}).forEach(function(s) { t += (s.monthly && s.monthly[m]) || 0; });
+    (QB_DATA.pnlUnmatched || []).forEach(function(r) { t += (r.monthly && r.monthly[m]) || 0; });
+    return Math.round(t);
+  });
+  var monthlyExpense = months.map(function(m) {
+    var t = 0;
+    expenseRows.forEach(function(r) { t += (r[m] || 0); });
+    return Math.round(t);
+  });
+  var monthlyNet = months.map(function(_, i) { return monthlyIncome[i] - monthlyExpense[i]; });
+  var labels = months.map(function(m) { var p = m.split(' '); return p[0].substring(0,3) + (p[1] ? ' ' + (p[1]||'').slice(-2) : ''); });
+
+  mkChart('finPnlChart', {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        { label: 'Income', data: monthlyIncome, backgroundColor: '#10B98140', borderColor: '#10B981', borderWidth: 1.5, borderRadius: 3, order: 2 },
+        { label: 'Expense', data: monthlyExpense, backgroundColor: '#EF444440', borderColor: '#EF4444', borderWidth: 1.5, borderRadius: 3, order: 2 },
+        { label: 'Net Income', data: monthlyNet, type: 'line', borderColor: '#1843AD', backgroundColor: 'transparent', borderWidth: 2.5, pointRadius: 4, pointBackgroundColor: monthlyNet.map(function(v){return v>=0?'#10B981':'#dc2626';}), tension: 0.3, order: 1 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'top', labels: { boxWidth: 12, font: { size: 10 } } } },
+      scales: {
+        x: { type: 'category', ticks: { font: { size: 9 } } },
+        y: { type: 'linear', ticks: { font: { size: 10 }, callback: function(v) { return v >= 1000 ? '$' + Math.round(v/1000) + 'K' : v <= -1000 ? '-$' + Math.round(Math.abs(v)/1000) + 'K' : '$' + v; } } }
+      }
+    }
+  });
 }
 
 function renderCRIOvsQB() {
@@ -9481,6 +9611,49 @@ function renderCRIOvsQB() {
           x: { type: 'category', ticks: { font: { size: 9 } } },
           y: { type: 'linear', ticks: { callback: function(v) { return '$' + Math.round(v/1000) + 'K'; } }, beginAtZero: true }
         }
+      }
+    });
+  }
+
+  // ── QB Expense Breakdown ──
+  var expRows = QB_DATA.expenseRows || [];
+  var expSection = document.getElementById('qbExpenseSection');
+  var expBody = document.getElementById('qbExpenseBody');
+  var expKpis = document.getElementById('qbExpenseKpis');
+  if (expSection && expBody && expRows.length > 0) {
+    expSection.style.display = '';
+    var totalExp = expRows.reduce(function(s,r){return s+(r.total||0);},0);
+    if (expKpis) {
+      var net = QB_DATA.qbTotalIncome - totalExp;
+      var margin = QB_DATA.qbTotalIncome > 0 ? Math.round(net/QB_DATA.qbTotalIncome*100) : 0;
+      expKpis.innerHTML = '<div class="kpi"><div class="kpi-stripe" style="background:#10B981"></div><div class="label">QB Income</div><div class="value" style="color:#10B981">' + fmtK(QB_DATA.qbTotalIncome) + '</div></div>' +
+        '<div class="kpi"><div class="kpi-stripe" style="background:#EF4444"></div><div class="label">QB Expenses</div><div class="value" style="color:#EF4444">' + fmtK(totalExp) + '</div></div>' +
+        '<div class="kpi"><div class="kpi-stripe" style="background:' + (net>=0?'#1843AD':'#dc2626') + '"></div><div class="label">Net Income</div><div class="value" style="color:' + (net>=0?'#1843AD':'#dc2626') + '">' + fmtK(net) + '</div><div class="sub">' + margin + '% margin</div></div>';
+    }
+    expBody.innerHTML = expRows.filter(function(r){return (r.total||0)>500;}).sort(function(a,b){return (b.total||0)-(a.total||0);}).map(function(r) {
+      var pct = totalExp > 0 ? Math.round((r.total||0)/totalExp*100) : 0;
+      return '<tr><td>' + escapeHTML(r.account||'') + '</td><td class="r" style="font-weight:600">' + fmtD(r.total||0) + '</td><td class="r">' + pct + '%</td></tr>';
+    }).join('');
+  }
+
+  // ── Monthly Margin Chart ──
+  var marginSection = document.getElementById('qbMarginSection');
+  if (marginSection && monthCols.length > 0 && expRows.length > 0) {
+    marginSection.style.display = '';
+    var mIncome = monthCols.map(function(m) { var t=0; Object.values(pnlByStudy).forEach(function(s){t+=(s.monthly&&s.monthly[m])||0;}); (QB_DATA.pnlUnmatched||[]).forEach(function(r){t+=(r.monthly&&r.monthly[m])||0;}); return Math.round(t); });
+    var mExpense = monthCols.map(function(m) { var t=0; expRows.forEach(function(r){t+=(r[m]||0);}); return Math.round(t); });
+    var mNet = monthCols.map(function(_,i){return mIncome[i]-mExpense[i];});
+    var mLabels = monthCols.map(function(m){var p=m.split(' ');return p[0].substring(0,3)+(p[1]?' '+p[1].slice(-2):'');});
+    mkChart('qbMarginChart', {
+      type: 'bar',
+      data: { labels: mLabels, datasets: [
+        {label:'Income',data:mIncome,backgroundColor:'#10B98140',borderColor:'#10B981',borderWidth:1.5,borderRadius:3,order:2},
+        {label:'Expense',data:mExpense,backgroundColor:'#EF444440',borderColor:'#EF4444',borderWidth:1.5,borderRadius:3,order:2},
+        {label:'Net',data:mNet,type:'line',borderColor:'#1843AD',backgroundColor:'transparent',borderWidth:2.5,pointRadius:4,pointBackgroundColor:mNet.map(function(v){return v>=0?'#10B981':'#dc2626';}),tension:0.3,order:1}
+      ]},
+      options: { responsive:true, maintainAspectRatio:false,
+        plugins:{legend:{position:'top',labels:{boxWidth:12,font:{size:10}}}},
+        scales:{x:{type:'category',ticks:{font:{size:9}}},y:{type:'linear',ticks:{font:{size:10},callback:function(v){return v>=1000?'$'+Math.round(v/1000)+'K':v<=-1000?'-$'+Math.round(Math.abs(v)/1000)+'K':'$'+v;}}}}
       }
     });
   }
@@ -19143,6 +19316,11 @@ document.addEventListener('click', function(e) {
       <div class="hero-val" style="color:#2d5a87" id="heroForecast">--</div>
       <div class="hero-sub">Based on aging bucket collection rates</div>
     </div>
+    <div class="hero-cell" id="fin-hero-netincome-cell" style="display:none">
+      <div class="hero-label">QB Net Income</div>
+      <div class="hero-val" id="fin-hero-netincome" style="color:#10B981">--</div>
+      <div class="hero-sub" id="fin-hero-netincome-sub">12-month P&amp;L</div>
+    </div>
   </div>
 
   <!-- ── TWO-COLUMN: AR Breakdown + Open Receivables ── -->
@@ -19205,6 +19383,12 @@ document.addEventListener('click', function(e) {
       <div class="forecast-cell"><div class="fl">30&ndash;60 Days</div><div class="fv" id="fc60">--</div><div class="fs">30-60d bucket &times; 78%</div></div>
       <div class="forecast-cell"><div class="fl">60&ndash;90 Days</div><div class="fv" id="fc90">--</div><div class="fs">61-90d bucket &times; 62%</div></div>
     </div>
+  </div>
+
+  <!-- ── QB Monthly P&L ── -->
+  <div class="group-panel" id="fin-pnl-panel" style="display:none;">
+    <div class="group-title"><span class="gt-icon" style="background:#1843AD"></span> Monthly P&amp;L — QuickBooks</div>
+    <div style="position:relative;height:280px;padding:12px;"><canvas id="finPnlChart"></canvas></div>
   </div>
 
   <!-- Hidden compat for JS that draws to these SVGs -->
@@ -19346,6 +19530,23 @@ document.addEventListener('click', function(e) {
         <thead><tr><th>Study</th><th>Item</th><th>Category</th><th class="r">Amount</th></tr></thead>
         <tbody id="uninvDetailBody"></tbody>
       </table>
+    </div>
+  </div>
+
+  <!-- ═══ REVENUE ITEMS (from BQ revenueItems feed) ═══ -->
+  <div class="section-label" style="margin-top:20px" id="revItemsSection" style="display:none">Revenue Lifecycle — Earned vs Collected</div>
+  <div id="revItemsBreakdown" style="display:none;"></div>
+
+  <!-- ═══ PROCEDURE REVENUE (from BQ procedureRevenue feed) ═══ -->
+  <div id="procRevenueSection" style="display:none;">
+    <div class="section-label">Procedure Revenue</div>
+    <div class="panel">
+      <div class="panel-body" style="overflow-x:auto;max-height:400px;overflow-y:auto">
+        <table class="tbl">
+          <thead><tr><th>Study</th><th>Procedure</th><th class="r">Completions</th><th class="r">Total Revenue</th><th class="r">Avg/Completion</th></tr></thead>
+          <tbody id="procRevenueBody"></tbody>
+        </table>
+      </div>
     </div>
   </div>
 
@@ -19504,7 +19705,27 @@ document.addEventListener('click', function(e) {
   <!-- AR Aging + Payment Trend removed (now in Billing tab) — hidden compat for JS -->
   <div style="display:none"><canvas id="qbAgingBarChart"></canvas><div id="qbAgingSummary"></div><canvas id="qbPaymentTrendChart"></canvas></div>
 
-  <!-- Staff Hours removed — available in Productivity tab -->
+  <!-- ═══ EXPENSE BREAKDOWN ═══ -->
+  <div id="qbExpenseSection" style="display:none;">
+    <div class="section-label">QB Expense Breakdown</div>
+    <div class="kpi-row" id="qbExpenseKpis"></div>
+    <div class="panel" style="margin-bottom:12px;">
+      <div class="panel-body" style="overflow-x:auto;max-height:400px;overflow-y:auto">
+        <table class="tbl">
+          <thead><tr><th>Category</th><th class="r">Amount</th><th class="r">% of Total</th></tr></thead>
+          <tbody id="qbExpenseBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ MONTHLY MARGIN ═══ -->
+  <div id="qbMarginSection" style="display:none;">
+    <div class="section-label">Monthly P&amp;L — Income vs Expense</div>
+    <div class="panel" style="margin-bottom:12px;">
+      <div style="position:relative;height:260px;padding:12px;"><canvas id="qbMarginChart"></canvas></div>
+    </div>
+  </div>
   <div style="display:none"><div id="qbTimeBody"></div></div>
 
 </div>
