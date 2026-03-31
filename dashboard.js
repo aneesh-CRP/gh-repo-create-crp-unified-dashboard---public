@@ -3349,14 +3349,14 @@ function buildScheduleTable() {
     // Investigator
     var invText = esc(v.investigator || '—');
     var invStyle = v.investigator ? 'font-size:11px;color:#072061' : 'font-size:11px;color:#cbd5e1';
-    html += '<tr data-date="' + (v.date_iso||'') + '" data-site="' + esc(v.site||'') + '" data-coord="' + esc(v.coord||'') + '">'
-      + '<td class="confirm-cell" style="width:90px;text-align:center;padding:4px;"></td>'
-      + '<td class="rideshare-cell" style="width:70px;text-align:center;padding:4px;"></td>'
+    html += '<tr data-date="' + (v.date_iso||'') + '" data-site="' + esc(v.site||'') + '" data-coord="' + esc(v.coord||'') + '" style="cursor:pointer" onclick="showVisitDetail(' + i + ')">'
+      + '<td class="confirm-cell" style="width:90px;text-align:center;padding:4px;" onclick="event.stopPropagation()"></td>'
+      + '<td class="rideshare-cell" style="width:70px;text-align:center;padding:4px;" onclick="event.stopPropagation()"></td>'
       + '<td style="font-weight:600;color:var(--blue);white-space:nowrap">' + esc(v.date||'—') + '</td>'
-      + '<td style="font-size:11px;color:#64748b;white-space:nowrap">' + esc(v.time||'—') + '</td>'
+      + '<td style="font-size:11px;color:#64748b;white-space:nowrap">' + esc(v.time||'—') + (function(){ var dur = parseInt(v.duration_min||0); return dur > 0 ? ' <span style="font-size:8px;font-weight:600;padding:1px 3px;border-radius:3px;background:#f0f4ff;color:#1843AD;">' + (dur >= 60 ? Math.round(dur/60) + 'hr' : dur + 'm') + '</span>' : ''; })() + '</td>'
       + '<td style="font-size:11px">' + studyHtml + '</td>'
-      + '<td style="font-size:11px;color:var(--muted)">' + esc(v.visit||'—') + (function(){ var fc = _isFasting(v.study, v.visit); return fc ? ' <span title="Fasting ' + fc.hours + 'hr — ' + esc(fc.note||'') + '" style="font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;cursor:help">&#x1F6A9; Fasting ' + fc.hours + 'hr</span>' : ''; })() + '</td>'
-      + '<td style="font-weight:600">' + patHtml + riskBadge + (_rescheduledSet.has(((v.patient||'')+'|'+(v.study||'')).toLowerCase()) ? '<span style="font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px;margin-left:4px;background:#ecfdf5;color:#059669;border:1px solid #a7f3d0">Rescheduled</span>' : '') + '</td>'
+      + '<td style="font-size:11px;color:var(--muted)">' + esc(v.visit||'—') + (function(){ var fc = _isFasting(v.study, v.visit); return fc ? ' <span title="Fasting ' + fc.hours + 'hr — ' + esc(fc.note||'') + '" style="font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;cursor:help">&#x1F6A9; Fasting ' + fc.hours + 'hr</span>' : ''; })() + (function(){ var vfKey = ((v.study||'')+'|'+(v.visit||'')).toLowerCase(); var vf = (window._visitFinanceMap||{})[vfKey]; return vf && vf.stipend > 0 ? ' <span style="font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px;background:#ecfdf5;color:#059669;border:1px solid #a7f3d0;cursor:help" title="Patient receives $' + vf.stipend + ' for this visit">$' + Math.round(vf.stipend) + '</span>' : ''; })() + '</td>'
+      + '<td style="font-weight:600">' + patHtml + riskBadge + (_rescheduledSet.has(((v.patient||'')+'|'+(v.study||'')).toLowerCase()) ? '<span style="font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px;margin-left:4px;background:#ecfdf5;color:#059669;border:1px solid #a7f3d0">Rescheduled</span>' : '') + (function(){ var pdb = PATIENT_DB_MAP.get(patKey); if (!pdb || !pdb.last_interaction_date) return ''; var lid = pdb.last_interaction_date.substring(0,10); var days = Math.floor((Date.now() - new Date(lid+'T00:00:00').getTime()) / 86400000); if (days < 0 || days > 365) return ''; var color = days <= 3 ? '#059669' : days <= 7 ? '#1843AD' : days <= 14 ? '#FF9933' : '#dc2626'; return ' <span title="Last contacted: ' + lid + '" style="font-size:8px;font-weight:600;padding:1px 3px;border-radius:3px;background:' + color + '15;color:' + color + ';">' + days + 'd ago</span>'; })() + '</td>'
       + '<td><span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:' + sc.bg + ';color:' + sc.fg + '">' + esc(v.status||'—') + '</span></td>'
       + '<td style="font-size:11px">' + esc(v.coord||'—') + '</td>'
       + '<td style="' + invStyle + '">' + invText + '</td>'
@@ -3365,6 +3365,81 @@ function buildScheduleTable() {
   }
   tbody.innerHTML = html;
   _log('buildScheduleTable: built ' + visits.length + ' rows from live CRIO data');
+}
+
+function showVisitDetail(idx) {
+  var visits = (DATA && DATA.allVisitDetail) ? DATA.allVisitDetail : [];
+  var v = visits[idx];
+  if (!v) return;
+
+  var esc = escapeHTML;
+  var patKey = (v.patient||'').toLowerCase().trim();
+  var pdb = PATIENT_DB_MAP.get(patKey);
+  var vfKey = ((v.study||'')+'|'+(v.visit||'')).toLowerCase();
+  var vf = (window._visitFinanceMap||{})[vfKey];
+  var fc = null;
+  var _fastingConfig = CRP_CONFIG.FASTING || {};
+  for (var code in _fastingConfig) {
+    if ((v.study||'').toLowerCase().indexOf(code.toLowerCase()) >= 0) {
+      var cfg = _fastingConfig[code];
+      if (cfg.exclude) { var ex = false; for (var k = 0; k < cfg.exclude.length; k++) { if ((v.visit||'').toLowerCase().indexOf(cfg.exclude[k]) >= 0) { ex = true; break; } } if (ex) break; }
+      if (cfg.visits === 'all') { fc = cfg; break; }
+      if (Array.isArray(cfg.visits)) { for (var j = 0; j < cfg.visits.length; j++) { if ((v.visit||'').toLowerCase().indexOf(cfg.visits[j]) >= 0) { fc = cfg; break; } } }
+      if (fc) break;
+    }
+  }
+
+  var dur = parseInt(v.duration_min||0);
+  var durText = dur >= 60 ? Math.round(dur/60) + ' hours' : dur + ' min';
+  var stipend = vf ? vf.stipend : 0;
+  var revenue = vf ? vf.revenue : 0;
+  var lastContact = pdb ? (pdb.last_interaction_date||'').substring(0,10) : '';
+  var daysSince = lastContact ? Math.floor((Date.now() - new Date(lastContact+'T00:00:00').getTime()) / 86400000) : null;
+
+  var h = '<table class="detail-table" style="width:100%;font-size:12px;">';
+
+  // Visit Info section
+  h += '<tr><td colspan="2" style="padding:8px;font-weight:700;color:#072061;border-bottom:2px solid #e2e8f0;">Visit Information</td></tr>';
+  h += '<tr><td style="padding:6px 8px;font-weight:600;width:40%">Study</td><td style="padding:6px 8px">' + esc(v.study||'') + '</td></tr>';
+  h += '<tr><td style="padding:6px 8px;font-weight:600">Visit</td><td style="padding:6px 8px">' + esc(v.visit||'') + '</td></tr>';
+  h += '<tr><td style="padding:6px 8px;font-weight:600">Date & Time</td><td style="padding:6px 8px">' + esc(v.date||'') + ' at ' + esc(v.time||'') + '</td></tr>';
+  h += '<tr><td style="padding:6px 8px;font-weight:600">Duration</td><td style="padding:6px 8px">' + durText + '</td></tr>';
+  h += '<tr><td style="padding:6px 8px;font-weight:600">Site</td><td style="padding:6px 8px">' + esc(v.site||'') + '</td></tr>';
+  h += '<tr><td style="padding:6px 8px;font-weight:600">Coordinator</td><td style="padding:6px 8px">' + esc(v.coord||'') + '</td></tr>';
+  h += '<tr><td style="padding:6px 8px;font-weight:600">Investigator</td><td style="padding:6px 8px">' + esc(v.investigator||'—') + '</td></tr>';
+
+  // Fasting
+  if (fc) {
+    h += '<tr><td style="padding:6px 8px;font-weight:600;color:#dc2626">Fasting Required</td><td style="padding:6px 8px;color:#dc2626;font-weight:700">' + fc.hours + ' hours — ' + esc(fc.note||'') + '</td></tr>';
+  }
+
+  // Financial
+  if (stipend > 0 || revenue > 0) {
+    h += '<tr><td colspan="2" style="padding:8px;font-weight:700;color:#072061;border-bottom:2px solid #e2e8f0;border-top:1px solid #e2e8f0;margin-top:4px">Financial</td></tr>';
+    if (revenue > 0) h += '<tr><td style="padding:6px 8px;font-weight:600">Visit Revenue</td><td style="padding:6px 8px;color:#1843AD;font-weight:700">$' + Math.round(revenue).toLocaleString() + '</td></tr>';
+    if (stipend > 0) h += '<tr><td style="padding:6px 8px;font-weight:600">Patient Stipend</td><td style="padding:6px 8px;color:#059669;font-weight:700">$' + Math.round(stipend) + '</td></tr>';
+  }
+
+  // Patient Info
+  h += '<tr><td colspan="2" style="padding:8px;font-weight:700;color:#072061;border-bottom:2px solid #e2e8f0;border-top:1px solid #e2e8f0">Patient</td></tr>';
+  h += '<tr><td style="padding:6px 8px;font-weight:600">Name</td><td style="padding:6px 8px">' + esc(PHI_MASKED ? maskPHI(v.patient||'') : v.patient||'') + '</td></tr>';
+  h += '<tr><td style="padding:6px 8px;font-weight:600">Status</td><td style="padding:6px 8px"><span style="font-size:11px;font-weight:700;padding:2px 6px;border-radius:4px;background:#1843AD15;color:#1843AD">' + esc(v.status||'—') + '</span></td></tr>';
+  if (v.phone) h += '<tr><td style="padding:6px 8px;font-weight:600">Phone</td><td style="padding:6px 8px"><a href="tel:' + esc(v.phone) + '" style="color:#1843AD">' + esc(v.phone) + '</a></td></tr>';
+  if (pdb && pdb.email) h += '<tr><td style="padding:6px 8px;font-weight:600">Email</td><td style="padding:6px 8px"><a href="mailto:' + esc(pdb.email) + '" style="color:#1843AD">' + esc(pdb.email) + '</a></td></tr>';
+  if (lastContact) {
+    var lcColor = daysSince <= 3 ? '#059669' : daysSince <= 7 ? '#1843AD' : daysSince <= 14 ? '#FF9933' : '#dc2626';
+    h += '<tr><td style="padding:6px 8px;font-weight:600">Last Contact</td><td style="padding:6px 8px"><span style="color:' + lcColor + ';font-weight:600">' + lastContact + ' (' + daysSince + ' days ago)</span></td></tr>';
+  }
+
+  // Links
+  var links = '';
+  if (v.patient_url) links += '<a href="' + esc(v.patient_url) + '" target="_blank" style="font-size:11px;color:#072061;text-decoration:none;font-weight:600;margin-right:12px">[CRIO Patient]</a>';
+  if (v.study_url) links += '<a href="' + esc(v.study_url) + '" target="_blank" style="font-size:11px;color:#072061;text-decoration:none;font-weight:600">[CRIO Study]</a>';
+  if (links) h += '<tr><td style="padding:6px 8px;font-weight:600">Links</td><td style="padding:6px 8px">' + links + '</td></tr>';
+
+  h += '</table>';
+
+  openModal(esc(v.visit||'Visit Detail'), esc(v.date||'') + ' · ' + esc(PHI_MASKED ? maskPHI(v.patient||'') : v.patient||''), h);
 }
 
 function buildSchedStudyBars() {
@@ -5752,6 +5827,24 @@ function fetchActionRequiredData() {
   _actionDataLoaded = true;
   var base = CRP_CONFIG.CF_BASE;
   var _s = function(id, val) { var e = document.getElementById(id); if (e) e.textContent = val; };
+
+  // Fetch visitFinance for schedule enrichment (parallel with batch)
+  fetch(base + '?feed=visitFinance&format=json').then(function(r){return r.json();}).then(function(j) {
+    var vfData = j.data || [];
+    window._visitFinanceMap = {};
+    vfData.forEach(function(r) {
+      var key = ((r.study_name||'') + '|' + (r.visit_name||'')).toLowerCase();
+      window._visitFinanceMap[key] = {
+        revenue: parseFloat(r.revenue_per_visit) || 0,
+        stipend: parseFloat(r.patient_stipend) || 0,
+        cost: parseFloat(r.cost_per_visit) || 0,
+        sf_revenue: parseFloat(r.revenue_screen_fail) || 0,
+      };
+    });
+    _log('Visit finance map: ' + vfData.length + ' visit types loaded');
+    // Re-inject badges if schedule already rendered
+    if (typeof _injectScheduleBadges === 'function') try { _injectScheduleBadges(); } catch(e) {}
+  }).catch(function(e) { _log('Visit finance fetch failed: ' + e.message); });
 
   // Batch fetch feeds in one request (reduces HTTP overhead)
   fetch(base + '?feed=batch&feeds=comments,documentSummary,visitTodos,regulatory,recruiterStats,demographics,eregPending,prescrVisits,recruiting,subjectAudit,unscheduledVisits,subjects,rideRequests,visitConfirmations,regulatoryPerformance&format=json')
@@ -9042,6 +9135,8 @@ function processLiveData(allRows, legacyCancels, auditLog) {
         coord: cleanCoord(r['Full Name']),
         investigator: cleanCoord(resolveInvestigator(r)),
         site: r['Site Name'],
+        phone: r['Mobile Phone']||r['mobile_phone']||'',
+        subject_key: subk||'',
       };
     }),
     allCancels: recentCancels.map(mapCancelDetail),
