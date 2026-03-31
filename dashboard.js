@@ -7002,11 +7002,35 @@ async function fetchFinanceBQ() {
 
     // ── Assign to globals (only overwrite if BQ returned data) ──
     if (newAgingInv.length > 0) AGING_INV = newAgingInv;
-    // Preserve existing AP/uninvoiced data — BQ doesn't have these yet, Sheets fills them later
-    if (!AGING_AP || !AGING_AP.length) AGING_AP = [];
+    // Build AGING_AP from gaapAging (autopay_ar per study)
+    if (gaapArRows.length > 0 && (!AGING_AP || AGING_AP.length === 0)) {
+      AGING_AP = gaapArRows.filter(function(r) { return num(r.autopay_ar) > 0; }).map(function(r) {
+        return { study: (r.study_name||'').trim(), current: Math.round(num(r.autopay_ar)), d30_60: 0, d61_90: 0, d91_120: 0, d121_150: 0, d150plus: 0 };
+      });
+      _log('CRP GAAP: AP aging built from gaapAging — ' + AGING_AP.length + ' studies');
+    }
     if (newUnpaidInv.length > 0) UNPAID_INVOICES = newUnpaidInv;
-    if (!UNPAID_AP || !UNPAID_AP.length) UNPAID_AP = [];
-    if (!UNINVOICED || !UNINVOICED.length) UNINVOICED = [];
+    // Build UNPAID_AP from gaapAging
+    if (gaapArRows.length > 0 && (!UNPAID_AP || UNPAID_AP.length === 0)) {
+      UNPAID_AP = gaapArRows.filter(function(r) { return num(r.autopay_ar) > 0; }).map(function(r) {
+        return { study: (r.study_name||'').trim(), total: Math.round(num(r.autopay_ar)) };
+      });
+    }
+    // Build UNINVOICED from gaapStudyRevenue
+    if (gaapRevRows.length > 0 && (!UNINVOICED || UNINVOICED.length === 0)) {
+      UNINVOICED = gaapRevRows.filter(function(r) { return num(r.uninvoiced) > 0; }).map(function(r) {
+        return { study: (r.study_name||'').trim(), amount: Math.round(num(r.uninvoiced)) };
+      });
+      _log('CRP GAAP: Uninvoiced built — ' + UNINVOICED.length + ' studies');
+    }
+    // Build FIN_MERGED_STUDIES from gaap data
+    if (gaapArRows.length > 0) {
+      FIN_MERGED_STUDIES = gaapArRows.map(function(r) {
+        var study = (r.study_name||'').trim();
+        var crio = (window.CRIO_STUDIES_DATA||[]).find(function(s) { return study.indexOf(s.protocol_number) >= 0; });
+        return { study: study, status: crio ? crio.status : '', enrolled: crio ? crio.enrolled : 0 };
+      });
+    }
     if (newRevenue.length > 0) MONTHLY_REVENUE = newRevenue;
     if (newPayments.length > 0) MONTHLY_PAYMENTS = newPayments;
     if (newTopAR.length > 0) TOP_AR_STUDIES = newTopAR;
@@ -7089,18 +7113,31 @@ async function fetchFinanceBQ() {
 }
 
 async function fetchFinanceLive() {
-  // BQ provides CRIO-side finance (invoices, revenue, stipends)
-  // Sheets provides the FULL picture including QuickBooks data
-  // Always load Sheets so QB vs CRIO tab works; BQ supplements with fresher CRIO data
-  const pk = CRP_CONFIG.DATA_FEEDS.FINANCE_PUB_KEY;
-  if (!pk) { _log('CRP Finance: No published key configured'); return false; }
-  const tabs = CRP_CONFIG.FINANCE_TABS;
-
-  _log('CRP Finance: Fetching BQ + Sheets in parallel...');
+  _log('CRP Finance: Loading from BQ (primary)...');
   try {
-    // Run BQ and Sheets in parallel (they're independent data sources)
-    var _bqPromise = CRP_CONFIG.USE_CLOUD_FUNCTION ? fetchFinanceBQ().catch(function() { return false; }) : Promise.resolve(false);
-    var _sheetsPromise = Promise.all([
+    // PRIMARY: BQ provides all finance data via cloud function
+    var bqLoaded = false;
+    if (CRP_CONFIG.USE_CLOUD_FUNCTION) {
+      bqLoaded = await fetchFinanceBQ().catch(function() { return false; });
+    }
+
+    // If BQ loaded successfully AND set the globals, we're done — skip Sheets entirely
+    if (bqLoaded && AGING_INV.length > 0) {
+      _log('CRP Finance: BQ primary loaded — ' + AGING_INV.length + ' inv aging, ' + (AGING_AP||[]).length + ' ap aging, ' + (UNINVOICED||[]).length + ' uninvoiced, skipping Sheets');
+      window._financeLastFetch = Date.now();
+      var _fds = document.getElementById('fin-data-source');
+      if (_fds) _fds.textContent = 'BQ Live · ' + new Date().toLocaleTimeString();
+      initFinanceDashboard(true);
+      return true;
+    }
+
+    // FALLBACK: Sheets CSV if BQ failed or returned empty
+    _log('CRP Finance: BQ empty/failed, falling back to Sheets...');
+    const pk = CRP_CONFIG.DATA_FEEDS.FINANCE_PUB_KEY;
+    if (!pk) { _log('CRP Finance: No Sheets key either — keeping defaults'); return false; }
+    const tabs = CRP_CONFIG.FINANCE_TABS;
+
+    const [agingInvRows, agingApRows, unpaidInvRows, unpaidApRows, uninvoicedRows, revenueRows, paymentsRows] = await Promise.all([
       fetchFinanceTab(pk, tabs.AGING_INV),
       fetchFinanceTab(pk, tabs.AGING_AP),
       fetchFinanceTab(pk, tabs.UNPAID_INV),
@@ -7109,9 +7146,6 @@ async function fetchFinanceLive() {
       fetchFinanceTab(pk, tabs.REVENUE),
       fetchFinanceTab(pk, tabs.PAYMENTS),
     ]);
-    var [bqLoaded, sheetsResults] = await Promise.all([_bqPromise, _sheetsPromise]);
-    if (bqLoaded) _log('CRP Finance: BQ CRIO data loaded');
-    const [agingInvRows, agingApRows, unpaidInvRows, unpaidApRows, uninvoicedRows, revenueRows, paymentsRows] = sheetsResults;
 
     // Parse into dashboard data structures
     const newAgingInv = parseAgingCSV(agingInvRows);

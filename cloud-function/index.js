@@ -89,7 +89,7 @@ function httpGet(url, token) {
 
 // In-memory query cache (2-min TTL, max 100 entries)
 const _queryCache = new Map();
-const _CACHE_TTL = 120000;
+const _CACHE_TTL = 300000; // 5 min cache — BQ data doesn't change minute-to-minute
 function _cachePrune() { if (_queryCache.size > 100) { const oldest = [..._queryCache.entries()].sort((a,b) => a[1].t - b[1].t); for (let i = 0; i < 20; i++) _queryCache.delete(oldest[i][0]); } }
 
 async function runQuery(sql) {
