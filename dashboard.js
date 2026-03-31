@@ -7297,7 +7297,17 @@ async function fetchQuickBooksData() {
     var qbPeriod = monthCols.length >= 2 ? monthCols[0] + ' — ' + monthCols[monthCols.length - 1] : '';
 
     // ── Parse PnL rows — match to CRIO study codes
+    // Use ALL known study codes for matching (not just those with revenue)
     var studyCodes = typeof STUDY_REVENUE_12M !== 'undefined' ? Object.keys(STUDY_REVENUE_12M) : [];
+    // Also add all CRIO study codes from the revenue feed (includes $0 revenue studies)
+    if (crioRevRes && crioRevRes.data) {
+      crioRevRes.data.forEach(function(r) {
+        var name = (r.study_name || '').trim();
+        var parts = name.split(' - ');
+        var code = parts.length > 1 ? parts[parts.length - 1].trim() : name;
+        if (code && studyCodes.indexOf(code) === -1) studyCodes.push(code);
+      });
+    }
     var pnlByStudy = {};
     var pnlUnmatched = [];
     var qbTotalIncome = 0;
@@ -7310,6 +7320,13 @@ async function fetchQuickBooksData() {
       'corevitas': 'COREVITAS',
       'inato': 'INATO',
       'organon': 'OG-6219-P001',
+      'cmdoc': 'CMDOC-0042',
+      'cntr 01758': 'CNTR-01758',
+      'cp-influ': 'CP-INFLU-001',
+      'cf113': 'CF113-303',
+      'mvt-601': 'MVT-601-050',
+      'm23-700': 'M23-700',
+      'm23-699': 'M23-699',
     };
 
     // Strip common sponsor prefixes from QB account names to extract protocol code
