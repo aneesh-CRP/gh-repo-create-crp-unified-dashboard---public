@@ -6624,18 +6624,28 @@ function renderCoordPeriodTable() {
     d.setDate(d.getDate() + 1);
   }
 
-  // Count visits + cancels per coordinator in period
+  // Count visits from coordinator goals data (includes past + upcoming)
   var visitsByCoord = {};
-  (DATA.allVisitDetail || []).forEach(function(v) {
-    var vd = v.date_iso || '';
-    if (vd >= startISO && vd <= endISO) {
-      var cn = v.coord || '';
-      if (cn) visitsByCoord[cn] = (visitsByCoord[cn] || 0) + 1;
-    }
-  });
+  if (goals && goals.byDay) {
+    COORDS.forEach(function(name) {
+      var byDay = goals.byDay[name] || {};
+      var total = 0;
+      Object.keys(byDay).forEach(function(d) {
+        if (d >= startISO && d <= endISO) total += (byDay[d] || 0);
+      });
+      visitsByCoord[name] = total;
+    });
+  }
+  // For 'month' period, use the pre-computed byMonth total
+  if (_coordPeriod === 'month' && goals && goals.byMonth) {
+    COORDS.forEach(function(name) {
+      if (goals.byMonth[name]) visitsByCoord[name] = goals.byMonth[name];
+    });
+  }
+  // Count cancels per coordinator in period
   var cancelsByCoord = {};
   (DATA.allCancels || []).filter(function(c){return !_patientRecovered(c.name,c.study,c.subject_key);}).forEach(function(c) {
-    var cd = c.cancel_date || '';
+    var cd = c.cancel_date_iso || c.date_iso || '';
     if (cd >= startISO && cd <= endISO) {
       var cn = c.coord || '';
       if (cn) cancelsByCoord[cn] = (cancelsByCoord[cn] || 0) + 1;
@@ -11152,6 +11162,7 @@ function processLiveData(allRows, legacyCancels, auditLog) {
       visit: r['Name']||r['Appointment Type']||'',
       category: r._category || categorizeReason(r['Cancel Reason'], r['Appointment Cancellation Type']),
       cancel_date: (() => { try { const d=parseDate(r['Cancel Date']);return d?d.toLocaleDateString('en-US',{month:'short',day:'numeric'}):''; }catch(e){return '';}})(),
+      cancel_date_iso: r['Cancel Date'] || r['cancel_date'] || '',
       site: r['Site Name'],
     };
   }
