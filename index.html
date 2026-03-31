@@ -1238,7 +1238,7 @@ body {
               <th style="padding:8px 8px;text-align:center;font-weight:700">Cancel Rate</th>
               <th style="padding:8px 8px;text-align:center;font-weight:700">Avg/Day</th>
               <th style="padding:8px 8px;text-align:center;font-weight:700">Volume</th>
-              <th style="padding:8px 8px;text-align:center;font-weight:700">Period</th>
+              <th style="padding:8px 8px;text-align:center;font-weight:700">Studies</th>
             </tr></thead>
             <tbody id="coordMonthBody"></tbody>
           </table>
@@ -6669,7 +6669,7 @@ function renderCoordPeriodTable() {
       '<td style="padding:8px 8px;text-align:center;font-weight:700;color:' + crColor + '">' + cancelRate + '%</td>' +
       '<td style="padding:8px 8px;text-align:center;color:#6B7280">' + avg + '/day</td>' +
       '<td style="padding:8px 12px"><div style="background:#E5E7EB;border-radius:6px;height:8px;overflow:hidden"><div style="background:#1843AD;height:100%;width:' + barPct + '%;border-radius:6px"></div></div></td>' +
-      '<td style="padding:8px 8px;text-align:center;color:#6B7280;font-size:10px">' + dateLabel + '</td>' +
+      '<td style="padding:8px 8px;text-align:center;color:#6B7280;font-size:11px">' + (function(){ var studySet = {}; (DATA.allVisitDetail||[]).forEach(function(v){ if (v.coord===name && v.date_iso >= startISO && v.date_iso <= endISO) studySet[v.study]=1; }); var ct = Object.keys(studySet).length; return ct > 0 ? ct : '—'; })() + '</td>' +
     '</tr>';
   }).join('');
 }
@@ -7286,15 +7286,37 @@ function renderInvCapacity() {
     var d = v.date_iso || '';
     return d >= startISO && d <= endISO;
   });
+  // Also count past visits from coordinator goals data (allVisitDetail is future-only)
+  var _invVisitsFromGoals = {};
+  var goals = window._coordGoalsData;
+  if (goals && goals.byDayDetail) {
+    // byDayDetail has per-day visit arrays with investigator info
+    Object.keys(goals.byDayDetail || {}).forEach(function(coordName) {
+      var byDay = goals.byDayDetail[coordName] || {};
+      Object.keys(byDay).forEach(function(d) {
+        if (d >= startISO && d <= endISO) {
+          (byDay[d] || []).forEach(function(v) {
+            var inv = v.investigator || '';
+            if (inv) _invVisitsFromGoals[inv] = (_invVisitsFromGoals[inv] || 0) + 1;
+          });
+        }
+      });
+    });
+  }
 
   var invStats = INVS.map(function(name) {
+    // Combine future visits (from allVisitDetail) + past visits (from goals)
     var iv = visits.filter(function(v){return v.investigator===name;});
-    var ic = cancels.filter(function(c){return c.investigator===name;});
+    var pastCount = _invVisitsFromGoals[name] || 0;
+    var totalVisits = Math.max(iv.length, pastCount); // use whichever is higher
+    var ic = cancels.filter(function(c){
+      var cd = c.cancel_date_iso || c.date_iso || '';
+      return c.investigator===name && cd >= startISO && cd <= endISO;
+    });
     var days = {};
     iv.forEach(function(v){days[v.date_iso]=((days[v.date_iso]||0)+1);});
-    var dayCount = Object.keys(days).length;
-    var avgPerDay = dayCount > 0 ? (iv.length / dayCount).toFixed(1) : '0';
-    // Utilization: days with visits / working days in selected period
+    var dayCount = Object.keys(days).length || (totalVisits > 0 ? Math.min(workDays, totalVisits) : 0);
+    var avgPerDay = workDays > 0 ? (totalVisits / workDays).toFixed(1) : '0';
     var utilPct = workDays > 0 ? Math.min(100, Math.round(dayCount / workDays * 100)) : 0;
     var studies = {};
     iv.forEach(function(v){studies[v.study]=1;});
@@ -7305,9 +7327,9 @@ function renderInvCapacity() {
       Object.entries(QB_DATA.pnlCostByName).forEach(function(kv) {
         if (kv[0].toLowerCase().indexOf(nameLo.split(' ')[0]) !== -1) pnlCost = kv[1];
       });
-      if (pnlCost > 0 && iv.length > 0) costPerVisit = Math.round(pnlCost / iv.length);
+      if (pnlCost > 0 && totalVisits > 0) costPerVisit = Math.round(pnlCost / totalVisits);
     }
-    return { name:name, visits:iv.length, cancels:ic.length, avgPerDay:avgPerDay, dayCount:dayCount, utilPct:utilPct, studies:Object.keys(studies).length, costPerVisit:costPerVisit };
+    return { name:name, visits:totalVisits, cancels:ic.length, avgPerDay:avgPerDay, dayCount:dayCount, utilPct:utilPct, studies:Object.keys(studies).length, costPerVisit:costPerVisit };
   }).sort(function(a,b){return b.visits-a.visits;});
 
   var maxVisits = Math.max.apply(null, invStats.map(function(i){return i.visits;}).concat([0])) || 1;
