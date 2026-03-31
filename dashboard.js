@@ -6755,13 +6755,30 @@ async function fetchFinanceBQ() {
       fetchCSV(base + '?feed=stipends&format=csv'),
       gaapBatchP,
     ]);
-    var pmtRows = []; // deprecated — GAAP payments used below
-    var mrevRows = []; // deprecated — GAAP monthly used below
     var gaapResults = gaapBatch.results || {};
     var gaapRevRows = (gaapResults.gaapStudyRevenue || {}).data || [];
     var gaapMonthRows = (gaapResults.gaapMonthly || {}).data || [];
     var gaapArRows = (gaapResults.gaapAging || {}).data || [];
     var forecastRows = (gaapResults.enrollmentForecast || {}).data || [];
+    var gaapPmtRows = (gaapResults.gaapPayments || {}).data || [];
+
+    // Build MONTHLY_PAYMENTS from live GAAP payments (replaces stale Sheets data)
+    if (gaapPmtRows.length > 0) {
+      var pmtByMonth = {};
+      gaapPmtRows.forEach(function(p) {
+        var dt = p.date_received || '';
+        if (!dt) return;
+        var mo = dt.substring(0,7);
+        pmtByMonth[mo] = (pmtByMonth[mo] || 0) + (parseFloat(p.amount) || 0);
+      });
+      var livePayments = Object.entries(pmtByMonth).sort(function(a,b){return a[0].localeCompare(b[0]);}).slice(-12).map(function(e) {
+        return { month: e[0], amount: Math.round(e[1]) };
+      });
+      if (livePayments.length > 0) {
+        MONTHLY_PAYMENTS = livePayments;
+        _log('CRP Finance: GAAP payments loaded — ' + gaapPmtRows.length + ' payments, ' + livePayments.length + ' months');
+      }
+    }
 
     if (invRows.length === 0 && sfRows.length === 0) {
       _log('CRP Finance BQ: empty — falling back to Sheets');
