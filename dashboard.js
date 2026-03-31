@@ -3360,7 +3360,9 @@ function buildScheduleTable() {
       + '<td><span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:' + sc.bg + ';color:' + sc.fg + '">' + esc(v.status||'—') + '</span></td>'
       + '<td style="font-size:11px">' + esc(v.coord||'—') + '</td>'
       + '<td style="' + invStyle + '">' + invText + '</td>'
-      + '<td><span style="font-size:9px;font-weight:700;padding:2px 5px;border-radius:3px;' + siteBg + '">' + siteCode + '</span></td>'
+      + '<td><span style="font-size:9px;font-weight:700;padding:2px 5px;border-radius:3px;' + siteBg + '">' + siteCode + '</span>'
+      + (function(){ var ds = (window._subjectDocStatus||{})[v.subject_key||'']; if (!ds) return ''; if (ds.unsigned > 0) return ' <span title="' + ds.unsigned + ' unsigned documents" style="font-size:8px;font-weight:700;padding:1px 3px;border-radius:3px;background:#fef2f2;color:#dc2626;">!' + ds.unsigned + '</span>'; if (!ds.consent) return ' <span title="Consent not signed" style="font-size:8px;font-weight:700;padding:1px 3px;border-radius:3px;background:#fef2f2;color:#dc2626;">!ICF</span>'; return ''; })()
+      + '</td>'
       + '</tr>';
   }
   tbody.innerHTML = html;
@@ -3429,6 +3431,18 @@ function showVisitDetail(idx) {
   if (lastContact) {
     var lcColor = daysSince <= 3 ? '#059669' : daysSince <= 7 ? '#1843AD' : daysSince <= 14 ? '#FF9933' : '#dc2626';
     h += '<tr><td style="padding:6px 8px;font-weight:600">Last Contact</td><td style="padding:6px 8px"><span style="color:' + lcColor + ';font-weight:600">' + lastContact + ' (' + daysSince + ' days ago)</span></td></tr>';
+  }
+
+  // Document Status
+  var docStatus = (window._subjectDocStatus || {})[v.subject_key || ''];
+  if (docStatus) {
+    h += '<tr><td colspan="2" style="padding:8px;font-weight:700;color:#072061;border-bottom:2px solid #e2e8f0;border-top:1px solid #e2e8f0">Documents</td></tr>';
+    var conIcon = docStatus.consent ? '<span style="color:#059669">&#x2713;</span>' : '<span style="color:#dc2626">&#x2717;</span>';
+    h += '<tr><td style="padding:6px 8px;font-weight:600">Consent</td><td style="padding:6px 8px">' + conIcon + ' ' + (docStatus.consent ? 'Signed ' + docStatus.consent_date : '<span style="color:#dc2626;font-weight:700">NOT SIGNED</span>') + '</td></tr>';
+    h += '<tr><td style="padding:6px 8px;font-weight:600">Lab Requisitions</td><td style="padding:6px 8px">' + (docStatus.lab_reqs > 0 ? docStatus.lab_reqs + ' on file' : '<span style="color:#94a3b8">None</span>') + '</td></tr>';
+    h += '<tr><td style="padding:6px 8px;font-weight:600">IWRS Confirmations</td><td style="padding:6px 8px">' + (docStatus.iwrs > 0 ? docStatus.iwrs + ' on file' : '<span style="color:#94a3b8">None</span>') + '</td></tr>';
+    if (docStatus.unsigned > 0) h += '<tr><td style="padding:6px 8px;font-weight:600;color:#dc2626">Unsigned Docs</td><td style="padding:6px 8px;color:#dc2626;font-weight:700">' + docStatus.unsigned + ' pending</td></tr>';
+    h += '<tr><td style="padding:6px 8px;font-weight:600">Total Documents</td><td style="padding:6px 8px">' + docStatus.total + '</td></tr>';
   }
 
   // Links
@@ -5827,6 +5841,25 @@ function fetchActionRequiredData() {
   _actionDataLoaded = true;
   var base = CRP_CONFIG.CF_BASE;
   var _s = function(id, val) { var e = document.getElementById(id); if (e) e.textContent = val; };
+
+  // Fetch source documents for consent/lab/IWRS status per patient
+  fetch(base + '?feed=sourceDocuments&format=json').then(function(r){return r.json();}).then(function(j) {
+    var docs = j.data || [];
+    window._subjectDocStatus = {};
+    docs.forEach(function(r) {
+      var sk = r.subject_key || '';
+      if (!sk) return;
+      if (!window._subjectDocStatus[sk]) window._subjectDocStatus[sk] = { consent: false, consent_date: '', lab_reqs: 0, iwrs: 0, unsigned: 0, total: 0 };
+      var sd = window._subjectDocStatus[sk];
+      sd.total++;
+      var dt = r.document_type || '';
+      if (dt === 'Informed Consent' && r.status === 'Signed') { sd.consent = true; sd.consent_date = (r.signed_date||'').substring(0,10); }
+      if (dt === 'Lab Requisition Form') sd.lab_reqs++;
+      if (dt.indexOf('IWRS') >= 0) sd.iwrs++;
+      if (r.status === 'Active' || r.status === 'Assigned') sd.unsigned++;
+    });
+    _log('Source docs: ' + docs.length + ' docs, ' + Object.keys(window._subjectDocStatus).length + ' subjects mapped');
+  }).catch(function(e) { _log('Source docs failed: ' + e.message); });
 
   // Fetch visitFinance for schedule enrichment (parallel with batch)
   fetch(base + '?feed=visitFinance&format=json').then(function(r){return r.json();}).then(function(j) {
