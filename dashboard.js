@@ -6155,7 +6155,11 @@ function showActionModal(type) {
   var _crioBase = 'https://app.clinicalresearch.io/clinical-research-philadelphia-crp/philadelphia-pa';
   var _crioStudyUrl = function(sk) { return sk ? _crioBase + '/study/' + sk + '/subjects' : ''; };
   var _crioSubjectUrl = function(sk, subk) { return (sk && subk) ? _crioBase + '/study/' + sk + '/subject/' + subk : ''; };
-  var _crioCommentUrl = function(sk, subk, svk, ck, vpath) { return (sk && subk && svk && ck) ? _crioBase + '/study/' + sk + '/subject/' + subk + '/' + (vpath||'completed-visit') + '/' + svk + '?open_comment=' + ck : _crioSubjectUrl(sk, subk); };
+  var _crioCommentUrl = function(sk, subk, svk, ck, vpath) {
+    if (sk && subk && svk && ck) return _crioBase + '/study/' + sk + '/subject/' + subk + '/' + (vpath||'completed-visit') + '/' + svk + '?open_comment=' + ck;
+    if (sk && subk) return _crioBase + '/study/' + sk + '/subject/' + subk + '/comments';
+    return _crioStudyUrl(sk);
+  };
   var _crioTodoUrl = function(sk, subk) { return (sk && subk) ? _crioBase + '/study/' + sk + '/subject/' + subk + '/todos' : _crioStudyUrl(sk); };
   var _crioLink = function(text, url) { return url ? '<a href="' + escapeHTML(url) + '" target="_blank" style="color:#1843ad;text-decoration:none">' + escapeHTML(text) + '</a>' : escapeHTML(text); };
 
