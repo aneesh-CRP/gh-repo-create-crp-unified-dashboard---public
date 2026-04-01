@@ -11561,6 +11561,37 @@ function showStudyUnifiedModal(studyName) {
     }
   }
 
+  /* Study Config — fasting, revenue, stipend */
+  var _fcConfig = CRP_CONFIG.FASTING || {};
+  var _fc = null;
+  for (var _fk in _fcConfig) { if (studyName.toLowerCase().indexOf(_fk.toLowerCase()) >= 0) { _fc = _fcConfig[_fk]; break; } }
+  var _vfKey = function(vn) { return (studyName + '|' + vn).toLowerCase(); };
+  var _vfMap = window._visitFinanceMap || {};
+  var hasConfig = _fc || Object.keys(_vfMap).some(function(k){ return k.indexOf(studyName.toLowerCase()) >= 0; });
+
+  if (hasConfig) {
+    body += '<h4 style="' + sectionStyle + '">Study Config</h4>';
+    body += '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;">';
+    if (_fc) {
+      body += '<div style="font-size:11px;padding:4px 8px;border-radius:4px;background:#fef2f2;color:#dc2626;font-weight:700;">Fasting: ' + _fc.hours + 'hr (' + (_fc.visits === 'all' ? 'ALL visits' : 'specific visits') + ')</div>';
+    } else {
+      body += '<div style="font-size:11px;padding:4px 8px;border-radius:4px;background:#ecfdf5;color:#059669;font-weight:600;">No Fasting Required</div>';
+    }
+    // Find max revenue and stipend for this study
+    var maxRev = 0, maxStip = 0, visitCount = 0;
+    Object.entries(_vfMap).forEach(function(e) {
+      if (e[0].indexOf(studyName.toLowerCase()) >= 0 || (studyName.length > 5 && e[0].indexOf(studyName.split(' ').pop().toLowerCase()) >= 0)) {
+        visitCount++;
+        if (e[1].revenue > maxRev) maxRev = e[1].revenue;
+        if (e[1].stipend > maxStip) maxStip = e[1].stipend;
+      }
+    });
+    if (maxRev > 0) body += '<div style="font-size:11px;"><strong>Max Revenue/Visit:</strong> $' + Math.round(maxRev).toLocaleString() + '</div>';
+    if (maxStip > 0) body += '<div style="font-size:11px;"><strong>Patient Stipend:</strong> up to $' + Math.round(maxStip) + '</div>';
+    if (visitCount > 0) body += '<div style="font-size:11px;"><strong>Visit Types:</strong> ' + visitCount + '</div>';
+    body += '</div>';
+  }
+
   if (!body) body = '<p style="color:#94a3b8;padding:20px;text-align:center">No data available for this study across any source.</p>';
 
   var subtitle = '';
@@ -17610,7 +17641,11 @@ async function _crpInit() {
 
     // Re-render the currently active tab with fresh data
     var _activeNow = _activeTab();
-    if (_activeNow === 'actions') safe(renderFollowUpTable, 'renderFollowUpTable-refresh');
+    if (_activeNow === 'actions') {
+      safe(renderFollowUpTable, 'renderFollowUpTable-refresh');
+      safe(renderOperationsTab, 'renderOperationsTab-refresh');
+      safe(renderTrendsCharts, 'renderTrendsCharts-refresh');
+    }
     if (_activeNow === 'studies') safe(renderStudiesTable, 'renderStudiesTable-refresh');
 
     if (badge) badge.textContent = `Auto-updated: ${now.toLocaleTimeString()}`;
