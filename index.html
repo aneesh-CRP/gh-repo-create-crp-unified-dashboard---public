@@ -6730,7 +6730,7 @@ function renderRegulatoryPerformance(containerId, badgeId) {
 
   // Sort each group by total done desc
   function totalDone(u) { return u.docs_signed + u.docs_uploaded + u.comments + u.signoffs; }
-  function totalPending(u) { return u.pending_docs + u.open_comments + u.pending_ereg + u.pending_signoffs; }
+  function totalPending(u) { return u.pending_docs + u.open_comments + u.pending_ereg; }
   groups.coord.sort(function(a,b){return totalDone(b)-totalDone(a);});
   groups.remote.sort(function(a,b){return totalDone(b)-totalDone(a);});
   groups.inv.sort(function(a,b){return totalDone(b)-totalDone(a);});
@@ -6761,7 +6761,7 @@ function renderRegulatoryPerformance(containerId, badgeId) {
     if (user && user.pending_docs > 0) parts.push(user.pending_docs + ' unsigned docs');
     if (user && user.pending_ereg > 0) parts.push(user.pending_ereg + ' pending eReg');
     if (user && user.open_comments > 0) parts.push(user.open_comments + ' open queries');
-    if (user && user.pending_signoffs > 0) parts.push(user.pending_signoffs + ' pending sign-offs');
+    // sign-offs tracked as completed only (BQ has no "pending sign-off" concept)
     var tip = parts.join(' · ');
     return '<td style="text-align:center;font-weight:700;font-size:11px;cursor:pointer;color:#dc2626;" title="' + escapeHTML(tip) + '" onclick="showRegPerfDetail(\''+jsAttr(userName)+'\',\'pending\')">' + val + '</td>';
   }
