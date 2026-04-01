@@ -5059,6 +5059,12 @@ function renderOpsMonitoringTable(filter) {
   if (!el) return;
 
   var data = _monitoringData;
+  // Study filter from Studies table click-through
+  if (window._opsStudyFilter) {
+    var _sf = window._opsStudyFilter.toLowerCase();
+    data = data.filter(function(r) { return (r.study||'').toLowerCase().indexOf(_sf) !== -1; });
+    window._opsStudyFilter = '';
+  }
   if (filter === 'open') data = data.filter(function(r) { return (r.status||'').toLowerCase().indexOf('open') >= 0; });
   else if (filter === 'deviations') data = data.filter(function(r) {
     var cat = (r.observation_category||'').toLowerCase();
@@ -5119,7 +5125,8 @@ function filterOpsMonitoring(filter, btn) {
   renderOpsMonitoringTable(filter);
 }
 
-function showOpsMonitoring(filter) {
+function showOpsMonitoring(filter, studyName) {
+  window._opsStudyFilter = studyName || '';
   switchTab('actions');
   setTimeout(function() {
     filterOpsMonitoring(filter, null);
@@ -9538,15 +9545,22 @@ function filterFollowUp(cat) { _fuFilter = cat; renderFollowUpTable(); }
 function _buildClickUpLookup() {
   var byName = new Map();  // normalized name → referral row
   var byPhone = new Map(); // normalized 10-digit phone → referral row
+  function _addName(key, row) { if (key && !byName.has(key)) byName.set(key, row); }
   (typeof REFERRAL_DATA !== 'undefined' ? REFERRAL_DATA : []).forEach(function(r) {
     if (!r.name) return;
     var nk = r.name.toLowerCase().replace(/\s+/g, ' ').trim();
-    if (nk && !byName.has(nk)) byName.set(nk, r);
-    // Also index by first+last for partial matching
+    _addName(nk, r);
+    // Index by first+last for partial matching
     var parts = nk.split(' ');
     if (parts.length >= 2) {
-      var fl = parts[0] + ' ' + parts[parts.length - 1];
-      if (!byName.has(fl)) byName.set(fl, r);
+      _addName(parts[0] + ' ' + parts[parts.length - 1], r);
+      // Also index reversed: "last first" for "Last, First" format matches
+      _addName(parts[parts.length - 1] + ' ' + parts[0], r);
+    }
+    // Handle "Last, First" format → "first last"
+    if (nk.indexOf(',') !== -1) {
+      var cp = nk.split(',').map(function(s){return s.trim();});
+      if (cp.length === 2 && cp[0] && cp[1]) _addName(cp[1] + ' ' + cp[0], r);
     }
     if (r.phone) {
       var ph = (r.phone || '').replace(/\D/g, '');
@@ -9559,16 +9573,25 @@ function _buildClickUpLookup() {
 function matchClickUpPatient(patientName, cuLookup) {
   if (!cuLookup) return null;
   var nk = (patientName || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  if (!nk) return null;
   // 1. Exact name match
-  if (nk && cuLookup.byName.has(nk)) return cuLookup.byName.get(nk);
-  // 2. First+last partial match
+  if (cuLookup.byName.has(nk)) return cuLookup.byName.get(nk);
+  // 2. "Last, First" → "First Last" normalization
+  if (nk.indexOf(',') !== -1) {
+    var cp = nk.split(',').map(function(s){return s.trim();});
+    if (cp.length === 2) { var flipped = cp[1] + ' ' + cp[0]; if (cuLookup.byName.has(flipped)) return cuLookup.byName.get(flipped); }
+  }
+  // 3. First+last partial match
   var parts = nk.split(' ');
   if (parts.length >= 2) {
     var fl = parts[0] + ' ' + parts[parts.length - 1];
     if (cuLookup.byName.has(fl)) return cuLookup.byName.get(fl);
+    // 4. Reversed: last+first
+    var rl = parts[parts.length - 1] + ' ' + parts[0];
+    if (cuLookup.byName.has(rl)) return cuLookup.byName.get(rl);
   }
-  // 3. Phone match via PATIENT_DB_MAP → get phone → match in ClickUp
-  if (PATIENT_DB_MAP && nk) {
+  // 5. Phone match via PATIENT_DB_MAP → get phone → match in ClickUp
+  if (PATIENT_DB_MAP) {
     var dbEntry = PATIENT_DB_MAP.get(nk);
     if (dbEntry && dbEntry.phone) {
       var ph = (dbEntry.phone || '').replace(/\D/g, '');
@@ -9632,7 +9655,7 @@ function renderFollowUpTable() {
       var source = srcObj ? srcObj.source : (_srcByName[nameLo] || '');
       // Lookup risk
       var riskFlag = _riskByName[nameLo];
-      var riskLevel = riskFlag ? riskFlag.level : '';
+      var riskLevel = riskFlag ? riskFlag.severity : '';
       // Best reason: audit trail > cancel reason > category
       var auditKey = nameLo + '|' + study.toLowerCase();
       var auditReasons = _auditReasons[auditKey] || [];
@@ -12140,8 +12163,9 @@ function renderReferralDashboard() {
       'gardinia - clinlife': ['clinlife','gardinia']
     };
     var _vendorSources = _vendorSourceMap[_vendorLower] || [_vendorLower];
+    var _campCrioSeen = new Set();
     if (window._recruitingData && window._recruitingData.length > 0 && _resolvedProtos.length > 0) {
-      // Use BQ recruiting data: filter by study protocol AND referral source
+      // Use BQ recruiting data: filter by study protocol AND referral source, dedup by patient
       window._recruitingData.forEach(function(rec) {
         var studyName = (rec.study_name||'').toLowerCase();
         var matchesStudy = _resolvedProtos.some(function(p) { return studyName.indexOf(p) !== -1; }) || studyName.indexOf(sn) !== -1;
@@ -12150,6 +12174,9 @@ function renderReferralDashboard() {
         var matchesVendor = _vendorSources.some(function(vs) { return src.indexOf(vs) !== -1 || vs.indexOf(src) !== -1; });
         if (!matchesVendor && src) return; // has a source but doesn't match this vendor
         if (!matchesVendor && !src) return; // no source at all — can't attribute
+        var pn = (rec.patient_name||rec.subject_name||'').toLowerCase().trim();
+        if (pn && _campCrioSeen.has(pn)) return;
+        if (pn) _campCrioSeen.add(pn);
         crioTotal++;
         var st = (rec.recruiting_status||'').toLowerCase();
         if (st === 'success') crioEnr++;
@@ -15110,13 +15137,18 @@ function renderMetaFunnel() {
     }
 
     // CRIO-verified conversions from BQ recruiting data (DELFA source = Meta)
+    // Dedup by patient name to avoid inflating counts when same patient appears in multiple studies
     var crioScreening = 0, crioEnrolled = 0, crioTotal = 0;
+    var _crioSeen = new Set();
     if (window._recruitingData && studies.length > 0) {
       window._recruitingData.forEach(function(rec) {
         var src = (rec.referral_source||'').toLowerCase();
         if (src.indexOf('delfa') === -1 && src.indexOf('facebook') === -1) return;
         var sn = (rec.study_name||'').toLowerCase();
         if (!studies.some(function(s) { return sn.indexOf(s.toLowerCase()) !== -1; })) return;
+        var pn = (rec.patient_name||rec.subject_name||'').toLowerCase().trim();
+        if (pn && _crioSeen.has(pn)) return;
+        if (pn) _crioSeen.add(pn);
         crioTotal++;
         var st = (rec.recruiting_status||'').toLowerCase();
         if (st === 'success') crioEnrolled++;
@@ -16297,6 +16329,17 @@ function renderStudiesTable() {
     _upcomingBySite[sk] = (_upcomingBySite[sk] || 0) + 1;
   });
 
+  // Build per-study observation/deviation counts from monitoring data
+  var _obsByStudy = {};
+  (_monitoringData || []).forEach(function(r) {
+    var st = (r.study || '').trim();
+    if (!st) return;
+    if (!_obsByStudy[st]) _obsByStudy[st] = { obs: 0, dev: 0 };
+    _obsByStudy[st].obs++;
+    var cat = (r.observation_category || '').toLowerCase();
+    if (cat.indexOf('protocol deviation') !== -1 || cat.indexOf('pd ') !== -1 || cat.indexOf('pd-') !== -1) _obsByStudy[st].dev++;
+  });
+
   // Populate therapeutic area dropdown
   var taSelect = document.getElementById('ta-filter');
   if (taSelect && taSelect.options.length <= 1) {
@@ -16506,6 +16549,13 @@ function renderStudiesTable() {
       <td style="padding:10px 8px;text-align:center;font-size:11px;color:${s.screening>0?'#072061':'var(--muted)'};font-weight:${s.screening>0?'700':'400'};cursor:pointer" data-action="studyUnified" data-study="${escapeHTML(s.study)}">${s.screening||0}</td>
       <td style="padding:10px 8px;text-align:center;font-size:11px;color:var(--muted);cursor:pointer" data-action="studyUnified" data-study="${escapeHTML(s.study)}">${s.screened||0}</td>
       <td style="padding:10px 8px;text-align:center">${siteTags}</td>
+      <td style="padding:10px 6px;text-align:center">${(() => {
+        var md = _obsByStudy[s.study];
+        if (!md || md.obs === 0) return '<span style="font-size:11px;color:#cbd5e1">0</span>';
+        var devColor = md.dev > 0 ? '#dc2626' : '#FF9933';
+        var tip = md.obs + ' observation' + (md.obs !== 1 ? 's' : '') + (md.dev > 0 ? ', ' + md.dev + ' deviation' + (md.dev !== 1 ? 's' : '') : '');
+        return '<span style="font-size:11px;font-weight:700;color:' + devColor + ';cursor:pointer" title="' + tip + '" onclick="showOpsMonitoring(\'all\',\'' + jsAttr(s.study) + '\')">' + md.obs + (md.dev > 0 ? '<span style="font-size:9px;color:#dc2626;margin-left:2px">(' + md.dev + 'D)</span>' : '') + '</span>';
+      })()}</td>
       <td style="padding:10px 6px;text-align:center">${(() => {
         var ref = typeof getStudyReferralPipeline === 'function' ? getStudyReferralPipeline(s.study) : null;
         var provLeads = ref ? ref.referrals.filter(function(r){ return r.tracker && r.tracker.length > 0; }) : [];
