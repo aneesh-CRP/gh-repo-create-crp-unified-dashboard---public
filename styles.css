@@ -149,6 +149,10 @@
 [data-theme="dark"] .tbl td { border-color: var(--border); }
 [data-theme="dark"] .fin-table th { background: var(--surface2); color: var(--muted); }
 [data-theme="dark"] .fin-table td { border-color: var(--border); }
+[data-theme="dark"] .cs-card { background: var(--surface2); }
+[data-theme="dark"] .detail-table th { background: var(--surface2); color: var(--muted); }
+[data-theme="dark"] .detail-table td { border-color: var(--border); }
+[data-theme="dark"] .kpi-row .kpi { background: var(--surface); border: 1px solid var(--border); }
 [data-theme="dark"] .sortable th:hover { background: var(--surface2); }
 
 /* ── Inline backgrounds override (JS-rendered content) ── */
@@ -296,6 +300,8 @@ body {
 .btn-secondary:hover { background: var(--border); }
 .btn-green { background: var(--green); color: #fff; }
 .btn-green:hover { background: #047857; }
+.btn-blue { background: #1843AD; color: #fff; }
+.btn-blue:hover { background: #0f2f7a; }
 .setup-footer {
   display: flex; justify-content: space-between; align-items: center;
   margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--border);
@@ -644,7 +650,6 @@ body {
 .sortable th.sort-asc::after  { content:' ↑'; opacity:1; color:var(--blue); }
 .sortable th.sort-desc::after { content:' ↓'; opacity:1; color:var(--blue); }
 
-
 /* ── Detail Modal ── */
 #detail-modal {
   display:none; position:fixed; inset:0; z-index:9000;
@@ -787,7 +792,6 @@ body {
     .alert-bar[onclick]:hover { filter: brightness(0.95); }
     .drill-hint { font-size: 10px; color: var(--muted); margin-top: 2px; }
     .drill-hint::before { content: '↗ '; }
-
 
     /* ═══ Touch targets (44px min for accessibility) ═══ */
     @media (pointer: coarse) {
@@ -979,4 +983,14 @@ body {
       .tb-section { flex: 0 0 calc(50% - 4px); }
       .tb-value { font-size: 15px; }
       .tb-label { font-size: 7px; }
+    }
+    @media (max-width: 768px) {
+      .hero-row { flex-wrap: wrap; }
+      .hero-cell { flex: 0 0 calc(50% - 8px); }
+      .two-col { flex-direction: column; }
+      .charts-row { flex-direction: column; }
+      .grid-2 { grid-template-columns: 1fr; }
+      .kpi-row { flex-wrap: wrap; }
+      .kpi-row .kpi { flex: 0 0 calc(50% - 4px); }
+      #coord-period-filter, #inv-period-filter { flex-wrap: wrap; }
     }

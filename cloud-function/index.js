@@ -1985,7 +1985,229 @@ function crioPut(path, body) {
   });
 }
 
-// ── CRIO API Test Phase 3 — deep dive: fix PUT payload, brute-force interaction paths ──
+// ═══════════════════════════════════════════════════════════
+// TWILIO SMS — Visit Reminders & Post-Visit Feedback
+// ═══════════════════════════════════════════════════════════
+
+const TWILIO_SID = process.env.TWILIO_SID || '';
+const TWILIO_TOKEN = process.env.TWILIO_TOKEN || '';
+const TWILIO_FROM = '+13366063863';
+
+function twilioSend(to, body) {
+  if (!TWILIO_SID || !TWILIO_TOKEN) throw new Error('Twilio credentials not configured');
+  return new Promise((resolve, reject) => {
+    const data = new URLSearchParams({ To: to, From: TWILIO_FROM, Body: body }).toString();
+    const auth = Buffer.from(TWILIO_SID + ':' + TWILIO_TOKEN).toString('base64');
+    const req = https.request({
+      hostname: 'api.twilio.com',
+      path: `/2010-04-01/Accounts/${TWILIO_SID}/Messages.json`,
+      method: 'POST',
+      headers: { 'Authorization': 'Basic ' + auth, 'Content-Type': 'application/x-www-form-urlencoded',
+                 'Content-Length': Buffer.byteLength(data) }
+    }, res => {
+      let d = ''; res.on('data', c => d += c);
+      res.on('end', () => {
+        try { resolve({ status: res.statusCode, ...JSON.parse(d) }); }
+        catch (e) { resolve({ status: res.statusCode, raw: d }); }
+      });
+    });
+    req.on('error', reject); req.write(data); req.end();
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// STUDY REMINDER CONFIG — per-study instructions & templates
+// ═══════════════════════════════════════════════════════════
+
+const REMINDER_CONFIG = {
+  // Default template — used when no study-specific config exists
+  _default: {
+    address_phl: '9501 Roosevelt Blvd, Suite 208, Philadelphia, PA 19114',
+    address_pnj: '1 Capital Way, Suite 200, Pennington, NJ 08534',
+    phone: '(215) 676-6696',
+    instructions: '',
+    compensation: '',
+  },
+
+  // Study-specific overrides (keyed by study_key from BQ)
+  // Add entries here as studies are configured
+  '89175': {  // EZEF — Lp(a) Heart Health
+    nickname: 'LP(a) Heart Health Study',
+    instructions: 'No fasting required. Blood draw included.',
+    compensation: '~$60 per visit',
+  },
+  '86826': {  // Menstrual Migraine
+    nickname: 'Menstrual Migraine Study',
+    instructions: 'Please complete your diary entries before this appointment.',
+    compensation: '',
+  },
+};
+
+// ── Message Templates ──
+function buildReminderMessage(patient, visit, studyCfg, type) {
+  const cfg = { ...REMINDER_CONFIG._default, ...studyCfg };
+  const firstName = patient.firstName || 'there';
+  const studyName = cfg.nickname || visit.study_name || 'your clinical study';
+  const date = visit.scheduled_date || '';
+  const time = visit.scheduled_time || '';
+  const address = visit.site_key === '5545' ? cfg.address_pnj : cfg.address_phl;
+  const instr = cfg.instructions ? `\nReminder: ${cfg.instructions}` : '';
+  const comp = cfg.compensation ? ` Compensation: ${cfg.compensation}.` : '';
+
+  switch (type) {
+    case '48h':
+      return `Hi ${firstName}, this is Clinical Research Philadelphia. Your visit for the ${studyName} is on ${date} at ${time}.${instr}\n\nLocation: ${address}${comp}\n\nReply YES to confirm or call ${cfg.phone} to reschedule.\n\nReply STOP to opt out.`;
+
+    case '24h':
+      return `Hi ${firstName}, reminder: your visit is tomorrow at ${time}.\n\nLocation: ${address}${instr}\n\nQuestions? Call ${cfg.phone}.\n\nReply STOP to opt out.`;
+
+    case 'day_of':
+      return `Hi ${firstName}, your visit is today at ${time} at ${address}. See you soon!\n\nCall ${cfg.phone} if you need to reach us.\n\nReply STOP to opt out.`;
+
+    case 'post_visit':
+      return `Hi ${firstName}, thank you for your visit yesterday for the ${studyName}. We hope it went well!\n\nIf you have any feedback or concerns, please reply to this message or call ${cfg.phone}. Your coordinator is here to help.\n\nReply STOP to opt out.`;
+
+    default:
+      return `Hi ${firstName}, this is Clinical Research Philadelphia regarding your ${studyName} visit. Please call ${cfg.phone} with any questions.\n\nReply STOP to opt out.`;
+  }
+}
+
+// ── Log interaction to CRIO patient notes via PUT ──
+async function logToCrioPatientNotes(patientKey, siteId, message) {
+  if (!CRIO_TOKEN || !patientKey) return { logged: false, reason: 'no token or patient key' };
+  try {
+    // Read current patient to get revision + existing notes
+    const getR = await crioFetch(`/api/v1/patient/${patientKey}/site/${siteId}`);
+    if (getR.status !== 200) return { logged: false, reason: 'patient read failed', status: getR.status };
+    const patient = JSON.parse(getR.body);
+    const pi = patient.patientInfo;
+    const existingNotes = pi.notes || '';
+    const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    const newNote = `[CRP Reminder ${timestamp}] ${message}`;
+    const updatedNotes = existingNotes ? existingNotes + '\n' + newNote : newNote;
+
+    // PUT with full patientInfo + siteId + revision
+    const putR = await crioPut(`/api/v1/patient/${patientKey}`, {
+      siteId: siteId,
+      revision: patient.revision,
+      patientInfo: { ...pi, notes: updatedNotes }
+    });
+    return { logged: putR.status === 200, status: putR.status };
+  } catch (e) { return { logged: false, error: e.message }; }
+}
+
+// ── Main reminder engine — query upcoming visits, send reminders ──
+async function runReminderEngine(options = {}) {
+  const { dryRun = false, testPhone = null, types = ['48h', '24h', 'day_of', 'post_visit'] } = options;
+  const results = { sent: [], skipped: [], errors: [], dryRun };
+
+  // 1. Query visits needing reminders from BQ
+  const visitRows = await runQuery(`
+    WITH upcoming AS (
+      SELECT
+        ${STUDY_NAME_SQL} AS study_name,
+        CAST(ca.study_key AS STRING) AS study_key,
+        FORMAT_DATETIME('%Y-%m-%d', ca.start) AS scheduled_date,
+        FORMAT_DATETIME('%H:%M', ca.start) AS scheduled_time,
+        ${SUBJECT_NAME_SQL} AS subject_name,
+        CAST(sub.patient_key AS STRING) AS patient_key,
+        COALESCE(sub.mobile_phone, p.mobile_phone, '') AS mobile_phone,
+        COALESCE(p.email, '') AS email,
+        CAST(ca.site_key AS STRING) AS site_key,
+        DATETIME_DIFF(ca.start, CURRENT_DATETIME(), HOUR) AS hours_until,
+        COALESCE(p.do_not_text, 0) AS do_not_text,
+        COALESCE(p.do_not_call, 0) AS do_not_call,
+        ca.calendar_appointment_key
+      FROM ${tbl('calendar_appointment')} ca
+      JOIN ${tbl('subject')} sub ON ca.subject_key = sub.subject_key AND ca._fivetran_deleted = false
+      JOIN ${tbl('study')} st ON ca.study_key = st.study_key
+      LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
+      LEFT JOIN ${tbl('patient')} p ON sub.patient_key = p.patient_key AND p._fivetran_deleted = false
+      WHERE ca.status != 0
+        AND ca.start >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 1 DAY)
+        AND ca.start <= DATETIME_ADD(CURRENT_DATETIME(), INTERVAL 3 DAY)
+        AND sub.status IN (4, 10, 11)
+        ${STUDY_FILTER_SQL}
+        AND ca._fivetran_deleted = false
+    )
+    SELECT * FROM upcoming
+    WHERE mobile_phone != ''
+    ORDER BY hours_until ASC
+  `);
+
+  // 2. Determine which reminder type each visit needs
+  for (const v of visitRows) {
+    const hours = parseInt(v.hours_until);
+    let reminderType = null;
+
+    if (hours >= 44 && hours <= 52 && types.includes('48h')) reminderType = '48h';
+    else if (hours >= 20 && hours <= 28 && types.includes('24h')) reminderType = '24h';
+    else if (hours >= 0 && hours <= 4 && types.includes('day_of')) reminderType = 'day_of';
+    else if (hours >= -28 && hours <= -20 && types.includes('post_visit')) reminderType = 'post_visit';
+
+    if (!reminderType) { results.skipped.push({ name: v.subject_name, hours, reason: 'outside reminder windows' }); continue; }
+
+    // Check do-not-text
+    if (v.do_not_text === 'true' || v.do_not_text === true) {
+      results.skipped.push({ name: v.subject_name, reason: 'do_not_text flag set' }); continue;
+    }
+
+    // Normalize phone
+    const phone = v.mobile_phone.replace(/[^0-9+]/g, '');
+    const fullPhone = phone.startsWith('+') ? phone : '+1' + phone.replace(/^1/, '');
+    if (fullPhone.length < 11) { results.skipped.push({ name: v.subject_name, reason: 'invalid phone' }); continue; }
+
+    // Build message
+    const studyCfg = REMINDER_CONFIG[v.study_key] || {};
+    const patientInfo = { firstName: (v.subject_name || '').split(' ')[0] };
+    const msg = buildReminderMessage(patientInfo, v, studyCfg, reminderType);
+
+    const entry = {
+      patient: v.subject_name, study: v.study_name, phone: fullPhone,
+      type: reminderType, hours, date: v.scheduled_date, time: v.scheduled_time,
+      message: msg.substring(0, 80) + '...'
+    };
+
+    if (dryRun) {
+      entry.dryRun = true;
+      if (testPhone) {
+        // In dry run with test phone, send to test phone instead
+        const testResult = await twilioSend(testPhone, `[TEST for ${v.subject_name}] ${msg}`);
+        entry.testSend = { status: testResult.status, sid: testResult.sid };
+      }
+      results.sent.push(entry);
+      continue;
+    }
+
+    // 3. Send SMS via Twilio
+    try {
+      const smsResult = await twilioSend(fullPhone, msg);
+      entry.sms = { status: smsResult.status, sid: smsResult.sid, error: smsResult.error_message };
+
+      // 4. Log to CRIO patient notes
+      if (smsResult.status === 201 && v.patient_key) {
+        const logResult = await logToCrioPatientNotes(v.patient_key, v.site_key,
+          `${reminderType} SMS sent to ${fullPhone}: "${msg.substring(0, 100)}..."`);
+        entry.crioLog = logResult;
+      }
+
+      results.sent.push(entry);
+    } catch (e) {
+      results.errors.push({ ...entry, error: e.message });
+    }
+  }
+
+  results.totalVisits = visitRows.length;
+  results.timestamp = new Date().toISOString();
+  return results;
+}
+
+// ── LEGACY: Test functions removed — keeping stubs for reference ──
+// Phase 1-3 test functions were used to discover CRIO API capabilities.
+// Key findings: Interaction API not available, Patient PUT works with full payload.
+// See memory: reference_crio_reminder_system.md
+
+/* eslint-disable no-unused-vars */
 async function testCrioApiPhase3(testPatientKey, testSiteId) {
   const results = {};
 
@@ -3415,22 +3637,33 @@ functions.http('crpBqApi', async (req, res) => {
   res.set('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
 
-  // ── GET: CRIO API Test — probe interaction/appointment endpoints ──
-  if (req.query.action === 'crio-test') {
+  // ── POST/GET: Send Reminders — dry-run preview or live send ──
+  if (req.query.action === 'send-reminders') {
     res.set('Cache-Control', 'no-store');
     try {
-      if (!CRIO_TOKEN) { res.status(500).json({ error: 'CRIO_TOKEN not configured. Set it as env var on the cloud function.' }); return; }
-      const phase1 = await testCrioApi();
-      const patientKey = phase1.testPatient?.key;
-      const siteId = phase1.testPatient?.site || CRIO_SITE_IDS.PHL;
-      // Phase 3: deep dive — fix PUT, brute-force interaction paths, BQ schema
-      let phase3 = null;
-      if (patientKey) {
-        phase3 = await testCrioApiPhase3(patientKey, siteId);
-      }
-      res.json({ success: true, timestamp: new Date().toISOString(), phase1, phase3 });
+      const body = req.method === 'POST' ? (typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {})) : {};
+      const dryRun = req.query.dry !== 'false';  // default to dry run for safety
+      const testPhone = body.testPhone || req.query.testPhone || null;
+      const types = body.types || (req.query.types ? req.query.types.split(',') : ['48h', '24h', 'day_of', 'post_visit']);
+      const result = await runReminderEngine({ dryRun, testPhone, types });
+      res.json({ success: true, ...result });
     } catch (err) {
-      console.error('crio-test error:', err.message);
+      console.error('send-reminders error:', err.message);
+      res.status(500).json({ success: false, error: err.message });
+    }
+    return;
+  }
+
+  // ── POST: Send single test SMS ──
+  if (req.query.action === 'test-sms' && req.method === 'POST') {
+    res.set('Cache-Control', 'no-store');
+    try {
+      const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
+      if (!body.to || !body.message) { res.status(400).json({ error: 'Provide to and message in body' }); return; }
+      const result = await twilioSend(body.to, body.message);
+      res.json({ success: result.status === 201, ...result });
+    } catch (err) {
+      console.error('test-sms error:', err.message);
       res.status(500).json({ success: false, error: err.message });
     }
     return;
