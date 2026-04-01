@@ -318,12 +318,7 @@ const CRP_CONFIG = {
   },
 
   // Brand Colors (match CSS :root variables)
-  BRAND: {
-    NAVY:   '#072061',
-    BLUE:   '#1843ad',
-    CYAN:   '#a2dceb',
-    ORANGE: '#ff9933',
-  },
+  // Brand colors in CSS variables (--navy, --blue, --cyan, --orange)
 
   // Google Sheets Data Feeds
   // To add a new feed: add an entry here, then handle in processLiveData()
@@ -509,8 +504,6 @@ const CRP_CONFIG = {
   },
 
   // Master Sheet (for Apps Script consolidation)
-  MASTER_SHEET_ID: '1LZWJeJE9EJqe1Th13sSazrWOI5k8I56mbZPieAHqoyo',
-
   // Coordinator visit goals
   COORDINATORS: ['Mario Castellanos','Stacey Scott','Ruby Pereira','Cady Chilensky','Angelina McMullen','Ema Gunic','Vlado Draganic','Gabrijela Ateljevic','Ana Lambic','Jana Milankovic'],
   // Clinical coordinators who schedule patient visits (shown in Schedule tab)
@@ -602,11 +595,6 @@ const CRP_CONFIG = {
   },
 
   // Sites
-  SITES: {
-    PHL: { name: 'Philadelphia, PA', coordinators: ['Stacey Scott', 'Ruby Pereira', 'Mario Castellanos', 'Ana Lambic', 'Jana Milankovic'] },
-    PNJ: { name: 'Pennington, NJ', coordinators: ['Angelina McMullen', 'Cady Chilensky', 'Ema Gunic', 'Vlado Draganic', 'Gabrijela Ateljevic'] },
-  },
-
   // CRIO Study Keys for Pennington site — add new Pennington studies here
   PENNINGTON_STUDY_KEYS: [161619, 162446, 167755, 167794, 172389, 173164, 189260],
 
@@ -625,8 +613,7 @@ const CRP_CONFIG = {
   },
 
   // Version
-  VERSION: '2.9.6',
-  BUILD_DATE: '2026-03-13T12:00:00Z',
+  VERSION: '3.0.0',
 };
 
 // ═══ EVENT BUS (for plugin extensibility) ═══
@@ -1510,8 +1497,6 @@ function renderFinMarketingROI() {
 }
 
 // ══════════ INIT ══════════
-
-
 
 // ═══ PASSWORD AUTHENTICATION ═══
 const FIN_PIN_HASH = CRP_CONFIG.AUTH_HASH;
@@ -2874,8 +2859,6 @@ function renderInsights() {
   CRP.emit('insightsRendered', { timestamp: new Date() });
 }
 
-
-
 function crioStudyUrl(name) {
   if (!name) return null;
   return CRIO_LINKS[name]
@@ -2931,7 +2914,6 @@ async function loadFallbackData() {
 }
 
 let DATA = SAMPLE;
-
 
 // ═══════════════════════════════════════════════════
 // CHARTS — instantiated once, updated on data change
@@ -3509,8 +3491,6 @@ function schedFilter(btn, filter) {
 }
 
 function filterSchedTable(filter, btn) { schedFilter(btn, filter); }
-
-
 
 function buildUpcomingDetailTable(rows) {
   if (!rows || typeof rows !== 'object' || !Array.isArray(rows)) {
@@ -4668,7 +4648,6 @@ function renderCoordPeriodTable() {
     '</tr>';
   }).join('');
 }
-
 
 // ═══ COORDINATOR CANCEL BREAKDOWN BY TYPE (No Show / Site / Patient) ═══
 // ═══ REGULATORY PERFORMANCE ═══
@@ -8977,7 +8956,6 @@ function processLiveData(allRows, legacyCancels, auditLog) {
   const marchTotal = activeUpcoming.filter(r => parseDate(r['Scheduled Date'])?.getMonth()===_thisMonth).length;
   const aprilTotal = activeUpcoming.filter(r => parseDate(r['Scheduled Date'])?.getMonth()===_nextMonth).length;
 
-
   // ── actionDetails from live CSV ──
   const sfGroups = {}, protoUpdates = {}, reschedPromises = [], noShowUnreach = [];
   const reschedNeeded = [], wdrRecoverable = [], wdrFinal = [], adminFixes = [];
@@ -9820,7 +9798,7 @@ function setFollowUpAction(sel) {
 }
 
 function _syncFollowUpToClickUp(r, action) {
-  var base = CRP_CONFIG.CF_BASE_URL || 'https://us-east1-crio-468120.cloudfunctions.net/crp-bq-feeds';
+  var base = CRP_CONFIG.CF_BASE || 'https://us-east1-crio-468120.cloudfunctions.net/crp-bq-feeds';
   var payload = {
     patient: r._name || '',
     study: r._study || '',
@@ -10155,7 +10133,6 @@ function buildActionSteps() {
       :'<div style="padding:12px;color:#94a3b8;font-size:12px;">No dormant studies detected</div>';
   }
 }
-
 
 // ═══════════════════════════════════════════════════
 // RENDER ALL + INIT
@@ -10769,7 +10746,6 @@ function closeSetup() {
   if (ov) ov.style.display = 'none';
 }
 
-
 function sortTable(th, tbodyId) {
   const tbody = tbodyId ? document.getElementById(tbodyId) : th.closest('table').querySelector('tbody');
   if (!tbody) return;
@@ -10804,7 +10780,6 @@ function sortTable(th, tbodyId) {
   });
   rows.forEach(r => tbody.appendChild(r));
 }
-
 
 // ── Modal engine ──────────────────────────────────────────────────────
 function openModal(title, sub, bodyHtml) {
@@ -11641,7 +11616,6 @@ function showCoordDetail(coordName) {
   if(!body) body = '<p style="color:#94a3b8;padding:20px;text-align:center">No records found</p>';
   openModal(coordName, upcoming.length+' upcoming · '+allCancelRows.length+' cancellations', body);
 }
-
 
 // ═══════════════════════════════════════════════════
 // CLICKUP REFERRAL PIPELINE INTEGRATION
@@ -13122,7 +13096,6 @@ function showReferralDetailModal(filterFn, title, subtitle) {
   openModal(title, subtitle || `${refs.length} referrals`, html);
 }
 
-
 // ══════════════════════════════════════════════════════════════
 // MEDICAL RECORDS & PATIENT'S PATH
 // ══════════════════════════════════════════════════════════════
@@ -14499,7 +14472,6 @@ function showMedRecFilteredModal(filterKey) {
   openModal(title, patients.length + ' patients', html);
 }
 
-
 // ══════════════════════════════════════════════════════════════
 // MED RECORDS TAB (dedicated view)
 // ══════════════════════════════════════════════════════════════
@@ -14684,10 +14656,6 @@ function enrichStudiesWithMasterList() {
 // ══════════════════════════════════════════════════════════════
 // PATIENT TRACKER NJ (PENNINGTON)
 // ══════════════════════════════════════════════════════════════
-
-
-
-
 
 async function fetchFacebookCRM() {
   const url = CRP_CONFIG.CLICKUP.FACEBOOK_CRM_URL;
@@ -15537,7 +15505,6 @@ function renderEnrollmentVelocity() {
   el.innerHTML = html;
 }
 
-
 // ── Data Source URLs (Looker → Google Sheets, auto-pushed every 15 min) ──
 const LIVE_URL1 = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSQJ_QKC-ttmVuaYZokhz6NPNsMUpMe262mqAXbLocxOgGqbxHIMschUhE6FERyYwJfARhVg3wppBZS/pub?output=csv';
 const LIVE_URL2_LEGACY = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRUXJxTDsr5IRByMfuLF0P3hVq_QuEw6M1MPNDwd1CaV2UZ9tnFflUwsmUKAd3xeX3_esn0c4YlrV0q/pub?gid=1487298034&single=true&output=csv';
@@ -15978,7 +15945,6 @@ function loadLongitudinalData() {
     else status.textContent = 'No data available yet. Wait for live data to load.';
   }
 }
-
 
 // ══════════════════════════════════════════════════════════════
 // ══════════════════════════════════════════════════════════════
