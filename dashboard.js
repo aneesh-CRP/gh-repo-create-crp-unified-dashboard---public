@@ -15569,6 +15569,9 @@ const LIVE_URL2_LEGACY = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRUXJx
 const AUDIT_LOG_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRpPUZFSyW0rrx2yQdqYPyccRZC0wqUCWyCfX_n2XTMPyKQr9da4jl1jMbZ5_KKFkYZjJiNl_ClYbXk/pub?output=csv';
 // BigQuery cancellation URL — uses BQ source when toggle is on AND URL is configured
 function _getCancelURL() {
+  if (CRP_CONFIG.USE_CLOUD_FUNCTION && CRP_CONFIG.CF_BASE) {
+    return CRP_CONFIG.CF_BASE + '?feed=cancels&format=csv';
+  }
   if (CRP_CONFIG.USE_BQ_CANCELS && CRP_CONFIG.DATA_FEEDS.BQ_CANCELS_CSV) {
     return CRP_CONFIG.DATA_FEEDS.BQ_CANCELS_CSV;
   }
@@ -15576,6 +15579,9 @@ function _getCancelURL() {
 }
 // BigQuery visits URL — uses BQ source when toggle is on AND URL is configured
 function _getVisitsURL() {
+  if (CRP_CONFIG.USE_CLOUD_FUNCTION && CRP_CONFIG.CF_BASE) {
+    return CRP_CONFIG.CF_BASE + '?feed=visits&format=csv';
+  }
   if (CRP_CONFIG.USE_BQ_VISITS && CRP_CONFIG.DATA_FEEDS.BQ_VISITS_CSV) {
     return CRP_CONFIG.DATA_FEEDS.BQ_VISITS_CSV;
   }
