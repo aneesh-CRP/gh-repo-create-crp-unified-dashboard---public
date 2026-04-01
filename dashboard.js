@@ -6429,6 +6429,7 @@ function switchView(name, el) {
     setTimeout(() => {
       safe(renderFollowUpTable, 'renderFollowUpTable');
       safe(renderOperationsTab, 'renderOperationsTab');
+      safe(renderTrendsCharts, 'renderTrendsCharts');
       if (_tabDirty.actions) {
         safe(buildActionSteps, 'buildActionSteps');
         safe(buildInsights, 'buildInsights');
