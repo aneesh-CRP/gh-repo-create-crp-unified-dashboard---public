@@ -6126,12 +6126,12 @@ function fetchActionRequiredData() {
     _s('ar-docs', unsignedTotal);
     _s('ar-docs-sub', unsignedStudies > 0 ? unsignedStudies + ' studies' : 'All signed');
 
-    // Overdue Todos
-    var overdue = todos.filter(function(r) { return r.status === 'Overdue'; });
-    var immediate = todos.filter(function(r) { return r.status === 'Immediate'; });
+    // Todos (all statuses)
+    var overdue = todos.filter(function(r) { return r.status === 'Overdue' || r.status === 'Immediate'; });
+    var openTodos = todos.filter(function(r) { return r.status !== 'Completed'; });
     window._actionTodos = todos;
-    _s('ar-todos', overdue.length);
-    _s('ar-todos-sub', immediate.length > 0 ? '+' + immediate.length + ' immediate' : overdue.length > 0 ? 'Need action' : 'All clear');
+    _s('ar-todos', openTodos.length);
+    _s('ar-todos-sub', overdue.length > 0 ? overdue.length + ' overdue' : 'All on track');
 
     // Training Gaps
     var missingTotal = regulatory.reduce(function(s, r) { return s + (parseInt(r.trainings_missing) || 0); }, 0);
@@ -6175,7 +6175,7 @@ function showActionModal(type) {
     title = 'Open Queries (' + rows.length + ')';
     body = '<table class="detail-table"><thead><tr><th>Study</th><th>Subject</th><th>Visit</th><th>Message</th><th>Assigned To</th><th>Days</th><th></th></tr></thead><tbody>' +
       rows.slice(0, 100).map(function(r) {
-        var commentUrl = r.subject_visit_key ? _crioCommentUrl(r.study_key, r.subject_key, r.subject_visit_key, r.comment_key, r.visit_path) : _crioSubjectUrl(r.study_key, r.subject_key);
+        var commentUrl = _crioCommentUrl(r.study_key, r.subject_key, r.subject_visit_key, r.comment_key, r.visit_path);
         return '<tr><td style="font-size:11px">' + escapeHTML(displayStudyName(r.study_name||'')) + '</td>' +
           '<td style="font-size:11px">' + escapeHTML(maskPHI(r.subject_name||'')) + '</td>' +
           '<td style="font-size:10px;color:#64748b">' + escapeHTML(r.visit_name||'—') + '</td>' +
@@ -6238,7 +6238,7 @@ function showActionModal(type) {
       }).join('') + '</tbody></table>';
   } else if (type === 'ereg') {
     var rows = window._actionEreg || [];
-    title = 'Assigned Documents (' + rows.length + ') — awaiting action';
+    title = 'Assigned Patient Documents (' + rows.length + ') — medical records, lab reports awaiting action';
     body = '<table class="detail-table"><thead><tr><th>Study</th><th>Subject</th><th>Document</th><th>Category</th><th>Assigned To</th><th>Date</th><th></th></tr></thead><tbody>' +
       rows.slice(0, 100).map(function(r) {
         var eregUrl = _crioStudyUrl(r.study_key);

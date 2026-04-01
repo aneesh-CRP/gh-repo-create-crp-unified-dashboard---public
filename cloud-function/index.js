@@ -1872,13 +1872,13 @@ const FEEDS = {
       ),
       last_visit AS (
         SELECT svi.subject_key, svi.study_key,
-          MAX(svi.last_updated) AS last_visit_date,
-          MAX(sv.name) AS last_visit_name
+          svi.last_updated AS last_visit_date,
+          sv.name AS last_visit_name
         FROM ${tbl('subject_visit')} svi
         LEFT JOIN ${tbl('study_visit')} sv ON svi.study_visit_key = sv.study_visit_key
         WHERE svi.status IN (21, 22, 23)
           AND svi._fivetran_deleted = false
-        GROUP BY svi.subject_key, svi.study_key
+        QUALIFY ROW_NUMBER() OVER (PARTITION BY svi.subject_key, svi.study_key ORDER BY svi.last_updated DESC) = 1
       ),
       next_visit AS (
         SELECT svi.subject_key, svi.study_key,
@@ -1916,7 +1916,7 @@ const FEEDS = {
       WHERE NOT EXISTS (
         SELECT 1 FROM ${tbl('calendar_appointment')} ca
         WHERE ca.subject_key = a.subject_key AND ca.study_key = a.study_key
-          AND ca.status != 0 AND ca.start >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 1 DAY)
+          AND ca.status != 0 AND ca.start >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 2 DAY)
           AND ca._fivetran_deleted = false
       )
       ORDER BY
