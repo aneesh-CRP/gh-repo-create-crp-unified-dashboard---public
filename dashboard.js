@@ -9672,11 +9672,16 @@ function renderFollowUpTable() {
   addRows(_filterRecovered(DATA.noShows), 'noshow', 'No Show', '#FF9933');
   addRows(_filterRecovered(DATA.withdrawals), 'withdrew', 'Withdrew', '#1843AD');
   addRows(_filterRecovered(DATA.screenFails), 'screenfail', 'Screen Fail', '#1843AD');
-  // Unscheduled — exclude pre-screening studies (no sponsor prefix or name contains "pre-screen")
+  // Unscheduled — exclude pre-screening studies and DELFA/Facebook leads (phone calls only, not real visits)
   (window._unscheduledVisits || []).forEach(function(r) {
     var fullStudy = (r.study_name || '');
     var isPrescreen = !fullStudy.includes(' - ') || fullStudy.toLowerCase().includes('pre-screen') || fullStudy.toLowerCase().includes('prescreening');
     if (isPrescreen) return;
+    // Exclude DELFA-sourced patients (phone screening only — may not progress to visit)
+    var _patName = (r.subject_name || '').toLowerCase().replace(/\s+/g,' ').trim();
+    var _srcCheck = window._crioRefSourceMap ? window._crioRefSourceMap.get(_patName) : null;
+    if (_srcCheck && (_srcCheck.source||'').toLowerCase().indexOf('delfa') >= 0) return;
+    if (_srcCheck && (_srcCheck.source||'').toLowerCase().indexOf('facebook') >= 0) return;
     var name = (r.subject_name || '').trim();
     var study = displayStudyName(fullStudy);
     var key = (name+'|'+study+'|unsched').toLowerCase();
