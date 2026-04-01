@@ -905,8 +905,9 @@ const FEEDS = {
     LEFT JOIN ${tbl('user')} cu ON vt.created_by_user_key = cu.user_key
     LEFT JOIN ${tbl('user')} comp_u ON vt.completed_by_user_key = comp_u.user_key
     LEFT JOIN ${tbl('subject')} sub ON vt.subject_key = sub.subject_key
-    WHERE vt._fivetran_deleted = false AND st.is_active = 1      AND vt.status IN (2, 3, 4)
-    ORDER BY CASE vt.status WHEN 4 THEN 0 WHEN 3 THEN 1 ELSE 2 END, vt.due_date ASC`
+    WHERE vt._fivetran_deleted = false AND st.is_active = 1      AND vt.status IN (1, 2, 3, 4)
+      AND (vt.status != 1 OR vt.date_completed >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 30 DAY))
+    ORDER BY CASE vt.status WHEN 4 THEN 0 WHEN 3 THEN 1 WHEN 2 THEN 2 WHEN 1 THEN 3 END, vt.due_date ASC`
   },
 
   // ── 23. Recruiting Pipeline Detail (per-patient per-study status) ──

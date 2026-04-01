@@ -6195,22 +6195,29 @@ function showActionModal(type) {
       }).join('') + '</tbody></table>';
   } else if (type === 'todos') {
     var rows = window._actionTodos || [];
-    var overdueCount = rows.filter(function(r){return r.status==='Overdue';}).length;
-    var availCount = rows.filter(function(r){return r.status==='Available';}).length;
-    title = 'Visit Todos (' + rows.length + ': ' + overdueCount + ' overdue, ' + availCount + ' available)';
-    body = '<table class="detail-table"><thead><tr><th>Study</th><th>Subject</th><th>Visit</th><th>Todo</th><th>Status</th><th>Due</th><th></th></tr></thead><tbody>' +
-      rows.slice(0, 100).map(function(r) {
-        var isOverdue = r.status === 'Overdue';
+    var overdueCount = rows.filter(function(r){return r.status==='Overdue'||r.status==='Immediate';}).length;
+    var openCount = rows.filter(function(r){return r.status==='Available';}).length;
+    var completedCount = rows.filter(function(r){return r.status==='Completed';}).length;
+    title = 'Visit Todos (' + rows.length + ')';
+    var summary = '<div style="display:flex;gap:12px;margin-bottom:10px;font-size:12px;">' +
+      '<span style="color:#dc2626;font-weight:700">' + overdueCount + ' Overdue</span>' +
+      '<span style="color:#1843AD;font-weight:700">' + openCount + ' Open</span>' +
+      '<span style="color:#059669;font-weight:700">' + completedCount + ' Completed (30d)</span>' +
+      '</div>';
+    body = summary + '<table class="detail-table"><thead><tr><th>Study</th><th>Subject</th><th>Visit</th><th>Todo</th><th>Status</th><th>Due / Completed</th><th></th></tr></thead><tbody>' +
+      rows.slice(0, 150).map(function(r) {
+        var isOverdue = r.status === 'Overdue' || r.status === 'Immediate';
         var isAvail = r.status === 'Available';
-        var statusColor = isOverdue ? '#dc2626' : isAvail ? '#1843AD' : '#059669';
-        var statusBg = isOverdue ? '#fef2f2' : isAvail ? '#eff6ff' : '#ecfdf5';
+        var isCompleted = r.status === 'Completed';
+        var statusColor = isOverdue ? '#dc2626' : isCompleted ? '#059669' : '#1843AD';
+        var statusBg = isOverdue ? '#fef2f2' : isCompleted ? '#ecfdf5' : '#eff6ff';
         var todoUrl = _crioSubjectUrl(r.study_key, r.subject_key);
         return '<tr style="' + (isOverdue?'background:#fef2f2':'') + '"><td style="font-size:11px">' + _crioLink(displayStudyName(r.study_name||''), _crioStudyUrl(r.study_key)) + '</td>' +
           '<td style="font-size:11px">' + _crioLink(maskPHI(r.subject_name||''), todoUrl) + '</td>' +
           '<td style="font-size:10px;color:#64748b">' + escapeHTML(r.visit_name||'—') + '</td>' +
           '<td style="font-size:11px">' + escapeHTML(r.todo_name||'') + '</td>' +
           '<td><span style="font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px;background:' + statusBg + ';color:' + statusColor + '">' + escapeHTML(r.status||'') + '</span></td>' +
-          '<td style="white-space:nowrap;color:' + (isOverdue?'#dc2626':'') + '">' + escapeHTML(r.due_date||'') + '</td>' +
+          '<td style="white-space:nowrap;color:' + (isOverdue?'#dc2626':isCompleted?'#059669':'') + '">' + escapeHTML(isCompleted ? (r.date_completed||'') : (r.due_date||'')) + (isCompleted && r.completed_by ? ' <span style="font-size:9px;color:#94a3b8">by ' + escapeHTML(r.completed_by) + '</span>' : '') + '</td>' +
           '<td>' + _crioLink('Go', todoUrl) + '</td></tr>';
       }).join('') + '</tbody></table>';
   } else if (type === 'training') {
@@ -6227,10 +6234,10 @@ function showActionModal(type) {
       }).join('') + '</tbody></table>';
   } else if (type === 'ereg') {
     var rows = window._actionEreg || [];
-    title = 'eReg Pending Documents (' + rows.length + ')';
+    title = 'Assigned Documents (' + rows.length + ') — awaiting action';
     body = '<table class="detail-table"><thead><tr><th>Study</th><th>Subject</th><th>Document</th><th>Category</th><th>Assigned To</th><th>Date</th><th></th></tr></thead><tbody>' +
       rows.slice(0, 100).map(function(r) {
-        var eregUrl = r.study_key && r.subject_key ? _crioBase + '/study/' + r.study_key + '/subject/' + r.subject_key : _crioStudyUrl(r.study_key);
+        var eregUrl = _crioStudyUrl(r.study_key);
         return '<tr><td style="font-size:11px">' + _crioLink(displayStudyName(r.study_name||''), _crioStudyUrl(r.study_key)) + '</td>' +
           '<td style="font-size:11px">' + _crioLink(maskPHI(r.subject_name||''), _crioSubjectUrl(r.study_key, r.subject_key)) + '</td>' +
           '<td style="font-size:11px">' + escapeHTML(r.document_name||'') + '</td>' +
