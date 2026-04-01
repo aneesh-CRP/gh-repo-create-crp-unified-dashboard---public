@@ -4736,7 +4736,7 @@ function renderRegulatoryPerformance(containerId, badgeId) {
 
   // Sort each group by total done desc
   function totalDone(u) { return u.docs_signed + u.docs_uploaded + u.comments + u.signoffs; }
-  function totalPending(u) { return u.pending_docs + u.open_comments; }
+  function totalPending(u) { return u.pending_docs + u.open_comments; } // pending_docs = assigned to them, open_comments = queries they raised still unresolved
   groups.coord.sort(function(a,b){return totalDone(b)-totalDone(a);});
   groups.remote.sort(function(a,b){return totalDone(b)-totalDone(a);});
   groups.inv.sort(function(a,b){return totalDone(b)-totalDone(a);});
@@ -4761,9 +4761,12 @@ function renderRegulatoryPerformance(containerId, badgeId) {
     return '<td style="text-align:center;font-weight:700;font-size:11px;cursor:pointer;color:'+color+';" onclick="showRegPerfDetail(\''+jsAttr(userName)+'\',\''+metric+'\')">' + val + '</td>';
   }
 
-  function pendCell(val, userName) {
+  function pendCell(val, userName, user) {
     if (!val) return '<td style="text-align:center;color:#cbd5e1;font-size:11px;">—</td>';
-    return '<td style="text-align:center;font-weight:700;font-size:11px;cursor:pointer;color:#dc2626;" onclick="showRegPerfDetail(\''+jsAttr(userName)+'\',\'pending\')">' + val + '</td>';
+    var pd = user ? (user.pending_docs||0) : 0;
+    var oc = user ? (user.open_comments||0) : 0;
+    var tip = (pd > 0 ? pd + ' docs assigned' : '') + (pd > 0 && oc > 0 ? ' + ' : '') + (oc > 0 ? oc + ' open queries' : '');
+    return '<td style="text-align:center;font-weight:700;font-size:11px;cursor:pointer;color:#dc2626;" title="' + escapeHTML(tip) + '" onclick="showRegPerfDetail(\''+jsAttr(userName)+'\',\'pending\')">' + val + '</td>';
   }
 
   // All columns for unified table
@@ -4800,7 +4803,7 @@ function renderRegulatoryPerformance(containerId, badgeId) {
         h += '<td style="text-align:center;padding:4px 6px;">'+siteLabel(u.site)+'</td>';
         allCols.forEach(function(c) { h += numCell(u[c.key], u.name, c.key, c.color); });
         h += '<td style="text-align:center;font-weight:700;color:#1843AD;">'+done+'</td>';
-        h += pendCell(pend, u.name);
+        h += pendCell(pend, u.name, u);
         h += '<td style="padding:4px 8px;"><div style="display:flex;height:10px;border-radius:3px;overflow:hidden;background:#e2e8f0;">';
         h += '<div style="width:'+barDone+'%;background:#1843AD;"></div>';
         if (barPend) h += '<div style="width:'+barPend+'%;background:#dc2626;"></div>';
