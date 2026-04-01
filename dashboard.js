@@ -6159,6 +6159,8 @@ function fetchActionRequiredData() {
     if (typeof _renderOpsContent === 'function') try { _renderOpsContent(); } catch(e2) {}
     // Re-render recruiter card with BQ outreach data
     if (typeof renderRecruiterPerformance === 'function') try { renderRecruiterPerformance(); } catch(e2) {}
+    // Re-render Follow-Up table if on Actions tab (source + unscheduled data now available)
+    if (_activeNow === 'actions') safe(renderFollowUpTable, 'renderFollowUpTable-batch');
   }).catch(function(e) {
     console.warn('Action Required fetch failed:', e);
   });
