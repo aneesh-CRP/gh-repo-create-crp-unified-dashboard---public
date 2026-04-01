@@ -7106,7 +7106,11 @@ function filterOpsMonitoring(filter, btn) {
 
 function showOpsMonitoring(filter) {
   switchTab('actions');
-  setTimeout(function() { filterOpsMonitoring(filter, null); }, 200);
+  setTimeout(function() {
+    filterOpsMonitoring(filter, null);
+    var el = document.getElementById('opsMonitoringTable');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 300);
 }
 
 function renderCoordCancelTypeChart() {
@@ -8167,12 +8171,12 @@ function showActionModal(type) {
     body = '<table class="detail-table"><thead><tr><th>Study</th><th>Total</th><th>Signed</th><th>Active</th><th>Assigned</th><th>Completion</th><th></th></tr></thead><tbody>' +
       rows.filter(function(r) { return (parseInt(r.active)||0) + (parseInt(r.assigned)||0) + (parseInt(r.incoming)||0) > 0; }).map(function(r) {
         var pct = parseFloat(r.completion_pct) || 0;
-        var filesUrl = r.study_key ? _crioBase + '/study/' + r.study_key + '/files' : '';
-        return '<tr><td style="font-size:11px">' + _crioLink((r.study_name||'').split(' - ').pop(), filesUrl) + '</td><td class="r">' + (r.total_documents||0) + '</td>' +
+        var docsUrl = r.study_key ? _crioBase + '/study/' + r.study_key + '/source-documents' : '';
+        return '<tr><td style="font-size:11px">' + _crioLink(displayStudyName(r.study_name||''), docsUrl) + '</td><td class="r">' + (r.total_documents||0) + '</td>' +
           '<td class="r">' + (r.signed||0) + '</td><td class="r" style="color:#FF9933;font-weight:700">' + (r.active||0) + '</td>' +
           '<td class="r" style="color:#dc2626;font-weight:700">' + (r.assigned||0) + '</td>' +
           '<td class="r"><span style="color:' + (pct>=95?'#059669':pct>=80?'#FF9933':'#dc2626') + ';font-weight:700">' + pct + '%</span></td>' +
-          '<td>' + _crioLink('Files', filesUrl) + '</td></tr>';
+          '<td>' + _crioLink('Sign', docsUrl) + '</td></tr>';
       }).join('') + '</tbody></table>';
   } else if (type === 'todos') {
     var rows = window._actionTodos || [];
@@ -8181,12 +8185,12 @@ function showActionModal(type) {
       rows.slice(0, 100).map(function(r) {
         var isOverdue = r.status === 'Overdue';
         var todoUrl = _crioTodoUrl(r.study_key, r.subject_key);
-        return '<tr style="' + (isOverdue?'background:#fef2f2':'') + '"><td style="font-size:11px">' + escapeHTML((r.study_name||'').split(' - ').pop()) + '</td>' +
-          '<td style="font-size:11px">' + escapeHTML(maskPHI(r.subject_name||'')) + '</td>' +
+        return '<tr style="' + (isOverdue?'background:#fef2f2':'') + '"><td style="font-size:11px">' + _crioLink(displayStudyName(r.study_name||''), _crioStudyUrl(r.study_key)) + '</td>' +
+          '<td style="font-size:11px">' + _crioLink(maskPHI(r.subject_name||''), _crioSubjectUrl(r.study_key, r.subject_key)) + '</td>' +
           '<td style="font-size:11px">' + escapeHTML(r.todo_name||'') + '</td>' +
           '<td><span style="font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px;background:' + (isOverdue?'#fef2f2':'#fffbeb') + ';color:' + (isOverdue?'#dc2626':'#FF9933') + '">' + escapeHTML(r.status||'') + '</span></td>' +
           '<td style="white-space:nowrap;color:' + (isOverdue?'#dc2626':'') + '">' + escapeHTML(r.due_date||'') + '</td>' +
-          '<td>' + _crioLink('Open', todoUrl) + '</td></tr>';
+          '<td>' + _crioLink('Go', todoUrl) + '</td></tr>';
       }).join('') + '</tbody></table>';
   } else if (type === 'training') {
     var rows = (window._actionTraining || []).filter(function(r) { return (parseInt(r.trainings_missing)||0) > 0 || (parseInt(r.duties_pending)||0) > 0; });
@@ -8203,18 +8207,16 @@ function showActionModal(type) {
   } else if (type === 'ereg') {
     var rows = window._actionEreg || [];
     title = 'eReg Pending Documents (' + rows.length + ')';
-    body = '<table class="detail-table"><thead><tr><th>Study</th><th>Subject</th><th>Document</th><th>Category</th><th>Assigned To</th><th>Assigned Date</th></tr></thead><tbody>' +
+    body = '<table class="detail-table"><thead><tr><th>Study</th><th>Subject</th><th>Document</th><th>Category</th><th>Assigned To</th><th>Date</th><th></th></tr></thead><tbody>' +
       rows.slice(0, 100).map(function(r) {
-        var studyUrl = _crioStudyUrl(r.study_key);
-        var pUrl = typeof window._crioPatientUrl === 'function' ? window._crioPatientUrl(r.study_key, r.subject_key, r.site_name) : null;
-        var pName = escapeHTML(maskPHI(r.subject_name||''));
-        var pHtml = pUrl ? '<a href="' + escapeHTML(pUrl) + '" target="_blank" style="color:#1843ad;text-decoration:none">' + pName + '</a>' : pName;
-        return '<tr><td style="font-size:11px">' + _crioLink((r.study_name||'').split(' - ').pop(), studyUrl) + '</td>' +
-          '<td style="font-size:11px">' + pHtml + '</td>' +
+        var eregUrl = r.study_key && r.subject_key ? _crioBase + '/study/' + r.study_key + '/subject/' + r.subject_key + '/regulatory' : _crioStudyUrl(r.study_key);
+        return '<tr><td style="font-size:11px">' + _crioLink(displayStudyName(r.study_name||''), _crioStudyUrl(r.study_key)) + '</td>' +
+          '<td style="font-size:11px">' + _crioLink(maskPHI(r.subject_name||''), _crioSubjectUrl(r.study_key, r.subject_key)) + '</td>' +
           '<td style="font-size:11px">' + escapeHTML(r.document_name||'') + '</td>' +
           '<td style="font-size:11px">' + escapeHTML(r.category||'') + '</td>' +
           '<td style="font-size:11px">' + escapeHTML(r.assigned_to||'') + '</td>' +
-          '<td style="font-size:11px">' + escapeHTML(r.assigned_date||'—') + '</td></tr>';
+          '<td style="font-size:11px">' + escapeHTML(r.assigned_date||'—') + '</td>' +
+          '<td>' + _crioLink('Go', eregUrl) + '</td></tr>';
       }).join('') + '</tbody></table>';
   }
   openModal(title, '', body || '<div style="padding:20px;color:#94a3b8">No data available</div>');
