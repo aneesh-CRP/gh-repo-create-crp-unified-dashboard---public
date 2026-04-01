@@ -10619,9 +10619,11 @@ function processLiveData(allRows, legacyCancels, auditLog) {
   function isBetween(d, a, b) { return d && d >= a && d <= b; }
 
   // ── Filter rows ──
+  // Keep past 90 days + future 2 months for period filters (coordinator/investigator performance)
+  const ninetyDaysAgo = new Date(today); ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
   const activeUpcoming = upcoming.filter(r => {
     const d = parseDate(r['Scheduled Date'] || r['snapshot_date']);
-    return d && d >= today && d <= twoMonthsAhead;
+    return d && d >= ninetyDaysAgo && d <= twoMonthsAhead;
   });
 
   // Step 1: Basic date/study filter
