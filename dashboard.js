@@ -3487,7 +3487,7 @@ function schedFilter(btn, filter) {
   });
   const badge = document.getElementById('sched-count');
   if (badge) badge.textContent = shown + ' visits';
-  safe(_updateConfirmCount, 'updateConfirmCount');
+  if (typeof _updateConfirmCount === 'function') safe(_updateConfirmCount, 'updateConfirmCount');
 }
 
 function filterSchedTable(filter, btn) { schedFilter(btn, filter); }
@@ -6160,7 +6160,7 @@ function fetchActionRequiredData() {
     // Re-render recruiter card with BQ outreach data
     if (typeof renderRecruiterPerformance === 'function') try { renderRecruiterPerformance(); } catch(e2) {}
     // Re-render Follow-Up table if on Actions tab (source + unscheduled data now available)
-    if (_activeNow === 'actions') safe(renderFollowUpTable, 'renderFollowUpTable-batch');
+    if (typeof _activeTab === 'function' && _activeTab() === 'actions') safe(renderFollowUpTable, 'renderFollowUpTable-batch');
   }).catch(function(e) {
     console.warn('Action Required fetch failed:', e);
   });
@@ -17613,7 +17613,8 @@ async function _crpInit() {
     }).catch(e => { console.warn('CRP: Patient DB fetch failed:', e); setHealthChip('dh-patientdb','fail','Patient DB (failed)'); });
 
     // Monitoring data — for Obs/Dev column in Studies + Operations tab
-    if (base) fetch(base + '?feed=monitoringVisits&format=json').then(r => r.json()).then(json => {
+    var _cfBase3 = CRP_CONFIG.CF_BASE;
+    if (_cfBase3) fetch(_cfBase3 + '?feed=monitoringVisits&format=json').then(r => r.json()).then(json => {
       _monitoringData = json.data || [];
       _monitoringData = _monitoringData.filter(function(r) { return (r.status||'').toLowerCase() !== 'completed'; });
       _log('CRP: Monitoring data loaded: ' + _monitoringData.length + ' observations');
@@ -17621,7 +17622,7 @@ async function _crpInit() {
     }).catch(e => { console.warn('CRP: Monitoring data fetch failed:', e); });
 
     // Last interaction per patient — for Follow-Up table
-    if (base) fetch(base + '?feed=lastInteraction&format=json').then(r => r.json()).then(json => {
+    if (_cfBase3) fetch(_cfBase3 + '?feed=lastInteraction&format=json').then(r => r.json()).then(json => {
       var data = json.data || [];
       window._lastInteractionMap = new Map();
       data.forEach(function(r) {
@@ -17629,7 +17630,7 @@ async function _crpInit() {
         if (n) window._lastInteractionMap.set(n, r);
       });
       _log('CRP: Last interactions loaded: ' + data.length + ' patients');
-      if (_activeNow === 'actions') safe(renderFollowUpTable, 'renderFollowUpTable-interactions');
+      if (_activeTab() === 'actions') safe(renderFollowUpTable, 'renderFollowUpTable-interactions');
     }).catch(e => { console.warn('CRP: lastInteraction fetch failed:', e); });
 
     fetchFacebookCRM().then(() => {
