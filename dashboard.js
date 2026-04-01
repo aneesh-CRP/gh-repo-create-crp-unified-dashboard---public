@@ -6465,6 +6465,20 @@ function switchView(name, el) {
         safe(buildInsights, 'buildInsights');
         _tabDirty.actions = false;
       }
+      // Retry Follow-Up if data wasn't ready on first render
+      var _fuRetries = 0;
+      function _fuRetry() {
+        if (_fuRetries >= 5 || _activeNow !== 'actions') return;
+        var total = (DATA.allCancels||[]).length + (DATA.noShows||[]).length + (DATA.withdrawals||[]).length + (DATA.screenFails||[]).length + (window._unscheduledVisits||[]).length;
+        var kpi = document.getElementById('fu-kpi-total');
+        if (total > 0 && kpi && (kpi.textContent === '—' || kpi.textContent === '0')) {
+          safe(renderFollowUpTable, 'renderFollowUpTable-retry');
+        } else if (total === 0) {
+          _fuRetries++;
+          setTimeout(_fuRetry, 2000);
+        }
+      }
+      setTimeout(_fuRetry, 2000);
     }, 50);
   }
   if (name === 'trends' && typeof LONGITUDINAL !== 'undefined' && LONGITUDINAL) {
@@ -10788,7 +10802,8 @@ function renderAll() {
   safe(() => filterSchedTable('all', null), 'schedFilter');
   _tabDirty.overview = false;
 
-  // ── Actions tab (render if active, defer otherwise) ──
+  // ── Actions tab (render if active, always mark dirty so tab-switch re-renders) ──
+  _tabDirty.actions = true;
   if (activeTab === 'actions') {
     safe(renderFollowUpTable,  'renderFollowUpTable');
     safe(buildActionSteps,     'buildActionSteps');
