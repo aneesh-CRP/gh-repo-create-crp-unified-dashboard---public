@@ -4692,7 +4692,7 @@ function renderRegulatoryPerformance(containerId, badgeId) {
     var rawName = (r.user_name || '').trim();
     if (!rawName) return;
     var name = _nameNorm[rawName.toLowerCase()] || rawName; // normalize to canonical name
-    if (!byUser[name]) byUser[name] = { name: name, site: '', docs_uploaded: 0, docs_signed: 0, comments: 0, open_comments: 0, signoffs: 0, pending_docs: 0, studies: {} };
+    if (!byUser[name]) byUser[name] = { name: name, site: '', docs_uploaded: 0, docs_signed: 0, comments: 0, open_comments: 0, signoffs: 0, pending_docs: 0, pending_ereg: 0, pending_signoffs: 0, studies: {} };
     var u = byUser[name];
     u.docs_uploaded += parseInt(r.docs_uploaded) || 0;
     u.docs_signed += parseInt(r.docs_signed) || 0;
@@ -4700,6 +4700,8 @@ function renderRegulatoryPerformance(containerId, badgeId) {
     u.open_comments += parseInt(r.open_comments) || 0;
     u.signoffs += parseInt(r.signoffs) || 0;
     u.pending_docs += parseInt(r.pending_docs) || 0;
+    u.pending_ereg += parseInt(r.pending_ereg) || 0;
+    u.pending_signoffs += parseInt(r.pending_signoffs) || 0;
         if (r.site_name && !u.site) u.site = r.site_name;
     else if (r.site_name && u.site && u.site !== r.site_name) u.site = 'Both';
     // Per-study detail for drill-down
@@ -4730,13 +4732,13 @@ function renderRegulatoryPerformance(containerId, badgeId) {
   });
 
   // Also add missing users with zero
-  COORDS.forEach(function(n) { if (!byUser[n]) groups.coord.push({ name: n, site: '', docs_uploaded: 0, docs_signed: 0, comments: 0, open_comments: 0, signoffs: 0, pending_docs: 0, studies: {} }); });
-  REMOTE_CRCS.forEach(function(n) { if (!byUser[n]) groups.remote.push({ name: n, site: '', docs_uploaded: 0, docs_signed: 0, comments: 0, open_comments: 0, signoffs: 0, pending_docs: 0, studies: {} }); });
-  INVESTIGATORS.forEach(function(n) { if (!byUser[n]) groups.inv.push({ name: n, site: '', docs_uploaded: 0, docs_signed: 0, comments: 0, open_comments: 0, signoffs: 0, pending_docs: 0, studies: {} }); });
+  COORDS.forEach(function(n) { if (!byUser[n]) groups.coord.push({ name: n, site: '', docs_uploaded: 0, docs_signed: 0, comments: 0, open_comments: 0, signoffs: 0, pending_docs: 0, pending_ereg: 0, pending_signoffs: 0, studies: {} }); });
+  REMOTE_CRCS.forEach(function(n) { if (!byUser[n]) groups.remote.push({ name: n, site: '', docs_uploaded: 0, docs_signed: 0, comments: 0, open_comments: 0, signoffs: 0, pending_docs: 0, pending_ereg: 0, pending_signoffs: 0, studies: {} }); });
+  INVESTIGATORS.forEach(function(n) { if (!byUser[n]) groups.inv.push({ name: n, site: '', docs_uploaded: 0, docs_signed: 0, comments: 0, open_comments: 0, signoffs: 0, pending_docs: 0, pending_ereg: 0, pending_signoffs: 0, studies: {} }); });
 
   // Sort each group by total done desc
   function totalDone(u) { return u.docs_signed + u.docs_uploaded + u.comments + u.signoffs; }
-  function totalPending(u) { return u.pending_docs + u.open_comments; } // pending_docs = assigned to them, open_comments = queries they raised still unresolved
+  function totalPending(u) { return u.pending_docs + u.open_comments + u.pending_ereg + u.pending_signoffs; }
   groups.coord.sort(function(a,b){return totalDone(b)-totalDone(a);});
   groups.remote.sort(function(a,b){return totalDone(b)-totalDone(a);});
   groups.inv.sort(function(a,b){return totalDone(b)-totalDone(a);});
@@ -4763,9 +4765,12 @@ function renderRegulatoryPerformance(containerId, badgeId) {
 
   function pendCell(val, userName, user) {
     if (!val) return '<td style="text-align:center;color:#cbd5e1;font-size:11px;">—</td>';
-    var pd = user ? (user.pending_docs||0) : 0;
-    var oc = user ? (user.open_comments||0) : 0;
-    var tip = (pd > 0 ? pd + ' docs assigned' : '') + (pd > 0 && oc > 0 ? ' + ' : '') + (oc > 0 ? oc + ' open queries' : '');
+    var parts = [];
+    if (user && user.pending_docs > 0) parts.push(user.pending_docs + ' unsigned docs');
+    if (user && user.pending_ereg > 0) parts.push(user.pending_ereg + ' pending eReg');
+    if (user && user.open_comments > 0) parts.push(user.open_comments + ' open queries');
+    if (user && user.pending_signoffs > 0) parts.push(user.pending_signoffs + ' pending sign-offs');
+    var tip = parts.join(' · ');
     return '<td style="text-align:center;font-weight:700;font-size:11px;cursor:pointer;color:#dc2626;" title="' + escapeHTML(tip) + '" onclick="showRegPerfDetail(\''+jsAttr(userName)+'\',\'pending\')">' + val + '</td>';
   }
 
