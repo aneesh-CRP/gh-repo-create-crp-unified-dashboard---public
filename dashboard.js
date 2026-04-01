@@ -17595,6 +17595,14 @@ async function _crpInit() {
       else setHealthChip('dh-patientdb','warn','Patient DB (empty)');
     }).catch(e => { console.warn('CRP: Patient DB fetch failed:', e); setHealthChip('dh-patientdb','fail','Patient DB (failed)'); });
 
+    // Monitoring data — for Obs/Dev column in Studies + Operations tab
+    if (base) fetch(base + '?feed=monitoringVisits&format=json').then(r => r.json()).then(json => {
+      _monitoringData = json.data || [];
+      _monitoringData = _monitoringData.filter(function(r) { return (r.status||'').toLowerCase() !== 'completed'; });
+      _log('CRP: Monitoring data loaded: ' + _monitoringData.length + ' observations');
+      _debouncedStudiesRender();
+    }).catch(e => { console.warn('CRP: Monitoring data fetch failed:', e); });
+
     // Last interaction per patient — for Follow-Up table
     if (base) fetch(base + '?feed=lastInteraction&format=json').then(r => r.json()).then(json => {
       var data = json.data || [];
