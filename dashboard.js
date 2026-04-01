@@ -4743,7 +4743,7 @@ function renderRegulatoryPerformance(containerId, badgeId) {
   groups.remote.sort(function(a,b){return totalDone(b)-totalDone(a);});
   groups.inv.sort(function(a,b){return totalDone(b)-totalDone(a);});
 
-  var allUsers = groups.coord.concat(groups.remote).concat(groups.inv);
+  var allUsers = groups.coord.concat(groups.inv);
   var totalSigned = allUsers.reduce(function(s,u){return s+u.docs_signed;},0);
   var totalUploaded = allUsers.reduce(function(s,u){return s+u.docs_uploaded;},0);
   var totalComments = allUsers.reduce(function(s,u){return s+u.comments;},0);
@@ -4831,7 +4831,6 @@ function renderRegulatoryPerformance(containerId, badgeId) {
 
   html += buildUnifiedTable([
     {title:'Coordinators', users: groups.coord},
-    {title:'Remote CRCs', users: groups.remote},
     {title:'Investigators', users: groups.inv}
   ]);
 
