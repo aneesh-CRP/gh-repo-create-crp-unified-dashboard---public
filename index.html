@@ -8175,7 +8175,7 @@ function showActionModal(type) {
     body = '<table class="detail-table"><thead><tr><th>Study</th><th>Total</th><th>Signed</th><th>Active</th><th>Assigned</th><th>Completion</th><th></th></tr></thead><tbody>' +
       rows.filter(function(r) { return (parseInt(r.active)||0) + (parseInt(r.assigned)||0) + (parseInt(r.incoming)||0) > 0; }).map(function(r) {
         var pct = parseFloat(r.completion_pct) || 0;
-        var docsUrl = r.study_key ? _crioBase + '/study/' + r.study_key + '/source-documents' : '';
+        var docsUrl = r.study_key ? _crioBase + '/study/' + r.study_key + '/files' : '';
         return '<tr><td style="font-size:11px">' + _crioLink(displayStudyName(r.study_name||''), docsUrl) + '</td><td class="r">' + (r.total_documents||0) + '</td>' +
           '<td class="r">' + (r.signed||0) + '</td><td class="r" style="color:#FF9933;font-weight:700">' + (r.active||0) + '</td>' +
           '<td class="r" style="color:#dc2626;font-weight:700">' + (r.assigned||0) + '</td>' +
@@ -8184,15 +8184,21 @@ function showActionModal(type) {
       }).join('') + '</tbody></table>';
   } else if (type === 'todos') {
     var rows = window._actionTodos || [];
-    title = 'Visit Todos (' + rows.length + ')';
-    body = '<table class="detail-table"><thead><tr><th>Study</th><th>Subject</th><th>Todo</th><th>Status</th><th>Due</th><th></th></tr></thead><tbody>' +
+    var overdueCount = rows.filter(function(r){return r.status==='Overdue';}).length;
+    var availCount = rows.filter(function(r){return r.status==='Available';}).length;
+    title = 'Visit Todos (' + rows.length + ': ' + overdueCount + ' overdue, ' + availCount + ' available)';
+    body = '<table class="detail-table"><thead><tr><th>Study</th><th>Subject</th><th>Visit</th><th>Todo</th><th>Status</th><th>Due</th><th></th></tr></thead><tbody>' +
       rows.slice(0, 100).map(function(r) {
         var isOverdue = r.status === 'Overdue';
-        var todoUrl = _crioTodoUrl(r.study_key, r.subject_key);
+        var isAvail = r.status === 'Available';
+        var statusColor = isOverdue ? '#dc2626' : isAvail ? '#1843AD' : '#059669';
+        var statusBg = isOverdue ? '#fef2f2' : isAvail ? '#eff6ff' : '#ecfdf5';
+        var todoUrl = _crioSubjectUrl(r.study_key, r.subject_key);
         return '<tr style="' + (isOverdue?'background:#fef2f2':'') + '"><td style="font-size:11px">' + _crioLink(displayStudyName(r.study_name||''), _crioStudyUrl(r.study_key)) + '</td>' +
-          '<td style="font-size:11px">' + _crioLink(maskPHI(r.subject_name||''), _crioSubjectUrl(r.study_key, r.subject_key)) + '</td>' +
+          '<td style="font-size:11px">' + _crioLink(maskPHI(r.subject_name||''), todoUrl) + '</td>' +
+          '<td style="font-size:10px;color:#64748b">' + escapeHTML(r.visit_name||'—') + '</td>' +
           '<td style="font-size:11px">' + escapeHTML(r.todo_name||'') + '</td>' +
-          '<td><span style="font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px;background:' + (isOverdue?'#fef2f2':'#fffbeb') + ';color:' + (isOverdue?'#dc2626':'#FF9933') + '">' + escapeHTML(r.status||'') + '</span></td>' +
+          '<td><span style="font-size:10px;font-weight:700;padding:1px 5px;border-radius:3px;background:' + statusBg + ';color:' + statusColor + '">' + escapeHTML(r.status||'') + '</span></td>' +
           '<td style="white-space:nowrap;color:' + (isOverdue?'#dc2626':'') + '">' + escapeHTML(r.due_date||'') + '</td>' +
           '<td>' + _crioLink('Go', todoUrl) + '</td></tr>';
       }).join('') + '</tbody></table>';
@@ -8213,7 +8219,7 @@ function showActionModal(type) {
     title = 'eReg Pending Documents (' + rows.length + ')';
     body = '<table class="detail-table"><thead><tr><th>Study</th><th>Subject</th><th>Document</th><th>Category</th><th>Assigned To</th><th>Date</th><th></th></tr></thead><tbody>' +
       rows.slice(0, 100).map(function(r) {
-        var eregUrl = r.study_key && r.subject_key ? _crioBase + '/study/' + r.study_key + '/subject/' + r.subject_key + '/regulatory' : _crioStudyUrl(r.study_key);
+        var eregUrl = r.study_key && r.subject_key ? _crioBase + '/study/' + r.study_key + '/subject/' + r.subject_key : _crioStudyUrl(r.study_key);
         return '<tr><td style="font-size:11px">' + _crioLink(displayStudyName(r.study_name||''), _crioStudyUrl(r.study_key)) + '</td>' +
           '<td style="font-size:11px">' + _crioLink(maskPHI(r.subject_name||''), _crioSubjectUrl(r.study_key, r.subject_key)) + '</td>' +
           '<td style="font-size:11px">' + escapeHTML(r.document_name||'') + '</td>' +
