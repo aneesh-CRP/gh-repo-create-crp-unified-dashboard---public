@@ -5389,6 +5389,27 @@ function showVisitDetail(idx) {
     h += '<tr><td style="padding:6px 8px;font-weight:600">Total Documents</td><td style="padding:6px 8px">' + docStatus.total + '</td></tr>';
   }
 
+  // Medical Records (from ClickUp)
+  if (MED_RECORDS_DATA && MED_RECORDS_DATA.length > 0) {
+    var _mrIdx = _findBestMedRecord(patKey, v.study||'');
+    if (_mrIdx >= 0) {
+      var mr = MED_RECORDS_DATA[_mrIdx];
+      var _mrR = _medReadiness(mr, v.status);
+      var _mrColors = { 'complete':'#059669', 'pending':'#FF9933', 'needs-action':'#dc2626' };
+      var _mrC = _mrColors[_mrR.level] || '#94a3b8';
+      var _dot = function(ok) { return ok ? '<span style="color:#059669;font-weight:700">&#x2713;</span>' : '<span style="color:#dc2626;font-weight:700">&#x2717;</span>'; };
+      h += '<tr><td colspan="2" style="padding:8px;font-weight:700;color:#072061;border-bottom:2px solid #e2e8f0;border-top:1px solid #e2e8f0">Medical Records <span style="font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:'+_mrC+'20;color:'+_mrC+';margin-left:8px">'+esc(_mrR.label)+'</span></td></tr>';
+      h += '<tr><td style="padding:6px 8px;font-weight:600">ClickUp Status</td><td style="padding:6px 8px;font-weight:600">' + esc(mr.status||'—') + '</td></tr>';
+      h += '<tr><td style="padding:6px 8px;font-weight:600">Medical Release</td><td style="padding:6px 8px">' + _dot(_mrR.relOk) + ' ' + esc(mr.medical_release || 'Not received') + '</td></tr>';
+      h += '<tr><td style="padding:6px 8px;font-weight:600">Records Received</td><td style="padding:6px 8px">' + _dot(_mrR.recOk) + ' ' + esc(mr.records_received || 'Not received') + '</td></tr>';
+      h += '<tr><td style="padding:6px 8px;font-weight:600">Records in CRIO</td><td style="padding:6px 8px">' + _dot(mr.records_in_crio === 'Yes') + ' ' + esc(mr.records_in_crio || 'No') + '</td></tr>';
+      if (mr.records_portal) h += '<tr><td style="padding:6px 8px;font-weight:600">Platform</td><td style="padding:6px 8px">' + esc(mr.records_portal) + '</td></tr>';
+      if (mr.investigator_approval) h += '<tr><td style="padding:6px 8px;font-weight:600">PI Approval</td><td style="padding:6px 8px">' + esc(mr.investigator_approval) + '</td></tr>';
+      if (mr.notes) h += '<tr><td style="padding:6px 8px;font-weight:600">Notes</td><td style="padding:6px 8px;font-size:11px;color:#64748b">' + esc(mr.notes) + '</td></tr>';
+      if (mr.url) h += '<tr><td style="padding:6px 8px;font-weight:600">ClickUp</td><td style="padding:6px 8px"><a href="' + esc(mr.url) + '" target="_blank" style="font-size:11px;color:#1843AD;text-decoration:none;font-weight:600">Open in ClickUp</a></td></tr>';
+    }
+  }
+
   // Links
   var links = '';
   if (v.patient_url) links += '<a href="' + esc(v.patient_url) + '" target="_blank" style="font-size:11px;color:#072061;text-decoration:none;font-weight:600;margin-right:12px">[CRIO Patient]</a>';
