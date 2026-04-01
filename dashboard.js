@@ -4778,7 +4778,7 @@ function renderRegulatoryPerformance(containerId, badgeId) {
   var allCols = [
     {key:'docs_signed',label:'Signed',color:'#1843AD'},
     {key:'docs_uploaded',label:'Uploaded',color:'#072061'},
-    {key:'comments',label:'Comments',color:'#FF9933'},
+    {key:'comments',label:'Queries',color:'#FF9933'},
     {key:'signoffs',label:'Sign-Offs',color:'#059669'}
   ];
 
@@ -4824,7 +4824,7 @@ function renderRegulatoryPerformance(containerId, badgeId) {
   var html = '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:10px;text-align:center;">';
   html += '<div><div style="font-size:18px;font-weight:800;color:#1843AD;">'+totalSigned+'</div><div style="font-size:9px;color:#94a3b8;">Signed</div></div>';
   html += '<div><div style="font-size:18px;font-weight:800;color:#072061;">'+totalUploaded+'</div><div style="font-size:9px;color:#94a3b8;">Uploaded</div></div>';
-  html += '<div><div style="font-size:18px;font-weight:800;color:#FF9933;">'+totalComments+'</div><div style="font-size:9px;color:#94a3b8;">Comments</div></div>';
+  html += '<div><div style="font-size:18px;font-weight:800;color:#FF9933;">'+totalComments+'</div><div style="font-size:9px;color:#94a3b8;">Open Queries</div></div>';
   html += '<div><div style="font-size:18px;font-weight:800;color:#059669;">'+totalSignoffs+'</div><div style="font-size:9px;color:#94a3b8;">Sign-Offs</div></div>';
   html += '<div><div style="font-size:18px;font-weight:800;color:#dc2626;">'+totalPend+'</div><div style="font-size:9px;color:#94a3b8;">Pending</div></div>';
   html += '</div>';
@@ -4864,7 +4864,7 @@ function showRegPerfDetail(userName, metric) {
     return (b[metric]||0) - (a[metric]||0);
   });
 
-  var labels = {docs_signed:'Documents Signed',docs_uploaded:'Documents Uploaded',comments:'Comments Created',signoffs:'Sign-Offs',pending:'Pending Items'};
+  var labels = {docs_signed:'Documents Signed',docs_uploaded:'Documents Uploaded',comments:'Open Queries Assigned',signoffs:'Sign-Offs',pending:'Pending Items'};
   var title = escapeHTML(userName) + ' — ' + (labels[metric] || metric);
   var total = studies.reduce(function(s,st) {
     if (metric === 'pending') return s + st.pending_docs + st.open_comments;
@@ -4896,11 +4896,12 @@ function showRegPerfDetail(userName, metric) {
     } else {
       body += '<td style="text-align:center;font-weight:700;">'+(s[metric]||0)+'</td>';
     }
-    // CRIO link to study files/regulatory page
-    var crioLink = studyUrl ? studyUrl.replace('/subjects', '/files') : '';
-    if (metric === 'pending' || metric === 'docs_signed' || metric === 'docs_uploaded') crioLink = studyUrl ? studyUrl.replace('/subjects', '/files') : '';
-    else if (metric === 'comments') crioLink = studyUrl || '';
-    else if (metric === 'signoffs') crioLink = studyUrl || '';
+    // CRIO link — comments go to /comments, docs go to /files
+    var crioLink = '';
+    if (metric === 'comments' || metric === 'pending') crioLink = studyUrl ? studyUrl.replace('/subjects', '/comments') : '';
+    else if (metric === 'docs_signed' || metric === 'docs_uploaded') crioLink = studyUrl ? studyUrl.replace('/subjects', '/files') : '';
+    else if (metric === 'signoffs') crioLink = studyUrl ? studyUrl.replace('/subjects', '/completed-visits') : '';
+    else crioLink = studyUrl || '';
     body += '<td style="text-align:center;">'+(crioLink ? '<a href="'+escapeHTML(crioLink)+'" target="_blank" style="color:#1843AD;font-size:10px;font-weight:600;text-decoration:none;">Open</a>' : '—')+'</td>';
     body += '</tr>';
   });
