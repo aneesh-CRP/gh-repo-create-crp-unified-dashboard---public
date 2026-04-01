@@ -216,7 +216,7 @@ const FEEDS = {
       JOIN ${tbl('user')} u ON ua.user_key = u.user_key
       WHERE ua._fivetran_deleted = false AND su._fivetran_deleted = false
       QUALIFY ROW_NUMBER() OVER (PARTITION BY ua.calendar_appointment_key ORDER BY ua.date_created DESC) = 1) sp ON ca.calendar_appointment_key = sp.calendar_appointment_key
-    WHERE ca.subject_key IS NOT NULL AND st.is_active = 1      AND ca.start >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL ${parseInt((params||{}).lookback) || 90} DAY)
+    WHERE ca.subject_key IS NOT NULL AND ca._fivetran_deleted = false AND st.is_active = 1      AND ca.start >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL ${parseInt((params||{}).lookback) || 90} DAY)
       AND ca.start <= DATETIME_ADD(CURRENT_DATETIME(), INTERVAL 365 DAY)
       ${STUDY_FILTER_SQL}
     ORDER BY ca.start ASC`,
@@ -464,7 +464,7 @@ const FEEDS = {
       JOIN ${tbl('user')} u ON ua.user_key = u.user_key
       WHERE ua._fivetran_deleted = false AND su._fivetran_deleted = false
       QUALIFY ROW_NUMBER() OVER (PARTITION BY ua.calendar_appointment_key ORDER BY ua.date_created DESC) = 1) sp ON ca.calendar_appointment_key = sp.calendar_appointment_key
-    WHERE ca.subject_key IS NOT NULL AND st.is_active = 1      AND ca.status != 0
+    WHERE ca.subject_key IS NOT NULL AND ca._fivetran_deleted = false AND st.is_active = 1      AND ca.status != 0
       AND ca.start >= CURRENT_DATETIME()
       AND ca.start <= DATETIME_ADD(CURRENT_DATETIME(), INTERVAL 365 DAY)
       AND (LOWER(CONCAT(COALESCE(st.nickname, ''), ' ', COALESCE(st.protocol_number, ''))) LIKE '%pre-screen%'
@@ -814,7 +814,7 @@ const FEEDS = {
       'visits' AS feed, COUNT(*) AS row_count,
       MAX(FORMAT_DATETIME('%Y-%m-%d %H:%M', ca.start)) AS latest_date
     FROM ${tbl('calendar_appointment')} ca
-    WHERE ca.start >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 7 DAY) AND ca.subject_key IS NOT NULL
+    WHERE ca.start >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 7 DAY) AND ca.subject_key IS NOT NULL AND ca._fivetran_deleted = false
     UNION ALL
     SELECT 'cancels', COUNT(*), MAX(FORMAT_DATETIME('%Y-%m-%d %H:%M', aal.date_created))
     FROM ${tbl('appointment_audit_log')} aal WHERE aal.change_type = 4 AND aal.date_created >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 90 DAY)
@@ -896,7 +896,7 @@ const FEEDS = {
       CONCAT(COALESCE(cu.first_name, ''), ' ', COALESCE(cu.last_name, '')) AS created_by,
       CONCAT(COALESCE(comp_u.first_name, ''), ' ', COALESCE(comp_u.last_name, '')) AS completed_by,
       CAST(vt.subject_key AS STRING) AS subject_key,
-      COALESCE(NULLIF(TRIM(CONCAT(COALESCE(sub.first_name,''),' ',COALESCE(sub.last_name,''))), ''), CAST(vt.subject_key AS STRING)) AS subject_name,
+      COALESCE(NULLIF(${SUBJECT_NAME_SQL}, ''), CAST(vt.subject_key AS STRING)) AS subject_name,
       COALESCE(sv.name, '') AS visit_name
     FROM ${tbl('subject_visit_todo')} vt
     JOIN ${tbl('study')} st ON vt.study_key = st.study_key
@@ -1217,7 +1217,7 @@ const FEEDS = {
       CASE WHEN c.is_resolved = 1 THEN 'Resolved' ELSE 'Open' END AS status,
       c.message,
       CONCAT(COALESCE(u.first_name, ''), ' ', COALESCE(u.last_name, '')) AS created_by,
-      COALESCE(NULLIF(TRIM(CONCAT(COALESCE(sub.first_name,''),' ',COALESCE(sub.last_name,''))), ''), CAST(c.subject_key AS STRING)) AS subject_name,
+      COALESCE(NULLIF(${SUBJECT_NAME_SQL}, ''), CAST(c.subject_key AS STRING)) AS subject_name,
       CAST(c.subject_key AS STRING) AS subject_key,
       CAST(c.comment_key AS STRING) AS comment_key,
       CAST(c.subject_visit_key AS STRING) AS subject_visit_key,
@@ -1344,7 +1344,7 @@ const FEEDS = {
       const days = parseInt(params.days) || 90;
       return `SELECT
         CAST(q.study_key AS STRING) AS study_key,
-        COALESCE(st.nickname, st.protocol_number, '') AS study_name,
+        ${STUDY_NAME_SQL} AS study_name,
         CAST(q.subject_visit_key AS STRING) AS subject_visit_key,
         COALESCE(sv.name, '') AS visit_name,
         CAST(q.subject_key AS STRING) AS subject_key,
@@ -1356,6 +1356,7 @@ const FEEDS = {
         COUNTIF(q.is_completed_outside_crio = 1) AS outside_crio
       FROM ${tbl('fact_subject_visit_procedure_question')} q
       JOIN ${tbl('study')} st ON q.study_key = st.study_key
+      LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
       LEFT JOIN ${tbl('subject_visit')} svi ON q.subject_visit_key = svi.subject_visit_key
       LEFT JOIN ${tbl('study_visit')} sv ON svi.study_visit_key = sv.study_visit_key
       WHERE q.date_completed >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL ${days} DAY)
@@ -1385,7 +1386,7 @@ const FEEDS = {
     JOIN ${tbl('study')} st ON gi.study_id = st.external_id
     LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
     LEFT JOIN ${tbl('gaap_invoice_item')} gii ON gi.invoice_id = gii.invoice_id AND gii.is_active = true
-    LEFT JOIN ${tbl('site')} si ON gi.site_id = st.external_id
+    LEFT JOIN ${tbl('site')} si ON CAST(si.site_key AS STRING) = gi.site_id
     WHERE st.is_active = 1
     GROUP BY gi.invoice_number, gi.invoice_id, st.study_key, study_name, spon.name, gi.status, gi.date_created, gi.date_due, gi.date_sent, gi.bill_to_company, si.name
     ORDER BY gi.date_created DESC`
@@ -1890,7 +1891,7 @@ const FEEDS = {
       WITH active_subjects AS (
         SELECT sub.subject_key, sub.study_key,
           ${SUBJECT_NAME_SQL} AS subject_name,
-          CASE sub.status WHEN 10 THEN 'Screening' WHEN 11 THEN 'Enrolled' ELSE CAST(sub.status AS STRING) END AS subject_status,
+          CASE sub.status WHEN -2 THEN 'Not Interested' WHEN -1 THEN 'Not Eligible' WHEN 1 THEN 'Interested' WHEN 2 THEN 'Prequalified' WHEN 3 THEN 'No Show/Cancelled V1' WHEN 4 THEN 'Scheduled V1' WHEN 10 THEN 'Screening' WHEN 11 THEN 'Enrolled' WHEN 12 THEN 'Screen Fail' WHEN 13 THEN 'Discontinued' WHEN 20 THEN 'Completed' ELSE CAST(sub.status AS STRING) END AS subject_status,
           sub.status AS status_code
         FROM ${tbl('subject')} sub
         JOIN ${tbl('study')} st ON sub.study_key = st.study_key
