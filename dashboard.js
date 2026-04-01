@@ -4634,7 +4634,7 @@ function renderCoordPeriodTable() {
     var visits = visitsByCoord[name] || 0;
     var cancels = cancelsByCoord[name] || 0;
     var barPct = Math.min(100, Math.round(visits / (monthMax * 1.1) * 100));
-    var avg = workDays > 0 ? (visits / workDays).toFixed(1) : '0.0';
+    var avg = workDays >= 5 ? (visits / workDays).toFixed(1) : (visits > 0 ? visits + '/' + workDays + 'd' : '—');
     var cancelRate = (visits + cancels) > 0 ? Math.round(cancels / (visits + cancels) * 100) : 0;
     var crColor = cancelRate > 20 ? '#dc2626' : cancelRate > 10 ? '#FF9933' : '#059669';
     return '<tr style="border-bottom:1px solid var(--border);cursor:pointer;" onclick="showCoordDetail(\'' + jsAttr(name) + '\')">' +
@@ -6450,6 +6450,7 @@ function switchView(name, el) {
       safe(renderFollowUpTable, 'renderFollowUpTable');
       safe(renderOperationsTab, 'renderOperationsTab');
       safe(renderTrendsCharts, 'renderTrendsCharts');
+      safe(renderCoordCancelTypeChart, 'renderCoordCancelTypeChart');
       if (_tabDirty.actions) {
         safe(buildActionSteps, 'buildActionSteps');
         safe(buildInsights, 'buildInsights');
