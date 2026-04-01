@@ -1991,7 +1991,7 @@ function crioPut(path, body) {
 
 const TWILIO_SID = process.env.TWILIO_SID || '';
 const TWILIO_TOKEN = process.env.TWILIO_TOKEN || '';
-const TWILIO_FROM = '+13366063863';
+const TWILIO_FROM = '+18334871852';  // Toll-free — pending verification
 
 function twilioSend(to, body) {
   if (!TWILIO_SID || !TWILIO_TOKEN) throw new Error('Twilio credentials not configured');
@@ -2148,7 +2148,7 @@ async function runReminderEngine(options = {}) {
     if (!reminderType) { results.skipped.push({ name: v.subject_name, hours, reason: 'outside reminder windows' }); continue; }
 
     // Check do-not-text
-    if (v.do_not_text === 'true' || v.do_not_text === true) {
+    if (v.do_not_text === '1' || v.do_not_text === 1 || v.do_not_text === 'true') {
       results.skipped.push({ name: v.subject_name, reason: 'do_not_text flag set' }); continue;
     }
 
@@ -3637,6 +3637,58 @@ functions.http('crpBqApi', async (req, res) => {
   res.set('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
 
+  // ── GET: CRIO Patient PUT test — read a patient, append a test note, PUT back ──
+  if (req.query.action === 'crio-put-test') {
+    res.set('Cache-Control', 'no-store');
+    try {
+      if (!CRIO_TOKEN) { res.status(500).json({ error: 'CRIO_TOKEN not configured' }); return; }
+      const siteId = req.query.site || CRIO_SITE_IDS.PHL;
+      // Get a test patient from BQ
+      const patients = await runQuery(`SELECT CAST(patient_key AS STRING) AS patient_key,
+        CONCAT(first_name, ' ', last_name) AS name
+        FROM ${tbl('patient')} WHERE site_key = ${siteId} AND _fivetran_deleted = false
+        ORDER BY last_updated DESC LIMIT 1`);
+      if (!patients.length) { res.json({ error: 'No patients found' }); return; }
+      const pk = patients[0].patient_key;
+      const results = { patient: patients[0].name, patient_key: pk, site: siteId };
+
+      // GET current patient
+      const getR = await crioFetch(`/api/v1/patient/${pk}/site/${siteId}`);
+      results.get = { status: getR.status };
+      if (getR.status !== 200) { results.get.body = getR.body.substring(0, 500); res.json(results); return; }
+      const patient = JSON.parse(getR.body);
+      const pi = patient.patientInfo;
+      results.get.revision = patient.revision;
+      results.get.hasNotes = !!pi.notes;
+      results.get.notesPreview = (pi.notes || '').substring(0, 200);
+
+      // PUT with updated notes (append test line)
+      const ts = new Date().toISOString().replace('T', ' ').substring(0, 19);
+      const testNote = `[CRP PUT Test ${ts}]`;
+      const updatedNotes = pi.notes ? pi.notes + '\n' + testNote : testNote;
+      const putR = await crioPut(`/api/v1/patient/${pk}`, {
+        siteId: siteId,
+        revision: patient.revision,
+        patientInfo: { ...pi, notes: updatedNotes }
+      });
+      results.put = { status: putR.status, body: putR.body.substring(0, 500) };
+      results.success = putR.status === 200;
+
+      // Verify by re-reading
+      if (putR.status === 200) {
+        const verifyR = await crioFetch(`/api/v1/patient/${pk}/site/${siteId}`);
+        if (verifyR.status === 200) {
+          const v = JSON.parse(verifyR.body);
+          results.verify = { notesContainTest: (v.patientInfo.notes || '').indexOf(testNote) !== -1, newRevision: v.revision };
+        }
+      }
+      res.json(results);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+    return;
+  }
+
   // ── POST/GET: Send Reminders — dry-run preview or live send ──
   if (req.query.action === 'send-reminders') {
     res.set('Cache-Control', 'no-store');
@@ -3661,7 +3713,7 @@ functions.http('crpBqApi', async (req, res) => {
       const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
       if (!body.to || !body.message) { res.status(400).json({ error: 'Provide to and message in body' }); return; }
       const result = await twilioSend(body.to, body.message);
-      res.json({ success: result.status === 201, ...result });
+      res.json({ success: result.status === 201 || result.status === 'queued', ...result });
     } catch (err) {
       console.error('test-sms error:', err.message);
       res.status(500).json({ success: false, error: err.message });

@@ -9633,11 +9633,18 @@ function renderFollowUpTable() {
     }
   });
 
-  // Build recruiting source lookup
+  // Build recruiting source + contact history lookup
   var _srcByName = {};
+  var _contactByName = {};  // name → { calls, texts, emails, status_changed, needs_followup }
   (window._recruitingData || []).forEach(function(r) {
     var n = (r.patient_name||'').toLowerCase().trim().replace(/\s+/g,' ');
-    if (n && r.referral_source) _srcByName[n] = r.referral_source;
+    if (!n) return;
+    if (r.referral_source) _srcByName[n] = r.referral_source;
+    var prev = _contactByName[n];
+    var calls = parseInt(r.calls)||0, texts = parseInt(r.texts)||0, emails = parseInt(r.emails)||0;
+    if (!prev || (calls+texts+emails) > (prev.calls+prev.texts+prev.emails)) {
+      _contactByName[n] = { calls:calls, texts:texts, emails:emails, status_changed:r.status_changed||'', needs_followup:r.needs_followup||'' };
+    }
   });
 
   function addRows(list, cat, catLabel, catColor) {
@@ -9653,9 +9660,11 @@ function renderFollowUpTable() {
       // Lookup referral source — try _crioRefSourceMap first, then recruiting data
       var srcObj = window._crioRefSourceMap ? window._crioRefSourceMap.get(nameLo) : null;
       var source = srcObj ? srcObj.source : (_srcByName[nameLo] || '');
-      // Lookup risk
-      var riskFlag = _riskByName[nameLo];
-      var riskLevel = riskFlag ? riskFlag.severity : '';
+      // Lookup last contact from PATIENT_DB_MAP + recruiting data
+      var _pdb = typeof PATIENT_DB_MAP !== 'undefined' ? PATIENT_DB_MAP.get(nameLo) : null;
+      var _lastContactDate = _pdb ? (_pdb.last_interaction_date||'').substring(0,10) : '';
+      var _contactInfo = _contactByName[nameLo] || { calls:0, texts:0, emails:0, status_changed:'' };
+      if (!_lastContactDate && _contactInfo.status_changed) _lastContactDate = (_contactInfo.status_changed||'').substring(0,10);
       // Best reason: audit trail > cancel reason > category
       var auditKey = nameLo + '|' + study.toLowerCase();
       var auditReasons = _auditReasons[auditKey] || [];
@@ -9676,11 +9685,9 @@ function renderFollowUpTable() {
         coord: r.coord || '',
         site: site, siteCode: siteCode,
         source: source,
-        riskLevel: riskLevel,
-        type: r.type || '',
-        clickup_url: cuMatch ? cuMatch.url : '',
-        clickup_stage: cuMatch ? cuMatch.stage : '',
-        clickup_tracker: cuMatch ? cuMatch.tracker : ''
+        lastContact: _lastContactDate,
+        contactCalls: _contactInfo.calls, contactTexts: _contactInfo.texts, contactEmails: _contactInfo.emails,
+        type: r.type || ''
       });
     });
   }
@@ -9712,11 +9719,15 @@ function renderFollowUpTable() {
     if (seen.has(key) || !name) return;
     seen.add(key);
     var site = r.site_name || '';
-    var srcObj = window._crioRefSourceMap ? window._crioRefSourceMap.get(name.toLowerCase().replace(/\s+/g,' ').trim()) : null;
+    var _uNameLo = name.toLowerCase().replace(/\s+/g,' ').trim();
+    var srcObj = window._crioRefSourceMap ? window._crioRefSourceMap.get(_uNameLo) : null;
     var _uSk = r.subject_key || '';
     var _uStatus = r.subject_status || '';
     if (_uSk && window._subjectCurrentStatus && window._subjectCurrentStatus[String(_uSk)]) _uStatus = window._subjectCurrentStatus[String(_uSk)];
-    var cuMatchU = matchClickUpPatient(name, _cuLookup);
+    var _uPdb = typeof PATIENT_DB_MAP !== 'undefined' ? PATIENT_DB_MAP.get(_uNameLo) : null;
+    var _uLastContact = _uPdb ? (_uPdb.last_interaction_date||'').substring(0,10) : '';
+    var _uContact = _contactByName[_uNameLo] || { calls:0, texts:0, emails:0, status_changed:'' };
+    if (!_uLastContact && _uContact.status_changed) _uLastContact = (_uContact.status_changed||'').substring(0,10);
     rows.push({
       _name: name, _study: study, _cat: 'unsched', _catLabel: 'Not Scheduled', _catColor: '#FF9933',
       url: typeof window._crioPatientUrl === 'function' ? window._crioPatientUrl(r.study_key, r.subject_key, site) : '',
@@ -9724,10 +9735,10 @@ function renderFollowUpTable() {
       status: _uStatus, reason: r.last_visit_name || '',
       date: r.last_visit_date || '', coord: '', site: site,
       siteCode: site.indexOf('Penn') !== -1 ? 'PNJ' : 'PHL',
-      source: srcObj ? srcObj.source : '', riskLevel: '', type: '',
-      clickup_url: cuMatchU ? cuMatchU.url : '',
-      clickup_stage: cuMatchU ? cuMatchU.stage : '',
-      clickup_tracker: cuMatchU ? cuMatchU.tracker : ''
+      source: srcObj ? srcObj.source : '',
+      lastContact: _uLastContact,
+      contactCalls: _uContact.calls, contactTexts: _uContact.texts, contactEmails: _uContact.emails,
+      type: ''
     });
   });
 
@@ -9784,7 +9795,6 @@ function renderFollowUpTable() {
     var k = _fuKey(r);
     var act = _fuActions[k] || {};
     var hasAction = !!act.action;
-    var riskColor = r.riskLevel === 'critical' ? '#dc2626' : r.riskLevel === 'high' ? '#FF9933' : r.riskLevel === 'medium' ? '#1843AD' : r.riskLevel === 'low' ? '#059669' : '#cbd5e1';
     var rowBg = hasAction ? (act.action === 'lost' || act.action === 'noaction' ? '#f8fafc' : '#f0fdf4') : '';
     var rowOpacity = (act.action === 'lost' || act.action === 'noaction') ? 'opacity:0.5;' : '';
 
@@ -9797,14 +9807,18 @@ function renderFollowUpTable() {
     html += '<td style="padding:7px 6px;text-align:center;font-size:11px;color:#64748b;">' + escapeHTML(r.date || '—') + '</td>';
     html += '<td style="padding:7px 6px;text-align:center;font-size:11px;">' + escapeHTML(r.coord ? r.coord.split(' ')[0] : '—') + '</td>';
     html += '<td style="padding:7px 6px;text-align:center;font-size:10px;color:#475569;max-width:80px;overflow:hidden;text-overflow:ellipsis;" title="'+escapeHTML(r.source)+'">' + escapeHTML(r.source ? r.source.split(' ')[0] : '—') + '</td>';
-    html += '<td style="padding:7px 6px;text-align:center;"><span style="font-size:9px;font-weight:700;padding:2px 5px;border-radius:4px;background:'+riskColor+'15;color:'+riskColor+';">'+(r.riskLevel||'—')+'</span></td>';
-    // ClickUp link
-    if (r.clickup_url) {
-      var cuColor = r.clickup_stage === 'Enrolled' ? '#059669' : r.clickup_stage === 'Screening' || r.clickup_stage === 'Pre-Screening' ? '#1843AD' : r.clickup_stage === 'Lost' || r.clickup_stage === 'DNQ' || r.clickup_stage === 'Screen Fail' ? '#dc2626' : '#072061';
-      html += '<td style="padding:7px 6px;text-align:center;"><a href="'+escapeHTML(r.clickup_url)+'" target="_blank" title="'+escapeHTML((r.clickup_tracker||'')+' · '+r.clickup_stage)+'" style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;background:'+cuColor+'15;color:'+cuColor+';text-decoration:none;white-space:nowrap;">'+escapeHTML(r.clickup_stage||'Open')+'</a></td>';
-    } else {
-      html += '<td style="padding:7px 6px;text-align:center;font-size:9px;color:#cbd5e1;">—</td>';
-    }
+    // Last Contact date with days-ago badge
+    var _lcDate = r.lastContact || '';
+    var _lcDays = _lcDate ? Math.floor((Date.now() - new Date(_lcDate+'T00:00:00').getTime()) / 86400000) : -1;
+    var _lcColor = _lcDays >= 0 && _lcDays <= 3 ? '#059669' : _lcDays <= 7 ? '#1843AD' : _lcDays <= 14 ? '#FF9933' : _lcDays >= 0 ? '#dc2626' : '#cbd5e1';
+    html += '<td style="padding:7px 6px;text-align:center;font-size:10px;">' + (_lcDate ? '<span style="color:'+_lcColor+';font-weight:600">'+_lcDate.substring(5)+'</span><div style="font-size:8px;color:'+_lcColor+';">'+(_lcDays >= 0 ? _lcDays+'d ago' : '')+'</div>' : '<span style="color:#cbd5e1">—</span>') + '</td>';
+    // Outreach summary: calls/texts/emails
+    var _totalOutreach = (r.contactCalls||0) + (r.contactTexts||0) + (r.contactEmails||0);
+    var _outreachParts = [];
+    if (r.contactCalls > 0) _outreachParts.push(r.contactCalls + 'C');
+    if (r.contactTexts > 0) _outreachParts.push(r.contactTexts + 'T');
+    if (r.contactEmails > 0) _outreachParts.push(r.contactEmails + 'E');
+    html += '<td style="padding:7px 6px;text-align:center;font-size:10px;">' + (_totalOutreach > 0 ? '<span style="font-weight:600;color:#072061" title="'+r.contactCalls+' calls, '+r.contactTexts+' texts, '+r.contactEmails+' emails">' + _outreachParts.join('/') + '</span>' : '<span style="color:#cbd5e1">—</span>') + '</td>';
     // Next steps dropdown
     html += '<td style="padding:4px 6px;text-align:center;"><select data-fukey="'+escapeHTML(k)+'" onchange="setFollowUpAction(this)" style="font-size:10px;padding:3px 4px;border-radius:4px;border:1px solid '+(hasAction?'#059669':'#e2e8f0')+';color:'+(hasAction?'#059669':'#64748b')+';background:'+(hasAction?'#f0fdf4':'#fff')+';cursor:pointer;width:100%;font-weight:'+(hasAction?'600':'400')+';">';
     FU_NEXT_STEPS.forEach(function(s) {
@@ -9815,7 +9829,7 @@ function renderFollowUpTable() {
   });
 
   if (filtered.length === 0) {
-    html = '<tr><td colspan="11" style="text-align:center;padding:30px;color:#94a3b8;">No patients match current filters</td></tr>';
+    html = '<tr><td colspan="11" style="text-align:center;padding:30px;color:#94a3b8">No patients match current filters</td></tr>';
   }
   tbody.innerHTML = html;
   // Store for ClickUp sync lookup
@@ -9868,7 +9882,7 @@ function _syncFollowUpToClickUp(r, action) {
     crio_url: r.url || '',
     status: r.status || '',
     source: r.source || '',
-    risk: r.riskLevel || ''
+    last_contact: r.lastContact || ''
   };
   fetch(base + '?action=followup-sync', {
     method: 'POST',
