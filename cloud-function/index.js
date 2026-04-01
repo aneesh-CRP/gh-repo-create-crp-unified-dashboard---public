@@ -1722,7 +1722,7 @@ const FEEDS = {
         GROUP BY sd.assigned_user_key, sd.study_key
       ),
       comments AS (
-        SELECT u.user_key,
+        SELECT sc.user_key,
           CAST(c.study_key AS STRING) AS study_key,
           ${STUDY_NAME_SQL} AS study_name,
           COUNT(*) AS comments_created,
@@ -1730,10 +1730,12 @@ const FEEDS = {
         FROM ${tbl('comment')} c
         JOIN ${tbl('study')} st ON c.study_key = st.study_key
         LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
-        LEFT JOIN ${tbl('user')} u ON LOWER(CONCAT(COALESCE(u.first_name,''),' ',COALESCE(u.last_name,''))) = LOWER(c.assigned_to)
+        LEFT JOIN (SELECT su.study_key, su.user_key
+          FROM ${tbl('study_user')} su WHERE su.role = 2 AND su._fivetran_deleted = false
+          QUALIFY ROW_NUMBER() OVER (PARTITION BY su.study_key ORDER BY su.date_created DESC) = 1) sc ON c.study_key = sc.study_key
         WHERE c._fivetran_deleted = false AND st.is_active = 1 AND c.is_resolved = 0
-          AND u.user_key IS NOT NULL
-        GROUP BY u.user_key, c.study_key, study_name
+          AND sc.user_key IS NOT NULL
+        GROUP BY sc.user_key, c.study_key, study_name
       ),
       signoffs AS (
         SELECT so.user_key,
