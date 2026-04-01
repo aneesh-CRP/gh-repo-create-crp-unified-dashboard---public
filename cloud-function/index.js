@@ -1816,7 +1816,35 @@ const FEEDS = {
     ORDER BY total_documents DESC`
   },
 
-  // ── 55. Unscheduled Visits (active subjects with no upcoming appointment) ──
+  // ── Last interaction per patient (for Follow-Up table) ──
+  lastInteraction: {
+    query: () => `WITH ranked AS (
+      SELECT
+        CONCAT(COALESCE(p.first_name,''), ' ', COALESCE(p.last_name,'')) AS patient_name,
+        CAST(pi.patient_key AS STRING) AS patient_key,
+        FORMAT_DATETIME('%Y-%m-%d', pi.action_date) AS action_date,
+        CASE
+          WHEN pi.action_type BETWEEN 100 AND 199 THEN 'Call'
+          WHEN pi.action_type BETWEEN 200 AND 299 THEN 'Text'
+          WHEN pi.action_type BETWEEN 300 AND 399 THEN 'Email'
+          WHEN pi.action_type = 720 THEN 'Interested'
+          ELSE 'Other'
+        END AS action_type,
+        COALESCE(pi.action_details, '') AS action_details,
+        CONCAT(COALESCE(u.first_name,''), ' ', COALESCE(u.last_name,'')) AS performed_by,
+        ROW_NUMBER() OVER (PARTITION BY pi.patient_key ORDER BY pi.action_date DESC, pi.date_created DESC) AS rn
+      FROM ${tbl('patient_interaction')} pi
+      LEFT JOIN ${tbl('patient')} p ON pi.patient_key = p.patient_key
+      LEFT JOIN ${tbl('user')} u ON pi.user_key = u.user_key
+      WHERE pi._fivetran_deleted = false
+        AND pi.action_date >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 90 DAY)
+        AND pi.site_key IN (1679, 5545)
+    )
+    SELECT patient_name, patient_key, action_date, action_type, action_details, performed_by
+    FROM ranked WHERE rn = 1
+    ORDER BY action_date DESC`
+  },
+
   // ── Ride/Transport Requests (from patient interactions) ──
   rideRequests: {
     query: () => `

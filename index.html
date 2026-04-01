@@ -1654,7 +1654,7 @@ body {
             <th style="padding:8px 6px;text-align:center;font-weight:700;white-space:nowrap;position:sticky;top:0;z-index:2;background:var(--surface2);font-size:11px">Coord</th>
             <th style="padding:8px 6px;text-align:center;font-weight:700;white-space:nowrap;position:sticky;top:0;z-index:2;background:var(--surface2);font-size:11px">Source</th>
             <th style="padding:8px 6px;text-align:center;font-weight:700;white-space:nowrap;position:sticky;top:0;z-index:2;background:var(--surface2);font-size:11px">Last Contact</th>
-            <th style="padding:8px 6px;text-align:center;font-weight:700;white-space:nowrap;position:sticky;top:0;z-index:2;background:var(--surface2);font-size:11px">Outreach</th>
+            <th style="padding:8px 6px;text-align:left;font-weight:700;white-space:nowrap;position:sticky;top:0;z-index:2;background:var(--surface2);font-size:11px">Last Action</th>
             <th style="padding:8px 8px;text-align:center;font-weight:700;white-space:nowrap;position:sticky;top:0;z-index:2;background:var(--surface2);min-width:130px">Next Steps</th>
           </tr>
         </thead>
@@ -11640,18 +11640,11 @@ function renderFollowUpTable() {
     }
   });
 
-  // Build recruiting source + contact history lookup
+  // Build recruiting source lookup
   var _srcByName = {};
-  var _contactByName = {};  // name → { calls, texts, emails, status_changed, needs_followup }
   (window._recruitingData || []).forEach(function(r) {
     var n = (r.patient_name||'').toLowerCase().trim().replace(/\s+/g,' ');
-    if (!n) return;
-    if (r.referral_source) _srcByName[n] = r.referral_source;
-    var prev = _contactByName[n];
-    var calls = parseInt(r.calls)||0, texts = parseInt(r.texts)||0, emails = parseInt(r.emails)||0;
-    if (!prev || (calls+texts+emails) > (prev.calls+prev.texts+prev.emails)) {
-      _contactByName[n] = { calls:calls, texts:texts, emails:emails, status_changed:r.status_changed||'', needs_followup:r.needs_followup||'' };
-    }
+    if (n && r.referral_source) _srcByName[n] = r.referral_source;
   });
 
   function addRows(list, cat, catLabel, catColor) {
@@ -11667,11 +11660,11 @@ function renderFollowUpTable() {
       // Lookup referral source — try _crioRefSourceMap first, then recruiting data
       var srcObj = window._crioRefSourceMap ? window._crioRefSourceMap.get(nameLo) : null;
       var source = srcObj ? srcObj.source : (_srcByName[nameLo] || '');
-      // Lookup last contact from PATIENT_DB_MAP + recruiting data
-      var _pdb = typeof PATIENT_DB_MAP !== 'undefined' ? PATIENT_DB_MAP.get(nameLo) : null;
-      var _lastContactDate = _pdb ? (_pdb.last_interaction_date||'').substring(0,10) : '';
-      var _contactInfo = _contactByName[nameLo] || { calls:0, texts:0, emails:0, status_changed:'' };
-      if (!_lastContactDate && _contactInfo.status_changed) _lastContactDate = (_contactInfo.status_changed||'').substring(0,10);
+      // Lookup last interaction from BQ lastInteraction feed
+      var _liMap = window._lastInteractionMap;
+      var _li = _liMap ? _liMap.get(nameLo) : null;
+      var _lastContactDate = _li ? (_li.action_date||'').substring(0,10) : '';
+      var _lastActionSummary = _li ? ((_li.action_type||'') + ((_li.action_details||'').trim() ? ': ' + _li.action_details.trim() : '') + (_li.performed_by ? ' — ' + _li.performed_by.split(' ')[0] : '')) : '';
       // Best reason: audit trail > cancel reason > category
       var auditKey = nameLo + '|' + study.toLowerCase();
       var auditReasons = _auditReasons[auditKey] || [];
@@ -11693,7 +11686,7 @@ function renderFollowUpTable() {
         site: site, siteCode: siteCode,
         source: source,
         lastContact: _lastContactDate,
-        contactCalls: _contactInfo.calls, contactTexts: _contactInfo.texts, contactEmails: _contactInfo.emails,
+        lastAction: _lastActionSummary,
         type: r.type || ''
       });
     });
@@ -11731,10 +11724,9 @@ function renderFollowUpTable() {
     var _uSk = r.subject_key || '';
     var _uStatus = r.subject_status || '';
     if (_uSk && window._subjectCurrentStatus && window._subjectCurrentStatus[String(_uSk)]) _uStatus = window._subjectCurrentStatus[String(_uSk)];
-    var _uPdb = typeof PATIENT_DB_MAP !== 'undefined' ? PATIENT_DB_MAP.get(_uNameLo) : null;
-    var _uLastContact = _uPdb ? (_uPdb.last_interaction_date||'').substring(0,10) : '';
-    var _uContact = _contactByName[_uNameLo] || { calls:0, texts:0, emails:0, status_changed:'' };
-    if (!_uLastContact && _uContact.status_changed) _uLastContact = (_uContact.status_changed||'').substring(0,10);
+    var _uLi = _liMap ? _liMap.get(_uNameLo) : null;
+    var _uLastContact = _uLi ? (_uLi.action_date||'').substring(0,10) : '';
+    var _uLastAction = _uLi ? ((_uLi.action_type||'') + ((_uLi.action_details||'').trim() ? ': ' + _uLi.action_details.trim() : '') + (_uLi.performed_by ? ' — ' + _uLi.performed_by.split(' ')[0] : '')) : '';
     rows.push({
       _name: name, _study: study, _cat: 'unsched', _catLabel: 'Not Scheduled', _catColor: '#FF9933',
       url: typeof window._crioPatientUrl === 'function' ? window._crioPatientUrl(r.study_key, r.subject_key, site) : '',
@@ -11744,7 +11736,7 @@ function renderFollowUpTable() {
       siteCode: site.indexOf('Penn') !== -1 ? 'PNJ' : 'PHL',
       source: srcObj ? srcObj.source : '',
       lastContact: _uLastContact,
-      contactCalls: _uContact.calls, contactTexts: _uContact.texts, contactEmails: _uContact.emails,
+      lastAction: _uLastAction,
       type: ''
     });
   });
@@ -11819,13 +11811,8 @@ function renderFollowUpTable() {
     var _lcDays = _lcDate ? Math.floor((Date.now() - new Date(_lcDate+'T00:00:00').getTime()) / 86400000) : -1;
     var _lcColor = _lcDays >= 0 && _lcDays <= 3 ? '#059669' : _lcDays <= 7 ? '#1843AD' : _lcDays <= 14 ? '#FF9933' : _lcDays >= 0 ? '#dc2626' : '#cbd5e1';
     html += '<td style="padding:7px 6px;text-align:center;font-size:10px;">' + (_lcDate ? '<span style="color:'+_lcColor+';font-weight:600">'+_lcDate.substring(5)+'</span><div style="font-size:8px;color:'+_lcColor+';">'+(_lcDays >= 0 ? _lcDays+'d ago' : '')+'</div>' : '<span style="color:#cbd5e1">—</span>') + '</td>';
-    // Outreach summary: calls/texts/emails
-    var _totalOutreach = (r.contactCalls||0) + (r.contactTexts||0) + (r.contactEmails||0);
-    var _outreachParts = [];
-    if (r.contactCalls > 0) _outreachParts.push(r.contactCalls + 'C');
-    if (r.contactTexts > 0) _outreachParts.push(r.contactTexts + 'T');
-    if (r.contactEmails > 0) _outreachParts.push(r.contactEmails + 'E');
-    html += '<td style="padding:7px 6px;text-align:center;font-size:10px;">' + (_totalOutreach > 0 ? '<span style="font-weight:600;color:#072061" title="'+r.contactCalls+' calls, '+r.contactTexts+' texts, '+r.contactEmails+' emails">' + _outreachParts.join('/') + '</span>' : '<span style="color:#cbd5e1">—</span>') + '</td>';
+    // Last action summary from CRIO patient_interaction
+    html += '<td style="padding:7px 6px;font-size:10px;color:#475569;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+escapeHTML(r.lastAction||'')+'">' + (r.lastAction ? escapeHTML(r.lastAction.substring(0, 80)) : '<span style="color:#cbd5e1">—</span>') + '</td>';
     // Next steps dropdown
     html += '<td style="padding:4px 6px;text-align:center;"><select data-fukey="'+escapeHTML(k)+'" onchange="setFollowUpAction(this)" style="font-size:10px;padding:3px 4px;border-radius:4px;border:1px solid '+(hasAction?'#059669':'#e2e8f0')+';color:'+(hasAction?'#059669':'#64748b')+';background:'+(hasAction?'#f0fdf4':'#fff')+';cursor:pointer;width:100%;font-weight:'+(hasAction?'600':'400')+';">';
     FU_NEXT_STEPS.forEach(function(s) {
@@ -19612,6 +19599,18 @@ async function _crpInit() {
       }
       else setHealthChip('dh-patientdb','warn','Patient DB (empty)');
     }).catch(e => { console.warn('CRP: Patient DB fetch failed:', e); setHealthChip('dh-patientdb','fail','Patient DB (failed)'); });
+
+    // Last interaction per patient — for Follow-Up table
+    if (base) fetch(base + '?feed=lastInteraction&format=json').then(r => r.json()).then(json => {
+      var data = json.data || [];
+      window._lastInteractionMap = new Map();
+      data.forEach(function(r) {
+        var n = (r.patient_name||'').toLowerCase().trim().replace(/\s+/g,' ');
+        if (n) window._lastInteractionMap.set(n, r);
+      });
+      _log('CRP: Last interactions loaded: ' + data.length + ' patients');
+      if (_activeNow === 'actions') safe(renderFollowUpTable, 'renderFollowUpTable-interactions');
+    }).catch(e => { console.warn('CRP: lastInteraction fetch failed:', e); });
 
     fetchFacebookCRM().then(() => {
       setHealthChip('dh-fbcrm','ok','FB CRM (' + (FB_CRM_DATA||[]).length + ')');
