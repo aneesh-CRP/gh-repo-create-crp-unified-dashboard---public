@@ -13782,16 +13782,18 @@ function disconnectClickUp() {
 
 function initReferrals() {
   // Data comes from Google Sheets CSV (synced from ClickUp every 15 min) — no token needed
-  document.getElementById('referral-setup').style.display = 'none';
-  document.getElementById('referral-dashboard').style.display = 'block';
+  var _refSetup = document.getElementById('referral-setup');
+  var _refDash = document.getElementById('referral-dashboard');
+  if (_refSetup) _refSetup.style.display = 'none';
+  if (_refDash) _refDash.style.display = 'block';
   if (!_referralsLoaded) refreshReferrals();
-  if (FB_CRM_DATA.length === 0) fetchFacebookCRM().catch(e => console.warn('FB CRM:', e));
+  if (FB_CRM_DATA.length === 0) fetchFacebookCRM().catch(e => { console.warn('FB CRM:', e); setHealthChip('dh-fbcrm','fail','FB CRM (failed)'); });
   // Delay med records fetch to avoid Google Sheets rate limiting (referrals+campaigns fetch first)
-  if (MED_RECORDS_DATA.length === 0) setTimeout(function(){ fetchMedicalRecords().catch(e => _log('Med Records retry: ' + e.message)); }, CRP_CONFIG.RETRY_DELAY);
-  // CRIO API data — fetch after a delay to avoid rate limiting
-  if (CRIO_STUDIES_DATA.length === 0) setTimeout(function(){ fetchCrioStudies().catch(e => console.warn('CRIO Studies:', e)); }, 8000);
+  if (MED_RECORDS_DATA.length === 0) setTimeout(function(){ fetchMedicalRecords().catch(e => { _log('Med Records: ' + e.message); setHealthChip('dh-medrec','fail','Med Records (failed)'); }); }, CRP_CONFIG.RETRY_DELAY);
+  // CRIO API data — fetch after a short delay
+  if (CRIO_STUDIES_DATA.length === 0) setTimeout(function(){ fetchCrioStudies().catch(e => { console.warn('CRIO Studies:', e); setHealthChip('dh-crio-api','fail','CRIO Studies (failed)'); }); }, 2000);
   // Looker study status — fetch after CRIO (needs study keys for merge)
-  if (Object.keys(LOOKER_STUDY_STATUS).length === 0) setTimeout(function(){ fetchLookerStudyStatus().catch(e => console.warn('Looker Status:', e)); }, 10000);
+  if (Object.keys(LOOKER_STUDY_STATUS).length === 0) setTimeout(function(){ fetchLookerStudyStatus().catch(e => console.warn('Looker Status:', e)); }, 5000);
 }
 
 async function refreshReferrals() {
@@ -19649,8 +19651,27 @@ async function _crpInit() {
     // Phase 4: Referrals (slight delay to let critical data start first)
     setTimeout(() => {
       _log('CRP: Phase 4 — loading referral data...');
-      try { initReferrals(); } catch(e) { console.warn('CRP: Auto-init referrals failed:', e); }
+      try { initReferrals(); } catch(e) {
+        console.warn('CRP: Auto-init referrals failed:', e);
+        setHealthChip('dh-referrals','fail','Referrals (failed)');
+        setHealthChip('dh-campaigns','fail','Campaigns (failed)');
+        _updateHealthButton();
+      }
     }, 500);
+
+    // Safety: mark any still-loading chips as timed out after 30s
+    setTimeout(() => {
+      var chips = document.querySelectorAll('#data-health-strip .dh-chip');
+      var changed = false;
+      chips.forEach(function(c) {
+        if (!c.classList.contains('ok') && !c.classList.contains('warn') && !c.classList.contains('fail')) {
+          c.classList.add('warn');
+          c.textContent = c.textContent + ' (timeout)';
+          changed = true;
+        }
+      });
+      if (changed) _updateHealthButton();
+    }, 30000);
   }
 
   // Kick off staggered loading
