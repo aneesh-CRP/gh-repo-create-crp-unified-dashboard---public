@@ -1221,6 +1221,7 @@ const FEEDS = {
       CAST(c.comment_key AS STRING) AS comment_key,
       CAST(c.subject_visit_key AS STRING) AS subject_visit_key,
       COALESCE(sc.name, '') AS assigned_to,
+      COALESCE(sv.name, '') AS visit_name,
       CASE svi.status WHEN 22 THEN 'completed-visit' WHEN 23 THEN 'completed-visit' WHEN 21 THEN 'completed-visit' WHEN 11 THEN 'visit' ELSE 'visit' END AS visit_path,
       FORMAT_DATETIME('%Y-%m-%d', c.date_created) AS date_created,
       DATE_DIFF(CURRENT_DATE(), DATE(c.date_created), DAY) AS days_outstanding
@@ -1230,6 +1231,7 @@ const FEEDS = {
     LEFT JOIN ${tbl('user')} u ON c.user_key = u.user_key
     LEFT JOIN ${tbl('subject')} sub ON c.subject_key = sub.subject_key
     LEFT JOIN ${tbl('subject_visit')} svi ON c.subject_visit_key = svi.subject_visit_key
+    LEFT JOIN ${tbl('study_visit')} sv ON svi.study_visit_key = sv.study_visit_key
     LEFT JOIN (SELECT su.study_key, CONCAT(u2.first_name, ' ', u2.last_name) AS name
       FROM ${tbl('study_user')} su JOIN ${tbl('user')} u2 ON su.user_key = u2.user_key
       WHERE su.role = 2 AND su._fivetran_deleted = false
@@ -1900,7 +1902,7 @@ const FEEDS = {
       WHERE NOT EXISTS (
         SELECT 1 FROM ${tbl('calendar_appointment')} ca
         WHERE ca.subject_key = a.subject_key AND ca.study_key = a.study_key
-          AND ca.status != 0 AND ca.start >= CURRENT_DATETIME()
+          AND ca.status != 0 AND ca.start >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 1 DAY)
           AND ca._fivetran_deleted = false
       )
       ORDER BY
