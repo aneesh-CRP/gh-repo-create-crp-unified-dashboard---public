@@ -4644,7 +4644,7 @@ function renderCoordPeriodTable() {
       '<td style="padding:8px 8px;text-align:center;font-weight:700;color:' + crColor + '">' + cancelRate + '%</td>' +
       '<td style="padding:8px 8px;text-align:center;color:#6B7280">' + avg + '/day</td>' +
       '<td style="padding:8px 12px"><div style="background:#E5E7EB;border-radius:6px;height:8px;overflow:hidden"><div style="background:#1843AD;height:100%;width:' + barPct + '%;border-radius:6px"></div></div></td>' +
-      '<td style="padding:8px 8px;text-align:center;color:#6B7280;font-size:11px">' + (function(){ var studySet = {}; (DATA.allVisitDetail||[]).forEach(function(v){ if (v.coord===name && v.date_iso >= startISO && v.date_iso <= endISO) studySet[v.study]=1; }); var ct = Object.keys(studySet).length; return ct > 0 ? ct : '—'; })() + '</td>' +
+      '<td style="padding:8px 8px;text-align:center;color:#6B7280;font-size:11px">' + (function(){ var studySet = {}; var bd = goals && goals.byDayDetail ? (goals.byDayDetail[name]||{}) : {}; Object.keys(bd).forEach(function(d){ if (d >= startISO && d <= endISO) (bd[d]||[]).forEach(function(v){ if (v.study) studySet[v.study]=1; }); }); (DATA.allVisitDetail||[]).forEach(function(v){ if (v.coord===name && v.date_iso >= startISO && v.date_iso <= endISO && v.study) studySet[v.study]=1; }); var ct = Object.keys(studySet).length; return ct > 0 ? ct : '—'; })() + '</td>' +
     '</tr>';
   }).join('');
 }

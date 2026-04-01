@@ -175,7 +175,7 @@ const FEEDS = {
 
   // ── 1. Upcoming Visits ──
   visits: {
-    query: () => `SELECT
+    query: (params) => `SELECT
       ${STUDY_NAME_SQL} AS study_name,
       CAST(ca.study_key AS STRING) AS study_key,
       FORMAT_DATETIME('%Y-%m-%d', ca.start) AS scheduled_date,
@@ -216,7 +216,7 @@ const FEEDS = {
       JOIN ${tbl('user')} u ON ua.user_key = u.user_key
       WHERE ua._fivetran_deleted = false AND su._fivetran_deleted = false
       QUALIFY ROW_NUMBER() OVER (PARTITION BY ua.calendar_appointment_key ORDER BY ua.date_created DESC) = 1) sp ON ca.calendar_appointment_key = sp.calendar_appointment_key
-    WHERE ca.subject_key IS NOT NULL AND st.is_active = 1      AND ca.start >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL 7 DAY)
+    WHERE ca.subject_key IS NOT NULL AND st.is_active = 1      AND ca.start >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL ${parseInt((params||{}).lookback) || 90} DAY)
       AND ca.start <= DATETIME_ADD(CURRENT_DATETIME(), INTERVAL 365 DAY)
       ${STUDY_FILTER_SQL}
     ORDER BY ca.start ASC`,
