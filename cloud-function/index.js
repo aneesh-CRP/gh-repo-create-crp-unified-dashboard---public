@@ -2086,14 +2086,88 @@ async function logToCrioPatientNotes(patientKey, siteId, message) {
     const newNote = `[CRP Reminder ${timestamp}] ${message}`;
     const updatedNotes = existingNotes ? existingNotes + '\n' + newNote : newNote;
 
-    // PUT with full patientInfo + siteId + revision
+    // PUT — spread full patientInfo but strip calculated/read-only fields
+    const cleanPi2 = { ...pi, notes: updatedNotes };
+    (cleanPi2.customFields || []).forEach((f, i) => { if (f.questionType === 'CALCULATION') cleanPi2.customFields[i] = undefined; });
+    if (cleanPi2.customFields) cleanPi2.customFields = cleanPi2.customFields.filter(Boolean);
+    delete cleanPi2.dateCreated; delete cleanPi2.dateCreatedTS;
+    delete cleanPi2.lastUpdated; delete cleanPi2.lastUpdatedTS;
     const putR = await crioPut(`/api/v1/patient/${patientKey}`, {
       siteId: siteId,
       revision: patient.revision,
-      patientInfo: { ...pi, notes: updatedNotes }
+      patientInfo: cleanPi2
     });
     return { logged: putR.status === 200, status: putR.status };
   } catch (e) { return { logged: false, error: e.message }; }
+}
+
+// ── Log structured follow-up interaction to CRIO patient notes ──
+async function logFollowUpToNotes(payload) {
+  const { patient, patient_key, study, category, action, reason, coord, site, status } = payload;
+  if (!CRIO_TOKEN) return { logged: false, reason: 'CRIO_TOKEN not configured' };
+
+  const actionLabels = {
+    'reschedule': 'Reschedule Visit', 'call': 'Call Patient', 'recruit': 'Send to Recruitment',
+    'rescreen': 'Re-screen', 'waitlist': 'Add to Waitlist', 'lost': 'Mark as Lost', 'noaction': 'No Action Needed'
+  };
+  const actionLabel = actionLabels[action] || action;
+
+  // Resolve patient_key from name if not provided
+  let pk = patient_key;
+  let siteId = site === 'PNJ' ? CRIO_SITE_IDS.PNJ : CRIO_SITE_IDS.PHL;
+  if (!pk && patient) {
+    try {
+      const rows = await runQuery(`SELECT CAST(p.patient_key AS STRING) AS patient_key,
+        CAST(p.site_key AS STRING) AS site_key
+        FROM ${tbl('patient')} p
+        WHERE LOWER(CONCAT(p.first_name, ' ', p.last_name)) = LOWER('${patient.replace(/'/g, "''")}')
+        AND p._fivetran_deleted = false
+        ORDER BY p.last_updated DESC LIMIT 1`);
+      if (rows.length) { pk = rows[0].patient_key; siteId = rows[0].site_key; }
+    } catch (e) { console.error('Patient lookup failed:', e.message); }
+  }
+  if (!pk) return { logged: false, reason: 'Could not resolve patient_key for: ' + patient };
+
+  try {
+    // GET current patient
+    const getR = await crioFetch(`/api/v1/patient/${pk}/site/${siteId}`);
+    if (getR.status !== 200) return { logged: false, reason: 'Patient GET failed', status: getR.status };
+    const patientData = JSON.parse(getR.body);
+    const pi = patientData.patientInfo;
+    const existingNotes = pi.notes || '';
+
+    // Build structured interaction entry
+    const ts = new Date().toISOString().replace('T', ' ').substring(0, 19);
+    const lines = [
+      `━━━ CRP Follow-Up [${ts}] ━━━`,
+      `Action: ${actionLabel}`,
+      study ? `Study: ${study}` : null,
+      category ? `Category: ${category}` : null,
+      reason ? `Reason: ${reason}` : null,
+      coord ? `Coordinator: ${coord}` : null,
+      status ? `CRIO Status: ${status}` : null,
+    ].filter(Boolean).join('\n');
+
+    const updatedNotes = existingNotes ? existingNotes + '\n\n' + lines : lines;
+
+    // PUT back — spread full patientInfo but strip calculated/read-only fields
+    const writableInfo = { ...pi, notes: updatedNotes };
+    // Strip ALL non-essential fields — only keep what we need to update notes safely
+    // CRIO rejects calculated question fields, custom form answers, etc.
+    const _keepKeys = new Set(['patientId','externalId','status','notes','patientContact',
+      'doNotCall','doNotEmail','doNotText','birthDate','gender','sex','nin','patientExternalId']);
+    Object.keys(writableInfo).forEach(k => { if (!_keepKeys.has(k)) delete writableInfo[k]; });
+    const putR = await crioPut(`/api/v1/patient/${pk}`, {
+      siteId: siteId,
+      revision: patientData.revision,
+      patientInfo: writableInfo
+    });
+
+    return { logged: putR.status === 200, patient_key: pk, site: siteId, status: putR.status,
+             detail: putR.status !== 200 ? putR.body.substring(0, 300) : undefined };
+  } catch (e) {
+    return { logged: false, error: e.message };
+  }
 }
 
 // ── Main reminder engine — query upcoming visits, send reminders ──
@@ -3637,6 +3711,84 @@ functions.http('crpBqApi', async (req, res) => {
   res.set('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') { res.status(204).send(''); return; }
 
+  // ── GET: CRIO Interaction POST test — try all known paths to create an interaction ──
+  if (req.query.action === 'crio-interaction-test') {
+    res.set('Cache-Control', 'no-store');
+    try {
+      if (!CRIO_TOKEN) { res.status(500).json({ error: 'CRIO_TOKEN not configured' }); return; }
+      const siteId = req.query.site || CRIO_SITE_IDS.PHL;
+      // Get a test patient + study/subject from BQ
+      const subs = await runQuery(`SELECT CAST(s.patient_key AS STRING) AS patient_key,
+        CAST(s.study_key AS STRING) AS study_key, CAST(s.subject_key AS STRING) AS subject_key,
+        CONCAT(p.first_name, ' ', p.last_name) AS name
+        FROM ${tbl('subject')} s
+        JOIN ${tbl('patient')} p ON s.patient_key = p.patient_key
+        WHERE s.site_key = ${siteId} AND s.status IN (4,10,11) AND s._fivetran_deleted = false
+        ORDER BY s.last_updated DESC LIMIT 1`);
+      if (!subs.length) { res.json({ error: 'No active subjects found' }); return; }
+      const { patient_key: pk, study_key: sk, subject_key: subk, name } = subs[0];
+      const results = { patient: name, patient_key: pk, study_key: sk, subject_key: subk, site: siteId, attempts: {} };
+
+      // Body variants to try
+      const ts = new Date().toISOString();
+      const bodies = {
+        // Format A: CRIO recruitment-style (action_type integers from BQ)
+        bqStyle: { actionType: 200, actionDetails: 'CRP Dashboard interaction test ' + ts, actionDate: ts },
+        // Format B: human-readable
+        readable: { type: 'TEXT', direction: 'OUTBOUND', notes: 'CRP test ' + ts },
+        // Format C: with patient/study context
+        withContext: { actionType: 200, patientKey: parseInt(pk), studyKey: parseInt(sk),
+                       actionDetails: 'CRP test ' + ts, actionDate: ts },
+        // Format D: snake_case
+        snakeCase: { action_type: 200, action_details: 'CRP test ' + ts, action_date: ts,
+                     patient_key: parseInt(pk), study_key: parseInt(sk) },
+      };
+
+      // Paths to try POST
+      const paths = [
+        `/api/v1/patient/${pk}/site/${siteId}/interaction`,
+        `/api/v1/patient/${pk}/interaction`,
+        `/api/v1/study/${sk}/site/${siteId}/subject/${subk}/interaction`,
+        `/api/v1/site/${siteId}/patient/${pk}/interaction`,
+        `/api/v1/recruitment/patient/${pk}/interaction`,
+        `/api/v1/recruitment/patient/${pk}/site/${siteId}/interaction`,
+        `/api/v1/patient/${pk}/site/${siteId}/interactions`,
+        `/api/v1/study/${sk}/site/${siteId}/subject/${subk}/interactions`,
+      ];
+
+      for (const path of paths) {
+        const pathResults = {};
+        for (const [bodyName, body] of Object.entries(bodies)) {
+          try {
+            const r = await crioPost(path, body);
+            pathResults[bodyName] = { status: r.status, body: r.body.substring(0, 300) };
+            // If we got a 2xx, we found the right combo!
+            if (r.status >= 200 && r.status < 300) {
+              results.success = { path, bodyFormat: bodyName, status: r.status, response: r.body.substring(0, 500) };
+            }
+          } catch (e) { pathResults[bodyName] = { error: e.message }; }
+        }
+        results.attempts[path] = pathResults;
+        // Stop if we found a working path
+        if (results.success) break;
+      }
+
+      // Also try GET on these paths to see if any return existing interactions
+      results.getProbe = {};
+      for (const path of paths.slice(0, 4)) {
+        try {
+          const r = await crioFetch(path);
+          results.getProbe[path] = { status: r.status, body: r.body.substring(0, 300) };
+        } catch (e) { results.getProbe[path] = { error: e.message }; }
+      }
+
+      res.json(results);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+    return;
+  }
+
   // ── GET: CRIO Patient PUT test — read a patient, append a test note, PUT back ──
   if (req.query.action === 'crio-put-test') {
     res.set('Cache-Control', 'no-store');
@@ -3666,10 +3818,16 @@ functions.http('crpBqApi', async (req, res) => {
       const ts = new Date().toISOString().replace('T', ' ').substring(0, 19);
       const testNote = `[CRP PUT Test ${ts}]`;
       const updatedNotes = pi.notes ? pi.notes + '\n' + testNote : testNote;
+      // Spread full patientInfo but strip calculated/read-only fields
+      const cleanPi = { ...pi, notes: updatedNotes };
+      (cleanPi.customFields || []).forEach((f, i) => { if (f && f.questionType === 'CALCULATION') cleanPi.customFields[i] = undefined; });
+      if (cleanPi.customFields) cleanPi.customFields = cleanPi.customFields.filter(Boolean);
+      delete cleanPi.dateCreated; delete cleanPi.dateCreatedTS;
+      delete cleanPi.lastUpdated; delete cleanPi.lastUpdatedTS;
       const putR = await crioPut(`/api/v1/patient/${pk}`, {
         siteId: siteId,
         revision: patient.revision,
-        patientInfo: { ...pi, notes: updatedNotes }
+        patientInfo: cleanPi
       });
       results.put = { status: putR.status, body: putR.body.substring(0, 500) };
       results.success = putR.status === 200;
@@ -3721,13 +3879,17 @@ functions.http('crpBqApi', async (req, res) => {
     return;
   }
 
-  // ── POST: Follow-Up → ClickUp sync ──
+  // ── POST: Follow-Up → ClickUp sync + CRIO notes ──
   if (req.method === 'POST' && req.query.action === 'followup-sync') {
     res.set('Cache-Control', 'no-store');
     try {
       const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
-      const result = await syncFollowUpToClickUp(body);
-      res.json({ success: true, ...result });
+      // Run ClickUp sync and CRIO notes log in parallel
+      const [clickupResult, crioResult] = await Promise.all([
+        syncFollowUpToClickUp(body).catch(e => ({ error: e.message })),
+        CRIO_TOKEN ? logFollowUpToNotes(body).catch(e => ({ logged: false, error: e.message })) : Promise.resolve({ logged: false, reason: 'CRIO_TOKEN not set' })
+      ]);
+      res.json({ success: true, clickup: clickupResult, crio: crioResult });
     } catch (err) {
       console.error('followup-sync error:', err.message);
       res.status(500).json({ success: false, error: err.message });

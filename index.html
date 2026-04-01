@@ -11878,8 +11878,16 @@ function setFollowUpAction(sel) {
 
 function _syncFollowUpToClickUp(r, action) {
   var base = CRP_CONFIG.CF_BASE || 'https://us-east1-crio-468120.cloudfunctions.net/crp-bq-feeds';
+  // Try to resolve patient_key from PATIENT_DB_MAP for CRIO notes write
+  var _pKey = '';
+  if (typeof PATIENT_DB_MAP !== 'undefined') {
+    var _nk = (r._name || '').toLowerCase().trim().replace(/\s+/g, ' ');
+    var _pdb = PATIENT_DB_MAP.get(_nk);
+    if (_pdb && _pdb.patient_key) _pKey = _pdb.patient_key;
+  }
   var payload = {
     patient: r._name || '',
+    patient_key: _pKey,
     study: r._study || '',
     category: r._catLabel || '',
     action: action,
@@ -11899,16 +11907,21 @@ function _syncFollowUpToClickUp(r, action) {
     if (data.success) {
       // Store ClickUp task URL for this patient
       var k = _fuKey(r);
+      var cu = data.clickup || data;
       if (_fuActions[k]) {
-        _fuActions[k].clickup_url = data.url || '';
-        _fuActions[k].clickup_id = data.task_id || '';
+        _fuActions[k].clickup_url = cu.url || '';
+        _fuActions[k].clickup_id = cu.task_id || '';
         _saveFuActions();
       }
-      _log('ClickUp sync: ' + (data.created ? 'created' : 'updated') + ' task ' + (data.task_id || ''));
+      _log('ClickUp sync: ' + (cu.created ? 'created' : cu.updated ? 'updated' : 'done') + ' task ' + (cu.task_id || ''));
+      // CRIO notes status
+      var crio = data.crio || {};
+      if (crio.logged) _log('CRIO notes: logged to patient ' + (crio.patient_key || ''));
+      else if (crio.reason || crio.error) _log('CRIO notes: ' + (crio.reason || crio.error));
     } else {
-      _log('ClickUp sync failed: ' + (data.error || 'unknown'));
+      _log('Follow-up sync failed: ' + (data.error || 'unknown'));
     }
-  }).catch(function(e) { _log('ClickUp sync error: ' + e.message); });
+  }).catch(function(e) { _log('Follow-up sync error: ' + e.message); });
 }
 
 function buildActionSteps() {
