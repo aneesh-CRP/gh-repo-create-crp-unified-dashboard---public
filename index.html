@@ -2267,18 +2267,7 @@ const CRP_CONFIG = {
   ORG_NAME: 'Clinical Research Philadelphia',
   ORG_SHORT: 'CRP',
 
-  // BigQuery Data Source Toggle
-  // When true: uses BQ_CANCELS_CSV for cancellation data instead of LIVE_URL2_LEGACY
-  // Set to true only AFTER verifying BQ data matches existing data
-  USE_BQ_CANCELS: true,
-  USE_BQ_VISITS: true,
-  USE_BQ_STUDIES: true,
-  USE_BQ_STUDY_STATUS: true,
-  USE_BQ_AUDIT_LOG: true,
-  USE_BQ_PATIENT_DB: true,
-
-  // Cloud Function — real-time BQ queries (1-3s, replaces Sheets CSV pipeline)
-  // Sheets CSV URLs remain as fallback if CF is down
+  // Cloud Function — all data sourced from BQ via cloud function (no Sheets dependencies)
   CF_BASE: 'https://us-east1-crio-468120.cloudfunctions.net/crp-bq-feeds',
   USE_CLOUD_FUNCTION: true,
 
@@ -2329,44 +2318,8 @@ const CRP_CONFIG = {
   // Brand Colors (match CSS :root variables)
   // Brand colors in CSS variables (--navy, --blue, --cyan, --orange)
 
-  // Google Sheets Data Feeds
-  // To add a new feed: add an entry here, then handle in processLiveData()
-  DATA_FEEDS: {
-    UPCOMING: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRUXJxTDsr5IRByMfuLF0P3hVq_QuEw6M1MPNDwd1CaV2UZ9tnFflUwsmUKAd3xeX3_esn0c4YlrV0q/pub?gid=0&single=true&output=csv',
-    CANCELLATIONS: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRUXJxTDsr5IRByMfuLF0P3hVq_QuEw6M1MPNDwd1CaV2UZ9tnFflUwsmUKAd3xeX3_esn0c4YlrV0q/pub?gid=1487298034&single=true&output=csv',
-    // ClickUp Referral Pipeline — synced to Google Sheets every 15 min by clickup-sync/Code.gs
-    // To set up: create a Google Sheet, publish each tab as CSV, paste URLs here
-    REFERRALS_CSV: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTPrFpOKckIDKYtnV30EBkL9ryI4q4HHKXDLxzgu6ZqVzrALoGU0Tpf_MNYHzg2UxcPajaJWpOONBbP/pub?gid=1264328878&single=true&output=csv',
-    CAMPAIGNS_CSV: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTPrFpOKckIDKYtnV30EBkL9ryI4q4HHKXDLxzgu6ZqVzrALoGU0Tpf_MNYHzg2UxcPajaJWpOONBbP/pub?gid=44963051&single=true&output=csv',
-    // Medical Records — synced from ClickUp folder 90147290121 by clickup-sync/Code.gs
-    // After first syncAll(), get the MedicalRecords sheet GID and update below
-    MED_RECORDS_CSV: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTPrFpOKckIDKYtnV30EBkL9ryI4q4HHKXDLxzgu6ZqVzrALoGU0Tpf_MNYHzg2UxcPajaJWpOONBbP/pub?gid=1921715962&single=true&output=csv',
-    // CRIO API — synced from CRIO Recruitment API by clickup-sync/Code.gs
-    // After first syncAll() with CRIO_TOKEN, publish CRIO_Studies and CRIO_Subjects tabs as CSV
-    // Then update the GIDs below (get GID from the sheet URL: #gid=XXXXXXX)
-    CRIO_STUDIES_CSV: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTPrFpOKckIDKYtnV30EBkL9ryI4q4HHKXDLxzgu6ZqVzrALoGU0Tpf_MNYHzg2UxcPajaJWpOONBbP/pub?gid=932189572&single=true&output=csv',
-    CRIO_SUBJECTS_CSV: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTPrFpOKckIDKYtnV30EBkL9ryI4q4HHKXDLxzgu6ZqVzrALoGU0Tpf_MNYHzg2UxcPajaJWpOONBbP/pub?gid=941302257&single=true&output=csv',
-    // BigQuery Cancellations — synced from CRIO BigQuery by bigquery-cancels-sync.gs
-    // After setup: publish the BQ_Cancellations tab as CSV, paste URL here, set USE_BQ_CANCELS: true
-    BQ_CANCELS_CSV: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQSVnZBL93Zx5t88q97kGRfKvEvDonnTD6y506i806UAuNLWMvMsQUsvnxJe9BIiRTF0ktF1bUgvkj8/pub?output=csv',
-    // BigQuery Visits — synced from CRIO BigQuery by bigquery-cancels-sync.gs → BQ_Visits tab
-    // After setup: publish the BQ_Visits tab as CSV, paste URL here, set USE_BQ_VISITS: true
-    BQ_VISITS_CSV: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQSVnZBL93Zx5t88q97kGRfKvEvDonnTD6y506i806UAuNLWMvMsQUsvnxJe9BIiRTF0ktF1bUgvkj8/pub?gid=1281180825&single=true&output=csv',
-    // BigQuery Studies — synced from CRIO BigQuery → BQ_Studies tab
-    BQ_STUDIES_CSV: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQSVnZBL93Zx5t88q97kGRfKvEvDonnTD6y506i806UAuNLWMvMsQUsvnxJe9BIiRTF0ktF1bUgvkj8/pub?gid=1386284017&single=true&output=csv',
-    // BigQuery Subjects — synced from CRIO BigQuery → BQ_Subjects tab
-    BQ_SUBJECTS_CSV: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQSVnZBL93Zx5t88q97kGRfKvEvDonnTD6y506i806UAuNLWMvMsQUsvnxJe9BIiRTF0ktF1bUgvkj8/pub?gid=1716126752&single=true&output=csv',
-    // BigQuery Study Status — study_details milestone dates → BQ_StudyStatus tab
-    BQ_STUDY_STATUS_CSV: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQSVnZBL93Zx5t88q97kGRfKvEvDonnTD6y506i806UAuNLWMvMsQUsvnxJe9BIiRTF0ktF1bUgvkj8/pub?gid=1176065764&single=true&output=csv',
-    // BigQuery Audit Log — appointment_audit_log → BQ_AuditLog tab
-    BQ_AUDIT_LOG_CSV: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQSVnZBL93Zx5t88q97kGRfKvEvDonnTD6y506i806UAuNLWMvMsQUsvnxJe9BIiRTF0ktF1bUgvkj8/pub?gid=1290402264&single=true&output=csv',
-    // BigQuery Patient DB — patient demographics → BQ_PatientDB tab
-    BQ_PATIENT_DB_CSV: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQSVnZBL93Zx5t88q97kGRfKvEvDonnTD6y506i806UAuNLWMvMsQUsvnxJe9BIiRTF0ktF1bUgvkj8/pub?gid=996237458&single=true&output=csv',
-    // Looker — Study Status & Key Dates (published Google Sheet)
-    LOOKER_STUDY_STATUS_CSV: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQrwoQwKCAiyv5xx_z0uXMQLHS5d2CUbzOj_qjxkZJYYe3Yxdu3i2T-rdQ9vtlDCBRTKfA1jDW_W0YW/pub?output=csv',
-    // Finance Master Sheet — published key + tab GIDs for CSV access
-    FINANCE_PUB_KEY: '2PACX-1vQXxreb6lrZHej3luMOSI07ditFm6mmGHIHrxWu9BkTfsvk0OLk_gx7o_JIY34UIgroGIKgEYbVdC_V',
-  },
+  // Data Feeds — all sourced from Cloud Function (BQ + ClickUp + CRIO APIs)
+  DATA_FEEDS: {},
 
   // Finance tab GIDs in the published Master Sheet
   // ── To add a new finance data source: ──
@@ -2399,7 +2352,7 @@ const CRP_CONFIG = {
   },
 
   // Patient Database (CRIO daily export — published CSV)
-  PATIENT_DB_URL: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSF6m57VM1I7VMG__gFSRGWGFUc05ZIymyMDCu4RiLcgNlBwgqccQmnT2A-bbfkm6f7mjb9f2Qe5lLf/pub?output=csv',
+  PATIENT_DB_URL: null, // Loaded from BQ cloud function
 
   // ClickUp Integration — Referral Pipeline
   CLICKUP: {
@@ -2417,7 +2370,7 @@ const CRP_CONFIG = {
     // Additional lists (add future tracker lists here)
     EXTRA_LISTS: [],
     // Facebook CRM Google Sheet (published CSV — recruitment team comments + Delfa AI pre-screener)
-    FACEBOOK_CRM_URL: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vR2y6TsaFLnVQcyskBntErNr5zl1WZRxZhWo-0cOIgMfEWvNm6NStcYatK9MF7U2tj4QDlnOCnopHri/pub?output=csv',
+    FACEBOOK_CRM_URL: null, // FB leads now sourced from BQ recruiting feed
     // Meta Marketing API — live campaign insights (token expires ~60 days, regenerate at developers.facebook.com)
     META_ADS: {
       ACCESS_TOKEN: 'EAAR30KmZARsIBRPInYVVajRoF5pMske7lkZAZCkZBcUAPh3CkFp5RAeQtMZALy4vLuJbPTc2Dkwd2aLXkz48zlY8Ya5lZBZBwA4CZB0ImfpZB1xSleCIcp66jl1MUNnUwJZBL8wHioYJWFwD04vrUERuFHo93XXzq29zwZCRmNUgtDzhhiwK6cbnfx6zSHoa7nrVZAe1C2vgL5oN',  // Long-lived 60-day token — expires ~2026-05-22
@@ -9246,10 +9199,10 @@ async function fetchFinanceLive() {
       return true;
     }
 
-    // FALLBACK: Sheets CSV if BQ failed or returned empty
-    _log('CRP Finance: BQ empty/failed, falling back to Sheets...');
-    const pk = CRP_CONFIG.DATA_FEEDS.FINANCE_PUB_KEY;
-    if (!pk) { _log('CRP Finance: No Sheets key either — keeping defaults'); return false; }
+    // No Sheets fallback — BQ is the only source
+    _log('CRP Finance: BQ returned no data');
+    var pk = null;
+    if (!pk) { return false; }
     const tabs = CRP_CONFIG.FINANCE_TABS;
 
     const [agingInvRows, agingApRows, unpaidInvRows, unpaidApRows, uninvoicedRows, revenueRows, paymentsRows] = await Promise.all([
@@ -9605,9 +9558,6 @@ async function fetchQuickBooksData() {
     renderFinancePnL();
   } catch(e) {
     console.warn('CRP QB: Live API fetch failed:', e.message);
-    // Fallback: try legacy Sheets fetch
-    _log('CRP QB: Falling back to Sheets data...');
-    try { await _fetchQBFromSheets(); } catch(e2) { console.warn('CRP QB: Sheets fallback also failed:', e2.message); }
   }
 }
 
@@ -11411,8 +11361,8 @@ async function refreshData() {
   try {
     // Phase 1: CRIO data (BQ primary, Looker fallback)
     const [rows1, legacyCancels, auditRows] = await Promise.all([
-      _fetchWithFallback(_getVisitsURL(), LIVE_URL1, 'Visits', 10),
-      _fetchWithFallback(_getCancelURL(), LIVE_URL2_LEGACY, 'Cancels', 5).catch(() => []),
+      _fetchWithFallback(_getVisitsURL(), null, 'Visits', 10),
+      _fetchWithFallback(_getCancelURL(), null, 'Cancels', 5).catch(() => []),
       _fetchAuditLog().catch(() => [])
     ]);
     const newData = processLiveData(rows1, legacyCancels, auditRows);
@@ -13821,15 +13771,6 @@ async function refreshReferrals() {
       fetchCSV(_refUrl).catch(function() { return []; }),
       fetchCSV(_campUrl).catch(function() { return []; }),
     ]);
-    // Fallback to Sheets CSV if cloud function returned empty (ClickUp API timeout)
-    if (refRows.length === 0 && CRP_CONFIG.DATA_FEEDS.REFERRALS_CSV) {
-      _log('CRP Referrals: Cloud function returned 0 rows, falling back to Sheets CSV');
-      try { refRows = await fetchCSV(CRP_CONFIG.DATA_FEEDS.REFERRALS_CSV); } catch(e2) { _log('CSV fallback failed: ' + e2.message); }
-    }
-    if (campRows.length === 0 && CRP_CONFIG.DATA_FEEDS.CAMPAIGNS_CSV) {
-      try { campRows = await fetchCSV(CRP_CONFIG.DATA_FEEDS.CAMPAIGNS_CSV); } catch(e2) { _log('CSV fallback failed: ' + e2.message); }
-    }
-
     // Normalize stage values — CSV may have case variants ("dnq" vs "DNQ") or blanks
     const STAGE_NORM = { 'dnq':'DNQ', 'screen fail':'Screen Fail', 'new lead':'New Lead',
       'contacted':'Contacted', 'pre-screening':'Pre-Screening', 'screening':'Screening',
@@ -15247,7 +15188,7 @@ function showReferralDetailModal(filterFn, title, subtitle) {
 // ══════════════════════════════════════════════════════════════
 async function fetchMedicalRecords(attempt) {
   attempt = attempt || 1;
-  const url = _cfUrl('medRecords') || CRP_CONFIG.DATA_FEEDS.MED_RECORDS_CSV;
+  const url = _cfUrl('medRecords');
   if (!url) return;
   try {
     const rows = await fetchCSV(url);
@@ -15329,9 +15270,7 @@ async function fetchMedicalRecords(attempt) {
 // ============================================================
 var LOOKER_STUDY_STATUS = {};  // Indexed by study_key (string)
 async function fetchLookerStudyStatus() {
-  var url = _cfUrl('studyStatus')
-    || (CRP_CONFIG.USE_BQ_STUDY_STATUS && CRP_CONFIG.DATA_FEEDS.BQ_STUDY_STATUS_CSV)
-    || CRP_CONFIG.DATA_FEEDS.LOOKER_STUDY_STATUS_CSV;
+  var url = _cfUrl('studyStatus');
   if (!url) return;
   try {
     var rows = await fetchCSV(url);
@@ -15378,12 +15317,8 @@ async function fetchCrioStudies() {
   if (_crioFetchInFlight) return;
   _crioFetchInFlight = true;
   try {
-    var studiesUrl = _cfUrl('studies')
-      || (CRP_CONFIG.USE_BQ_STUDIES && CRP_CONFIG.DATA_FEEDS.BQ_STUDIES_CSV)
-      || CRP_CONFIG.DATA_FEEDS.CRIO_STUDIES_CSV;
-    var subjectsUrl = _cfUrl('subjects')
-      || (CRP_CONFIG.USE_BQ_STUDIES && CRP_CONFIG.DATA_FEEDS.BQ_SUBJECTS_CSV)
-      || CRP_CONFIG.DATA_FEEDS.CRIO_SUBJECTS_CSV;
+    var studiesUrl = _cfUrl('studies');
+    var subjectsUrl = _cfUrl('subjects');
     if (!studiesUrl) { _log('CRIO Studies CSV URL not configured'); return; }
     // Fetch studies + subjects in parallel (they're independent)
     var _studiesPromise = fetchCSV(studiesUrl);
@@ -17656,108 +17591,22 @@ function renderEnrollmentVelocity() {
   el.innerHTML = html;
 }
 
-// ── Data Source URLs (Looker → Google Sheets, auto-pushed every 15 min) ──
-const LIVE_URL1 = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSQJ_QKC-ttmVuaYZokhz6NPNsMUpMe262mqAXbLocxOgGqbxHIMschUhE6FERyYwJfARhVg3wppBZS/pub?output=csv';
-const LIVE_URL2_LEGACY = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRUXJxTDsr5IRByMfuLF0P3hVq_QuEw6M1MPNDwd1CaV2UZ9tnFflUwsmUKAd3xeX3_esn0c4YlrV0q/pub?gid=1487298034&single=true&output=csv';
-const AUDIT_LOG_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRpPUZFSyW0rrx2yQdqYPyccRZC0wqUCWyCfX_n2XTMPyKQr9da4jl1jMbZ5_KKFkYZjJiNl_ClYbXk/pub?output=csv';
-// BigQuery cancellation URL — uses BQ source when toggle is on AND URL is configured
-function _getCancelURL() {
-  if (CRP_CONFIG.USE_CLOUD_FUNCTION && CRP_CONFIG.CF_BASE) {
-    return CRP_CONFIG.CF_BASE + '?feed=cancels&format=csv';
-  }
-  if (CRP_CONFIG.USE_BQ_CANCELS && CRP_CONFIG.DATA_FEEDS.BQ_CANCELS_CSV) {
-    return CRP_CONFIG.DATA_FEEDS.BQ_CANCELS_CSV;
-  }
-  return LIVE_URL2_LEGACY;
-}
-// BigQuery visits URL — uses BQ source when toggle is on AND URL is configured
-function _getVisitsURL() {
-  if (CRP_CONFIG.USE_CLOUD_FUNCTION && CRP_CONFIG.CF_BASE) {
-    return CRP_CONFIG.CF_BASE + '?feed=visits&format=csv';
-  }
-  if (CRP_CONFIG.USE_BQ_VISITS && CRP_CONFIG.DATA_FEEDS.BQ_VISITS_CSV) {
-    return CRP_CONFIG.DATA_FEEDS.BQ_VISITS_CSV;
-  }
-  return LIVE_URL1;
-}
+// ── Data Source URLs — all from Cloud Function (BQ) ──
+function _getCancelURL() { return CRP_CONFIG.CF_BASE + '?feed=cancels&format=csv'; }
+function _getVisitsURL() { return CRP_CONFIG.CF_BASE + '?feed=visits&format=csv'; }
+function _getPatientDBURL() { return CRP_CONFIG.CF_BASE + '?feed=patientDB&format=csv'; }
+function _cfUrl(feed) { return CRP_CONFIG.CF_BASE + '?feed=' + feed + '&format=csv'; }
 
-// Audit log — use fetchWithFallback for 3-tier resilience
 async function _fetchAuditLog() {
-  var cfUrl = _cfUrl('auditLog');
-  var sheetsUrl = (CRP_CONFIG.USE_BQ_AUDIT_LOG && CRP_CONFIG.DATA_FEEDS.BQ_AUDIT_LOG_CSV)
-    ? CRP_CONFIG.DATA_FEEDS.BQ_AUDIT_LOG_CSV : null;
-  // Try CF first (with 8s timeout race)
-  if (cfUrl) {
-    try {
-      var cfPromise = fetchCSV(cfUrl);
-      var timeout = new Promise(function(_, rej) { setTimeout(function() { rej(new Error('CF timeout')); }, 8000); });
-      var rows = await Promise.race([cfPromise, timeout]);
-      if (rows.length >= 100) { _log('CRP CF: Audit log loaded ' + rows.length + ' rows'); return rows; }
-    } catch(e) { _log('CRP CF: Audit log failed (' + e.message + ') — trying Sheets'); }
-  }
-  // Try Sheets CSV
-  if (sheetsUrl) {
-    try { var sr = await fetchCSV(sheetsUrl); if (sr.length >= 100) return sr; } catch(e) {}
-  }
-  // Legacy
-  return fetchCSV(AUDIT_LOG_URL);
-}
-// Patient DB URL — CF → BQ Sheet → legacy CRIO export
-function _getPatientDBURL() {
-  var cf = _cfUrl('patientDB');
-  if (cf) return cf;
-  if (CRP_CONFIG.USE_BQ_PATIENT_DB && CRP_CONFIG.DATA_FEEDS.BQ_PATIENT_DB_CSV) return CRP_CONFIG.DATA_FEEDS.BQ_PATIENT_DB_CSV;
-  return CRP_CONFIG.PATIENT_DB_URL;
+  var rows = await fetchCSV(_cfUrl('auditLog'));
+  _log('CRP CF: Audit log loaded ' + rows.length + ' rows');
+  return rows;
 }
 
-// ═══ CLOUD FUNCTION URL BUILDER ═══
-function _cfUrl(feed) {
-  if (CRP_CONFIG.USE_CLOUD_FUNCTION && CRP_CONFIG.CF_BASE) {
-    return CRP_CONFIG.CF_BASE + '?feed=' + feed + '&format=csv';
-  }
-  return null;
-}
-
-// ═══ DATA FETCH: Cloud Function → Sheets CSV → Legacy fallback ═══
-async function _fetchWithFallback(bqUrl, lookerUrl, label, minRows) {
-  minRows = minRows || 5;
-
-  // Tier 1: Cloud Function (real-time, 1-3s)
-  var cfFeed = { 'Visits': 'visits', 'Cancels': 'cancels', 'Visits-retry': 'visits',
-    'Cancels-retry': 'cancels', 'Visits-auto': 'visits', 'Cancels-auto': 'cancels' }[label];
-  if (cfFeed) {
-    var cfEndpoint = _cfUrl(cfFeed);
-    if (cfEndpoint) {
-      try {
-        var cfRows = await fetchCSV(cfEndpoint);
-        if (cfRows.length >= minRows) {
-          _log('CRP CF: ' + label + ' loaded ' + cfRows.length + ' rows (real-time)');
-          return cfRows;
-        }
-      } catch(e) {
-        _log('CRP CF: ' + label + ' failed (' + e.message + ') — trying Sheets CSV');
-      }
-    }
-  }
-
-  // Tier 2: Sheets CSV (5-10 min cache)
-  if (bqUrl && bqUrl !== lookerUrl) {
-    try {
-      var rows = await fetchCSV(bqUrl);
-      if (rows.length >= minRows) {
-        _log('CRP BQ: ' + label + ' loaded ' + rows.length + ' rows from Sheets CSV');
-        return rows;
-      }
-    } catch(e) {
-      console.warn('CRP BQ: ' + label + ' Sheets fetch failed (' + e.message + ')');
-    }
-  }
-
-  // Tier 3: Legacy (Looker/ClickUp)
-  var fallback = await fetchCSV(lookerUrl);
-  _log('CRP: ' + label + ' fallback loaded ' + fallback.length + ' rows from legacy');
-  setHealthChip('dh-crio', 'warn', 'CRIO (Looker fallback)');
-  return fallback;
+async function _fetchWithFallback(bqUrl, unused, label) {
+  var rows = await fetchCSV(bqUrl);
+  _log('CRP CF: ' + label + ' loaded ' + rows.length + ' rows');
+  return rows;
 }
 
 // ════════════════════════════════════════════════════════════
@@ -17772,7 +17621,7 @@ async function compareBQvLegacy(bqUrl) {
   var legacy, bq;
   try {
     [legacy, bq] = await Promise.all([
-      fetchCSV(LIVE_URL2_LEGACY, true),
+      fetchCSV(_getCancelURL(), true),
       fetchCSV(bqUrl, true)
     ]);
   } catch(e) { console.error('Fetch failed:', e.message); return; }
@@ -19522,8 +19371,8 @@ async function _crpInit() {
     let _lastAuditRows = [];
     try {
       const [rows1, legacyCancels, auditRows] = await Promise.all([
-        _fetchWithFallback(_getVisitsURL(), LIVE_URL1, 'Visits', 10),
-        _fetchWithFallback(_getCancelURL(), LIVE_URL2_LEGACY, 'Cancels', 5).catch(() => []),
+        _fetchWithFallback(_getVisitsURL(), null, 'Visits', 10),
+        _fetchWithFallback(_getCancelURL(), null, 'Cancels', 5).catch(() => []),
         _fetchAuditLog().catch(e => { console.warn('CRP: Audit log fetch failed, continuing without:', e.message); setHealthChip('dh-audit','fail','Audit Log'); return []; })
       ]);
       _lastCrioRows = rows1;
@@ -19546,11 +19395,7 @@ async function _crpInit() {
         crioOk = true;
         setHealthChip('dh-crio','ok','CRIO (' + rows1.length + ')');
         setHealthChip('dh-audit', auditRows.length > 0 ? 'ok' : 'warn', 'Audit Log (' + auditRows.length + ')');
-        if (CRP_CONFIG.USE_BQ_CANCELS && CRP_CONFIG.DATA_FEEDS.BQ_CANCELS_CSV) {
-          var bqEl = document.getElementById('dh-bq-cancels');
-          if (bqEl) bqEl.style.display = '';
-          setHealthChip('dh-bq-cancels', legacyCancels.length > 0 ? 'ok' : 'warn', 'BQ Cancels (' + legacyCancels.length + ')');
-        }
+        setHealthChip('dh-bq-cancels', legacyCancels.length > 0 ? 'ok' : 'warn', 'BQ Cancels (' + legacyCancels.length + ')');
         checkDataFreshness(rows1);
       }
     } catch(e) {
@@ -19561,8 +19406,8 @@ async function _crpInit() {
       await new Promise(r => setTimeout(r, CRP_CONFIG.RETRY_DELAY));
       try {
         const [rows1b, legacyB, auditB] = await Promise.all([
-          _fetchWithFallback(_getVisitsURL(), LIVE_URL1, 'Visits-retry', 10),
-          _fetchWithFallback(_getCancelURL(), LIVE_URL2_LEGACY, 'Cancels-retry', 5).catch(() => []),
+          _fetchWithFallback(_getVisitsURL(), null, 'Visits-retry', 10),
+          _fetchWithFallback(_getCancelURL(), null, 'Cancels-retry', 5).catch(() => []),
           _fetchAuditLog().catch(() => [])
         ]);
         _lastCrioRows = rows1b;
@@ -19731,8 +19576,8 @@ async function _crpInit() {
     // Phase 1: CRIO data (critical)
     try {
       const [rows1, legacyCancels, auditRows] = await Promise.all([
-        _fetchWithFallback(_getVisitsURL(), LIVE_URL1, 'Visits-auto', 10),
-        _fetchWithFallback(_getCancelURL(), LIVE_URL2_LEGACY, 'Cancels-auto', 5).catch(() => []),
+        _fetchWithFallback(_getVisitsURL(), null, 'Visits-auto', 10),
+        _fetchWithFallback(_getCancelURL(), null, 'Cancels-auto', 5).catch(() => []),
         _fetchAuditLog().catch(() => [])
       ]);
       const newData = processLiveData(rows1, legacyCancels, auditRows);
