@@ -4574,11 +4574,20 @@ function renderCoordPeriodTable() {
     startDate = new Date(yy, now.getMonth()-2, 1);
     endDate = now;
     label = startDate.toLocaleDateString('en-US',{month:'short'}) + ' — ' + now.toLocaleDateString('en-US',{month:'short',year:'numeric'});
-  } else if (_coordPeriod === 'q1') {
-    startDate = new Date(yy, 0, 1);
-    endDate = new Date(yy, 2, 31);
-    if (endDate > now) endDate = now;
-    label = 'Q1 ' + yy;
+  } else if (_coordPeriod === 'quarter') {
+    var qm = Math.floor(now.getMonth() / 3) * 3;
+    startDate = new Date(yy, qm, 1);
+    endDate = now;
+    var qNum = Math.floor(qm / 3) + 1;
+    label = 'Q' + qNum + ' ' + yy;
+  } else if (_coordPeriod === 'lastq') {
+    var cqm = Math.floor(now.getMonth() / 3) * 3;
+    var lqStart = cqm >= 3 ? new Date(yy, cqm - 3, 1) : new Date(yy - 1, 9, 1);
+    var lqEnd = cqm >= 3 ? new Date(yy, cqm, 0) : new Date(yy - 1, 11, 31);
+    startDate = lqStart;
+    endDate = lqEnd;
+    var lqNum = cqm >= 3 ? Math.floor((cqm - 3) / 3) + 1 : 4;
+    label = 'Q' + lqNum + ' ' + (cqm >= 3 ? yy : yy - 1);
   } else if (_coordPeriod === 'ytd') {
     startDate = new Date(yy, 0, 1);
     endDate = now;
@@ -5265,7 +5274,8 @@ function renderInvCapacity() {
   if (_invPeriod === 'month') { startDate = new Date(yy, now.getMonth(), 1); endDate = now; }
   else if (_invPeriod === 'lastmonth') { startDate = new Date(yy, now.getMonth()-1, 1); endDate = new Date(yy, now.getMonth(), 0); }
   else if (_invPeriod === '2month') { startDate = new Date(yy, now.getMonth()-2, 1); endDate = now; }
-  else if (_invPeriod === 'q1') { startDate = new Date(yy, 0, 1); endDate = new Date(yy, 2, 31); if (endDate > now) endDate = now; }
+  else if (_invPeriod === 'quarter') { var _iqm = Math.floor(now.getMonth()/3)*3; startDate = new Date(yy, _iqm, 1); endDate = now; }
+  else if (_invPeriod === 'lastq') { var _icqm = Math.floor(now.getMonth()/3)*3; startDate = _icqm >= 3 ? new Date(yy, _icqm-3, 1) : new Date(yy-1, 9, 1); endDate = _icqm >= 3 ? new Date(yy, _icqm, 0) : new Date(yy-1, 11, 31); }
   else if (_invPeriod === 'ytd') { startDate = new Date(yy, 0, 1); endDate = now; }
   else { startDate = new Date(yy, now.getMonth(), 1); endDate = now; }
   var startISO = localISO(startDate);
@@ -8638,11 +8648,11 @@ function processLiveData(allRows, legacyCancels, auditLog) {
   function isBetween(d, a, b) { return d && d >= a && d <= b; }
 
   // ── Filter rows ──
-  // Keep past 90 days + future 2 months for period filters (coordinator/investigator performance)
-  const ninetyDaysAgo = new Date(today); ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+  // Keep past 6 months + future 2 months for period filters (coordinator/investigator performance)
+  const sixMonthsAgo = new Date(today); sixMonthsAgo.setDate(sixMonthsAgo.getDate() - 183);
   const activeUpcoming = upcoming.filter(r => {
     const d = parseDate(r['Scheduled Date'] || r['snapshot_date']);
-    return d && d >= ninetyDaysAgo && d <= twoMonthsAhead;
+    return d && d >= sixMonthsAgo && d <= twoMonthsAhead;
   });
 
   // Step 1: Basic date/study filter
