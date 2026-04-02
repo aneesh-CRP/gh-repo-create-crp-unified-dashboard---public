@@ -3826,7 +3826,7 @@ function _updateStatusCount() {
   if (badge) badge.textContent = tracked + '/' + total + ' tracked';
 }
 
-// ── Rideshare tracking (localStorage) ──
+// ── Rideshare / Uber Health ──
 var _rideshareData = {};
 function _loadRideshare() { try { _rideshareData = JSON.parse(localStorage.getItem('crp_rideshare') || '{}'); } catch(e) { _rideshareData = {}; } }
 function _saveRideshare() { try { localStorage.setItem('crp_rideshare', JSON.stringify(_rideshareData)); } catch(e) {} }
@@ -3836,6 +3836,136 @@ function _rideshareKey(row) {
   var pat = cells[6] ? (cells[6].textContent || '').trim() : '';
   var study = cells[4] ? (cells[4].textContent || '').trim() : '';
   return (date + '|' + pat + '|' + study).toLowerCase().replace(/\s+/g, ' ');
+}
+
+function _openUberRideModal(patName, dateIso, timeStr, site) {
+  _loadRideshare();
+  var pdb = PATIENT_DB_MAP.get((patName||'').toLowerCase().trim());
+  var phone = pdb ? (pdb.mobile || pdb.home_phone || pdb.work_phone || '') : '';
+  var addr1 = pdb ? (pdb.address1 || '') : '';
+  var addr2 = pdb ? (pdb.address2 || '') : '';
+  var city = pdb ? (pdb.city || '') : '';
+  var state = pdb ? (pdb.state || '') : '';
+  var zip = pdb ? (pdb.zip || '') : '';
+  var lat = pdb ? (pdb.lat || '') : '';
+  var lng = pdb ? (pdb.lng || '') : '';
+  var fullAddr = [addr1, addr2, city, state, zip].filter(Boolean).join(', ');
+  var siteCode = (site||'').toLowerCase().indexOf('pennington') >= 0 ? 'pnj' : 'phl';
+  var siteAddr = siteCode === 'pnj' ? '1 Capital Way, Suite 200, Pennington, NJ 08534' : '9501 Roosevelt Blvd, Suite 208, Philadelphia, PA 19114';
+  // Build scheduled time ISO from date + time
+  var schedTime = '';
+  if (dateIso && timeStr) {
+    var timeParts = timeStr.match(/(\d{1,2}):(\d{2})\s*(am|pm)/i);
+    if (timeParts) {
+      var hr = parseInt(timeParts[1]);
+      var mn = timeParts[2];
+      var ampm = timeParts[3].toLowerCase();
+      if (ampm === 'pm' && hr < 12) hr += 12;
+      if (ampm === 'am' && hr === 12) hr = 0;
+      schedTime = dateIso + 'T' + String(hr).padStart(2,'0') + ':' + mn + ':00';
+    }
+  }
+  var nameParts = (patName||'').trim().split(/\s+/);
+  var firstName = nameParts[0] || '';
+  var lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
+
+  var key = (dateIso + '|' + (patName||'').toLowerCase().trim() + '|' + '').replace(/\s+/g, ' ');
+  var existing = _rideshareData[key];
+
+  var html = '<div style="text-align:left;font-size:13px;line-height:1.6">';
+  if (existing && existing.rideId) {
+    // Existing ride — show status
+    html += '<div style="padding:12px;border-radius:8px;background:#ecfdf5;border:1px solid #a7f3d0;margin-bottom:12px">'
+      + '<div style="font-weight:700;color:#059669;font-size:14px">Ride Booked</div>'
+      + '<div style="color:#065f46;font-size:11px;margin-top:4px">Ride ID: ' + escapeHTML(existing.rideId) + '</div>'
+      + '<div style="color:#065f46;font-size:11px">Status: ' + escapeHTML(existing.status || 'processing') + '</div>'
+      + '</div>'
+      + '<div style="display:flex;gap:8px;justify-content:center;margin-top:12px">'
+      + '<button onclick="checkUberRideStatus(\'' + escapeHTML(existing.rideId) + '\',\'' + jsAttr(key) + '\')" style="padding:8px 16px;border-radius:6px;border:1.5px solid #1843AD;background:#f0f4ff;color:#1843AD;font-weight:700;font-size:12px;cursor:pointer">Check Status</button>'
+      + '<button onclick="cancelUberRide(\'' + escapeHTML(existing.rideId) + '\',\'' + jsAttr(key) + '\')" style="padding:8px 16px;border-radius:6px;border:1.5px solid #dc2626;background:#fef2f2;color:#dc2626;font-weight:700;font-size:12px;cursor:pointer">Cancel Ride</button>'
+      + '</div>';
+  } else {
+    // New ride booking form
+    html += '<div style="display:grid;grid-template-columns:100px 1fr;gap:8px;align-items:center">'
+      + '<span style="font-weight:600;color:#475569">Patient:</span><span style="font-weight:700;color:#072061">' + escapeHTML(patName||'—') + '</span>'
+      + '<span style="font-weight:600;color:#475569">Phone:</span><input id="uber-phone" value="' + escapeHTML(phone) + '" style="padding:6px 8px;border:1px solid #e2e8f0;border-radius:6px;font-size:12px;font-family:inherit" placeholder="Patient phone">'
+      + '<span style="font-weight:600;color:#475569">Pickup:</span><input id="uber-pickup" value="' + escapeHTML(fullAddr) + '" style="padding:6px 8px;border:1px solid #e2e8f0;border-radius:6px;font-size:12px;font-family:inherit" placeholder="Pickup address">'
+      + '<span style="font-weight:600;color:#475569">Dropoff:</span><span style="font-size:11px;color:#64748b">' + escapeHTML(siteAddr) + '</span>'
+      + '<span style="font-weight:600;color:#475569">Date/Time:</span><span style="font-size:11px;color:#64748b">' + escapeHTML((dateIso||'') + ' ' + (timeStr||'')) + '</span>'
+      + '</div>';
+    if (!phone) html += '<div style="margin-top:8px;padding:8px;border-radius:6px;background:#fef2f2;color:#dc2626;font-size:11px;font-weight:600">No phone number on file — enter one above</div>';
+    if (!fullAddr) html += '<div style="margin-top:4px;padding:8px;border-radius:6px;background:#fff7ed;color:#FF9933;font-size:11px;font-weight:600">No pickup address on file — enter one above or patient will set via SMS</div>';
+    html += '<div style="margin-top:16px;text-align:center">'
+      + '<button id="uber-book-btn" onclick="bookUberRide(\'' + jsAttr(firstName) + '\',\'' + jsAttr(lastName) + '\',\'' + jsAttr(siteCode) + '\',\'' + jsAttr(schedTime) + '\',\'' + jsAttr(lat) + '\',\'' + jsAttr(lng) + '\',\'' + jsAttr(key) + '\')" '
+      + 'style="padding:10px 28px;border-radius:8px;border:none;background:linear-gradient(135deg,#072061,#1843AD);color:#fff;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;letter-spacing:0.3px">'
+      + 'Book Uber Ride</button></div>';
+  }
+  html += '</div>';
+  openModal('Book Ride — Uber Health', escapeHTML(patName||''), html);
+}
+
+function bookUberRide(firstName, lastName, site, schedTime, lat, lng, key) {
+  var phone = (document.getElementById('uber-phone')||{}).value || '';
+  var pickup = (document.getElementById('uber-pickup')||{}).value || '';
+  var btn = document.getElementById('uber-book-btn');
+  if (!phone) { alert('Phone number is required'); return; }
+  if (btn) { btn.textContent = 'Booking...'; btn.disabled = true; btn.style.opacity = '0.6'; }
+  var body = { phone: phone, firstName: firstName, lastName: lastName, site: site };
+  if (lat && lng) { body.pickupLat = lat; body.pickupLng = lng; }
+  else if (pickup) { body.pickupAddress = pickup; }
+  if (schedTime) body.scheduledTime = schedTime;
+  fetch(CRP_CONFIG.CF_BASE + '?action=uber-ride', {
+    method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (data.success) {
+      _loadRideshare();
+      var rideId = data.ride_id || data.request_id || data.id || '';
+      _rideshareData[key] = { rideId: rideId, status: 'processing', booked: new Date().toISOString() };
+      _saveRideshare();
+      // Re-inject buttons to update UI
+      document.querySelectorAll('#upcoming-tbody tr').forEach(function(r) { delete r.dataset.rideshareInjected; });
+      injectRideshareButtons();
+      // Update modal
+      var mBody = document.querySelector('#detailModal .modal-body') || document.querySelector('.modal-body');
+      if (mBody) mBody.innerHTML = '<div style="text-align:center;padding:24px"><div style="font-size:32px;margin-bottom:12px">&#x2705;</div><div style="font-weight:700;font-size:16px;color:#059669">Ride Booked!</div><div style="font-size:12px;color:#64748b;margin-top:8px">Ride ID: ' + escapeHTML(rideId) + '</div><div style="font-size:11px;color:#64748b;margin-top:4px">Patient will receive an SMS with ride details.</div></div>';
+    } else {
+      if (btn) { btn.textContent = 'Book Uber Ride'; btn.disabled = false; btn.style.opacity = '1'; }
+      alert('Booking failed: ' + (data.error || data.message || JSON.stringify(data)));
+    }
+  }).catch(function(err) {
+    if (btn) { btn.textContent = 'Book Uber Ride'; btn.disabled = false; btn.style.opacity = '1'; }
+    alert('Error: ' + err.message);
+  });
+}
+
+function checkUberRideStatus(rideId, key) {
+  fetch(CRP_CONFIG.CF_BASE + '?action=uber-status&rideId=' + encodeURIComponent(rideId))
+    .then(function(r) { return r.json(); }).then(function(data) {
+      if (data.status_label || data.ride_status) {
+        _loadRideshare();
+        if (_rideshareData[key]) _rideshareData[key].status = data.status_label || data.ride_status || 'unknown';
+        _saveRideshare();
+        document.querySelectorAll('#upcoming-tbody tr').forEach(function(r) { delete r.dataset.rideshareInjected; });
+        injectRideshareButtons();
+      }
+      alert('Ride Status: ' + (data.status_label || data.ride_status || data.status || 'unknown'));
+    }).catch(function(err) { alert('Error checking status: ' + err.message); });
+}
+
+function cancelUberRide(rideId, key) {
+  if (!confirm('Cancel this Uber ride?')) return;
+  fetch(CRP_CONFIG.CF_BASE + '?action=uber-cancel&rideId=' + encodeURIComponent(rideId), {
+    method: 'POST'
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    _loadRideshare();
+    delete _rideshareData[key];
+    _saveRideshare();
+    document.querySelectorAll('#upcoming-tbody tr').forEach(function(r) { delete r.dataset.rideshareInjected; });
+    injectRideshareButtons();
+    // Close modal
+    var overlay = document.getElementById('modalOverlay');
+    if (overlay) overlay.style.display = 'none';
+  }).catch(function(err) { alert('Error cancelling: ' + err.message); });
 }
 
 function injectRideshareButtons() {
@@ -3855,40 +3985,62 @@ function injectRideshareButtons() {
     var cells = row.querySelectorAll('td');
     var patCell = cells[6]; // Patient column (shifted for rideshare col)
     var patLink = patCell ? (patCell.querySelector('a') || patCell) : null;
-    var patName = patLink ? (patLink.dataset.phiOriginal || patCell.textContent || '').trim().toLowerCase() : '';
-    var crioRide = patName ? ridePatients[patName] : null;
+    var patName = patLink ? (patLink.dataset.phiOriginal || patCell.textContent || '').trim() : '';
+    var patNameLower = patName.toLowerCase();
+    var crioRide = patNameLower ? ridePatients[patNameLower] : null;
 
     // Migrate legacy boolean values to string states
     if (_rideshareData[key] === true) _rideshareData[key] = 'requested';
 
-    // Auto-populate from CRIO if found, otherwise use localStorage
-    var tooltip = crioRide ? crioRide.note || '' : '';
-    var btn = document.createElement('button');
+    var existing = _rideshareData[key];
+    var hasRideId = existing && typeof existing === 'object' && existing.rideId;
     var fromCrio = !!crioRide;
 
+    var btn = document.createElement('button');
+    var tooltip = crioRide ? crioRide.note || '' : '';
+
     function _updateRideBtn() {
-      var st = _rideshareData[key] || (crioRide ? 'requested' : 'not_requested');
-      var styles = {
-        'not_requested': { text: 'Not Requested', border: '#cbd5e1', bg: '#fff', color: '#94a3b8' },
-        'requested':     { text: fromCrio ? '🚗 CRIO' : '✓ Requested', border: '#FF9933', bg: '#fff7ed', color: '#FF9933' },
-        'ordered':       { text: '✓ Ordered', border: '#059669', bg: '#ecfdf5', color: '#059669' }
-      };
-      var s = styles[st] || styles['not_requested'];
-      btn.textContent = s.text;
-      btn.style.cssText = 'font-size:9px;font-weight:700;padding:3px 6px;border-radius:4px;cursor:pointer;white-space:nowrap;min-width:70px;border:1.5px solid ' + s.border + ';background:' + s.bg + ';color:' + s.color + ';';
+      if (hasRideId) {
+        var st = existing.status || 'processing';
+        var statusStyles = {
+          'processing': { text: 'Booked', border: '#059669', bg: '#ecfdf5', color: '#059669' },
+          'accepted':   { text: 'Driver Found', border: '#059669', bg: '#ecfdf5', color: '#059669' },
+          'arriving':   { text: 'Arriving', border: '#1843AD', bg: '#f0f4ff', color: '#1843AD' },
+          'in_progress':{ text: 'In Transit', border: '#1843AD', bg: '#f0f4ff', color: '#1843AD' },
+          'completed':  { text: 'Completed', border: '#072061', bg: '#e8edf5', color: '#072061' },
+          'cancelled':  { text: 'Cancelled', border: '#dc2626', bg: '#fef2f2', color: '#dc2626' }
+        };
+        var s = statusStyles[st] || statusStyles['processing'];
+        btn.textContent = s.text;
+        btn.style.cssText = 'font-size:9px;font-weight:700;padding:3px 6px;border-radius:4px;cursor:pointer;white-space:nowrap;min-width:70px;border:1.5px solid ' + s.border + ';background:' + s.bg + ';color:' + s.color + ';';
+      } else if (typeof existing === 'string' && existing !== 'not_requested') {
+        var styles2 = {
+          'requested': { text: fromCrio ? 'CRIO' : 'Requested', border: '#FF9933', bg: '#fff7ed', color: '#FF9933' },
+          'ordered':   { text: 'Ordered', border: '#059669', bg: '#ecfdf5', color: '#059669' }
+        };
+        var s2 = styles2[existing] || styles2['requested'];
+        btn.textContent = s2.text;
+        btn.style.cssText = 'font-size:9px;font-weight:700;padding:3px 6px;border-radius:4px;cursor:pointer;white-space:nowrap;min-width:70px;border:1.5px solid ' + s2.border + ';background:' + s2.bg + ';color:' + s2.color + ';';
+      } else if (crioRide) {
+        btn.textContent = 'CRIO';
+        btn.style.cssText = 'font-size:9px;font-weight:700;padding:3px 6px;border-radius:4px;cursor:pointer;white-space:nowrap;min-width:70px;border:1.5px solid #FF9933;background:#fff7ed;color:#FF9933;';
+      } else {
+        btn.textContent = 'Book';
+        btn.style.cssText = 'font-size:9px;font-weight:700;padding:3px 6px;border-radius:4px;cursor:pointer;white-space:nowrap;min-width:70px;border:1.5px solid #cbd5e1;background:#fff;color:#94a3b8;';
+      }
     }
     _updateRideBtn();
     if (tooltip) btn.title = tooltip.substring(0, 150);
 
+    // Extract row data for modal
+    var dateIso = row.dataset.date || '';
+    var timeCell = cells[3]; // time column
+    var timeStr = timeCell ? (timeCell.textContent || '').trim().split(/\s/)[0] : '';
+    var siteStr = row.dataset.site || '';
+
     btn.onclick = function(e) {
       e.stopPropagation();
-      var cur = _rideshareData[key] || (crioRide ? 'requested' : 'not_requested');
-      // Cycle: not_requested → requested → ordered → not_requested
-      var next = cur === 'not_requested' ? 'requested' : cur === 'requested' ? 'ordered' : 'not_requested';
-      if (next === 'not_requested') delete _rideshareData[key];
-      else _rideshareData[key] = next;
-      _saveRideshare();
-      _updateRideBtn();
+      _openUberRideModal(patName, dateIso, timeStr, siteStr);
     };
     td.innerHTML = '';
     td.appendChild(btn);
@@ -8066,8 +8218,13 @@ async function fetchPatientDB() {
       work_phone: (r['Work Phone']||'').trim(),
       record: (r['Record Number']||'').trim(),
       site: (r['Site Name']||'').trim(),
+      address1: (r['Address 1']||'').trim(),
+      address2: (r['Address 2']||'').trim(),
       city: (r['City']||'').trim(),
       state: (r['State']||'').trim(),
+      zip: (r['Zip Code']||'').trim(),
+      lat: (r['Latitude']||'').trim(),
+      lng: (r['Longitude']||'').trim(),
     }));
     PATIENT_DB_MAP = new Map(PATIENT_DB.map(p => [p.name_lower, p]));
     // Phone lookup map for cross-referencing referrals → CRIO

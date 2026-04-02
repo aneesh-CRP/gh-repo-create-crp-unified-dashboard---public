@@ -485,8 +485,13 @@ const FEEDS = {
       COALESCE(p.work_phone, '') AS work_phone,
       COALESCE(p.patient_id, CAST(p.patient_key AS STRING)) AS record_number,
       COALESCE(si.name, '') AS site_name,
+      COALESCE(p.address1, '') AS address1,
+      COALESCE(p.address2, '') AS address2,
       COALESCE(p.city, '') AS city,
       COALESCE(p.state, '') AS state,
+      COALESCE(p.zip_code, '') AS zip_code,
+      COALESCE(CAST(p.latitude AS STRING), '') AS latitude,
+      COALESCE(CAST(p.longitude AS STRING), '') AS longitude,
       CASE p.sex WHEN 0 THEN 'Female' WHEN 1 THEN 'Male' WHEN 2 THEN 'Intersex' ELSE '' END AS gender,
       COALESCE(FORMAT_DATETIME('%Y-%m-%d', p.birth_date), '') AS birth_date,
       CAST(p.patient_key AS STRING) AS patient_key,
@@ -501,7 +506,10 @@ const FEEDS = {
       patient_full_name: 'Patient Full Name', patient_status: 'Patient Status',
       email: 'Email', mobile_phone: 'Mobile Phone', home_phone: 'Home Phone',
       work_phone: 'Work Phone', record_number: 'Record Number', site_name: 'Site Name',
-      city: 'City', state: 'State', gender: 'Gender', birth_date: 'Birth Date',
+      address1: 'Address 1', address2: 'Address 2',
+      city: 'City', state: 'State', zip_code: 'Zip Code',
+      latitude: 'Latitude', longitude: 'Longitude',
+      gender: 'Gender', birth_date: 'Birth Date',
       patient_key: 'Patient Key', last_interaction_date: 'Last Interaction Date',
       rating: 'Rating', snapshot_date: 'snapshot_date'
     }
@@ -1964,6 +1972,69 @@ const FEEDS = {
 // ═══════════════════════════════════════════════════════════
 
 const CRIO_TOKEN = process.env.CRIO_TOKEN || '';
+
+// ── Uber Health API ──
+const UBER = {
+  clientId: process.env.UBER_CLIENT_ID || '',
+  clientSecret: process.env.UBER_CLIENT_SECRET || '',
+};
+let _uberToken = null;
+let _uberTokenExpiry = 0;
+
+async function getUberToken() {
+  if (_uberToken && Date.now() < _uberTokenExpiry - 60000) return _uberToken;
+  const auth = Buffer.from(UBER.clientId + ':' + UBER.clientSecret).toString('base64');
+  const data = 'grant_type=client_credentials&scope=health';
+  return new Promise((resolve, reject) => {
+    const req = https.request({
+      hostname: 'auth.uber.com', path: '/oauth/v2/token', method: 'POST',
+      headers: { 'Authorization': 'Basic ' + auth, 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(data) }
+    }, res => {
+      let d = ''; res.on('data', c => d += c);
+      res.on('end', () => {
+        try {
+          const j = JSON.parse(d);
+          if (j.access_token) {
+            _uberToken = j.access_token;
+            _uberTokenExpiry = Date.now() + (j.expires_in || 2592000) * 1000;
+            resolve(_uberToken);
+          } else { reject(new Error('Uber token error: ' + d)); }
+        } catch (e) { reject(new Error('Uber token parse error: ' + d)); }
+      });
+    });
+    req.on('error', reject); req.write(data); req.end();
+  });
+}
+
+function uberApi(method, path, body) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const token = await getUberToken();
+      const postData = body ? JSON.stringify(body) : null;
+      const options = {
+        hostname: 'api.uber.com', path, method,
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
+      };
+      if (postData) options.headers['Content-Length'] = Buffer.byteLength(postData);
+      const req = https.request(options, res => {
+        let d = ''; res.on('data', c => d += c);
+        res.on('end', () => {
+          try { resolve({ status: res.statusCode, ...JSON.parse(d) }); }
+          catch (e) { resolve({ status: res.statusCode, raw: d }); }
+        });
+      });
+      req.on('error', reject);
+      if (postData) req.write(postData);
+      req.end();
+    } catch (e) { reject(e); }
+  });
+}
+
+// Site addresses for ride dropoff
+const SITE_ADDRESSES = {
+  phl: { line1: '9501 Roosevelt Blvd, Suite 208', city: 'Philadelphia', state: 'PA', zip: '19114', latitude: 40.0638, longitude: -75.0143 },
+  pnj: { line1: '1 Capital Way, Suite 200', city: 'Pennington', state: 'NJ', zip: '08534', latitude: 40.3340, longitude: -74.7905 }
+};
 const CRIO_API_BASE = 'https://api.clinicalresearch.io';
 const CRIO_CLIENT_ID = '1329';
 const CRIO_SITE_IDS = { PHL: '1679', PNJ: '5545' };
@@ -3906,6 +3977,71 @@ functions.http('crpBqApi', async (req, res) => {
       res.json({ success: result.status === 201 || result.status === 'queued', ...result });
     } catch (err) {
       console.error('test-sms error:', err.message);
+      res.status(500).json({ success: false, error: err.message });
+    }
+    return;
+  }
+
+  // ── POST: Uber Health — book ride ──
+  if (req.method === 'POST' && req.query.action === 'uber-ride') {
+    res.set('Cache-Control', 'no-store');
+    try {
+      if (!UBER.clientId) { res.status(500).json({ error: 'Uber credentials not configured' }); return; }
+      const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
+      const { phone, firstName, lastName, pickupAddress, pickupLat, pickupLng, site, scheduledTime } = body;
+      if (!phone || !site) { res.status(400).json({ error: 'phone and site are required' }); return; }
+      const dropoff = SITE_ADDRESSES[site] || SITE_ADDRESSES.phl;
+      const pickup = {};
+      if (pickupLat && pickupLng) {
+        pickup.latitude = parseFloat(pickupLat);
+        pickup.longitude = parseFloat(pickupLng);
+      } else if (pickupAddress) {
+        pickup.place = { address: pickupAddress };
+      }
+      const rideBody = {
+        pickup: pickup,
+        dropoff: { latitude: dropoff.latitude, longitude: dropoff.longitude, place: { address: dropoff.line1 + ', ' + dropoff.city + ', ' + dropoff.state + ' ' + dropoff.zip } },
+        rider: {
+          phone_number: phone.startsWith('+') ? phone : '+1' + phone.replace(/[^0-9]/g, '').replace(/^1/, ''),
+        }
+      };
+      if (firstName) rideBody.rider.first_name = firstName;
+      if (lastName) rideBody.rider.last_name = lastName;
+      if (scheduledTime) rideBody.scheduled_pickup_time = scheduledTime; // ISO 8601
+      console.log('Uber Health: booking ride for', firstName, lastName, '→', site);
+      const result = await uberApi('POST', '/v1/guests/rides', rideBody);
+      console.log('Uber Health result:', result.status, result.ride_id || result.request_id || '');
+      res.json({ success: result.status >= 200 && result.status < 300, ...result });
+    } catch (err) {
+      console.error('uber-ride error:', err.message);
+      res.status(500).json({ success: false, error: err.message });
+    }
+    return;
+  }
+
+  // ── GET: Uber Health — ride status ──
+  if (req.query.action === 'uber-status' && req.query.rideId) {
+    res.set('Cache-Control', 'no-store');
+    try {
+      if (!UBER.clientId) { res.status(500).json({ error: 'Uber credentials not configured' }); return; }
+      const result = await uberApi('GET', '/v1/guests/rides/' + encodeURIComponent(req.query.rideId));
+      res.json({ success: result.status >= 200 && result.status < 300, ...result });
+    } catch (err) {
+      console.error('uber-status error:', err.message);
+      res.status(500).json({ success: false, error: err.message });
+    }
+    return;
+  }
+
+  // ── POST: Uber Health — cancel ride ──
+  if (req.method === 'POST' && req.query.action === 'uber-cancel' && req.query.rideId) {
+    res.set('Cache-Control', 'no-store');
+    try {
+      if (!UBER.clientId) { res.status(500).json({ error: 'Uber credentials not configured' }); return; }
+      const result = await uberApi('DELETE', '/v1/guests/rides/' + encodeURIComponent(req.query.rideId));
+      res.json({ success: result.status >= 200 && result.status < 300, ...result });
+    } catch (err) {
+      console.error('uber-cancel error:', err.message);
       res.status(500).json({ success: false, error: err.message });
     }
     return;
