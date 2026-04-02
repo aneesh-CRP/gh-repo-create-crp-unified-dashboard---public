@@ -6299,14 +6299,14 @@ function injectRideshareButtons() {
         btn.title = 'This study uses a sponsor-provided rideshare vendor';
       } else if (typeof existing === 'string' && existing !== 'not_requested') {
         var styles2 = {
-          'requested': { text: fromCrio ? 'CRIO' : 'Requested', border: '#FF9933', bg: '#fff7ed', color: '#FF9933' },
+          'requested': { text: 'Requested', border: '#FF9933', bg: '#fff7ed', color: '#FF9933' },
           'ordered':   { text: 'Ordered', border: '#059669', bg: '#ecfdf5', color: '#059669' }
         };
         var s2 = styles2[existing] || styles2['requested'];
         btn.textContent = s2.text;
         btn.style.cssText = 'font-size:9px;font-weight:700;padding:3px 6px;border-radius:4px;cursor:pointer;white-space:nowrap;min-width:70px;border:1.5px solid ' + s2.border + ';background:' + s2.bg + ';color:' + s2.color + ';';
       } else if (crioRide) {
-        btn.textContent = 'CRIO';
+        btn.textContent = 'Requested';
         btn.style.cssText = 'font-size:9px;font-weight:700;padding:3px 6px;border-radius:4px;cursor:pointer;white-space:nowrap;min-width:70px;border:1.5px solid #FF9933;background:#fff7ed;color:#FF9933;';
       } else {
         btn.textContent = 'Book';
