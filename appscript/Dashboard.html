@@ -1824,6 +1824,24 @@ body {
   <div style="display:none" id="cq-kpi-db-sub"></div>
   <div style="display:none" id="cq-badge"></div>
 
+  <!-- Confirmation vs No-Show Trend -->
+  <div class="card fade-in" id="confirm-outcome-card" style="display:none;margin-top:12px;">
+    <div class="card-header">
+      <span class="card-title">Confirmation Impact — No-Show Rate</span>
+      <span class="badge badge-blue" id="confirm-outcome-badge"></span>
+    </div>
+    <div style="padding:0 16px 4px;font-size:10px;color:#94a3b8">How often do confirmed vs unconfirmed appointments result in no-shows? (Last 90 days from CRIO interactions + dashboard tracking)</div>
+    <div style="padding:8px 16px;display:flex;gap:24px;flex-wrap:wrap;" id="confirm-outcome-kpis"></div>
+    <div style="height:220px;padding:8px 16px 16px;"><canvas id="confirm-outcome-chart"></canvas></div>
+    <div style="max-height:250px;overflow-y:auto;display:none;" id="confirm-outcome-table-wrap">
+      <table class="tbl" style="width:100%">
+        <thead><tr><th>Week</th><th style="text-align:right">Confirmed</th><th style="text-align:right">Conf. No-Shows</th><th style="text-align:right">Conf. No-Show %</th><th style="text-align:right">Unconfirmed</th><th style="text-align:right">Unconf. No-Shows</th><th style="text-align:right">Unconf. No-Show %</th></tr></thead>
+        <tbody id="confirm-outcome-tbody"></tbody>
+      </table>
+    </div>
+    <div style="padding:4px 16px 12px;text-align:right"><button onclick="document.getElementById('confirm-outcome-table-wrap').style.display=document.getElementById('confirm-outcome-table-wrap').style.display==='none'?'':'none'" style="font-size:10px;color:#1843AD;background:none;border:none;cursor:pointer;font-weight:600">Toggle Table</button></div>
+  </div>
+
 </div><!-- /view-actions -->
 
 <!-- Operations merged into Actions tab -->

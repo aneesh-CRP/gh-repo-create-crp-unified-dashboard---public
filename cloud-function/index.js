@@ -1863,6 +1863,67 @@ const FEEDS = {
     ORDER BY action_date DESC`
   },
 
+  // ── Confirmation vs No-Show Correlation (historical) ──
+  confirmationOutcomes: {
+    query: (params) => {
+      const days = parseInt(params.days) || 90;
+      return `
+      WITH scheduled_visits AS (
+        SELECT
+          ca.calendar_appointment_key,
+          ca.subject_key,
+          ca.study_key,
+          ca.start AS visit_start,
+          FORMAT_DATETIME('%Y-%m-%d', ca.start) AS visit_date,
+          FORMAT_DATETIME('%Y-%W', ca.start) AS visit_week,
+          ca.status AS appt_status,
+          ca.cancel_type,
+          CASE ca.status
+            WHEN 1 THEN 'Completed'
+            WHEN 0 THEN CASE ca.cancel_type WHEN 1 THEN 'No Show' WHEN 2 THEN 'Site Cancelled' WHEN 3 THEN 'Patient Cancelled' ELSE 'Cancelled' END
+            ELSE 'Active'
+          END AS outcome,
+          sub.patient_key
+        FROM ${tbl('calendar_appointment')} ca
+        LEFT JOIN ${tbl('subject')} sub ON ca.subject_key = sub.subject_key
+        LEFT JOIN ${tbl('study')} st ON ca.study_key = st.study_key
+        WHERE ca._fivetran_deleted = false
+          AND ca.start >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL ${days} DAY)
+          AND ca.start < CURRENT_DATETIME()
+          AND ca.type IN (0, 1)
+          AND st.is_active = 1
+          ${STUDY_FILTER_SQL}
+      ),
+      confirmations AS (
+        SELECT
+          pi.patient_key,
+          pi.action_date AS confirm_date
+        FROM ${tbl('patient_interaction')} pi
+        WHERE pi._fivetran_deleted = false
+          AND pi.action_date >= DATETIME_SUB(CURRENT_DATETIME(), INTERVAL ${days + 14} DAY)
+          AND REGEXP_CONTAINS(LOWER(pi.action_details), r'\\bconfirm.{0,20}(appt|appointment|visit)|(appt|appointment|visit).{0,20}\\bconfirm|appointment confirmation|\\bconfirmed for\\b|received email from patient confirming')
+      ),
+      matched AS (
+        SELECT
+          sv.*,
+          CASE WHEN c.patient_key IS NOT NULL THEN 'Confirmed' ELSE 'Unconfirmed' END AS confirmation_status
+        FROM scheduled_visits sv
+        LEFT JOIN confirmations c ON sv.patient_key = c.patient_key
+          AND c.confirm_date BETWEEN DATETIME_SUB(sv.visit_start, INTERVAL 7 DAY) AND sv.visit_start
+        QUALIFY ROW_NUMBER() OVER (PARTITION BY sv.calendar_appointment_key ORDER BY c.confirm_date DESC) = 1
+      )
+      SELECT
+        visit_week,
+        confirmation_status,
+        outcome,
+        COUNT(*) AS visit_count
+      FROM matched
+      WHERE outcome IN ('Completed', 'No Show', 'Patient Cancelled')
+      GROUP BY visit_week, confirmation_status, outcome
+      ORDER BY visit_week, confirmation_status, outcome`;
+    }
+  },
+
   // ── Ride/Transport Requests (from patient interactions) ──
   rideRequests: {
     query: () => `

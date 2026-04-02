@@ -3989,7 +3989,11 @@ function _makeStatusBtn(key, row) {
       opt.onmouseleave = function(){this.style.background=isActive?s.color+'15':'';};
       opt.onclick = function(ev) {
         ev.stopPropagation();
-        _visitStatuses[key] = {status: s.id, ts: Date.now()};
+        var _vCells = row.querySelectorAll('td');
+        var _vDate = row.dataset.date || '';
+        var _vStudy = _vCells[4] ? (_vCells[4].textContent||'').trim() : '';
+        var _vPat = _vCells[6] ? ((_vCells[6].querySelector('a')||_vCells[6]).dataset.phiOriginal || _vCells[6].textContent||'').trim() : '';
+        _visitStatuses[key] = {status: s.id, ts: Date.now(), date: _vDate, study: _vStudy, patient: _vPat};
         _saveVisitStatuses();
         _render();
         dd.remove();
@@ -4243,7 +4247,7 @@ function injectRideshareButtons() {
         btn.style.cssText = 'font-size:9px;font-weight:700;padding:3px 6px;border-radius:4px;cursor:pointer;white-space:nowrap;min-width:70px;border:1.5px solid ' + s.border + ';background:' + s.bg + ';color:' + s.color + ';';
       } else if (crioRide && !uberEligible) {
         // Ride requested but study uses 3rd-party vendor
-        btn.textContent = '3rd Party';
+        btn.textContent = 'Req\u2019d 3rd Party';
         btn.style.cssText = 'font-size:9px;font-weight:600;padding:3px 6px;border-radius:4px;cursor:default;white-space:nowrap;min-width:70px;border:1.5px solid #8b5cf6;background:#f5f3ff;color:#8b5cf6;';
         btn.title = 'Ride requested — this study uses a sponsor-provided vendor';
       } else if (typeof existing === 'string' && existing !== 'not_requested') {
@@ -16360,6 +16364,136 @@ function renderTrendsCharts() {
   });
 }
 
+// ═══ CONFIRMATION vs NO-SHOW OUTCOME CHART ═══
+var _confirmOutcomeChart = null;
+var _confirmOutcomeData = null;
+
+function fetchConfirmationOutcomes() {
+  fetch(CRP_CONFIG.CF_BASE + '?feed=confirmationOutcomes&format=json&days=90')
+    .then(function(r) { return r.json(); })
+    .then(function(j) {
+      var rows = j.data || [];
+      _log('Confirmation outcomes: ' + rows.length + ' rows from BQ');
+
+      // Also merge in dashboard-tracked confirmations from Firestore
+      var dashConfirmed = crpState.get('visit_statuses');
+      // Group dashboard confirmations by week
+      var dashByWeek = {};
+      Object.keys(dashConfirmed).forEach(function(k) {
+        var v = dashConfirmed[k];
+        if (!v || !v.date) return;
+        var d = parseDate(v.date);
+        if (!d || isNaN(d.getTime())) return;
+        // Get ISO week
+        var jan1 = new Date(d.getFullYear(), 0, 1);
+        var weekNum = Math.ceil(((d - jan1) / 86400000 + jan1.getDay() + 1) / 7);
+        var weekKey = d.getFullYear() + '-' + String(weekNum).padStart(2, '0');
+        if (!dashByWeek[weekKey]) dashByWeek[weekKey] = { confirmed: 0, unconfirmed: 0 };
+        if (v.status === 'confirmed' || v.status === 'completed') dashByWeek[weekKey].confirmed++;
+      });
+
+      // Aggregate BQ data by week
+      var byWeek = {};
+      rows.forEach(function(r) {
+        var w = r.visit_week;
+        if (!byWeek[w]) byWeek[w] = { confCompleted: 0, confNoShow: 0, confCancelled: 0, unconfCompleted: 0, unconfNoShow: 0, unconfCancelled: 0 };
+        var cnt = parseInt(r.visit_count) || 0;
+        var isConf = r.confirmation_status === 'Confirmed';
+        if (r.outcome === 'Completed') { if (isConf) byWeek[w].confCompleted += cnt; else byWeek[w].unconfCompleted += cnt; }
+        if (r.outcome === 'No Show') { if (isConf) byWeek[w].confNoShow += cnt; else byWeek[w].unconfNoShow += cnt; }
+        if (r.outcome === 'Patient Cancelled') { if (isConf) byWeek[w].confCancelled += cnt; else byWeek[w].unconfCancelled += cnt; }
+      });
+
+      _confirmOutcomeData = byWeek;
+      renderConfirmOutcomeChart();
+    })
+    .catch(function(err) { _log('Confirmation outcomes fetch failed: ' + err.message); });
+}
+
+function renderConfirmOutcomeChart() {
+  var byWeek = _confirmOutcomeData;
+  if (!byWeek) return;
+  var card = document.getElementById('confirm-outcome-card');
+  if (card) card.style.display = '';
+
+  var weeks = Object.keys(byWeek).sort();
+  if (weeks.length === 0) return;
+
+  // Calculate totals for KPIs
+  var totConf = 0, totConfNS = 0, totUnconf = 0, totUnconfNS = 0;
+  weeks.forEach(function(w) {
+    var d = byWeek[w];
+    var confTotal = d.confCompleted + d.confNoShow + d.confCancelled;
+    var unconfTotal = d.unconfCompleted + d.unconfNoShow + d.unconfCancelled;
+    totConf += confTotal; totConfNS += d.confNoShow;
+    totUnconf += unconfTotal; totUnconfNS += d.unconfNoShow;
+  });
+  var confRate = totConf > 0 ? ((totConfNS / totConf) * 100).toFixed(1) : '0.0';
+  var unconfRate = totUnconf > 0 ? ((totUnconfNS / totUnconf) * 100).toFixed(1) : '0.0';
+
+  // KPI chips
+  var kpiEl = document.getElementById('confirm-outcome-kpis');
+  if (kpiEl) {
+    kpiEl.innerHTML = ''
+      + '<div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px">'
+      + '<div style="padding:8px 12px;border-radius:8px;background:#ecfdf5;border:1px solid #a7f3d0"><span style="color:#065f46;font-weight:700">Confirmed</span><div style="font-size:18px;font-weight:800;color:#059669">' + confRate + '% <span style="font-size:11px;font-weight:500">no-show</span></div><div style="font-size:10px;color:#065f46">' + totConfNS + ' / ' + totConf + ' visits</div></div>'
+      + '<div style="padding:8px 12px;border-radius:8px;background:#fef2f2;border:1px solid #fecaca"><span style="color:#991b1b;font-weight:700">Unconfirmed</span><div style="font-size:18px;font-weight:800;color:#dc2626">' + unconfRate + '% <span style="font-size:11px;font-weight:500">no-show</span></div><div style="font-size:10px;color:#991b1b">' + totUnconfNS + ' / ' + totUnconf + ' visits</div></div>'
+      + '<div style="padding:8px 12px;border-radius:8px;background:#f0f4ff;border:1px solid #c7d2fe"><span style="color:#1e3a8a;font-weight:700">Reduction</span><div style="font-size:18px;font-weight:800;color:#1843AD">' + (parseFloat(unconfRate) > 0 ? Math.round((1 - parseFloat(confRate)/parseFloat(unconfRate)) * 100) : 0) + '% <span style="font-size:11px;font-weight:500">fewer no-shows</span></div><div style="font-size:10px;color:#1e3a8a">when appointment is confirmed</div></div>'
+      + '</div>';
+  }
+
+  var badge = document.getElementById('confirm-outcome-badge');
+  if (badge) badge.textContent = weeks.length + ' weeks';
+
+  // Table
+  var tbody = document.getElementById('confirm-outcome-tbody');
+  if (tbody) {
+    var html = '';
+    weeks.forEach(function(w) {
+      var d = byWeek[w];
+      var cTotal = d.confCompleted + d.confNoShow + d.confCancelled;
+      var uTotal = d.unconfCompleted + d.unconfNoShow + d.unconfCancelled;
+      var cPct = cTotal > 0 ? ((d.confNoShow / cTotal) * 100).toFixed(1) : '0.0';
+      var uPct = uTotal > 0 ? ((d.unconfNoShow / uTotal) * 100).toFixed(1) : '0.0';
+      html += '<tr><td style="font-size:11px;font-weight:600">' + w + '</td>'
+        + '<td style="text-align:right;font-size:11px">' + cTotal + '</td>'
+        + '<td style="text-align:right;font-size:11px;color:#dc2626;font-weight:600">' + d.confNoShow + '</td>'
+        + '<td style="text-align:right;font-size:11px;font-weight:700;color:' + (parseFloat(cPct) > 10 ? '#dc2626' : '#059669') + '">' + cPct + '%</td>'
+        + '<td style="text-align:right;font-size:11px">' + uTotal + '</td>'
+        + '<td style="text-align:right;font-size:11px;color:#dc2626;font-weight:600">' + d.unconfNoShow + '</td>'
+        + '<td style="text-align:right;font-size:11px;font-weight:700;color:' + (parseFloat(uPct) > 10 ? '#dc2626' : '#059669') + '">' + uPct + '%</td>'
+        + '</tr>';
+    });
+    tbody.innerHTML = html;
+  }
+
+  // Chart
+  var canvas = document.getElementById('confirm-outcome-chart');
+  if (!canvas || typeof Chart === 'undefined') return;
+  if (_confirmOutcomeChart) { _confirmOutcomeChart.destroy(); _confirmOutcomeChart = null; }
+  var confNoShowPcts = weeks.map(function(w) { var d = byWeek[w]; var t = d.confCompleted + d.confNoShow + d.confCancelled; return t > 0 ? +((d.confNoShow / t) * 100).toFixed(1) : 0; });
+  var unconfNoShowPcts = weeks.map(function(w) { var d = byWeek[w]; var t = d.unconfCompleted + d.unconfNoShow + d.unconfCancelled; return t > 0 ? +((d.unconfNoShow / t) * 100).toFixed(1) : 0; });
+
+  _confirmOutcomeChart = new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels: weeks,
+      datasets: [
+        { label: 'Confirmed No-Show %', data: confNoShowPcts, borderColor: '#059669', backgroundColor: '#05966920', borderWidth: 2, pointRadius: 3, tension: 0.3, fill: true },
+        { label: 'Unconfirmed No-Show %', data: unconfNoShowPcts, borderColor: '#dc2626', backgroundColor: '#dc262620', borderWidth: 2, pointRadius: 3, tension: 0.3, fill: true }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 9 } } },
+        y: { grid: { color: '#f1f5f9' }, beginAtZero: true, ticks: { callback: function(v) { return v + '%'; }, font: { size: 9 } } }
+      }
+    }
+  });
+}
+
 function loadLongitudinalData() {
   renderTrendsCharts();
   const status = document.getElementById('trends-load-status');
@@ -18041,8 +18175,9 @@ async function _crpInit() {
       setHealthChip('dh-finance','fail','Finance (failed)');
     });
 
-    // Phase 3: Supplemental data (Action Required + Patient DB + Meta Ads)
+    // Phase 3: Supplemental data (Action Required + Patient DB + Meta Ads + Confirmation Outcomes)
     if (typeof fetchActionRequiredData === 'function') fetchActionRequiredData();
+    if (typeof fetchConfirmationOutcomes === 'function') fetchConfirmationOutcomes();
     // regulatoryPerformance now included in the batch call above
     // Debounce studies re-render from multiple async sources
     var _studiesRenderPending = false;
