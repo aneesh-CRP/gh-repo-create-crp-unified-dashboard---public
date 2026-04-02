@@ -306,6 +306,20 @@ const CRP_CONFIG = {
     'N1T-MC-MALO': 10,
   },
 
+  // Uber Health rideshare — studies where CRP books rides directly and invoices sponsor
+  // Only these studies show the "Book" button; all others use 3rd-party vendors
+  UBER_RIDESHARE: {
+    'D6973C00001': { sponsor: 'AstraZeneca', max: 50, per: 'each way', note: 'Taxi/rideshare, 15+ miles each way', minMiles: 15 },
+    'D7960C00015': { sponsor: 'AstraZeneca', max: 50, per: 'each way', note: 'Taxi/rideshare, 15+ miles each way', minMiles: 15 },
+    'EFC17559':    { sponsor: 'Sanofi', max: 50, per: 'roundtrip', note: 'Rideshare up to $50 roundtrip' },
+    'EFC17600':    { sponsor: 'Sanofi', max: 30, per: 'roundtrip', note: 'Rideshare up to $30 roundtrip' },
+    'EFC18366':    { sponsor: 'Sanofi', max: 50, per: 'roundtrip', note: 'Rideshare up to $50 roundtrip' },
+    'MR-130A-01-TD-3001': { sponsor: 'Viatris', max: 100, per: 'roundtrip', note: 'Invoice must include subject #, amount, visit #, date' },
+    'M23-698':     { sponsor: 'AbbVie', max: 75, per: 'visit', note: 'Actual receipts, $75/visit' },
+    'M20-465':     { sponsor: 'AbbVie', max: 51, per: 'visit', note: 'Actual receipts, $51/visit' },
+    'M24-601':     { sponsor: 'AbbVie', max: 51, per: 'visit', note: 'Actual receipts, $51/visit — can request approval to exceed' },
+  },
+
   // Brand Colors (match CSS :root variables)
   // Brand colors in CSS variables (--navy, --blue, --cyan, --orange)
 
@@ -3837,8 +3851,18 @@ function _rideshareKey(row) {
   var study = cells[4] ? (cells[4].textContent || '').trim() : '';
   return (date + '|' + pat + '|' + study).toLowerCase().replace(/\s+/g, ' ');
 }
+// Check if study qualifies for Uber booking (returns config or null)
+function _getUberStudyConfig(studyName) {
+  if (!studyName || !CRP_CONFIG.UBER_RIDESHARE) return null;
+  var sn = studyName.toLowerCase();
+  var keys = Object.keys(CRP_CONFIG.UBER_RIDESHARE);
+  for (var i = 0; i < keys.length; i++) {
+    if (sn.indexOf(keys[i].toLowerCase()) >= 0) return CRP_CONFIG.UBER_RIDESHARE[keys[i]];
+  }
+  return null;
+}
 
-function _openUberRideModal(patName, dateIso, timeStr, site) {
+function _openUberRideModal(patName, dateIso, timeStr, site, studyName) {
   _loadRideshare();
   var pdb = PATIENT_DB_MAP.get((patName||'').toLowerCase().trim());
   var phone = pdb ? (pdb.mobile || pdb.home_phone || pdb.work_phone || '') : '';
@@ -3893,6 +3917,14 @@ function _openUberRideModal(patName, dateIso, timeStr, site) {
       + '<span style="font-weight:600;color:#475569">Dropoff:</span><span style="font-size:11px;color:#64748b">' + escapeHTML(siteAddr) + '</span>'
       + '<span style="font-weight:600;color:#475569">Date/Time:</span><span style="font-size:11px;color:#64748b">' + escapeHTML((dateIso||'') + ' ' + (timeStr||'')) + '</span>'
       + '</div>';
+    var uberCfg = _getUberStudyConfig(studyName);
+    if (uberCfg) {
+      html += '<div style="margin-top:8px;padding:8px;border-radius:6px;background:#f0f4ff;border:1px solid #c7d2fe;font-size:11px">'
+        + '<span style="font-weight:700;color:#1843AD">' + escapeHTML(uberCfg.sponsor) + '</span> — '
+        + '<span style="color:#475569">Max <strong>$' + uberCfg.max + '</strong> ' + escapeHTML(uberCfg.per) + '</span>'
+        + (uberCfg.note ? '<div style="color:#64748b;font-size:10px;margin-top:2px">' + escapeHTML(uberCfg.note) + '</div>' : '')
+        + '</div>';
+    }
     if (!phone) html += '<div style="margin-top:8px;padding:8px;border-radius:6px;background:#fef2f2;color:#dc2626;font-size:11px;font-weight:600">No phone number on file — enter one above</div>';
     if (!fullAddr) html += '<div style="margin-top:4px;padding:8px;border-radius:6px;background:#fff7ed;color:#FF9933;font-size:11px;font-weight:600">No pickup address on file — enter one above or patient will set via SMS</div>';
     html += '<div style="margin-top:16px;text-align:center">'
@@ -3996,6 +4028,11 @@ function injectRideshareButtons() {
     var hasRideId = existing && typeof existing === 'object' && existing.rideId;
     var fromCrio = !!crioRide;
 
+    // Get study name for Uber eligibility check
+    var studyCell = cells[4];
+    var studyName = studyCell ? (studyCell.textContent || '').trim() : '';
+    var uberEligible = _getUberStudyConfig(studyName);
+
     var btn = document.createElement('button');
     var tooltip = crioRide ? crioRide.note || '' : '';
 
@@ -4013,6 +4050,11 @@ function injectRideshareButtons() {
         var s = statusStyles[st] || statusStyles['processing'];
         btn.textContent = s.text;
         btn.style.cssText = 'font-size:9px;font-weight:700;padding:3px 6px;border-radius:4px;cursor:pointer;white-space:nowrap;min-width:70px;border:1.5px solid ' + s.border + ';background:' + s.bg + ';color:' + s.color + ';';
+      } else if (!uberEligible && !crioRide) {
+        // Study uses 3rd-party vendor — show non-interactive label
+        btn.textContent = '3rd Party';
+        btn.style.cssText = 'font-size:9px;font-weight:600;padding:3px 6px;border-radius:4px;cursor:default;white-space:nowrap;min-width:70px;border:1px solid #e2e8f0;background:#f8fafc;color:#94a3b8;';
+        btn.title = 'This study uses a sponsor-provided rideshare vendor';
       } else if (typeof existing === 'string' && existing !== 'not_requested') {
         var styles2 = {
           'requested': { text: fromCrio ? 'CRIO' : 'Requested', border: '#FF9933', bg: '#fff7ed', color: '#FF9933' },
@@ -4040,7 +4082,8 @@ function injectRideshareButtons() {
 
     btn.onclick = function(e) {
       e.stopPropagation();
-      _openUberRideModal(patName, dateIso, timeStr, siteStr);
+      if (!uberEligible && !crioRide && !hasRideId) return; // 3rd party — no action
+      _openUberRideModal(patName, dateIso, timeStr, siteStr, studyName);
     };
     td.innerHTML = '';
     td.appendChild(btn);
