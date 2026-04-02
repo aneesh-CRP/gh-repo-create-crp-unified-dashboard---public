@@ -6292,11 +6292,11 @@ function injectRideshareButtons() {
         var s = statusStyles[st] || statusStyles['processing'];
         btn.textContent = s.text;
         btn.style.cssText = 'font-size:9px;font-weight:700;padding:3px 6px;border-radius:4px;cursor:pointer;white-space:nowrap;min-width:70px;border:1.5px solid ' + s.border + ';background:' + s.bg + ';color:' + s.color + ';';
-      } else if (!uberEligible && !crioRide) {
-        // Study uses 3rd-party vendor — show non-interactive label
+      } else if (crioRide && !uberEligible) {
+        // Ride requested but study uses 3rd-party vendor
         btn.textContent = '3rd Party';
-        btn.style.cssText = 'font-size:9px;font-weight:600;padding:3px 6px;border-radius:4px;cursor:default;white-space:nowrap;min-width:70px;border:1px solid #e2e8f0;background:#f8fafc;color:#94a3b8;';
-        btn.title = 'This study uses a sponsor-provided rideshare vendor';
+        btn.style.cssText = 'font-size:9px;font-weight:600;padding:3px 6px;border-radius:4px;cursor:default;white-space:nowrap;min-width:70px;border:1.5px solid #8b5cf6;background:#f5f3ff;color:#8b5cf6;';
+        btn.title = 'Ride requested — this study uses a sponsor-provided vendor';
       } else if (typeof existing === 'string' && existing !== 'not_requested') {
         var styles2 = {
           'requested': { text: 'Requested', border: '#FF9933', bg: '#fff7ed', color: '#FF9933' },
@@ -6308,9 +6308,12 @@ function injectRideshareButtons() {
       } else if (crioRide) {
         btn.textContent = 'Requested';
         btn.style.cssText = 'font-size:9px;font-weight:700;padding:3px 6px;border-radius:4px;cursor:pointer;white-space:nowrap;min-width:70px;border:1.5px solid #FF9933;background:#fff7ed;color:#FF9933;';
-      } else {
+      } else if (uberEligible) {
         btn.textContent = 'Book';
         btn.style.cssText = 'font-size:9px;font-weight:700;padding:3px 6px;border-radius:4px;cursor:pointer;white-space:nowrap;min-width:70px;border:1.5px solid #cbd5e1;background:#fff;color:#94a3b8;';
+      } else {
+        btn.textContent = 'Not Requested';
+        btn.style.cssText = 'font-size:9px;font-weight:600;padding:3px 6px;border-radius:4px;cursor:default;white-space:nowrap;min-width:70px;border:1px solid #e2e8f0;background:#f8fafc;color:#94a3b8;';
       }
     }
     _updateRideBtn();
@@ -6324,7 +6327,8 @@ function injectRideshareButtons() {
 
     btn.onclick = function(e) {
       e.stopPropagation();
-      if (!uberEligible && !crioRide && !hasRideId) return; // 3rd party — no action
+      if (!uberEligible && !crioRide && !hasRideId) return; // not requested — no action
+      if (crioRide && !uberEligible && !hasRideId) return; // 3rd party — no action
       _openUberRideModal(patName, dateIso, timeStr, siteStr, studyName);
     };
     td.innerHTML = '';
