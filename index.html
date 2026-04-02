@@ -2655,6 +2655,173 @@ const CRP = {
 };
 
 // ════════════════════════════════════════
+// SHARED STATE (Firestore + localStorage fallback)
+// ════════════════════════════════════════
+var crpState = {
+  _cache: {},       // In-memory cache: { docName: { key: value } }
+  _loaded: false,
+  _user: '',
+  _cfBase: '',
+
+  init: function() {
+    this._cfBase = CRP_CONFIG.CF_BASE;
+    // Load user identity
+    this._user = localStorage.getItem('crp_user_name') || '';
+    if (!this._user) {
+      var name = prompt('Enter your name for the dashboard (used to track who made changes):');
+      if (name && name.trim()) {
+        this._user = name.trim();
+        localStorage.setItem('crp_user_name', this._user);
+      } else {
+        this._user = 'Unknown';
+      }
+    }
+    _log('CRP State: user = ' + this._user);
+  },
+
+  // Load all state from Firestore (called once on dashboard load)
+  loadAll: function(callback) {
+    var self = this;
+    fetch(this._cfBase + '?action=state-all')
+      .then(function(r) { return r.json(); })
+      .then(function(result) {
+        var data = result.data || {};
+        // Merge Firestore state into cache, writing to localStorage as fallback
+        self._mergeDoc('visit_statuses', data.visit_statuses || {}, 'crp_visit_statuses');
+        self._mergeDoc('rideshare', data.rideshare || {}, 'crp_rideshare');
+        self._mergeDoc('payouts', data.payouts || {}, 'crp_payout_paid');
+        self._mergeDoc('followups', data.followups || {}, 'crp_followup_actions');
+        self._mergeDoc('dismissed', data.dismissed || {}, 'crp_dismissed_items');
+        self._mergeDoc('collection_tracking', data.collection_tracking || {}, 'crp_coll');
+        self._loaded = true;
+        _log('CRP State: loaded from Firestore (' + Object.keys(data).length + ' docs)');
+        if (callback) callback();
+      })
+      .catch(function(err) {
+        _log('CRP State: Firestore load failed (' + err.message + '), using localStorage fallback');
+        self._loaded = true;
+        if (callback) callback();
+      });
+  },
+
+  _mergeDoc: function(docName, firestoreData, localStorageKey) {
+    // Start with localStorage data, then overlay Firestore data (Firestore wins)
+    var local = {};
+    try {
+      if (localStorageKey === 'crp_coll') {
+        // Collection tracking uses per-investigator keys
+        var keys = Object.keys(localStorage).filter(function(k) { return k.startsWith('crp_coll_'); });
+        keys.forEach(function(k) {
+          try { local[k.replace('crp_coll_', '')] = JSON.parse(localStorage.getItem(k)); } catch(e) {}
+        });
+      } else {
+        local = JSON.parse(localStorage.getItem(localStorageKey) || '{}');
+      }
+    } catch(e) { local = {}; }
+
+    // Merge: Firestore data takes precedence
+    var merged = Object.assign({}, local, firestoreData);
+
+    // Strip internal metadata for the in-memory cache used by the app
+    var clean = {};
+    for (var k in merged) {
+      if (k.startsWith('_')) continue; // skip Firestore metadata fields at top level
+      var v = merged[k];
+      if (v && typeof v === 'object' && v._user) {
+        // Unwrap value-only entries
+        if ('value' in v) { clean[k] = v.value; }
+        else {
+          var copy = Object.assign({}, v);
+          delete copy._user; delete copy._ts;
+          clean[k] = copy;
+        }
+      } else {
+        clean[k] = v;
+      }
+    }
+    this._cache[docName] = clean;
+
+    // Update localStorage with merged data (for offline fallback)
+    try {
+      if (localStorageKey === 'crp_coll') {
+        for (var ck in clean) {
+          localStorage.setItem('crp_coll_' + ck, JSON.stringify(clean[ck]));
+        }
+      } else {
+        localStorage.setItem(localStorageKey, JSON.stringify(clean));
+      }
+    } catch(e) {}
+  },
+
+  // Get full state for a doc
+  get: function(docName) {
+    return this._cache[docName] || {};
+  },
+
+  // Get single key from a doc
+  getKey: function(docName, key) {
+    return (this._cache[docName] || {})[key];
+  },
+
+  // Set key(s) in a doc — writes to Firestore + localStorage + cache
+  set: function(docName, key, value, localStorageKey) {
+    // Update in-memory cache
+    if (!this._cache[docName]) this._cache[docName] = {};
+    if (value === null || value === undefined) {
+      delete this._cache[docName][key];
+    } else {
+      this._cache[docName][key] = value;
+    }
+
+    // Update localStorage immediately (fast, synchronous)
+    try {
+      if (localStorageKey === 'crp_coll') {
+        if (value === null) localStorage.removeItem('crp_coll_' + key);
+        else localStorage.setItem('crp_coll_' + key, JSON.stringify(value));
+      } else if (localStorageKey) {
+        localStorage.setItem(localStorageKey, JSON.stringify(this._cache[docName]));
+      }
+    } catch(e) {}
+
+    // Write to Firestore (async, fire-and-forget)
+    var entries = {};
+    entries[key] = value;
+    this._postState(docName, entries);
+  },
+
+  // Batch set multiple keys
+  setMany: function(docName, entries, localStorageKey) {
+    if (!this._cache[docName]) this._cache[docName] = {};
+    for (var k in entries) {
+      if (entries[k] === null || entries[k] === undefined) delete this._cache[docName][k];
+      else this._cache[docName][k] = entries[k];
+    }
+    try {
+      if (localStorageKey && localStorageKey !== 'crp_coll') {
+        localStorage.setItem(localStorageKey, JSON.stringify(this._cache[docName]));
+      }
+    } catch(e) {}
+    this._postState(docName, entries);
+  },
+
+  // Delete a key from a doc
+  del: function(docName, key, localStorageKey) {
+    this.set(docName, key, null, localStorageKey);
+  },
+
+  _postState: function(docName, entries) {
+    var self = this;
+    fetch(this._cfBase + '?action=state&doc=' + docName, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ entries: entries, user: self._user })
+    }).catch(function(err) {
+      _log('CRP State: Firestore write failed for ' + docName + ': ' + err.message);
+    });
+  }
+};
+
+// ════════════════════════════════════════
 // STAGE COLORS — unified color map for all pipeline/funnel stages
 // ════════════════════════════════════════
 const STAGE_COLORS = {
@@ -3400,7 +3567,10 @@ function defaultStatus(days,amt){
 }
 function initColl(){
   if (!UNPAID_INVOICES || !UNPAID_INVOICES.length) return;
-  collData=UNPAID_INVOICES.map(inv=>{const k='crp_coll_'+inv.invoice;const s=localStorage.getItem(k);
+  collData=UNPAID_INVOICES.map(inv=>{const k=inv.invoice;
+    var cached = crpState.getKey('collection_tracking', k);
+    if(cached){return{...inv,...cached};}
+    const s=localStorage.getItem('crp_coll_'+k);
     if(s){try{const p=JSON.parse(s);return{...inv,...p};}catch(e){}}
     return{...inv,status:defaultStatus(inv.days,Math.abs(inv.unpaid)),notes:''};});
 }
@@ -3409,12 +3579,14 @@ function cycleSt(inv){
   const item=collData.find(i=>i.invoice===inv);if(!item)return;
   item.status=sts[(sts.indexOf(item.status)+1)%sts.length];
   localStorage.setItem('crp_coll_'+inv,JSON.stringify({status:item.status,notes:item.notes}));
+  crpState.set('collection_tracking', inv, {status:item.status,notes:item.notes}, 'crp_coll');
   renderCollections();
 }
 function saveNote(inv){
   const item=collData.find(i=>i.invoice===inv);if(!item)return;
   const el=document.querySelector('[data-inv="'+inv+'"]');if(el){item.notes=el.value;
-  localStorage.setItem('crp_coll_'+inv,JSON.stringify({status:item.status,notes:item.notes}));}
+  localStorage.setItem('crp_coll_'+inv,JSON.stringify({status:item.status,notes:item.notes}));
+  crpState.set('collection_tracking', inv, {status:item.status,notes:item.notes}, 'crp_coll');}
 }
 function toggleNote(inv){const el=document.querySelector('[data-inv="'+inv+'"]');if(el)el.classList.toggle('active');}
 function renderCollections(){
@@ -5786,14 +5958,26 @@ var VISIT_STATUSES = [
 ];
 var _visitStatuses = {}; // key → {status, timestamp}
 function _loadVisitStatuses() {
+  // Load from crpState cache (Firestore-backed), fallback to localStorage
+  var cached = crpState.get('visit_statuses');
+  if (cached && Object.keys(cached).length > 0) {
+    var cutoff = Date.now() - 7 * 86400000;
+    Object.keys(cached).forEach(function(k) {
+      var ts = cached[k].ts || 0;
+      if (ts > cutoff) _visitStatuses[k] = cached[k];
+    });
+    return;
+  }
   try {
     var raw = JSON.parse(localStorage.getItem('crp_visit_statuses') || '{}');
-    var cutoff = Date.now() - 7 * 86400000; // prune > 7 days
+    var cutoff = Date.now() - 7 * 86400000;
     Object.keys(raw).forEach(function(k) { if (raw[k].ts > cutoff) _visitStatuses[k] = raw[k]; });
   } catch(e) { _visitStatuses = {}; }
 }
 function _saveVisitStatuses() {
   try { localStorage.setItem('crp_visit_statuses', JSON.stringify(_visitStatuses)); } catch(e) {}
+  // Sync to Firestore
+  crpState.setMany('visit_statuses', _visitStatuses, 'crp_visit_statuses');
 }
 function _statusBtnColor(statusId) {
   var s = VISIT_STATUSES.find(function(x){return x.id===statusId;});
@@ -5893,8 +6077,15 @@ function _updateStatusCount() {
 
 // ── Rideshare / Uber Health ──
 var _rideshareData = {};
-function _loadRideshare() { try { _rideshareData = JSON.parse(localStorage.getItem('crp_rideshare') || '{}'); } catch(e) { _rideshareData = {}; } }
-function _saveRideshare() { try { localStorage.setItem('crp_rideshare', JSON.stringify(_rideshareData)); } catch(e) {} }
+function _loadRideshare() {
+  var cached = crpState.get('rideshare');
+  if (cached && Object.keys(cached).length > 0) { _rideshareData = cached; return; }
+  try { _rideshareData = JSON.parse(localStorage.getItem('crp_rideshare') || '{}'); } catch(e) { _rideshareData = {}; }
+}
+function _saveRideshare() {
+  try { localStorage.setItem('crp_rideshare', JSON.stringify(_rideshareData)); } catch(e) {}
+  crpState.setMany('rideshare', _rideshareData, 'crp_rideshare');
+}
 function _rideshareKey(row) {
   var date = row.dataset.date || '';
   var cells = row.querySelectorAll('td');
@@ -11719,10 +11910,13 @@ function undismissAction(actionId) {
 
 // ── Per-item dismissal (individual patients within actions) ──
 function loadDismissedItems() {
+  var cached = crpState.get('dismissed');
+  if (cached && Object.keys(cached).length > 0) return cached;
   try { return JSON.parse(localStorage.getItem('crp_dismissed_items') || '{}'); } catch(e) { return {}; }
 }
 function saveDismissedItems(map) {
   try { localStorage.setItem('crp_dismissed_items', JSON.stringify(map)); } catch(e) {}
+  crpState.setMany('dismissed', map, 'crp_dismissed_items');
 }
 function dismissItem(itemKey, reason) {
   var map = loadDismissedItems();
@@ -11773,8 +11967,15 @@ function _getLatestStatus(name, study) {
 // ═══ UNIFIED FOLLOW-UP TABLE ═══
 var _fuFilter = 'all';
 var _fuActions = {}; // key → {action, notes, ts}
-function _loadFuActions() { try { _fuActions = JSON.parse(localStorage.getItem('crp_followup_actions')||'{}'); } catch(e) { _fuActions = {}; } }
-function _saveFuActions() { try { localStorage.setItem('crp_followup_actions', JSON.stringify(_fuActions)); } catch(e) {} }
+function _loadFuActions() {
+  var cached = crpState.get('followups');
+  if (cached && Object.keys(cached).length > 0) { _fuActions = cached; return; }
+  try { _fuActions = JSON.parse(localStorage.getItem('crp_followup_actions')||'{}'); } catch(e) { _fuActions = {}; }
+}
+function _saveFuActions() {
+  try { localStorage.setItem('crp_followup_actions', JSON.stringify(_fuActions)); } catch(e) {}
+  crpState.setMany('followups', _fuActions, 'crp_followup_actions');
+}
 function _fuKey(r) { return ((r._name||'')+'|'+(r._study||'')+'|'+(r._cat||'')).replace(/[^a-z0-9|]/gi,'-').toLowerCase(); }
 
 var FU_NEXT_STEPS = [
@@ -19036,8 +19237,15 @@ function switchAdmin(section, btn) {
 // ═══ INVESTIGATOR PAYOUTS ═══
 var _payoutPaid = {};
 var _payoutFilter = 'all';
-(function() { try { _payoutPaid = JSON.parse(localStorage.getItem('crp_payout_paid') || '{}'); } catch(e) { _payoutPaid = {}; } })();
-function _savePayoutPaid() { try { localStorage.setItem('crp_payout_paid', JSON.stringify(_payoutPaid)); } catch(e) {} }
+(function() {
+  var cached = crpState.get('payouts');
+  if (cached && Object.keys(cached).length > 0) { _payoutPaid = cached; return; }
+  try { _payoutPaid = JSON.parse(localStorage.getItem('crp_payout_paid') || '{}'); } catch(e) { _payoutPaid = {}; }
+})();
+function _savePayoutPaid() {
+  try { localStorage.setItem('crp_payout_paid', JSON.stringify(_payoutPaid)); } catch(e) {}
+  crpState.setMany('payouts', _payoutPaid, 'crp_payout_paid');
+}
 
 var PAYOUT_RATES = {
   'taher modarressi': { rate: 0.30, label: '30%' },
@@ -19726,9 +19934,20 @@ function checkDataFreshness(rows) {
 }
 
 async function _crpInit() {
+  // Initialize shared state (Firestore + localStorage)
+  crpState.init();
   // Load fallback data from external file before first render
   if (typeof loadFallbackData === 'function') await loadFallbackData();
   renderAll();
+  // Load shared state from Firestore (async, updates localStorage + cache)
+  crpState.loadAll(function() {
+    _log('CRP State: Firestore sync complete — re-injecting tracking buttons');
+    // Re-inject buttons with Firestore-synced data
+    var _schedRows = document.querySelectorAll('#upcoming-tbody tr');
+    _schedRows.forEach(function(r) { delete r.dataset.rideshareInjected; delete r.dataset.confirmInjected; });
+    safe(injectVisitConfirmButtons, 'confirmBtns-firestore');
+    safe(injectRideshareButtons, 'rideshareBtns-firestore');
+  });
   // Set schedule KPIs immediately
   const d = SAMPLE;
   const skpi = (id, val) => { const e = document.getElementById(id); if(e && val) e.textContent = val; };

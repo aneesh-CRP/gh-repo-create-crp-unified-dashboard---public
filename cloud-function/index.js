@@ -14,12 +14,18 @@
  */
 
 const { BigQuery } = require('@google-cloud/bigquery');
+const { Firestore } = require('@google-cloud/firestore');
 const functions = require('@google-cloud/functions-framework');
 const https = require('https');
 
 const PROJECT = 'crio-468120';
 const DATASET = 'crio_data';
 function tbl(name) { return '`' + PROJECT + '.' + DATASET + '.' + name + '`'; }
+
+// ── Firestore (shared persistent state) ──
+const firestore = new Firestore({ projectId: PROJECT });
+const STATE_COLLECTION = 'dashboard_state';
+const VALID_STATE_DOCS = ['visit_statuses', 'rideshare', 'payouts', 'followups', 'dismissed', 'collection_tracking'];
 
 // Use user credentials (refresh token) to access Fivetran-managed authorized views
 // The default service account can't read through authorized views — only the user who
@@ -3978,6 +3984,83 @@ functions.http('crpBqApi', async (req, res) => {
     } catch (err) {
       console.error('test-sms error:', err.message);
       res.status(500).json({ success: false, error: err.message });
+    }
+    return;
+  }
+
+  // ── Firestore shared state — GET/POST/DELETE ──
+  if (req.query.action === 'state') {
+    res.set('Cache-Control', 'no-store');
+    const doc = req.query.doc;
+    if (!doc || !VALID_STATE_DOCS.includes(doc)) {
+      res.status(400).json({ error: 'Invalid doc. Valid: ' + VALID_STATE_DOCS.join(', ') });
+      return;
+    }
+    const docRef = firestore.collection(STATE_COLLECTION).doc(doc);
+
+    try {
+      if (req.method === 'GET') {
+        // Get full state document
+        const snap = await docRef.get();
+        res.json({ doc, data: snap.exists ? snap.data() : {}, timestamp: new Date().toISOString() });
+        return;
+      }
+
+      if (req.method === 'POST') {
+        // Merge keys into state document
+        const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
+        const { entries, user } = body;
+        if (!entries || typeof entries !== 'object') {
+          res.status(400).json({ error: 'Provide entries: { key: value, ... }' });
+          return;
+        }
+        // Add metadata to each entry
+        const now = new Date().toISOString();
+        const updates = {};
+        for (const [k, v] of Object.entries(entries)) {
+          if (v === null || v === undefined) {
+            // Delete key via FieldValue.delete()
+            updates[k] = Firestore.FieldValue.delete();
+          } else if (typeof v === 'object' && v !== null) {
+            updates[k] = { ...v, _user: user || 'unknown', _ts: now };
+          } else {
+            updates[k] = { value: v, _user: user || 'unknown', _ts: now };
+          }
+        }
+        await docRef.set(updates, { merge: true });
+        res.json({ success: true, doc, keysUpdated: Object.keys(entries).length, timestamp: now });
+        return;
+      }
+
+      if (req.method === 'DELETE') {
+        const key = req.query.key;
+        if (!key) { res.status(400).json({ error: 'Provide key to delete' }); return; }
+        await docRef.update({ [key]: Firestore.FieldValue.delete() });
+        res.json({ success: true, doc, keyDeleted: key });
+        return;
+      }
+
+      res.status(405).json({ error: 'Use GET, POST, or DELETE' });
+    } catch (err) {
+      console.error('state error:', err.message);
+      res.status(500).json({ error: err.message, doc });
+    }
+    return;
+  }
+
+  // ── GET: Firestore state — bulk load all state docs at once ──
+  if (req.query.action === 'state-all' && req.method === 'GET') {
+    res.set('Cache-Control', 'no-store');
+    try {
+      const results = {};
+      await Promise.all(VALID_STATE_DOCS.map(async (name) => {
+        const snap = await firestore.collection(STATE_COLLECTION).doc(name).get();
+        results[name] = snap.exists ? snap.data() : {};
+      }));
+      res.json({ data: results, timestamp: new Date().toISOString() });
+    } catch (err) {
+      console.error('state-all error:', err.message);
+      res.status(500).json({ error: err.message });
     }
     return;
   }
