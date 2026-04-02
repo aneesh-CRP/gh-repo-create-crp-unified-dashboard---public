@@ -4705,7 +4705,7 @@ function renderCoordinatorGoals() {
   if (!monthBody) return;
   window._coordGoalsData = goals;
   window._coordsList = COORDS;
-  setCoordPeriod('month', document.querySelector('#coord-period-filter .filter-btn.active'));
+  setCoordPeriod('lastq', document.querySelector('#coord-period-filter .filter-btn[onclick*="lastq"]'));
 }
 
 var _coordPeriod = 'month';
@@ -4733,7 +4733,7 @@ function renderCoordPeriodTable() {
 
   if (_coordPeriod === 'month') {
     startDate = new Date(yy, now.getMonth(), 1);
-    endDate = now;
+    endDate = new Date(yy, now.getMonth() + 1, 0); // full month for scheduled visits
     label = now.toLocaleDateString('en-US',{month:'long',year:'numeric'});
   } else if (_coordPeriod === 'lastmonth') {
     startDate = new Date(yy, now.getMonth()-1, 1);
@@ -4812,7 +4812,8 @@ function renderCoordPeriodTable() {
     var visits = visitsByCoord[name] || 0;
     var cancels = cancelsByCoord[name] || 0;
     var barPct = Math.min(100, Math.round(visits / (monthMax * 1.1) * 100));
-    var avg = workDays >= 5 ? (visits / workDays).toFixed(1) : (visits > 0 ? visits + '/' + workDays + 'd' : '—');
+    var avg = workDays > 0 ? (visits / workDays).toFixed(1) : '—';
+    var avgColor = parseFloat(avg) >= 2 ? '#059669' : parseFloat(avg) >= 1 ? '#FF9933' : '#dc2626';
     var cancelRate = (visits + cancels) > 0 ? Math.round(cancels / (visits + cancels) * 100) : 0;
     var crColor = cancelRate > 20 ? '#dc2626' : cancelRate > 10 ? '#FF9933' : '#059669';
     return '<tr style="border-bottom:1px solid var(--border);cursor:pointer;" onclick="showCoordDetail(\'' + jsAttr(name) + '\')">' +
@@ -4820,7 +4821,7 @@ function renderCoordPeriodTable() {
       '<td style="padding:8px 8px;text-align:center;font-weight:700">' + visits + '</td>' +
       '<td style="padding:8px 8px;text-align:center;color:#FF9933;font-weight:600">' + cancels + '</td>' +
       '<td style="padding:8px 8px;text-align:center;font-weight:700;color:' + crColor + '">' + cancelRate + '%</td>' +
-      '<td style="padding:8px 8px;text-align:center;color:#6B7280">' + avg + '/day</td>' +
+      '<td style="padding:8px 8px;text-align:center;font-weight:700;color:' + avgColor + '">' + avg + '</td>' +
       '<td style="padding:8px 12px"><div style="background:#E5E7EB;border-radius:6px;height:8px;overflow:hidden"><div style="background:#1843AD;height:100%;width:' + barPct + '%;border-radius:6px"></div></div></td>' +
       '<td style="padding:8px 8px;text-align:center;color:#6B7280;font-size:11px">' + (function(){ var studySet = {}; var bd = goals && goals.byDayDetail ? (goals.byDayDetail[name]||{}) : {}; Object.keys(bd).forEach(function(d){ if (d >= startISO && d <= endISO) (bd[d]||[]).forEach(function(v){ if (v.study) studySet[v.study]=1; }); }); (DATA.allVisitDetail||[]).forEach(function(v){ if (v.coord===name && v.date_iso >= startISO && v.date_iso <= endISO && v.study) studySet[v.study]=1; }); var ct = Object.keys(studySet).length; return ct > 0 ? ct : '—'; })() + '</td>' +
     '</tr>';
@@ -5416,7 +5417,7 @@ function renderCoordCancelTypeChart() {
   }
 }
 
-var _invPeriod = 'month';
+var _invPeriod = 'lastq';
 function setInvPeriod(period, btn) {
   _invPeriod = period;
   if (btn) {
@@ -5440,7 +5441,7 @@ function renderInvCapacity() {
   // Period-aware date range
   var now = new Date(); var yy = now.getFullYear();
   var startDate, endDate;
-  if (_invPeriod === 'month') { startDate = new Date(yy, now.getMonth(), 1); endDate = now; }
+  if (_invPeriod === 'month') { startDate = new Date(yy, now.getMonth(), 1); endDate = new Date(yy, now.getMonth() + 1, 0); }
   else if (_invPeriod === 'lastmonth') { startDate = new Date(yy, now.getMonth()-1, 1); endDate = new Date(yy, now.getMonth(), 0); }
   else if (_invPeriod === '2month') { startDate = new Date(yy, now.getMonth()-2, 1); endDate = now; }
   else if (_invPeriod === 'quarter') { var _iqm = Math.floor(now.getMonth()/3)*3; startDate = new Date(yy, _iqm, 1); endDate = now; }
@@ -16965,7 +16966,7 @@ function copyEmailToClipboard() {
 // ADMIN TAB SUB-NAVIGATION
 // ══════════════════════════════════════════════════════════════
 function switchAdmin(section, btn) {
-  ['trends','connect','auditlog','email'].forEach(s => {
+  ['trends','connect','auditlog','email','payouts'].forEach(s => {
     const el = document.getElementById('admin-'+s);
     if (el) el.style.display = s === section ? '' : 'none';
   });
@@ -16978,6 +16979,7 @@ function switchAdmin(section, btn) {
     if (typeof renderCoordCancelTypeChart === 'function') { try { renderCoordCancelTypeChart(); } catch(e) { _log('renderCoordCancelTypeChart: ' + e.message); } }
   }
   if (section === 'auditlog') renderAuditLogView();
+  if (section === 'payouts') renderPayoutsTable();
 }
 
 // ═══ AUDIT LOG ═══

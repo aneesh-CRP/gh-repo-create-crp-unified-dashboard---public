@@ -1234,10 +1234,10 @@ body {
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px">
           <div style="font-size:13px;font-weight:700;color:var(--navy)">Performance Snapshot — <span id="coord-month-label">March 2026</span></div>
           <div style="display:flex;gap:4px;" id="coord-period-filter">
-            <button class="filter-btn active" onclick="setCoordPeriod('month',this)" style="font-size:10px;padding:2px 8px;">This Month</button>
+            <button class="filter-btn" onclick="setCoordPeriod('month',this)" style="font-size:10px;padding:2px 8px;">This Month</button>
             <button class="filter-btn" onclick="setCoordPeriod('lastmonth',this)" style="font-size:10px;padding:2px 8px;">Last Month</button>
             <button class="filter-btn" onclick="setCoordPeriod('2month',this)" style="font-size:10px;padding:2px 8px;">Last 2 Mo</button>
-            <button class="filter-btn" onclick="setCoordPeriod('lastq',this)" style="font-size:10px;padding:2px 8px;">Last Quarter</button>
+            <button class="filter-btn active" onclick="setCoordPeriod('lastq',this)" style="font-size:10px;padding:2px 8px;">Last Quarter</button>
             <button class="filter-btn" onclick="setCoordPeriod('quarter',this)" style="font-size:10px;padding:2px 8px;">This Quarter</button>
             <button class="filter-btn" onclick="setCoordPeriod('ytd',this)" style="font-size:10px;padding:2px 8px;">YTD</button>
           </div>
@@ -1265,10 +1265,10 @@ body {
     <div class="card-header" style="flex-wrap:wrap;gap:6px">
       <span class="card-title">Investigator Workload</span>
       <div style="display:flex;gap:4px;" id="inv-period-filter">
-        <button class="filter-btn active" onclick="setInvPeriod('month',this)" style="font-size:10px;padding:2px 8px;">This Month</button>
+        <button class="filter-btn" onclick="setInvPeriod('month',this)" style="font-size:10px;padding:2px 8px;">This Month</button>
         <button class="filter-btn" onclick="setInvPeriod('lastmonth',this)" style="font-size:10px;padding:2px 8px;">Last Month</button>
         <button class="filter-btn" onclick="setInvPeriod('2month',this)" style="font-size:10px;padding:2px 8px;">Last 2 Mo</button>
-        <button class="filter-btn" onclick="setInvPeriod('lastq',this)" style="font-size:10px;padding:2px 8px;">Last Quarter</button>
+        <button class="filter-btn active" onclick="setInvPeriod('lastq',this)" style="font-size:10px;padding:2px 8px;">Last Quarter</button>
         <button class="filter-btn" onclick="setInvPeriod('quarter',this)" style="font-size:10px;padding:2px 8px;">This Quarter</button>
         <button class="filter-btn" onclick="setInvPeriod('ytd',this)" style="font-size:10px;padding:2px 8px;">YTD</button>
       </div>
@@ -1836,6 +1836,7 @@ body {
     <button onclick="switchAdmin('connect',this)" class="sched-filter" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Connect & Setup</button>
     <button onclick="switchAdmin('auditlog',this)" class="sched-filter" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Audit Log</button>
     <button onclick="switchAdmin('email',this)" class="sched-filter" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Daily Email</button>
+    <button onclick="switchAdmin('payouts',this)" class="sched-filter" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Payouts</button>
   </div>
 
   <!-- Staff Performance Panel -->
@@ -1999,6 +2000,47 @@ body {
     </div>
   </div>
 </div><!-- /view-connect -->
+
+  <div id="admin-payouts" style="display:none;">
+    <div class="card fade-in">
+      <div class="card-header">
+        <span class="card-title">Investigator Payouts — Visit Fees</span>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span class="badge badge-blue" id="payout-summary"></span>
+          <button class="btn btn-green" onclick="exportPayouts()" style="font-size:11px;padding:4px 10px;">Export CSV</button>
+        </div>
+      </div>
+      <div style="padding:8px 16px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <button onclick="filterPayouts('all',this)" class="sched-filter payout-filter active" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid #1843ad;background:#e8eeff;color:#1843ad;cursor:pointer">All</button>
+        <button onclick="filterPayouts('unpaid',this)" class="sched-filter payout-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Unpaid</button>
+        <button onclick="filterPayouts('paid',this)" class="sched-filter payout-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Paid</button>
+        <span style="margin-left:8px;font-size:10px;color:#94a3b8">|</span>
+        <button onclick="filterPayouts('taher',this)" class="sched-filter payout-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Taher</button>
+        <button onclick="filterPayouts('donna',this)" class="sched-filter payout-filter" style="padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Donna</button>
+        <span style="flex:1"></span>
+        <label style="font-size:11px;color:#64748b;cursor:pointer;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="payout-select-all" onchange="toggleAllPayouts(this.checked)"> Select all visible</label>
+        <button class="btn btn-blue" onclick="markSelectedPaid()" style="font-size:11px;padding:4px 10px;">Mark Selected Paid</button>
+      </div>
+      <div style="max-height:600px;overflow-y:auto;">
+        <table class="tbl" style="width:100%">
+          <thead><tr>
+            <th style="width:36px"></th>
+            <th onclick="sortTable(this)">Date</th>
+            <th onclick="sortTable(this)">Investigator</th>
+            <th onclick="sortTable(this)">Study</th>
+            <th onclick="sortTable(this)">Visit</th>
+            <th onclick="sortTable(this)">Patient</th>
+            <th onclick="sortTable(this)" style="text-align:right">Visit Fee</th>
+            <th onclick="sortTable(this)" style="text-align:right">Rate</th>
+            <th onclick="sortTable(this)" style="text-align:right">Payout</th>
+            <th onclick="sortTable(this)">Status</th>
+          </tr></thead>
+          <tbody id="payout-tbody"></tbody>
+        </table>
+      </div>
+      <div style="padding:12px 16px;border-top:1px solid var(--border);" id="payout-totals"></div>
+    </div>
+  </div>
 
 </div><!-- /view-admin -->
 
