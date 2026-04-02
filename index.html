@@ -19033,6 +19033,152 @@ function switchAdmin(section, btn) {
   if (section === 'payouts') renderPayoutsTable();
 }
 
+// ═══ INVESTIGATOR PAYOUTS ═══
+var _payoutPaid = {};
+var _payoutFilter = 'all';
+(function() { try { _payoutPaid = JSON.parse(localStorage.getItem('crp_payout_paid') || '{}'); } catch(e) { _payoutPaid = {}; } })();
+function _savePayoutPaid() { try { localStorage.setItem('crp_payout_paid', JSON.stringify(_payoutPaid)); } catch(e) {} }
+
+var PAYOUT_RATES = {
+  'taher modarressi': { rate: 0.30, label: '30%' },
+  'donna gavarone':   { rate: 0.20, label: '20%' }
+};
+
+function _payoutKey(r) {
+  return ((r.date_completed||'') + '|' + (r.subject_name||'') + '|' + (r.study_name||'') + '|' + (r.visit_name||'')).toLowerCase();
+}
+
+function renderPayoutsTable() {
+  var tbody = document.getElementById('payout-tbody');
+  var totalsEl = document.getElementById('payout-totals');
+  var summaryEl = document.getElementById('payout-summary');
+  if (!tbody) return;
+
+  var data = (window._rpuData || []).filter(function(r) {
+    var inv = (r.investigator || '').toLowerCase();
+    return PAYOUT_RATES[inv] && parseFloat(r.visit_revenue || 0) > 0;
+  });
+
+  // Sort by date descending
+  data.sort(function(a, b) { return (b.date_completed || '').localeCompare(a.date_completed || ''); });
+
+  var html = '';
+  var totalFee = 0, totalPayout = 0, unpaidFee = 0, unpaidPayout = 0;
+  var taherTotal = 0, taherUnpaid = 0, donnaTotal = 0, donnaUnpaid = 0;
+  var visibleCount = 0;
+
+  data.forEach(function(r) {
+    var inv = (r.investigator || '').toLowerCase();
+    var cfg = PAYOUT_RATES[inv];
+    if (!cfg) return;
+    var fee = parseFloat(r.visit_revenue || 0);
+    var payout = Math.round(fee * cfg.rate * 100) / 100;
+    var key = _payoutKey(r);
+    var isPaid = !!_payoutPaid[key];
+
+    // Filter logic
+    if (_payoutFilter === 'unpaid' && isPaid) return;
+    if (_payoutFilter === 'paid' && !isPaid) return;
+    if (_payoutFilter === 'taher' && inv !== 'taher modarressi') return;
+    if (_payoutFilter === 'donna' && inv !== 'donna gavarone') return;
+
+    totalFee += fee;
+    totalPayout += payout;
+    if (!isPaid) { unpaidFee += fee; unpaidPayout += payout; }
+    if (inv === 'taher modarressi') { taherTotal += payout; if (!isPaid) taherUnpaid += payout; }
+    if (inv === 'donna gavarone') { donnaTotal += payout; if (!isPaid) donnaUnpaid += payout; }
+    visibleCount++;
+
+    var invName = r.investigator || '';
+    var invColor = inv === 'taher modarressi' ? '#1843AD' : '#7c3aed';
+    var statusHtml = isPaid
+      ? '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:#ecfdf5;color:#059669;cursor:pointer" onclick="togglePayout(\'' + jsAttr(key) + '\',this)">Paid</span>'
+      : '<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:#fff7ed;color:#FF9933;cursor:pointer" onclick="togglePayout(\'' + jsAttr(key) + '\',this)">Unpaid</span>';
+
+    html += '<tr data-payout-key="' + escapeHTML(key) + '" data-paid="' + (isPaid?'1':'0') + '">'
+      + '<td style="text-align:center;padding:4px"><input type="checkbox" class="payout-check" data-key="' + escapeHTML(key) + '"' + (isPaid ? ' checked' : '') + '></td>'
+      + '<td style="font-size:11px;white-space:nowrap">' + escapeHTML(r.date_completed || '—') + '</td>'
+      + '<td><span style="font-size:11px;font-weight:600;color:' + invColor + '">' + escapeHTML(invName) + '</span></td>'
+      + '<td style="font-size:11px">' + escapeHTML(r.study_name || '—') + '</td>'
+      + '<td style="font-size:11px;color:#64748b">' + escapeHTML(r.visit_name || '—') + '</td>'
+      + '<td style="font-size:11px">' + escapeHTML(r.subject_name || '—') + '</td>'
+      + '<td style="text-align:right;font-size:11px;font-weight:600">$' + fee.toFixed(2) + '</td>'
+      + '<td style="text-align:right;font-size:11px;color:' + invColor + ';font-weight:700">' + cfg.label + '</td>'
+      + '<td style="text-align:right;font-size:12px;font-weight:700;color:#072061">$' + payout.toFixed(2) + '</td>'
+      + '<td style="text-align:center">' + statusHtml + '</td>'
+      + '</tr>';
+  });
+
+  tbody.innerHTML = html || '<tr><td colspan="10" style="text-align:center;padding:24px;color:#94a3b8;font-size:13px">No visit data loaded — switch to Productivity tab first to load revenue data</td></tr>';
+
+  if (summaryEl) summaryEl.textContent = visibleCount + ' visits | $' + unpaidPayout.toFixed(2) + ' unpaid';
+
+  if (totalsEl) {
+    totalsEl.innerHTML = '<div style="display:flex;gap:20px;flex-wrap:wrap;font-size:12px">'
+      + '<div><span style="color:#64748b">Taher (30%):</span> <strong style="color:#1843AD">$' + taherTotal.toFixed(2) + '</strong>'
+      + (taherUnpaid > 0 ? ' <span style="color:#FF9933;font-size:11px">($' + taherUnpaid.toFixed(2) + ' unpaid)</span>' : ' <span style="color:#059669;font-size:11px">(all paid)</span>') + '</div>'
+      + '<div><span style="color:#64748b">Donna (20%):</span> <strong style="color:#7c3aed">$' + donnaTotal.toFixed(2) + '</strong>'
+      + (donnaUnpaid > 0 ? ' <span style="color:#FF9933;font-size:11px">($' + donnaUnpaid.toFixed(2) + ' unpaid)</span>' : ' <span style="color:#059669;font-size:11px">(all paid)</span>') + '</div>'
+      + '<div><span style="color:#64748b">Total Payout:</span> <strong>$' + totalPayout.toFixed(2) + '</strong></div>'
+      + '<div><span style="color:#64748b">Total Visit Fees:</span> $' + totalFee.toFixed(2) + '</div>'
+      + '</div>';
+  }
+}
+
+function togglePayout(key, el) {
+  if (_payoutPaid[key]) delete _payoutPaid[key];
+  else _payoutPaid[key] = new Date().toISOString();
+  _savePayoutPaid();
+  renderPayoutsTable();
+}
+
+function filterPayouts(filter, btn) {
+  _payoutFilter = filter;
+  document.querySelectorAll('.payout-filter').forEach(function(b) {
+    b.style.background = 'var(--surface)'; b.style.color = 'var(--muted)'; b.style.borderColor = 'var(--border)';
+  });
+  if (btn) { btn.style.background = '#e8eeff'; btn.style.color = '#1843ad'; btn.style.borderColor = '#1843ad'; }
+  renderPayoutsTable();
+}
+
+function toggleAllPayouts(checked) {
+  document.querySelectorAll('.payout-check').forEach(function(cb) { cb.checked = checked; });
+}
+
+function markSelectedPaid() {
+  var checks = document.querySelectorAll('.payout-check:checked');
+  if (!checks.length) return;
+  checks.forEach(function(cb) {
+    var key = cb.dataset.key;
+    if (key) _payoutPaid[key] = new Date().toISOString();
+  });
+  _savePayoutPaid();
+  renderPayoutsTable();
+}
+
+function exportPayouts() {
+  var data = (window._rpuData || []).filter(function(r) {
+    var inv = (r.investigator || '').toLowerCase();
+    return PAYOUT_RATES[inv] && parseFloat(r.visit_revenue || 0) > 0;
+  });
+  var csv = 'Date,Investigator,Study,Visit,Patient,Visit Fee,Rate,Payout,Status\n';
+  data.forEach(function(r) {
+    var inv = (r.investigator || '').toLowerCase();
+    var cfg = PAYOUT_RATES[inv];
+    if (!cfg) return;
+    var fee = parseFloat(r.visit_revenue || 0);
+    var payout = Math.round(fee * cfg.rate * 100) / 100;
+    var key = _payoutKey(r);
+    var status = _payoutPaid[key] ? 'Paid' : 'Unpaid';
+    csv += [r.date_completed||'', r.investigator||'', '"'+(r.study_name||'')+'"', '"'+(r.visit_name||'')+'"', '"'+(r.subject_name||'')+'"', fee.toFixed(2), cfg.label, payout.toFixed(2), status].join(',') + '\n';
+  });
+  var blob = new Blob([csv], {type:'text/csv'});
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'crp_payouts_' + new Date().toISOString().substring(0,10) + '.csv';
+  a.click();
+}
+
 // ═══ AUDIT LOG ═══
 var _auditLog = [];
 (function() {
