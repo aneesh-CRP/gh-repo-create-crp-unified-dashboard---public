@@ -7379,10 +7379,12 @@ async function fetchFinanceBQ() {
     // GAAP batch (6 feeds in 1 request) + core finance feeds (3 requests)
     var gaapBatchP = fetch(base + '?feed=batch&feeds=gaapStudyRevenue,gaapMonthly,gaapAging,gaapPayments,enrollmentForecast,stipendPayments&format=json')
       .then(function(r) { return r.json(); }).catch(function() { return { results: {} }; });
-    var [invRows, sfRows, stipRows, gaapBatch] = await Promise.all([
+    var [invRows, sfRows, stipRows, mrevRows, pmtRows, gaapBatch] = await Promise.all([
       fetchCSV(base + '?feed=agingInvoices&format=csv'),
       fetchCSV(base + '?feed=studyFinance&format=csv'),
       fetchCSV(base + '?feed=stipends&format=csv'),
+      fetchCSV(base + '?feed=monthlyRevenue&format=csv'),
+      fetchCSV(base + '?feed=payments&format=csv'),
       gaapBatchP,
     ]);
     var gaapResults = gaapBatch.results || {};
