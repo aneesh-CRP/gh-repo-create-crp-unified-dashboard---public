@@ -10206,7 +10206,6 @@ function renderFollowUpTable() {
     html += '<td style="padding:7px 8px;font-size:10px;color:#475569;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+escapeHTML(r.reason)+'">' + escapeHTML(r.reason || '—') + '</td>';
     html += '<td style="padding:7px 6px;text-align:center;font-size:11px;color:#64748b;">' + escapeHTML(r.date || '—') + '</td>';
     html += '<td style="padding:7px 6px;text-align:center;font-size:11px;">' + escapeHTML(r.coord ? r.coord.split(' ')[0] : '—') + '</td>';
-    html += '<td style="padding:7px 6px;text-align:center;font-size:10px;color:#475569;max-width:80px;overflow:hidden;text-overflow:ellipsis;" title="'+escapeHTML(r.source)+'">' + escapeHTML(r.source ? r.source.split(' ')[0] : '—') + '</td>';
     // Last Contact date with days-ago badge
     var _lcDate = r.lastContact || '';
     var _lcDays = _lcDate ? Math.floor((Date.now() - new Date(_lcDate+'T00:00:00').getTime()) / 86400000) : -1;
