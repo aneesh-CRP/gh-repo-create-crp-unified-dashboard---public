@@ -2040,37 +2040,57 @@ const FEEDS = {
 
 const CRIO_TOKEN = process.env.CRIO_TOKEN || '';
 
-// ── Uber Health API ──
+// ── Uber Health API (Authorization Code / Refresh Token flow) ──
 const UBER = {
   clientId: process.env.UBER_CLIENT_ID || '',
   clientSecret: process.env.UBER_CLIENT_SECRET || '',
+  refreshToken: process.env.UBER_REFRESH_TOKEN || '',
+  redirectUri: 'https://us-east1-crio-468120.cloudfunctions.net/crp-bq-feeds?action=uber-callback',
 };
 let _uberToken = null;
 let _uberTokenExpiry = 0;
+let _uberRefreshToken = UBER.refreshToken;
 
-async function getUberToken() {
-  if (_uberToken && Date.now() < _uberTokenExpiry - 60000) return _uberToken;
-  const auth = Buffer.from(UBER.clientId + ':' + UBER.clientSecret).toString('base64');
-  const data = 'grant_type=client_credentials&scope=health';
+function _uberTokenRequest(data) {
   return new Promise((resolve, reject) => {
     const req = https.request({
       hostname: 'auth.uber.com', path: '/oauth/v2/token', method: 'POST',
-      headers: { 'Authorization': 'Basic ' + auth, 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(data) }
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'Content-Length': Buffer.byteLength(data) }
     }, res => {
       let d = ''; res.on('data', c => d += c);
       res.on('end', () => {
-        try {
-          const j = JSON.parse(d);
-          if (j.access_token) {
-            _uberToken = j.access_token;
-            _uberTokenExpiry = Date.now() + (j.expires_in || 2592000) * 1000;
-            resolve(_uberToken);
-          } else { reject(new Error('Uber token error: ' + d)); }
-        } catch (e) { reject(new Error('Uber token parse error: ' + d)); }
+        try { resolve({ status: res.statusCode, ...JSON.parse(d) }); }
+        catch (e) { resolve({ status: res.statusCode, raw: d }); }
       });
     });
     req.on('error', reject); req.write(data); req.end();
   });
+}
+
+async function getUberToken() {
+  if (_uberToken && Date.now() < _uberTokenExpiry - 60000) return _uberToken;
+  // Try loading refresh token from Firestore (survives cold starts + token rotation)
+  if (!_uberRefreshToken) {
+    try {
+      const snap = await firestore.collection('secrets').doc('uber').get();
+      if (snap.exists && snap.data().refreshToken) _uberRefreshToken = snap.data().refreshToken;
+    } catch(e) {}
+  }
+  if (!_uberRefreshToken) throw new Error('No Uber refresh token — authorize at ?action=uber-auth first');
+  const data = `grant_type=refresh_token&refresh_token=${encodeURIComponent(_uberRefreshToken)}&client_id=${UBER.clientId}&client_secret=${UBER.clientSecret}`;
+  const result = await _uberTokenRequest(data);
+  if (result.access_token) {
+    _uberToken = result.access_token;
+    _uberTokenExpiry = Date.now() + (result.expires_in || 3600) * 1000;
+    if (result.refresh_token && result.refresh_token !== _uberRefreshToken) {
+      _uberRefreshToken = result.refresh_token;
+      console.log('Uber: refresh token rotated — update UBER_REFRESH_TOKEN env var');
+      // Store to Firestore for persistence across cold starts
+      try { await firestore.collection('secrets').doc('uber').set({ refreshToken: _uberRefreshToken, updated: new Date().toISOString() }); } catch(e) {}
+    }
+    return _uberToken;
+  }
+  throw new Error('Uber token refresh failed: ' + JSON.stringify(result));
 }
 
 function uberApi(method, path, body) {
@@ -4122,6 +4142,45 @@ functions.http('crpBqApi', async (req, res) => {
     } catch (err) {
       console.error('state-all error:', err.message);
       res.status(500).json({ error: err.message });
+    }
+    return;
+  }
+
+  // ── Uber Health OAuth: Step 1 — redirect to Uber auth page ──
+  if (req.query.action === 'uber-auth') {
+    const scopes = req.query.scope || 'health';
+    const authUrl = `https://auth.uber.com/oauth/v2/authorize?client_id=${UBER.clientId}&redirect_uri=${encodeURIComponent(UBER.redirectUri)}&scope=${encodeURIComponent(scopes)}&response_type=code`;
+    res.redirect(authUrl);
+    return;
+  }
+
+  // ── Uber Health OAuth: Step 2 — callback, exchange code for tokens ──
+  if (req.query.action === 'uber-callback') {
+    res.set('Cache-Control', 'no-store');
+    const code = req.query.code;
+    if (!code) { res.status(400).send('Missing authorization code'); return; }
+    try {
+      const data = `grant_type=authorization_code&code=${encodeURIComponent(code)}&client_id=${UBER.clientId}&client_secret=${UBER.clientSecret}&redirect_uri=${encodeURIComponent(UBER.redirectUri)}`;
+      const result = await _uberTokenRequest(data);
+      if (result.access_token) {
+        _uberToken = result.access_token;
+        _uberTokenExpiry = Date.now() + (result.expires_in || 3600) * 1000;
+        _uberRefreshToken = result.refresh_token || '';
+        // Store refresh token to Firestore for persistence
+        if (_uberRefreshToken) {
+          await firestore.collection('secrets').doc('uber').set({
+            refreshToken: _uberRefreshToken, updated: new Date().toISOString()
+          });
+        }
+        console.log('Uber OAuth: authorized! Refresh token stored.');
+        res.send('<html><body style="font-family:sans-serif;text-align:center;padding:60px"><h2 style="color:#059669">Uber Health Connected!</h2><p>You can close this tab and return to the dashboard.</p><p style="font-size:12px;color:#64748b">Refresh token saved. Access token expires in ' + Math.round((result.expires_in || 3600) / 60) + ' minutes.</p></body></html>');
+      } else {
+        console.error('Uber OAuth failed:', result);
+        res.status(400).send('<html><body style="font-family:sans-serif;text-align:center;padding:60px"><h2 style="color:#dc2626">Authorization Failed</h2><pre>' + JSON.stringify(result, null, 2) + '</pre></body></html>');
+      }
+    } catch (err) {
+      console.error('uber-callback error:', err.message);
+      res.status(500).send('Error: ' + err.message);
     }
     return;
   }
