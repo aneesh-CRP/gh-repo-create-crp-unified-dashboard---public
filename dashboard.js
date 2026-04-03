@@ -5084,15 +5084,16 @@ function renderRegulatoryPerformance(containerId, badgeId) {
     else if (r.site_name && u.site && u.site !== r.site_name) u.site = 'Both';
     // Per-study detail for drill-down
     var sk = r.study_key || '';
-    if (sk && !u.studies[sk]) u.studies[sk] = { study_name: r.study_name || '', study_key: sk, docs_uploaded: 0, docs_signed: 0, comments: 0, signoffs: 0, pending_docs: 0, };
+    if (sk && !u.studies[sk]) u.studies[sk] = { study_name: r.study_name || '', study_key: sk, docs_uploaded: 0, docs_signed: 0, comments: 0, open_comments: 0, signoffs: 0, pending_docs: 0 };
     if (sk) {
       var st = u.studies[sk];
       st.docs_uploaded += parseInt(r.docs_uploaded) || 0;
       st.docs_signed += parseInt(r.docs_signed) || 0;
       st.comments += parseInt(r.comments_created) || 0;
+      st.open_comments += parseInt(r.open_comments) || 0;
       st.signoffs += parseInt(r.signoffs) || 0;
       st.pending_docs += parseInt(r.pending_docs) || 0;
-          }
+    }
   });
 
   // Store for detail drill-down
@@ -5278,22 +5279,27 @@ function showRegPerfDetail(userName, metric) {
     var studyUrl = typeof window._crioStudyUrl === 'function' ? window._crioStudyUrl(s.study_key) : '';
     var sName = displayStudyName(s.study_name || _studyNames[s.study_key] || s.study_key);
     var studyLink = studyUrl ? '<a href="'+escapeHTML(studyUrl)+'" target="_blank" style="color:#1843AD;text-decoration:none;font-weight:600;">'+escapeHTML(sName)+'</a>' : escapeHTML(sName);
+    // Direct CRIO links per item type
+    var docsUrl = studyUrl ? studyUrl.replace('/subjects', '/files') : '';
+    var commentsUrl = studyUrl ? studyUrl.replace('/subjects', '/comments') : '';
+    var signoffsUrl = studyUrl ? studyUrl.replace('/subjects', '/completed-visits') : '';
     body += '<tr style="border-bottom:1px solid #f1f5f9;">';
     body += '<td style="padding:6px 8px;">'+studyLink+'</td>';
     if (metric === 'pending') {
-      body += '<td style="text-align:center;color:'+(s.pending_docs?'#dc2626':'#cbd5e1')+';">'+(s.pending_docs||'—')+'</td>';
-      body += '<td style="text-align:center;color:'+(s.open_comments?'#FF9933':'#cbd5e1')+';">'+(s.open_comments||'—')+'</td>';
+      var docsLink = s.pending_docs && docsUrl ? '<a href="'+escapeHTML(docsUrl)+'" target="_blank" style="color:#dc2626;text-decoration:none;font-weight:700;">'+s.pending_docs+'</a>' : (s.pending_docs || '<span style="color:#cbd5e1">—</span>');
+      var commLink = s.open_comments && commentsUrl ? '<a href="'+escapeHTML(commentsUrl)+'" target="_blank" style="color:#FF9933;text-decoration:none;font-weight:700;">'+s.open_comments+'</a>' : (s.open_comments || '<span style="color:#cbd5e1">—</span>');
+      body += '<td style="text-align:center;">'+docsLink+'</td>';
+      body += '<td style="text-align:center;">'+commLink+'</td>';
       body += '<td style="text-align:center;font-weight:700;">'+(s.pending_docs+s.open_comments)+'</td>';
     } else {
-      body += '<td style="text-align:center;font-weight:700;">'+(s[metric]||0)+'</td>';
+      var crioLink = '';
+      if (metric === 'comments') crioLink = commentsUrl;
+      else if (metric === 'docs_signed' || metric === 'docs_uploaded') crioLink = docsUrl;
+      else if (metric === 'signoffs') crioLink = signoffsUrl;
+      else crioLink = studyUrl || '';
+      var val = s[metric] || 0;
+      body += '<td style="text-align:center;font-weight:700;">'+(crioLink ? '<a href="'+escapeHTML(crioLink)+'" target="_blank" style="color:#1843AD;text-decoration:none;font-weight:700;">'+val+'</a>' : val)+'</td>';
     }
-    // CRIO link — comments go to /comments, docs go to /files
-    var crioLink = '';
-    if (metric === 'comments' || metric === 'pending') crioLink = studyUrl ? studyUrl.replace('/subjects', '/comments') : '';
-    else if (metric === 'docs_signed' || metric === 'docs_uploaded') crioLink = studyUrl ? studyUrl.replace('/subjects', '/files') : '';
-    else if (metric === 'signoffs') crioLink = studyUrl ? studyUrl.replace('/subjects', '/completed-visits') : '';
-    else crioLink = studyUrl || '';
-    body += '<td style="text-align:center;">'+(crioLink ? '<a href="'+escapeHTML(crioLink)+'" target="_blank" style="color:#1843AD;font-size:10px;font-weight:600;text-decoration:none;">Open</a>' : '—')+'</td>';
     body += '</tr>';
   });
 
