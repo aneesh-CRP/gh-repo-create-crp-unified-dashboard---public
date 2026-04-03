@@ -5095,6 +5095,9 @@ function renderRegulatoryPerformance(containerId, badgeId) {
           }
   });
 
+  // Store for detail drill-down
+  window._regPerfByUser = byUser;
+
   function classify(name) {
     var lo = name.toLowerCase();
     if (coordLo.indexOf(lo) !== -1) return 'coord';
@@ -5217,22 +5220,32 @@ function renderRegulatoryPerformance(containerId, badgeId) {
 
 // Detail modal — per-study breakdown with CRIO links
 function showRegPerfDetail(userName, metric) {
-  // Name normalization — match normalized name to raw BQ names (case-insensitive)
+  // Use pre-aggregated user data from renderRegulatoryPerformance if available
   var userNameLo = userName.toLowerCase();
   var byStudy = {};
-  (window._regPerfData || []).forEach(function(r) {
-    if ((r.user_name || '').trim().toLowerCase() !== userNameLo) return;
-    var sk = r.study_key || '';
-    if (!sk) return;
-    if (!byStudy[sk]) byStudy[sk] = { study_name: displayStudyName(r.study_name || ''), study_key: sk, docs_uploaded: 0, docs_signed: 0, comments: 0, open_comments: 0, signoffs: 0, pending_docs: 0 };
-    var s = byStudy[sk];
-    s.docs_uploaded += parseInt(r.docs_uploaded) || 0;
-    s.docs_signed += parseInt(r.docs_signed) || 0;
-    s.comments += parseInt(r.comments_created) || 0;
-    s.open_comments += parseInt(r.open_comments) || 0;
-    s.signoffs += parseInt(r.signoffs) || 0;
-    s.pending_docs += parseInt(r.pending_docs) || 0;
-  });
+  // First try pre-aggregated data (stored during render)
+  if (window._regPerfByUser) {
+    var preAgg = window._regPerfByUser[userName] || window._regPerfByUser[Object.keys(window._regPerfByUser).find(function(k){return k.toLowerCase()===userNameLo;})];
+    if (preAgg && preAgg.studies) {
+      byStudy = JSON.parse(JSON.stringify(preAgg.studies)); // deep clone
+    }
+  }
+  // Fallback: re-query raw data
+  if (Object.keys(byStudy).length === 0) {
+    (window._regPerfData || []).forEach(function(r) {
+      if ((r.user_name || '').trim().toLowerCase() !== userNameLo) return;
+      var sk = r.study_key || '';
+      if (!sk) return;
+      if (!byStudy[sk]) byStudy[sk] = { study_name: displayStudyName(r.study_name || ''), study_key: sk, docs_uploaded: 0, docs_signed: 0, comments: 0, open_comments: 0, signoffs: 0, pending_docs: 0 };
+      var s = byStudy[sk];
+      s.docs_uploaded += parseInt(r.docs_uploaded) || 0;
+      s.docs_signed += parseInt(r.docs_signed) || 0;
+      s.comments += parseInt(r.comments_created) || 0;
+      s.open_comments += parseInt(r.open_comments) || 0;
+      s.signoffs += parseInt(r.signoffs) || 0;
+      s.pending_docs += parseInt(r.pending_docs) || 0;
+    });
+  }
 
   var studies = Object.values(byStudy).filter(function(s) {
     if (metric === 'pending') return (s.pending_docs + s.open_comments) > 0;
@@ -11204,12 +11217,16 @@ function renderAll() {
     _tabDirty.actions = false;
   }
 
-  // ── Admin tab: trends charts (defer unless active) ──
+  // ── Admin tab: coord charts + recruiter perf (defer unless active) ──
   if (activeTab === 'admin') {
     safe(renderCoordCancelTypeChart, 'renderCoordCancelTypeChart');
     safe(renderRecruiterPerformance, 'renderRecruiterPerformance');
-    safe(renderTrendsCharts,       'renderTrendsCharts');
     _tabDirty.admin = false;
+  }
+
+  // ── Actions tab: trends charts (moved from Admin) ──
+  if (activeTab === 'actions') {
+    safe(renderTrendsCharts, 'renderTrendsCharts');
   }
 
   // ── Referrals tab ──
