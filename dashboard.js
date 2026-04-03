@@ -7593,7 +7593,7 @@ async function fetchFinanceLive() {
     // PRIMARY: BQ provides all finance data via cloud function
     var bqLoaded = false;
     if (CRP_CONFIG.USE_CLOUD_FUNCTION) {
-      bqLoaded = await fetchFinanceBQ().catch(function() { return false; });
+      bqLoaded = await fetchFinanceBQ().catch(function(err) { _log('CRP Finance BQ error: ' + err.message); return false; });
     }
 
     // If BQ loaded successfully AND set the globals, we're done — skip Sheets entirely
