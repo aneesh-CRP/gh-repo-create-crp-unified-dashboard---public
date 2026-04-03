@@ -4155,7 +4155,8 @@ functions.http('crpBqApi', async (req, res) => {
   }
 
   // ── Uber Health OAuth: Step 2 — callback, exchange code for tokens ──
-  if (req.query.action === 'uber-callback') {
+  // Uber redirects to ?action=uber-callback&code=xxx OR just ?code=xxx (depends on Uber's redirect behavior)
+  if (req.query.action === 'uber-callback' || (req.query.code && !req.query.feed && !req.query.action)) {
     res.set('Cache-Control', 'no-store');
     const code = req.query.code;
     if (!code) { res.status(400).send('Missing authorization code'); return; }
