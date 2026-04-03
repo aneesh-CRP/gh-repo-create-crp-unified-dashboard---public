@@ -16774,6 +16774,25 @@ function renderStudiesTable() {
   _incBreakdown(DATA.screenFails, 'screenFails');
   _incBreakdown(DATA.rescheduledVisits, 'rescheduled');
 
+  // Override SF counts with CRIO subjects data (authoritative — cancel reasons undercount SFs)
+  if (CRIO_SUBJECTS_DATA && CRIO_SUBJECTS_DATA.length > 0 && CRIO_STUDIES_DATA && CRIO_STUDIES_DATA.length > 0) {
+    var _crioKeyToName = {};
+    CRIO_STUDIES_DATA.forEach(function(cs) { if (cs.study_name) _crioKeyToName[cs.study_key] = cs.study_name; });
+    var _sfByStudyKey = {};
+    CRIO_SUBJECTS_DATA.forEach(function(s) {
+      if (s.status === 'SCREEN_FAIL') _sfByStudyKey[s.study_key] = (_sfByStudyKey[s.study_key] || 0) + 1;
+    });
+    Object.keys(_sfByStudyKey).forEach(function(sk) {
+      var studyName = _crioKeyToName[sk];
+      if (!studyName) return;
+      // Match to mergedStudies name (may differ from CRIO name)
+      var matched = (DATA.mergedStudies || []).find(function(ms) { return ms.crio_study_key === sk; });
+      var displayName = matched ? matched.study : studyName;
+      if (!_studyBreakdown[displayName]) _studyBreakdown[displayName] = {cancels:0, noShows:0, withdrew:0, screenFails:0, rescheduled:0};
+      _studyBreakdown[displayName].screenFails = _sfByStudyKey[sk];
+    });
+  }
+
   // Build per-study+site upcoming visit counts
   var _upcomingBySite = {};
   (DATA.allVisitDetail || []).forEach(function(v) {
