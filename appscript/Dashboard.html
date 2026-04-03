@@ -462,6 +462,7 @@ body {
 }
 .risk-table td { padding: 8px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
 #merged-study-table th, #vis-table th { position: sticky; top: 0; z-index: 2; background: var(--surface2, #f8fafc); }
+#vis-table tbody tr td { padding: 8px 6px; }
 .risk-table tr:last-child td { border-bottom: none; }
 .risk-table tr:hover td { background: #f8fafc; }
 .risk-tag {
@@ -1540,7 +1541,20 @@ body {
       <div id="meta-alerts-container" style="padding:12px 16px;"></div>
     </div>
 
-    <!-- ═══ SECTION 3: RECRUITER PERFORMANCE ═══ -->
+    <!-- ═══ SECTION 3: MEDICAL RECORDS ═══ -->
+    <div class="section-title" style="margin-top:16px;margin-bottom:8px;">Medical Records</div>
+    <div class="card fade-in" style="margin-bottom:12px;">
+      <div class="card-header">
+        <span class="card-title">Medical Records Pipeline</span>
+        <span class="badge badge-gray" id="medrec-alerts-badge">Loading...</span>
+      </div>
+      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 0;">ClickUp Medical Records folder · patient tracking · release forms</div>
+      <div id="medrec-alerts-content" style="padding:12px 16px;">
+        <p style="color:#94a3b8;font-size:12px">Loading medical records data...</p>
+      </div>
+    </div>
+
+    <!-- ═══ SECTION 4: RECRUITER PERFORMANCE ═══ -->
     <div class="section-title" style="margin-top:16px;margin-bottom:8px;">Recruiter Outreach</div>
     <div class="card fade-in" style="margin-bottom:12px;">
       <div class="card-header">
