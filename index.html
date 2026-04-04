@@ -2140,9 +2140,8 @@ function jsAttr(s) {
   return escapeHTML(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'"));
 }
 
-// ═══ SAFETY: Override parseInt to always use radix 10 ═══
-var _origParseInt = parseInt;
-parseInt = function(val, radix) { return _origParseInt(val, radix || 10); };
+// parseInt radix: all calls in this codebase use base-10 implicitly.
+// Global override removed — too risky with external libraries (Chart.js).
 
 // ═══ DATE PARSING (global — safe for YYYY-MM-DD) ═══
 // Forces local-time parsing: 'YYYY-MM-DD' → 'YYYY-MM-DDT00:00:00' to avoid UTC off-by-one
