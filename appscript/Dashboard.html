@@ -1193,13 +1193,14 @@ body {
       <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
         <span class="badge badge-green" id="sched-count">— visits</span>
         <span class="badge" id="sched-confirm-count" style="background:#1843AD;color:#fff;font-size:10px;padding:2px 8px;border-radius:10px;">0/0 tracked</span>
-        <button class="filter-btn active" onclick="schedFilter(this,'all')"  style="font-size:11px;padding:3px 8px;">All</button>
-        <button class="filter-btn"        onclick="schedFilter(this,'today')" style="font-size:11px;padding:3px 8px;">Today</button>
-        <button class="filter-btn"        onclick="schedFilter(this,'week')"  style="font-size:11px;padding:3px 8px;">This Week</button>
-        <button class="filter-btn"        onclick="schedFilter(this,'14')"   style="font-size:11px;padding:3px 8px;">14 days</button>
-        <button class="filter-btn"        onclick="schedFilter(this,'30')"   style="font-size:11px;padding:3px 8px;">30 days</button>
-        <button class="filter-btn"        onclick="schedFilter(this,'phl')"  style="font-size:11px;padding:3px 8px;">PHL only</button>
-        <button class="filter-btn"        onclick="schedFilter(this,'pnj')"  style="font-size:11px;padding:3px 8px;">PNJ only</button>
+        <button class="filter-btn sched-filter active" onclick="schedFilter(this,'all')"  style="font-size:11px;padding:3px 8px;">All</button>
+        <button class="filter-btn sched-filter"        onclick="schedFilter(this,'today')" style="font-size:11px;padding:3px 8px;">Today</button>
+        <button class="filter-btn sched-filter"        onclick="schedFilter(this,'tomorrow')" style="font-size:11px;padding:3px 8px;">Tomorrow</button>
+        <button class="filter-btn sched-filter"        onclick="schedFilter(this,'week')"  style="font-size:11px;padding:3px 8px;">This Week</button>
+        <button class="filter-btn sched-filter"        onclick="schedFilter(this,'14')"   style="font-size:11px;padding:3px 8px;">14 days</button>
+        <button class="filter-btn sched-filter"        onclick="schedFilter(this,'30')"   style="font-size:11px;padding:3px 8px;">30 days</button>
+        <button class="filter-btn sched-filter"        onclick="schedFilter(this,'phl')"  style="font-size:11px;padding:3px 8px;">PHL only</button>
+        <button class="filter-btn sched-filter"        onclick="schedFilter(this,'pnj')"  style="font-size:11px;padding:3px 8px;">PNJ only</button>
       </div>
     </div>
     <div style="max-height:600px;overflow-y:auto;border-radius:0 0 8px 8px;">

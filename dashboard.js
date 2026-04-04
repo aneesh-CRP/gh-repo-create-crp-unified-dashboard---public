@@ -3624,24 +3624,27 @@ function buildSchedStudyBars() {
 }
 
 function schedFilter(btn, filter) {
-  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.sched-filter').forEach(b => b.classList.remove('active'));
   if (btn) btn.classList.add('active');
   const today = new Date(); today.setHours(0,0,0,0);
   const rows = document.querySelectorAll('#upcoming-tbody tr');
   let shown = 0;
   rows.forEach(row => {
     const ds = (row.dataset.date||'').split('-');
-    if (ds.length < 3) return;
+    if (ds.length < 3) { row.style.display = 'none'; return; }
     const d = new Date(parseInt(ds[0]), parseInt(ds[1])-1, parseInt(ds[2]));
     const site = row.dataset.site || '';
-    const days = (d - today) / 86400000;
-    let vis = days >= 0; // always hide past
-    if (vis && filter === 'today') vis = days === 0;
-    else if (vis && filter === 'week') { var dow = today.getDay(); var daysToFri = dow === 0 ? -2 : 5 - dow; vis = days <= daysToFri; }
-    else if (vis && filter === '14')  vis = days <= 14;
-    else if (vis && filter === '30')  vis = days <= 30;
-    else if (vis && filter === 'phl') vis = !site.includes('Penn');
-    else if (vis && filter === 'pnj') vis = site.includes('Penn');
+    const days = Math.round((d - today) / 86400000);
+    let vis = true;
+    // Date filters
+    if (filter === 'all')           vis = days >= 0;
+    else if (filter === 'today')    vis = days === 0;
+    else if (filter === 'tomorrow') vis = days === 1;
+    else if (filter === 'week')     { var dow = today.getDay(); var endDay = dow === 0 ? 0 : (dow === 6 ? 1 : 5 - dow); vis = days >= 0 && days <= endDay; }
+    else if (filter === '14')       vis = days >= 0 && days <= 14;
+    else if (filter === '30')       vis = days >= 0 && days <= 30;
+    else if (filter === 'phl')      vis = days >= 0 && !site.includes('Penn');
+    else if (filter === 'pnj')      vis = days >= 0 && site.includes('Penn');
     row.style.display = vis ? '' : 'none';
     if (vis) shown++;
   });
