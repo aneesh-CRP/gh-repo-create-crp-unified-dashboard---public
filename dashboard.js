@@ -4789,16 +4789,80 @@ function mergeCoordGoalsWithSnapshot(goals) {
 }
 
 function computeCoordGoals() {
-  // Compute from allVisitDetail if coordGoals not pre-computed
   var COORDS = CRP_CONFIG.SCHEDULE_COORDINATORS || CRP_CONFIG.COORDINATORS || [];
   var COORD_LOWER = COORDS.map(function(c) { return c.toLowerCase(); });
-  var goals = { byDay: {}, byMonth: {}, byMonthDuration: {}, byDayDetail: {} };
+  var goals = { byDay: {}, byMonth: {}, byMonthDuration: {}, byDayDetail: {}, bqSourced: false };
   COORDS.forEach(function(c) { goals.byDay[c] = {}; goals.byMonth[c] = 0; goals.byMonthDuration[c] = 0; goals.byDayDetail[c] = {}; });
-  var seen = new Set();
-  var visits = DATA.allVisitDetail || [];
   var now = new Date();
   var mm = String(now.getMonth()+1).padStart(2,'0');
   var yy = now.getFullYear();
+
+  // ── PRIMARY: Use coordPerf BQ feed (iron-clad attribution — see CLAUDE.md) ──
+  if (window._coordPerfData && window._coordPerfData.length > 0) {
+    goals.bqSourced = true;
+    window._coordPerfData.forEach(function(r) {
+      var rawName = (r.coordinator || '').trim();
+      if (!rawName) return;
+      var idx = COORD_LOWER.indexOf(rawName.toLowerCase());
+      if (idx === -1) return;
+      var name = COORDS[idx];
+      var date = r.visit_date || '';
+      if (!date) return;
+      var active = parseInt(r.active_visits) || 0;
+      var cancelled = parseInt(r.cancelled) || 0;
+      var mins = parseInt(r.total_minutes) || 0;
+      if (active > 0) {
+        goals.byDay[name][date] = (goals.byDay[name][date] || 0) + active;
+        if (date >= yy+'-'+mm+'-01' && date <= yy+'-'+mm+'-31') {
+          goals.byMonth[name] += active;
+          goals.byMonthDuration[name] += mins;
+        }
+      }
+      // Store cancel data for Performance Snapshot
+      if (!goals._cancelsByDay) goals._cancelsByDay = {};
+      if (!goals._cancelsByDay[name]) goals._cancelsByDay[name] = {};
+      if (cancelled > 0) goals._cancelsByDay[name][date] = (goals._cancelsByDay[name][date] || 0) + cancelled;
+      // Store breakdown for Performance Snapshot
+      if (!goals._perfByDay) goals._perfByDay = {};
+      if (!goals._perfByDay[name]) goals._perfByDay[name] = {};
+      goals._perfByDay[name][date] = {
+        active: active, completed: parseInt(r.completed) || 0,
+        partial: parseInt(r.partially_complete) || 0,
+        unresolved: parseInt(r.unresolved) || 0,
+        future: parseInt(r.scheduled_future) || 0,
+        cancelled: cancelled,
+        no_shows: parseInt(r.no_shows) || 0,
+        site_cancelled: parseInt(r.site_cancelled) || 0,
+        patient_cancelled: parseInt(r.patient_cancelled) || 0,
+        minutes: mins
+      };
+    });
+    // Also build investigator data
+    goals._invByDay = {};
+    window._coordPerfData.forEach(function(r) {
+      var inv = (r.investigator || '').trim();
+      if (!inv) return;
+      var date = r.visit_date || '';
+      var active = parseInt(r.active_visits) || 0;
+      var cancelled = parseInt(r.cancelled) || 0;
+      var mins = parseInt(r.total_minutes) || 0;
+      if (!goals._invByDay[inv]) goals._invByDay[inv] = {};
+      if (!goals._invByDay[inv][date]) goals._invByDay[inv][date] = { active: 0, cancelled: 0, minutes: 0, no_shows: 0, site_cancelled: 0, patient_cancelled: 0, completed: 0, studies: new Set() };
+      var d = goals._invByDay[inv][date];
+      d.active += active; d.cancelled += cancelled; d.minutes += mins;
+      d.no_shows += parseInt(r.no_shows) || 0;
+      d.site_cancelled += parseInt(r.site_cancelled) || 0;
+      d.patient_cancelled += parseInt(r.patient_cancelled) || 0;
+      d.completed += parseInt(r.completed) || 0;
+      if (r.site_name) d.site = r.site_name;
+    });
+    _log('computeCoordGoals: BQ-sourced — ' + window._coordPerfData.length + ' rows');
+    return goals;
+  }
+
+  // ── FALLBACK: Compute from allVisitDetail (for initial render before BQ loads) ──
+  var seen = new Set();
+  var visits = DATA.allVisitDetail || [];
   visits.forEach(function(r) {
     var rawName = r.coord || '';
     var date = r.date_iso || '';
@@ -4813,7 +4877,7 @@ function computeCoordGoals() {
     seen.add(key);
     goals.byDay[name][date] = (goals.byDay[name][date]||0) + 1;
     if (!goals.byDayDetail[name][date]) goals.byDayDetail[name][date] = [];
-    goals.byDayDetail[name][date].push({ patient: patient, study: r.study || '', url: r.patient_url || '' });
+    goals.byDayDetail[name][date].push({ patient: patient, study: r.study || '', url: r.patient_url || '', investigator: r.investigator || '' });
     if (date >= yy+'-'+mm+'-01' && date <= yy+'-'+mm+'-31') {
       goals.byMonth[name]++;
       goals.byMonthDuration[name] = (goals.byMonthDuration[name]||0) + (r.duration_min||0);
@@ -4823,9 +4887,9 @@ function computeCoordGoals() {
 }
 
 function renderCoordinatorGoals() {
-  var goals = DATA.coordGoals || computeCoordGoals();
-  // Merge with localStorage snapshot so past days are preserved
-  goals = mergeCoordGoalsWithSnapshot(goals);
+  var goals = computeCoordGoals();
+  // Only merge localStorage snapshot if NOT BQ-sourced (BQ is the source of truth)
+  if (!goals.bqSourced) goals = mergeCoordGoalsWithSnapshot(goals);
   if (!goals) return;
   const COORDS = CRP_CONFIG.SCHEDULE_COORDINATORS || CRP_CONFIG.COORDINATORS || [];
   const DAILY_GOAL = CRP_CONFIG.COORD_DAILY_GOAL || 2;
@@ -5007,15 +5071,26 @@ function renderCoordPeriodTable() {
       if (goals.byMonth[name]) visitsByCoord[name] = goals.byMonth[name];
     });
   }
-  // Count cancels per coordinator in period
+  // Count cancels per coordinator in period — use BQ data if available
   var cancelsByCoord = {};
-  (DATA.allCancels || []).filter(function(c){return !_patientRecovered(c.name,c.study,c.subject_key);}).forEach(function(c) {
-    var cd = c.cancel_date_iso || c.date_iso || '';
-    if (cd >= startISO && cd <= endISO) {
-      var cn = c.coord || '';
-      if (cn) cancelsByCoord[cn] = (cancelsByCoord[cn] || 0) + 1;
-    }
-  });
+  if (goals._cancelsByDay) {
+    // BQ-sourced: definitive cancel counts
+    COORDS.forEach(function(name) {
+      var byDay = goals._cancelsByDay[name] || {};
+      Object.keys(byDay).forEach(function(d) {
+        if (d >= startISO && d <= endISO) cancelsByCoord[name] = (cancelsByCoord[name] || 0) + byDay[d];
+      });
+    });
+  } else {
+    // Fallback: allCancels
+    (DATA.allCancels || []).filter(function(c){return !_patientRecovered(c.name,c.study,c.subject_key);}).forEach(function(c) {
+      var cd = c.cancel_date_iso || c.date_iso || '';
+      if (cd >= startISO && cd <= endISO) {
+        var cn = c.coord || '';
+        if (cn) cancelsByCoord[cn] = (cancelsByCoord[cn] || 0) + 1;
+      }
+    });
+  }
 
   var monthMax = 1;
   COORDS.forEach(function(name) { var v = visitsByCoord[name] || 0; if (v > monthMax) monthMax = v; });
@@ -5686,15 +5761,33 @@ function renderInvCapacity() {
   var workDays = 0; var dd = new Date(startDate);
   while (dd <= endDate) { if (dd.getDay() > 0 && dd.getDay() < 6) workDays++; dd.setDate(dd.getDate() + 1); }
 
+  // ── PRIMARY: Use BQ coordPerf investigator data (iron-clad — see CLAUDE.md) ──
+  var goals = window._coordGoalsData || computeCoordGoals();
+  var _invFromBQ = {};
+  if (goals._invByDay) {
+    Object.keys(goals._invByDay).forEach(function(inv) {
+      var byDay = goals._invByDay[inv];
+      var total = { active: 0, cancelled: 0, minutes: 0, no_shows: 0, site_cancelled: 0, patient_cancelled: 0, completed: 0, sites: new Set() };
+      Object.keys(byDay).forEach(function(d) {
+        if (d >= startISO && d <= endISO) {
+          var v = byDay[d];
+          total.active += v.active; total.cancelled += v.cancelled; total.minutes += v.minutes;
+          total.no_shows += v.no_shows; total.site_cancelled += v.site_cancelled;
+          total.patient_cancelled += v.patient_cancelled; total.completed += v.completed;
+          if (v.site) total.sites.add(v.site);
+        }
+      });
+      if (total.active > 0 || total.cancelled > 0) _invFromBQ[inv] = total;
+    });
+  }
+
+  // Fallback: count from allVisitDetail
   var visits = allVisits.filter(function(v) {
     var d = v.date_iso || '';
     return d >= startISO && d <= endISO;
   });
-  // Also count past visits from coordinator goals data (allVisitDetail is future-only)
   var _invVisitsFromGoals = {};
-  var goals = window._coordGoalsData;
-  if (goals && goals.byDayDetail) {
-    // byDayDetail has per-day visit arrays with investigator info
+  if (!goals._invByDay && goals.byDayDetail) {
     Object.keys(goals.byDayDetail || {}).forEach(function(coordName) {
       var byDay = goals.byDayDetail[coordName] || {};
       Object.keys(byDay).forEach(function(d) {
@@ -5709,10 +5802,24 @@ function renderInvCapacity() {
   }
 
   var invStats = INVS.map(function(name) {
-    // Combine future visits (from allVisitDetail) + past visits (from goals)
+    var nameLo = name.toLowerCase();
+    // ── BQ path (iron-clad) ──
+    var bqMatch = Object.keys(_invFromBQ).find(function(k) { return k.toLowerCase() === nameLo; });
+    if (bqMatch) {
+      var bq = _invFromBQ[bqMatch];
+      var daySet = new Set();
+      Object.keys(goals._invByDay[bqMatch] || {}).forEach(function(d) {
+        if (d >= startISO && d <= endISO && goals._invByDay[bqMatch][d].active > 0) daySet.add(d);
+      });
+      var dayCount = daySet.size;
+      var avgPerDay = workDays > 0 ? (bq.active / workDays).toFixed(1) : '0';
+      var utilPct = workDays > 0 ? Math.min(100, Math.round(dayCount / workDays * 100)) : 0;
+      return { name:name, visits:bq.active, cancels:bq.cancelled, completed:bq.completed, noShows:bq.no_shows, siteCancelled:bq.site_cancelled, patientCancelled:bq.patient_cancelled, hours:Math.round(bq.minutes/60), avgPerDay:avgPerDay, dayCount:dayCount, utilPct:utilPct, studies:0, bqSourced:true };
+    }
+    // ── Fallback path ──
     var iv = visits.filter(function(v){return v.investigator===name;});
     var pastCount = _invVisitsFromGoals[name] || 0;
-    var totalVisits = Math.max(iv.length, pastCount); // use whichever is higher
+    var totalVisits = Math.max(iv.length, pastCount);
     var ic = cancels.filter(function(c){
       var cd = c.cancel_date_iso || c.date_iso || '';
       return c.investigator===name && cd >= startISO && cd <= endISO;
@@ -5724,16 +5831,7 @@ function renderInvCapacity() {
     var utilPct = workDays > 0 ? Math.min(100, Math.round(dayCount / workDays * 100)) : 0;
     var studies = {};
     iv.forEach(function(v){studies[v.study]=1;});
-    var costPerVisit = 0;
-    if (typeof QB_DATA !== 'undefined' && QB_DATA.loaded && QB_DATA.pnlCostByName) {
-      var pnlCost = 0;
-      var nameLo = name.toLowerCase();
-      Object.entries(QB_DATA.pnlCostByName).forEach(function(kv) {
-        if (kv[0].toLowerCase().indexOf(nameLo.split(' ')[0]) !== -1) pnlCost = kv[1];
-      });
-      if (pnlCost > 0 && totalVisits > 0) costPerVisit = Math.round(pnlCost / totalVisits);
-    }
-    return { name:name, visits:totalVisits, cancels:ic.length, avgPerDay:avgPerDay, dayCount:dayCount, utilPct:utilPct, studies:Object.keys(studies).length, costPerVisit:costPerVisit };
+    return { name:name, visits:totalVisits, cancels:ic.length, completed:0, noShows:0, siteCancelled:0, patientCancelled:0, hours:0, avgPerDay:avgPerDay, dayCount:dayCount, utilPct:utilPct, studies:Object.keys(studies).length, bqSourced:false };
   }).sort(function(a,b){return b.visits-a.visits;});
 
   var maxVisits = Math.max.apply(null, invStats.map(function(i){return i.visits;}).concat([0])) || 1;
@@ -18234,6 +18332,18 @@ async function _crpInit() {
       console.warn('CRP Finance fetch failed:', e);
       setHealthChip('dh-finance','fail','Finance (failed)');
     });
+
+    // Phase 3a: Coordinator Performance from BQ (iron-clad attribution — see CLAUDE.md)
+    if (CRP_CONFIG.USE_CLOUD_FUNCTION && CRP_CONFIG.CF_BASE) {
+      fetch(CRP_CONFIG.CF_BASE + '?feed=coordPerf&format=json').then(r => r.json()).then(j => {
+        window._coordPerfData = j.data || [];
+        _log('CRP: coordPerf loaded — ' + window._coordPerfData.length + ' rows (BQ source of truth)');
+        setHealthChip('dh-coordperf', window._coordPerfData.length > 0 ? 'ok' : 'warn', 'Coord Perf (' + window._coordPerfData.length + ')');
+        // Re-render coordinator sections with BQ data
+        if (typeof renderCoordinatorGoals === 'function') safe(renderCoordinatorGoals, 'renderCoordinatorGoals-bq');
+        if (typeof renderInvCapacity === 'function') safe(renderInvCapacity, 'renderInvCapacity-bq');
+      }).catch(e => { console.warn('coordPerf fetch failed:', e.message); });
+    }
 
     // Phase 3: Supplemental data (Action Required + Patient DB + Meta Ads + Confirmation Outcomes)
     if (typeof fetchActionRequiredData === 'function') fetchActionRequiredData();
