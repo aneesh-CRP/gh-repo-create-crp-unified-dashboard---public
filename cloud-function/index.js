@@ -25,7 +25,7 @@ function tbl(name) { return '`' + PROJECT + '.' + DATASET + '.' + name + '`'; }
 // ── Firestore (shared persistent state) ──
 const firestore = new Firestore({ projectId: PROJECT });
 const STATE_COLLECTION = 'dashboard_state';
-const VALID_STATE_DOCS = ['visit_statuses', 'rideshare', 'payouts', 'followups', 'dismissed', 'collection_tracking'];
+const VALID_STATE_DOCS = ['visit_statuses', 'rideshare', 'payouts', 'followups', 'dismissed', 'collection_tracking', 'confirmed_visits', 'risk_cards', 'winback', 'dismissed_actions', 'audit_log'];
 
 // Use user credentials (refresh token) to access Fivetran-managed authorized views
 // The default service account can't read through authorized views — only the user who
@@ -4281,6 +4281,83 @@ functions.http('crpBqApi', async (req, res) => {
   }
 
   // ── POST/GET: Send Reminders — dry-run preview or live send ──
+  // ── GET: BQ Verification — cross-check performance numbers ──
+  if (req.query.action === 'verify-perf') {
+    res.set('Cache-Control', 'no-store');
+    try {
+      // Run coordPerf feed + raw BQ counts side by side
+      const coordPerfDef = FEEDS['coordPerf'];
+      const coordPerfSql = typeof coordPerfDef.query === 'function' ? coordPerfDef.query() : coordPerfDef.query;
+      const coordPerfRows = await runQuery(coordPerfSql);
+
+      // Raw BQ counts (no eSource attribution — simple user_appointment join)
+      const rawSql = `SELECT
+        COALESCE(CONCAT(u.first_name, ' ', u.last_name), 'Unassigned') AS coordinator,
+        COUNT(CASE WHEN ca.status != 0 THEN 1 END) AS raw_active,
+        COUNT(CASE WHEN ca.status = 0 THEN 1 END) AS raw_cancelled,
+        COUNT(*) AS raw_total
+      FROM ${tbl('calendar_appointment')} ca
+      LEFT JOIN (
+        SELECT ua.calendar_appointment_key, u.first_name, u.last_name
+        FROM ${tbl('user_appointment')} ua
+        JOIN ${tbl('study_user')} su ON ua.user_key = su.user_key AND ua.study_key = su.study_key AND su.role = 2
+        JOIN ${tbl('user')} u ON ua.user_key = u.user_key
+        WHERE ua._fivetran_deleted = false AND su._fivetran_deleted = false
+        QUALIFY ROW_NUMBER() OVER (PARTITION BY ua.calendar_appointment_key ORDER BY ua.date_created DESC) = 1
+      ) u ON ca.calendar_appointment_key = u.calendar_appointment_key
+      JOIN ${tbl('study')} st ON ca.study_key = st.study_key
+      LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
+      WHERE ca.start >= '2026-01-01' AND ca._fivetran_deleted = false AND ca.type IN (0,1)
+        ${STUDY_FILTER_SQL}
+      GROUP BY coordinator ORDER BY raw_total DESC`;
+      const rawRows = await runQuery(rawSql);
+
+      // Aggregate coordPerf by coordinator
+      const cpByCoord = {};
+      coordPerfRows.forEach(r => {
+        const c = r.coordinator || '';
+        if (!c.trim()) return;
+        if (!cpByCoord[c]) cpByCoord[c] = { active: 0, cancelled: 0, completed: 0, esource: 0 };
+        cpByCoord[c].active += parseInt(r.active_visits) || 0;
+        cpByCoord[c].cancelled += parseInt(r.cancelled) || 0;
+        cpByCoord[c].completed += parseInt(r.completed) || 0;
+        cpByCoord[c].esource += parseInt(r.coord_esource_count) || 0;
+      });
+
+      // Compare
+      const comparison = rawRows.map(r => {
+        const name = r.coordinator;
+        const cp = cpByCoord[name] || { active: 0, cancelled: 0, completed: 0, esource: 0 };
+        const rawActive = parseInt(r.raw_active) || 0;
+        const rawCancelled = parseInt(r.raw_cancelled) || 0;
+        const rawTotal = parseInt(r.raw_total) || 0;
+        const cpTotal = cp.active + cp.cancelled;
+        return {
+          coordinator: name,
+          raw_assigned: { active: rawActive, cancelled: rawCancelled, total: rawTotal },
+          bq_attributed: { active: cp.active, cancelled: cp.cancelled, total: cpTotal, completed: cp.completed, esource_pct: cpTotal ? Math.round(cp.esource / cpTotal * 100) : 0 },
+          diff: cpTotal - rawTotal,
+          match: Math.abs(cpTotal - rawTotal) <= 1
+        };
+      });
+
+      const totalRaw = rawRows.reduce((s, r) => s + (parseInt(r.raw_total) || 0), 0);
+      const totalCP = Object.values(cpByCoord).reduce((s, v) => s + v.active + v.cancelled, 0);
+
+      res.json({
+        verified: Math.abs(totalRaw - totalCP) <= 5,
+        timestamp: new Date().toISOString(),
+        totals: { raw_assigned: totalRaw, bq_attributed: totalCP, diff: totalCP - totalRaw },
+        by_coordinator: comparison,
+        note: 'Diff is expected when eSource re-attributes visits between coordinators. Total should be close.'
+      });
+    } catch (err) {
+      console.error('verify-perf error:', err.message);
+      res.status(500).json({ error: err.message });
+    }
+    return;
+  }
+
   if (req.query.action === 'send-reminders') {
     res.set('Cache-Control', 'no-store');
     try {

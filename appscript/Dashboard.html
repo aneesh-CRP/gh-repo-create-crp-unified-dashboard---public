@@ -1855,6 +1855,7 @@ body {
     <button onclick="switchAdmin('auditlog',this)" class="sched-filter" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Audit Log</button>
     <button onclick="switchAdmin('email',this)" class="sched-filter" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Daily Email</button>
     <button onclick="switchAdmin('payouts',this)" class="sched-filter" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Payouts</button>
+    <button onclick="switchAdmin('completedVisits',this)" class="sched-filter" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Completed Visits</button>
   </div>
 
   <!-- Staff Performance Panel -->
@@ -2057,6 +2058,24 @@ body {
         </table>
       </div>
       <div style="padding:12px 16px;border-top:1px solid var(--border);" id="payout-totals"></div>
+    </div>
+  </div>
+
+  <!-- Completed Visits Panel (BQ source of truth) -->
+  <div id="admin-completedVisits" style="display:none;">
+    <div class="card fade-in">
+      <div class="card-header">
+        <span class="card-title">Completed Visits — BQ Audit Trail</span>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span class="badge badge-green" id="cv-count">Loading...</span>
+          <button class="btn btn-green" onclick="exportCompletedVisits()" style="font-size:11px;padding:4px 10px;">Export CSV</button>
+          <button class="btn" onclick="verifyPerfNumbers()" style="font-size:11px;padding:4px 10px;background:#f0f4ff;color:#1843AD;border:1px solid #1843AD;">Verify vs BQ</button>
+        </div>
+      </div>
+      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 8px;">All past visits YTD from BigQuery · eSource-first attribution · iron-clad coordinator/investigator credit (see CLAUDE.md)</div>
+      <div style="overflow-x:auto;max-height:600px;overflow-y:auto;" id="cv-table-wrap">
+        <p style="padding:20px;color:#94a3b8;text-align:center;font-size:12px;">Click to load completed visits from BigQuery...</p>
+      </div>
     </div>
   </div>
 

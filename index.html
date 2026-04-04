@@ -1855,6 +1855,7 @@ body {
     <button onclick="switchAdmin('auditlog',this)" class="sched-filter" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Audit Log</button>
     <button onclick="switchAdmin('email',this)" class="sched-filter" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Daily Email</button>
     <button onclick="switchAdmin('payouts',this)" class="sched-filter" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Payouts</button>
+    <button onclick="switchAdmin('completedVisits',this)" class="sched-filter" style="padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer">Completed Visits</button>
   </div>
 
   <!-- Staff Performance Panel -->
@@ -2057,6 +2058,24 @@ body {
         </table>
       </div>
       <div style="padding:12px 16px;border-top:1px solid var(--border);" id="payout-totals"></div>
+    </div>
+  </div>
+
+  <!-- Completed Visits Panel (BQ source of truth) -->
+  <div id="admin-completedVisits" style="display:none;">
+    <div class="card fade-in">
+      <div class="card-header">
+        <span class="card-title">Completed Visits — BQ Audit Trail</span>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span class="badge badge-green" id="cv-count">Loading...</span>
+          <button class="btn btn-green" onclick="exportCompletedVisits()" style="font-size:11px;padding:4px 10px;">Export CSV</button>
+          <button class="btn" onclick="verifyPerfNumbers()" style="font-size:11px;padding:4px 10px;background:#f0f4ff;color:#1843AD;border:1px solid #1843AD;">Verify vs BQ</button>
+        </div>
+      </div>
+      <div style="font-size:10px;color:#94a3b8;padding:2px 16px 8px;">All past visits YTD from BigQuery · eSource-first attribution · iron-clad coordinator/investigator credit (see CLAUDE.md)</div>
+      <div style="overflow-x:auto;max-height:600px;overflow-y:auto;" id="cv-table-wrap">
+        <p style="padding:20px;color:#94a3b8;text-align:center;font-size:12px;">Click to load completed visits from BigQuery...</p>
+      </div>
     </div>
   </div>
 
@@ -2711,6 +2730,11 @@ var crpState = {
         self._mergeDoc('followups', data.followups || {}, 'crp_followup_actions');
         self._mergeDoc('dismissed', data.dismissed || {}, 'crp_dismissed_items');
         self._mergeDoc('collection_tracking', data.collection_tracking || {}, 'crp_coll');
+        self._mergeDoc('confirmed_visits', data.confirmed_visits || {}, 'crp_confirmed_visits');
+        self._mergeDoc('risk_cards', data.risk_cards || {}, 'crp_risk_card_status_v1');
+        self._mergeDoc('winback', data.winback || {}, 'crp_winback_status_v1');
+        self._mergeDoc('dismissed_actions', data.dismissed_actions || {}, 'crp_dismissed_actions_v1');
+        self._mergeDoc('audit_log', data.audit_log || {}, 'crp_audit_log');
         self._loaded = true;
         _log('CRP State: loaded from Firestore (' + Object.keys(data).length + ' docs)');
         if (callback) callback();
@@ -5285,8 +5309,15 @@ function buildUpcomingStudyChart() {
 }
 
 var RISK_CARD_STATUS_KEY = 'crp_risk_card_status_v1';
-function _loadRiskCardStatus() { try { return JSON.parse(localStorage.getItem(RISK_CARD_STATUS_KEY)||'{}'); } catch(e) { return {}; } }
-function _saveRiskCardStatus(s) { try { localStorage.setItem(RISK_CARD_STATUS_KEY, JSON.stringify(s)); } catch(e) {} }
+function _loadRiskCardStatus() {
+  var cached = crpState.get('risk_cards');
+  if (cached && Object.keys(cached).length > 0) return cached;
+  try { return JSON.parse(localStorage.getItem(RISK_CARD_STATUS_KEY)||'{}'); } catch(e) { return {}; }
+}
+function _saveRiskCardStatus(s) {
+  try { localStorage.setItem(RISK_CARD_STATUS_KEY, JSON.stringify(s)); } catch(e) {}
+  crpState.setMany('risk_cards', s, RISK_CARD_STATUS_KEY);
+}
 function setRiskCardStatus(key, status, btn) {
   var s = _loadRiskCardStatus();
   if (s[key] === status) { delete s[key]; } else { s[key] = status; }
@@ -5932,16 +5963,19 @@ function hidePastVisits() {
   _log('hidePastVisits: hidden=' + hidden + ', shown=' + shown);
 }
 
-// ── Visit Confirmation (localStorage-persisted per-visit checkboxes) ──
+// ── Visit Confirmation (Firestore-backed, localStorage fallback) ──
 var _confirmedVisits = {};
 function _loadConfirmedVisits() {
-  try { _confirmedVisits = JSON.parse(localStorage.getItem('crp_confirmed_visits') || '{}'); } catch(e) { _confirmedVisits = {}; }
+  var cached = crpState.get('confirmed_visits');
+  if (cached && Object.keys(cached).length > 0) { _confirmedVisits = cached; }
+  else { try { _confirmedVisits = JSON.parse(localStorage.getItem('crp_confirmed_visits') || '{}'); } catch(e) { _confirmedVisits = {}; } }
   // Prune entries older than 90 days
   var now = Date.now(), cutoff = 90 * 86400000;
   Object.keys(_confirmedVisits).forEach(function(k) { if (now - (_confirmedVisits[k] || 0) > cutoff) delete _confirmedVisits[k]; });
 }
 function _saveConfirmedVisits() {
   try { localStorage.setItem('crp_confirmed_visits', JSON.stringify(_confirmedVisits)); } catch(e) {}
+  crpState.setMany('confirmed_visits', _confirmedVisits, 'crp_confirmed_visits');
 }
 function _visitKey(row) {
   // Use data-date attribute (stable) + patient name from data-date's row
@@ -12032,29 +12066,37 @@ async function manualRefresh() {
 // ═══════════════════════════════════════════════════
 // RENDER ALL
 // ═══════════════════════════════════════════════════
-// ── Win-back status persistence ──
+// ── Win-back status persistence (Firestore-backed) ──
 var WB_STATUS_KEY = 'crp_winback_status_v1';
+function _loadWinbackStatus() {
+  var cached = crpState.get('winback');
+  if (cached && Object.keys(cached).length > 0) return cached;
+  try { return JSON.parse(localStorage.getItem(WB_STATUS_KEY) || '{}'); } catch(e) { return {}; }
+}
 function setWinbackStatus(pKey, status, btn) {
-  var wbStatus = {};
-  try { wbStatus = JSON.parse(localStorage.getItem(WB_STATUS_KEY) || '{}'); } catch(e) { wbStatus = {}; }
+  var wbStatus = _loadWinbackStatus();
   if (wbStatus[pKey] === status) {
-    delete wbStatus[pKey]; // toggle off
+    delete wbStatus[pKey];
+    crpState.del('winback', pKey, WB_STATUS_KEY);
   } else {
     wbStatus[pKey] = status;
+    crpState.set('winback', pKey, status, WB_STATUS_KEY);
   }
   try { localStorage.setItem(WB_STATUS_KEY, JSON.stringify(wbStatus)); } catch(e) {}
-  // Re-render the CRIO section to reflect updated states
   if (typeof renderCrioStudies === 'function') safe(renderCrioStudies, 'renderCrioStudies');
 }
 
-// ── Dismissed actions persistence ──
+// ── Dismissed actions persistence (Firestore-backed) ──
 var DISMISSED_ACTIONS_KEY = 'crp_dismissed_actions_v1';
 
 function loadDismissedActions() {
+  var cached = crpState.get('dismissed_actions');
+  if (cached && Object.keys(cached).length > 0) return cached;
   try { return JSON.parse(localStorage.getItem(DISMISSED_ACTIONS_KEY) || '{}'); } catch(e) { return {}; }
 }
 function saveDismissedActions(map) {
   try { localStorage.setItem(DISMISSED_ACTIONS_KEY, JSON.stringify(map)); } catch(e) {}
+  crpState.setMany('dismissed_actions', map, DISMISSED_ACTIONS_KEY);
 }
 function dismissAction(actionId, reason) {
   var map = loadDismissedActions();
@@ -16305,7 +16347,7 @@ function renderCrioStudies() {
     });
     // Load persisted winback statuses from localStorage
     var wbStatus = {};
-    try { wbStatus = JSON.parse(localStorage.getItem(WB_STATUS_KEY) || '{}'); } catch(e) { wbStatus = {}; }
+    wbStatus = _loadWinbackStatus();
 
     html += '<div style="margin-bottom:14px">'
       + '<div style="font-size:12px;font-weight:700;color:#dc2626;margin-bottom:6px">Win-Back Opportunities — V1 No-Shows / Cancellations</div>'
@@ -19537,7 +19579,7 @@ function copyEmailToClipboard() {
 // ADMIN TAB SUB-NAVIGATION
 // ══════════════════════════════════════════════════════════════
 function switchAdmin(section, btn) {
-  ['trends','connect','auditlog','email','payouts'].forEach(s => {
+  ['trends','connect','auditlog','email','payouts','completedVisits'].forEach(s => {
     const el = document.getElementById('admin-'+s);
     if (el) el.style.display = s === section ? '' : 'none';
   });
@@ -19551,6 +19593,107 @@ function switchAdmin(section, btn) {
   }
   if (section === 'auditlog') renderAuditLogView();
   if (section === 'payouts') renderPayoutsTable();
+  if (section === 'completedVisits') loadCompletedVisits();
+}
+
+// ═══ COMPLETED VISITS — BQ AUDIT TRAIL ═══
+var _completedVisitsData = null;
+
+function loadCompletedVisits() {
+  var wrap = document.getElementById('cv-table-wrap');
+  var badge = document.getElementById('cv-count');
+  if (!wrap) return;
+  if (_completedVisitsData) { renderCompletedVisits(); return; }
+  wrap.innerHTML = '<p style="padding:20px;color:#94a3b8;text-align:center;font-size:12px;">Loading from BigQuery...</p>';
+  fetch(CRP_CONFIG.CF_BASE + '?feed=completedVisits&format=json').then(r => r.json()).then(j => {
+    _completedVisitsData = j.data || [];
+    if (badge) badge.textContent = _completedVisitsData.length + ' visits';
+    renderCompletedVisits();
+  }).catch(e => {
+    wrap.innerHTML = '<p style="padding:20px;color:#dc2626;text-align:center;">Failed: ' + escapeHTML(e.message) + '</p>';
+  });
+}
+
+function renderCompletedVisits() {
+  var wrap = document.getElementById('cv-table-wrap');
+  if (!wrap || !_completedVisitsData) return;
+  var esc = escapeHTML;
+  var rows = _completedVisitsData;
+  var h = '<table style="width:100%;border-collapse:collapse;font-size:11px;"><thead><tr style="background:var(--surface2);border-bottom:2px solid var(--border);">';
+  h += '<th style="padding:6px 8px;text-align:left;font-weight:700;position:sticky;top:0;z-index:1;background:var(--surface2);">Date</th>';
+  h += '<th style="padding:6px 8px;text-align:left;font-weight:700;position:sticky;top:0;z-index:1;background:var(--surface2);">Coordinator</th>';
+  h += '<th style="padding:6px 8px;text-align:left;font-weight:700;position:sticky;top:0;z-index:1;background:var(--surface2);">Investigator</th>';
+  h += '<th style="padding:6px 8px;text-align:left;font-weight:700;position:sticky;top:0;z-index:1;background:var(--surface2);">Patient</th>';
+  h += '<th style="padding:6px 8px;text-align:left;font-weight:700;position:sticky;top:0;z-index:1;background:var(--surface2);">Study</th>';
+  h += '<th style="padding:6px 8px;text-align:left;font-weight:700;position:sticky;top:0;z-index:1;background:var(--surface2);">Visit</th>';
+  h += '<th style="padding:6px 4px;text-align:center;font-weight:700;position:sticky;top:0;z-index:1;background:var(--surface2);">Status</th>';
+  h += '<th style="padding:6px 4px;text-align:center;font-weight:700;position:sticky;top:0;z-index:1;background:var(--surface2);">eS Q</th>';
+  h += '<th style="padding:6px 4px;text-align:center;font-weight:700;position:sticky;top:0;z-index:1;background:var(--surface2);">Credit</th>';
+  h += '<th style="padding:6px 4px;text-align:center;font-weight:700;position:sticky;top:0;z-index:1;background:var(--surface2);">Site</th>';
+  h += '</tr></thead><tbody>';
+  rows.forEach(function(r) {
+    var statusColor = r.completion_status === 'Complete' ? '#059669' : r.completion_status === 'Unresolved' ? '#dc2626' : '#FF9933';
+    var creditBadge = r.coord_attribution === 'esource' ? '<span style="font-size:8px;padding:1px 4px;border-radius:3px;background:#05966915;color:#059669;font-weight:700;">eSource</span>' : '<span style="font-size:8px;padding:1px 4px;border-radius:3px;background:#e2e8f0;color:#64748b;font-weight:600;">Assigned</span>';
+    var siteCode = (r.site_name||'').indexOf('Penn') !== -1 ? 'PNJ' : 'PHL';
+    h += '<tr style="border-bottom:1px solid #f1f5f9;">';
+    h += '<td style="padding:5px 8px;font-weight:600;color:#1843AD;white-space:nowrap;">' + esc(r.visit_date || '') + '</td>';
+    h += '<td style="padding:5px 8px;">' + esc(r.coordinator || '—') + '</td>';
+    h += '<td style="padding:5px 8px;color:#64748b;">' + esc(r.investigator || '—') + '</td>';
+    h += '<td style="padding:5px 8px;font-weight:600;">' + esc(r.subject_name || '—') + '</td>';
+    h += '<td style="padding:5px 8px;font-size:10px;">' + esc(r.study_name || '') + '</td>';
+    h += '<td style="padding:5px 8px;font-size:10px;color:#64748b;">' + esc(r.visit_name || '') + '</td>';
+    h += '<td style="padding:5px 4px;text-align:center;"><span style="font-size:9px;font-weight:700;padding:1px 4px;border-radius:3px;color:' + statusColor + ';">' + esc(r.completion_status || '') + '</span></td>';
+    h += '<td style="padding:5px 4px;text-align:center;font-weight:700;color:#1843AD;">' + (parseInt(r.coord_esource_q) || '—') + '</td>';
+    h += '<td style="padding:5px 4px;text-align:center;">' + creditBadge + '</td>';
+    h += '<td style="padding:5px 4px;text-align:center;font-size:9px;font-weight:600;">' + siteCode + '</td>';
+    h += '</tr>';
+  });
+  h += '</tbody></table>';
+  wrap.innerHTML = h;
+}
+
+function exportCompletedVisits() {
+  if (!_completedVisitsData || !_completedVisitsData.length) return;
+  var csv = 'Date,Time,Coordinator,Investigator,Patient,Subject ID,Study,Visit,Site,Status,Coord eSource Q,Inv eSource Q,Coord Attribution,Inv Attribution,Duration Min\n';
+  _completedVisitsData.forEach(function(r) {
+    csv += [r.visit_date, r.visit_time, r.coordinator, r.investigator, r.subject_name, r.subject_id, r.study_name, r.visit_name, r.site_name, r.completion_status, r.coord_esource_q, r.inv_esource_q, r.coord_attribution, r.inv_attribution, r.duration_min].map(function(v) {
+      var s = String(v == null ? '' : v).replace(/"/g, '""');
+      return s.includes(',') || s.includes('"') || s.includes('\n') ? '"' + s + '"' : s;
+    }).join(',') + '\n';
+  });
+  var blob = new Blob([csv], { type: 'text/csv' });
+  var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'completed-visits-ytd-' + new Date().toISOString().substring(0,10) + '.csv';
+  a.click(); URL.revokeObjectURL(a.href);
+}
+
+function verifyPerfNumbers() {
+  var wrap = document.getElementById('cv-table-wrap');
+  if (!wrap) return;
+  var oldContent = wrap.innerHTML;
+  wrap.innerHTML = '<p style="padding:20px;color:#1843AD;text-align:center;font-size:12px;">Running BQ verification...</p>';
+  fetch(CRP_CONFIG.CF_BASE + '?action=verify-perf').then(r => r.json()).then(j => {
+    var h = '<div style="padding:16px;">';
+    h += '<div style="font-size:14px;font-weight:700;color:' + (j.verified ? '#059669' : '#dc2626') + ';margin-bottom:12px;">' + (j.verified ? 'VERIFIED — Numbers match BQ' : 'MISMATCH — Review needed') + '</div>';
+    h += '<div style="font-size:11px;color:#64748b;margin-bottom:12px;">Raw assigned total: ' + j.totals.raw_assigned + ' · BQ attributed total: ' + j.totals.bq_attributed + ' · Diff: ' + j.totals.diff + '</div>';
+    h += '<table style="width:100%;border-collapse:collapse;font-size:11px;"><thead><tr style="background:var(--surface2);"><th style="padding:6px 8px;text-align:left">Coordinator</th><th style="text-align:right;padding:6px 8px">Raw Assigned</th><th style="text-align:right;padding:6px 8px">BQ Attributed</th><th style="text-align:right;padding:6px 8px">Diff</th><th style="text-align:center;padding:6px 8px">eSource %</th><th style="text-align:center;padding:6px 8px">Match</th></tr></thead><tbody>';
+    (j.by_coordinator || []).forEach(function(c) {
+      var color = c.match ? '#059669' : '#dc2626';
+      h += '<tr style="border-bottom:1px solid #f1f5f9;"><td style="padding:5px 8px;font-weight:600;">' + escapeHTML(c.coordinator) + '</td>';
+      h += '<td style="text-align:right;padding:5px 8px;">' + c.raw_assigned.total + '</td>';
+      h += '<td style="text-align:right;padding:5px 8px;">' + c.bq_attributed.total + '</td>';
+      h += '<td style="text-align:right;padding:5px 8px;color:' + (c.diff === 0 ? '#059669' : '#FF9933') + ';font-weight:700;">' + (c.diff > 0 ? '+' : '') + c.diff + '</td>';
+      h += '<td style="text-align:center;padding:5px 8px;">' + c.bq_attributed.esource_pct + '%</td>';
+      h += '<td style="text-align:center;padding:5px 8px;color:' + color + ';font-weight:700;">' + (c.match ? 'Yes' : 'No') + '</td></tr>';
+    });
+    h += '</tbody></table>';
+    h += '<div style="margin-top:12px;font-size:10px;color:#94a3b8;">Note: Small diffs are expected when eSource re-attributes visits between coordinators. Total across all should be close.</div>';
+    h += '<button onclick="loadCompletedVisits()" style="margin-top:12px;padding:6px 16px;background:#e8eeff;color:#1843AD;border:1px solid #1843AD;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">← Back to Completed Visits</button>';
+    h += '</div>';
+    wrap.innerHTML = h;
+  }).catch(function(e) {
+    wrap.innerHTML = '<p style="padding:20px;color:#dc2626;">Verification failed: ' + escapeHTML(e.message) + '</p><button onclick="renderCompletedVisits()" style="margin:12px;padding:6px 16px;">← Back</button>';
+  });
 }
 
 // ═══ INVESTIGATOR PAYOUTS ═══
@@ -19706,16 +19849,19 @@ function exportPayouts() {
   a.click();
 }
 
-// ═══ AUDIT LOG ═══
+// ═══ AUDIT LOG (Firestore-backed) ═══
 var _auditLog = [];
 (function() {
+  var cached = crpState.get('audit_log');
+  if (cached && cached.entries && cached.entries.length > 0) { _auditLog = cached.entries; return; }
   try { _auditLog = JSON.parse(localStorage.getItem('crp_audit_log') || '[]'); } catch(e) { _auditLog = []; }
 })();
 
 function logAudit(action, details) {
-  _auditLog.push({ timestamp: new Date().toISOString(), action: action, details: details || '' });
+  _auditLog.push({ timestamp: new Date().toISOString(), action: action, details: details || '', user: crpState._user || '' });
   if (_auditLog.length > 500) _auditLog = _auditLog.slice(-500);
   try { localStorage.setItem('crp_audit_log', JSON.stringify(_auditLog)); } catch(e) {}
+  crpState.set('audit_log', 'entries', _auditLog, 'crp_audit_log');
 }
 
 function renderAuditLogView() {
