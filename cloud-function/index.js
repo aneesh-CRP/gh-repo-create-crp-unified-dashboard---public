@@ -627,6 +627,249 @@ const FEEDS = {
   },
 
 
+  // ═══════════════════════════════════════════════════════════════════════
+  // PERFORMANCE ATTRIBUTION — IRON-CLAD RULES (do NOT modify without review)
+  //
+  // These feeds drive performance reviews. The attribution logic:
+  //
+  // COORDINATOR CREDIT (per visit):
+  //   1. eSource: Among users with study_user.role=2 (coordinator) who answered
+  //      eSource questions for this visit, pick the one with the most answers.
+  //   2. Fallback: user_appointment role=2 assignment (calendar scheduling).
+  //   3. If neither → "Unattributed" (flagged for review).
+  //
+  // INVESTIGATOR CREDIT (per visit):
+  //   1. eSource: Among users with study_user.role=1 (investigator) who answered
+  //      eSource questions for this visit, pick the one with the most answers.
+  //   2. Fallback: user_appointment role=1 assignment.
+  //   3. If neither → NULL.
+  //
+  // VISIT STATUS categories:
+  //   - Completed: subject_visit.status IN (22=Complete, 23=Outside CRIO)
+  //   - Partially Complete: status=21
+  //   - In Progress: status IN (11=In Progress, 12=Paused)
+  //   - Unresolved: past date + status IN (0=Unscheduled, 1=Scheduled) — needs attention
+  //   - Upcoming: future date + appointment active
+  //   - Cancelled: calendar_appointment.status=0 (with cancel_type breakdown)
+  //
+  // CANCEL ATTRIBUTION:
+  //   - cancel_type 1 = No Show (not coordinator's fault)
+  //   - cancel_type 2 = Site Cancelled (not coordinator's fault)
+  //   - cancel_type 3 = Patient Cancelled
+  //   - Performance cancel rate uses ONLY patient_cancelled / total
+  //
+  // FILTERS:
+  //   - calendar_appointment.type IN (0=Regular, 1=Ad Hoc) — excludes Blocks and General
+  //   - Excludes test/demo/sandbox studies via STUDY_FILTER_SQL
+  //   - Excludes _fivetran_deleted records
+  //   - YTD from Jan 1 of current year
+  //
+  // WHY ESOURCE-FIRST:
+  //   The person who answered the most eSource questions for a visit is the one
+  //   who actually conducted it. The calendar assignment can be wrong (reassigned
+  //   but not updated, covering for someone, etc.). eSource is proof of work.
+  //   Role filtering ensures coordinators don't steal investigator credit and
+  //   vice versa. Remote CRCs who only do data entry won't steal credit because
+  //   they typically don't have study_user.role=2 on the study.
+  // ═══════════════════════════════════════════════════════════════════════
+
+  // ── 11b. Coordinator & Investigator Performance (definitive YTD from BQ) ──
+  coordPerf: {
+    query: () => `WITH
+    -- eSource top COORDINATOR per visit: match answerer name → user → study_user role=2
+    esource_coord AS (
+      SELECT q.subject_visit_key,
+        TRIM(CONCAT(COALESCE(q.first_name,''), ' ', COALESCE(q.last_name,''))) AS coord_name,
+        COUNT(*) AS questions_answered
+      FROM ${tbl('fact_subject_visit_procedure_question')} q
+      JOIN ${tbl('user')} u ON LOWER(TRIM(CONCAT(COALESCE(q.first_name,''), ' ', COALESCE(q.last_name,'')))) = LOWER(TRIM(CONCAT(u.first_name, ' ', u.last_name)))
+      JOIN ${tbl('study_user')} su ON u.user_key = su.user_key AND q.study_key = su.study_key AND su.role = 2 AND su._fivetran_deleted = false
+      WHERE q.date_completed >= '2026-01-01' AND q.answer IS NOT NULL AND q.answer != ''
+      GROUP BY q.subject_visit_key, q.first_name, q.last_name
+      QUALIFY ROW_NUMBER() OVER (PARTITION BY q.subject_visit_key ORDER BY COUNT(*) DESC) = 1
+    ),
+    -- eSource top INVESTIGATOR per visit: match answerer name → user → study_user role=1
+    esource_inv AS (
+      SELECT q.subject_visit_key,
+        TRIM(CONCAT(COALESCE(q.first_name,''), ' ', COALESCE(q.last_name,''))) AS inv_name,
+        COUNT(*) AS questions_answered
+      FROM ${tbl('fact_subject_visit_procedure_question')} q
+      JOIN ${tbl('user')} u ON LOWER(TRIM(CONCAT(COALESCE(q.first_name,''), ' ', COALESCE(q.last_name,'')))) = LOWER(TRIM(CONCAT(u.first_name, ' ', u.last_name)))
+      JOIN ${tbl('study_user')} su ON u.user_key = su.user_key AND q.study_key = su.study_key AND su.role = 1 AND su._fivetran_deleted = false
+      WHERE q.date_completed >= '2026-01-01' AND q.answer IS NOT NULL AND q.answer != ''
+      GROUP BY q.subject_visit_key, q.first_name, q.last_name
+      QUALIFY ROW_NUMBER() OVER (PARTITION BY q.subject_visit_key ORDER BY COUNT(*) DESC) = 1
+    ),
+    -- Assigned coordinator from user_appointment (role=2) — works for active AND cancelled appts
+    assigned_coord AS (
+      SELECT ua.calendar_appointment_key,
+        CONCAT(u.first_name, ' ', u.last_name) AS coord_name
+      FROM ${tbl('user_appointment')} ua
+      JOIN ${tbl('study_user')} su ON ua.user_key = su.user_key AND ua.study_key = su.study_key AND su.role = 2
+      JOIN ${tbl('user')} u ON ua.user_key = u.user_key
+      WHERE ua._fivetran_deleted = false AND su._fivetran_deleted = false
+      QUALIFY ROW_NUMBER() OVER (PARTITION BY ua.calendar_appointment_key ORDER BY ua.date_created DESC) = 1
+    ),
+    -- Assigned investigator from user_appointment (role=1)
+    assigned_inv AS (
+      SELECT ua.calendar_appointment_key,
+        CONCAT(u.first_name, ' ', u.last_name) AS inv_name
+      FROM ${tbl('user_appointment')} ua
+      JOIN ${tbl('study_user')} su ON ua.user_key = su.user_key AND ua.study_key = su.study_key AND su.role = 1
+      JOIN ${tbl('user')} u ON ua.user_key = u.user_key
+      WHERE ua._fivetran_deleted = false AND su._fivetran_deleted = false
+      QUALIFY ROW_NUMBER() OVER (PARTITION BY ua.calendar_appointment_key ORDER BY ua.date_created DESC) = 1
+    ),
+    -- All appointments with role-based attribution
+    appts AS (
+      SELECT
+        COALESCE(ec.coord_name, ac.coord_name) AS coordinator,
+        COALESCE(ei.inv_name, ai.inv_name) AS investigator,
+        FORMAT_DATETIME('%Y-%m-%d', ca.start) AS visit_date,
+        DATETIME_DIFF(ca.\`end\`, ca.start, MINUTE) AS duration_min,
+        ca.calendar_appointment_key,
+        ca.status AS appt_status,
+        ca.cancel_type,
+        COALESCE(svi.status, -1) AS visit_status,
+        ${STUDY_NAME_SQL} AS study_name,
+        COALESCE(si.name, '') AS site_name,
+        ${SUBJECT_NAME_SQL} AS subject_name,
+        CAST(ca.study_key AS STRING) AS study_key,
+        COALESCE(sv.name, '') AS visit_name,
+        CASE WHEN ec.coord_name IS NOT NULL THEN 'esource'
+             WHEN ac.coord_name IS NOT NULL THEN 'assigned'
+             ELSE 'unattributed' END AS coord_attribution,
+        CASE WHEN ei.inv_name IS NOT NULL THEN 'esource'
+             WHEN ai.inv_name IS NOT NULL THEN 'assigned'
+             ELSE 'unattributed' END AS inv_attribution,
+        COALESCE(ec.questions_answered, 0) AS coord_esource_q,
+        COALESCE(ei.questions_answered, 0) AS inv_esource_q
+      FROM ${tbl('calendar_appointment')} ca
+      JOIN ${tbl('subject')} sub ON ca.subject_key = sub.subject_key AND sub._fivetran_deleted = false
+      JOIN ${tbl('study')} st ON ca.study_key = st.study_key
+      LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
+      LEFT JOIN ${tbl('site')} si ON ca.site_key = si.site_key
+      LEFT JOIN ${tbl('subject_visit')} svi ON ca.subject_visit_key = svi.subject_visit_key
+      LEFT JOIN ${tbl('study_visit')} sv ON svi.study_visit_key = sv.study_visit_key
+      LEFT JOIN esource_coord ec ON ca.subject_visit_key = ec.subject_visit_key
+      LEFT JOIN esource_inv ei ON ca.subject_visit_key = ei.subject_visit_key
+      LEFT JOIN assigned_coord ac ON ca.calendar_appointment_key = ac.calendar_appointment_key
+      LEFT JOIN assigned_inv ai ON ca.calendar_appointment_key = ai.calendar_appointment_key
+      WHERE ca.start >= '2026-01-01'
+        AND ca._fivetran_deleted = false
+        AND ca.type IN (0, 1)
+        ${STUDY_FILTER_SQL}
+    )
+    SELECT
+      coordinator,
+      investigator,
+      visit_date,
+      SUM(CASE WHEN appt_status != 0 THEN duration_min ELSE 0 END) AS total_minutes,
+      COUNT(CASE WHEN appt_status != 0 THEN 1 END) AS active_visits,
+      COUNT(CASE WHEN appt_status != 0 AND visit_status IN (22, 23) THEN 1 END) AS completed,
+      COUNT(CASE WHEN appt_status != 0 AND visit_status = 21 THEN 1 END) AS partially_complete,
+      COUNT(CASE WHEN appt_status != 0 AND visit_status IN (11, 12) THEN 1 END) AS in_progress,
+      COUNT(CASE WHEN appt_status != 0 AND visit_status IN (0, 1) AND visit_date < FORMAT_DATETIME('%Y-%m-%d', CURRENT_DATETIME()) THEN 1 END) AS unresolved,
+      COUNT(CASE WHEN appt_status != 0 AND visit_date >= FORMAT_DATETIME('%Y-%m-%d', CURRENT_DATETIME()) THEN 1 END) AS scheduled_future,
+      COUNT(CASE WHEN appt_status = 0 THEN 1 END) AS cancelled,
+      COUNT(CASE WHEN appt_status = 0 AND cancel_type = 1 THEN 1 END) AS no_shows,
+      COUNT(CASE WHEN appt_status = 0 AND cancel_type = 2 THEN 1 END) AS site_cancelled,
+      COUNT(CASE WHEN appt_status = 0 AND cancel_type = 3 THEN 1 END) AS patient_cancelled,
+      COUNT(DISTINCT study_key) AS studies,
+      site_name,
+      COUNTIF(coord_attribution = 'esource') AS coord_esource_count,
+      COUNTIF(coord_attribution = 'assigned') AS coord_assigned_count,
+      COUNTIF(coord_attribution = 'unattributed') AS coord_unattributed_count
+    FROM appts
+    WHERE coordinator IS NOT NULL AND TRIM(coordinator) != ''
+    GROUP BY coordinator, investigator, visit_date, site_name
+    ORDER BY coordinator, visit_date`
+  },
+
+  // ── 11c. Completed Visits Detail (all past visits YTD for admin audit trail) ──
+  completedVisits: {
+    query: () => `WITH
+    esource_coord AS (
+      SELECT q.subject_visit_key,
+        TRIM(CONCAT(COALESCE(q.first_name,''), ' ', COALESCE(q.last_name,''))) AS coord_name,
+        COUNT(*) AS questions_answered
+      FROM ${tbl('fact_subject_visit_procedure_question')} q
+      JOIN ${tbl('user')} u ON LOWER(TRIM(CONCAT(COALESCE(q.first_name,''), ' ', COALESCE(q.last_name,'')))) = LOWER(TRIM(CONCAT(u.first_name, ' ', u.last_name)))
+      JOIN ${tbl('study_user')} su ON u.user_key = su.user_key AND q.study_key = su.study_key AND su.role = 2 AND su._fivetran_deleted = false
+      WHERE q.date_completed >= '2026-01-01' AND q.answer IS NOT NULL AND q.answer != ''
+      GROUP BY q.subject_visit_key, q.first_name, q.last_name
+      QUALIFY ROW_NUMBER() OVER (PARTITION BY q.subject_visit_key ORDER BY COUNT(*) DESC) = 1
+    ),
+    esource_inv AS (
+      SELECT q.subject_visit_key,
+        TRIM(CONCAT(COALESCE(q.first_name,''), ' ', COALESCE(q.last_name,''))) AS inv_name,
+        COUNT(*) AS questions_answered
+      FROM ${tbl('fact_subject_visit_procedure_question')} q
+      JOIN ${tbl('user')} u ON LOWER(TRIM(CONCAT(COALESCE(q.first_name,''), ' ', COALESCE(q.last_name,'')))) = LOWER(TRIM(CONCAT(u.first_name, ' ', u.last_name)))
+      JOIN ${tbl('study_user')} su ON u.user_key = su.user_key AND q.study_key = su.study_key AND su.role = 1 AND su._fivetran_deleted = false
+      WHERE q.date_completed >= '2026-01-01' AND q.answer IS NOT NULL AND q.answer != ''
+      GROUP BY q.subject_visit_key, q.first_name, q.last_name
+      QUALIFY ROW_NUMBER() OVER (PARTITION BY q.subject_visit_key ORDER BY COUNT(*) DESC) = 1
+    ),
+    assigned_coord AS (
+      SELECT ua.calendar_appointment_key,
+        CONCAT(u.first_name, ' ', u.last_name) AS coord_name
+      FROM ${tbl('user_appointment')} ua
+      JOIN ${tbl('study_user')} su ON ua.user_key = su.user_key AND ua.study_key = su.study_key AND su.role = 2
+      JOIN ${tbl('user')} u ON ua.user_key = u.user_key
+      WHERE ua._fivetran_deleted = false AND su._fivetran_deleted = false
+      QUALIFY ROW_NUMBER() OVER (PARTITION BY ua.calendar_appointment_key ORDER BY ua.date_created DESC) = 1
+    ),
+    assigned_inv AS (
+      SELECT ua.calendar_appointment_key,
+        CONCAT(u.first_name, ' ', u.last_name) AS inv_name
+      FROM ${tbl('user_appointment')} ua
+      JOIN ${tbl('study_user')} su ON ua.user_key = su.user_key AND ua.study_key = su.study_key AND su.role = 1
+      JOIN ${tbl('user')} u ON ua.user_key = u.user_key
+      WHERE ua._fivetran_deleted = false AND su._fivetran_deleted = false
+      QUALIFY ROW_NUMBER() OVER (PARTITION BY ua.calendar_appointment_key ORDER BY ua.date_created DESC) = 1
+    )
+    SELECT
+      COALESCE(ec.coord_name, ac.coord_name) AS coordinator,
+      COALESCE(ei.inv_name, ai.inv_name) AS investigator,
+      FORMAT_DATETIME('%Y-%m-%d', ca.start) AS visit_date,
+      FORMAT_DATETIME('%H:%M', ca.start) AS visit_time,
+      DATETIME_DIFF(ca.\`end\`, ca.start, MINUTE) AS duration_min,
+      ${STUDY_NAME_SQL} AS study_name,
+      COALESCE(sv.name, '') AS visit_name,
+      ${SUBJECT_NAME_SQL} AS subject_name,
+      COALESCE(sub.patient_id, '') AS subject_id,
+      COALESCE(si.name, '') AS site_name,
+      CASE svi.status
+        WHEN 22 THEN 'Complete' WHEN 23 THEN 'Outside CRIO'
+        WHEN 21 THEN 'Partially Complete' WHEN 11 THEN 'In Progress'
+        WHEN 12 THEN 'Paused' WHEN 1 THEN 'Unresolved'
+        WHEN 0 THEN 'Unresolved' ELSE 'Attended' END AS completion_status,
+      COALESCE(ec.questions_answered, 0) AS coord_esource_q,
+      COALESCE(ei.questions_answered, 0) AS inv_esource_q,
+      CASE WHEN ec.coord_name IS NOT NULL THEN 'esource' WHEN ac.coord_name IS NOT NULL THEN 'assigned' ELSE 'unattributed' END AS coord_attribution,
+      CASE WHEN ei.inv_name IS NOT NULL THEN 'esource' WHEN ai.inv_name IS NOT NULL THEN 'assigned' ELSE 'unattributed' END AS inv_attribution,
+      CAST(ca.study_key AS STRING) AS study_key,
+      CAST(ca.subject_key AS STRING) AS subject_key
+    FROM ${tbl('calendar_appointment')} ca
+    JOIN ${tbl('subject')} sub ON ca.subject_key = sub.subject_key AND sub._fivetran_deleted = false
+    JOIN ${tbl('study')} st ON ca.study_key = st.study_key
+    LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
+    LEFT JOIN ${tbl('site')} si ON ca.site_key = si.site_key
+    LEFT JOIN ${tbl('subject_visit')} svi ON ca.subject_visit_key = svi.subject_visit_key
+    LEFT JOIN ${tbl('study_visit')} sv ON svi.study_visit_key = sv.study_visit_key
+    LEFT JOIN esource_coord ec ON ca.subject_visit_key = ec.subject_visit_key
+    LEFT JOIN esource_inv ei ON ca.subject_visit_key = ei.subject_visit_key
+    LEFT JOIN assigned_coord ac ON ca.calendar_appointment_key = ac.calendar_appointment_key
+    LEFT JOIN assigned_inv ai ON ca.calendar_appointment_key = ai.calendar_appointment_key
+    WHERE ca.start >= '2026-01-01' AND ca.start < CURRENT_DATETIME()
+      AND ca.status != 0
+      AND ca._fivetran_deleted = false
+      AND ca.type IN (0, 1)
+      ${STUDY_FILTER_SQL}
+    ORDER BY ca.start DESC`
+  },
+
   // ── 12. Visit Compliance ──
   compliance: {
     query: () => `SELECT

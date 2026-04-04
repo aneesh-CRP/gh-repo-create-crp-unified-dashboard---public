@@ -56,6 +56,52 @@
 - `setHealthChip('dh-xxx', ...)` requires a matching `<span id="dh-xxx">` in the data health strip HTML
 - Call `_updateHealthButton()` after any render cycle that might change chip states
 
+## Performance Attribution — IRON-CLAD RULES (NEVER modify without explicit user approval)
+
+These feeds (`coordPerf`, `completedVisits`) drive performance reviews. **Do NOT change the attribution logic.**
+
+### Coordinator Credit (per visit)
+1. **eSource first**: Among users with `study_user.role=2` (coordinator) who answered eSource questions for this visit, pick the one with the **most answers**. Join: `fact_subject_visit_procedure_question` → `user` (by name) → `study_user` (role=2).
+2. **Fallback**: `user_appointment` role=2 assignment (calendar scheduling).
+3. **If neither** → "Unattributed" (flagged for review).
+
+### Investigator Credit (per visit)
+1. **eSource first**: Among users with `study_user.role=1` (investigator) who answered eSource questions, pick the one with the **most answers**.
+2. **Fallback**: `user_appointment` role=1 assignment.
+3. **If neither** → NULL.
+
+### Visit Status Categories
+- **Completed**: `subject_visit.status IN (22, 23)` — visit done
+- **Partially Complete**: `status=21` — visit done but eSource incomplete
+- **In Progress**: `status IN (11, 12)` — visit underway or paused
+- **Unresolved**: past date + `status IN (0, 1)` — needs attention, DO NOT count as "attended"
+- **Upcoming**: future date + appointment active
+- **Cancelled**: `calendar_appointment.status=0` (with cancel_type breakdown)
+
+### Cancel Type Attribution
+- `cancel_type=1` = No Show — **not** coordinator's fault
+- `cancel_type=2` = Site Cancelled — **not** coordinator's fault
+- `cancel_type=3` = Patient Cancelled
+- **Performance cancel rate** should use ONLY `patient_cancelled / total`
+
+### Why eSource-First
+The person who answered the most eSource questions for a visit is the one who actually conducted it. Calendar assignments can be wrong (reassigned but not updated, covering for someone). eSource is **proof of work**. Role filtering (`study_user.role`) ensures coordinators don't steal investigator credit and vice versa.
+
+### What NOT to Do
+- **NEVER** use `subject_visit_stats.coordinator_user_key` alone — it doesn't work for cancelled visits
+- **NEVER** use a single "top answerer" without role filtering — investigators and coordinators must be tracked separately
+- **NEVER** count `subject_visit.status IN (0, 1)` for past dates as "attended" — these are unresolved
+- **NEVER** use localStorage snapshots for performance numbers — BQ is the source of truth
+- **NEVER** modify the `coordPerf` or `completedVisits` SQL without explicit user approval
+
+### Two-System Architecture
+- **Operational** (schedule table, daily tracker): Uses `allVisitDetail.coord` from the visits feed. Fine for "who's seeing this patient today."
+- **Performance** (Performance Snapshot, Completed Visits audit): Uses `coordPerf`/`completedVisits` BQ feeds. These are the numbers that matter for reviews.
+
+### BQ Feeds
+- `?feed=coordPerf` — daily aggregates with role-based attribution, hours, cancel breakdown
+- `?feed=completedVisits` — per-visit detail with coordinator, investigator, eSource Q count, attribution method
+
 ## Audit Hotspots — check these areas first for "bugs data code" requests
 
 | Area | What to check |
