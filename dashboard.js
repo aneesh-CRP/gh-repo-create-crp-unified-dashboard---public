@@ -4855,6 +4855,7 @@ function computeCoordGoals() {
       d.patient_cancelled += parseInt(r.patient_cancelled) || 0;
       d.completed += parseInt(r.completed) || 0;
       if (r.site_name) d.site = r.site_name;
+      if (r.study_name) d.studies.add(r.study_name);
     });
     _log('computeCoordGoals: BQ-sourced — ' + window._coordPerfData.length + ' rows');
     return goals;
@@ -5767,7 +5768,7 @@ function renderInvCapacity() {
   if (goals._invByDay) {
     Object.keys(goals._invByDay).forEach(function(inv) {
       var byDay = goals._invByDay[inv];
-      var total = { active: 0, cancelled: 0, minutes: 0, no_shows: 0, site_cancelled: 0, patient_cancelled: 0, completed: 0, sites: new Set() };
+      var total = { active: 0, cancelled: 0, minutes: 0, no_shows: 0, site_cancelled: 0, patient_cancelled: 0, completed: 0, sites: new Set(), studies: new Set() };
       Object.keys(byDay).forEach(function(d) {
         if (d >= startISO && d <= endISO) {
           var v = byDay[d];
@@ -5775,8 +5776,10 @@ function renderInvCapacity() {
           total.no_shows += v.no_shows; total.site_cancelled += v.site_cancelled;
           total.patient_cancelled += v.patient_cancelled; total.completed += v.completed;
           if (v.site) total.sites.add(v.site);
+          if (v.studies) v.studies.forEach(function(s) { total.studies.add(s); });
         }
       });
+      total.studyCount = total.studies.size;
       if (total.active > 0 || total.cancelled > 0) _invFromBQ[inv] = total;
     });
   }
@@ -5814,7 +5817,7 @@ function renderInvCapacity() {
       var dayCount = daySet.size;
       var avgPerDay = workDays > 0 ? (bq.active / workDays).toFixed(1) : '0';
       var utilPct = workDays > 0 ? Math.min(100, Math.round(dayCount / workDays * 100)) : 0;
-      return { name:name, visits:bq.active, cancels:bq.cancelled, completed:bq.completed, noShows:bq.no_shows, siteCancelled:bq.site_cancelled, patientCancelled:bq.patient_cancelled, hours:Math.round(bq.minutes/60), avgPerDay:avgPerDay, dayCount:dayCount, utilPct:utilPct, studies:0, bqSourced:true };
+      return { name:name, visits:bq.active, cancels:bq.cancelled, completed:bq.completed, noShows:bq.no_shows, siteCancelled:bq.site_cancelled, patientCancelled:bq.patient_cancelled, hours:Math.round(bq.minutes/60), avgPerDay:avgPerDay, dayCount:dayCount, utilPct:utilPct, studies:bq.studyCount || 0, bqSourced:true };
     }
     // ── Fallback path ──
     var iv = visits.filter(function(v){return v.investigator===name;});
@@ -5853,9 +5856,11 @@ function renderInvCapacity() {
     var utilColor = inv.utilPct >= 80 ? '#059669' : inv.utilPct >= 50 ? '#FF9933' : '#94a3b8';
     html += '<tr style="border-bottom:1px solid #f1f5f9;cursor:pointer;" onclick="showInvDetail(\''+jsAttr(inv.name)+'\')">';
     html += '<td style="padding:8px;"><div style="font-weight:700;color:#1e293b;">'+escapeHTML(inv.name.split(' ')[0])+'</div></td>';
-    html += '<td style="padding:8px;"><div style="background:#e2e8f0;border-radius:5px;height:18px;overflow:hidden;position:relative;">';
+    html += '<td style="padding:8px;"><div style="display:flex;align-items:center;gap:6px;">';
+    html += '<div style="flex:1;background:#e2e8f0;border-radius:5px;height:18px;overflow:hidden;">';
     html += '<div style="height:100%;width:'+pct+'%;background:linear-gradient(90deg,#072061,#a78bfa);border-radius:5px;"></div>';
-    html += '<div style="position:absolute;left:8px;top:0;font-size:11px;font-weight:700;color:'+(pct>30?'#fff':'#1e293b')+';line-height:18px;">'+inv.visits+'</div>';
+    html += '</div>';
+    html += '<span style="font-size:12px;font-weight:700;color:#072061;min-width:28px;text-align:right;">'+inv.visits+'</span>';
     html += '</div></td>';
     html += '<td style="padding:8px;text-align:center;font-weight:700;color:'+utilColor+';">'+inv.utilPct+'%</td>';
     html += '<td style="padding:8px;text-align:center;font-weight:600;color:#475569;">'+inv.studies+'</td>';
