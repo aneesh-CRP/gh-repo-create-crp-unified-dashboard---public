@@ -18865,14 +18865,7 @@ function ptUpdateKPIs() {
 
 function ptApplyFilters() { ptRender(); }
 
-function ptSwitchView(view, btn) {
-  _ptData.view = view;
-  document.querySelectorAll('#pt-view-bar .sched-filter').forEach(function(b) {
-    b.style.background = 'var(--surface)'; b.style.color = 'var(--muted)'; b.style.borderColor = 'var(--border)';
-  });
-  if (btn) { btn.style.background = '#e8eeff'; btn.style.color = '#1843ad'; btn.style.borderColor = '#1843ad'; }
-  ptRender();
-}
+function ptSwitchView() {} // Legacy — single view now
 
 function ptRender() {
   var el = document.getElementById('pt-content');
@@ -18881,196 +18874,80 @@ function ptRender() {
   var f = ptGetFilters();
   var esc = escapeHTML;
   var fmt = function(v) { var n = parseFloat(v) || 0; return n < 0 ? '-$' + Math.abs(Math.round(n)).toLocaleString() : '$' + Math.round(n).toLocaleString(); };
+  var clickCell = function(val, label, detail) {
+    if (!val || val === '0' || val === '$0') return '<span style="color:#cbd5e1">—</span>';
+    return '<span style="font-weight:600;cursor:pointer;color:#1843AD;text-decoration:underline dotted" onclick="openModal(\'' + jsAttr(label) + '\',\'\',\'<div style=padding:16px;font-size:13px>' + jsAttr(detail) + '</div>\')">' + esc(String(val)) + '</span>';
+  };
 
-  if (_ptData.view === 'cash') {
-    var rows = (_ptData.payments || []).filter(function(r) {
-      if (!ptFilterRow(r, f, 'date_received')) return false;
-      if (f.status !== 'all' && (r.reconciliation_status || '') !== f.status) return false;
-      return true;
-    });
-    if (badge) badge.textContent = rows.length + ' payments';
-    var h = '<table style="width:100%;border-collapse:collapse;font-size:11px;"><thead><tr style="background:var(--surface2);border-bottom:2px solid var(--border);">';
-    h += '<th style="padding:6px 8px;text-align:left;position:sticky;top:0;z-index:1;background:var(--surface2);font-weight:700;">Date</th>';
-    h += '<th style="padding:6px 6px;text-align:left;position:sticky;top:0;z-index:1;background:var(--surface2);font-weight:700;">Payment #</th>';
-    h += '<th style="padding:6px 8px;text-align:left;position:sticky;top:0;z-index:1;background:var(--surface2);font-weight:700;">Study</th>';
-    h += '<th style="padding:6px 6px;text-align:left;position:sticky;top:0;z-index:1;background:var(--surface2);font-weight:700;">Sponsor</th>';
-    h += '<th style="padding:6px 6px;text-align:right;position:sticky;top:0;z-index:1;background:var(--surface2);font-weight:700;">Amount</th>';
-    h += '<th style="padding:6px 6px;text-align:center;position:sticky;top:0;z-index:1;background:var(--surface2);font-weight:700;">Method</th>';
-    h += '<th style="padding:6px 6px;text-align:right;position:sticky;top:0;z-index:1;background:var(--surface2);font-weight:700;">Reconciled</th>';
-    h += '<th style="padding:6px 6px;text-align:right;position:sticky;top:0;z-index:1;background:var(--surface2);font-weight:700;">Unreconciled</th>';
-    h += '<th style="padding:6px 6px;text-align:center;position:sticky;top:0;z-index:1;background:var(--surface2);font-weight:700;">Status</th>';
-    h += '<th style="padding:6px 6px;text-align:center;position:sticky;top:0;z-index:1;background:var(--surface2);font-weight:700;">Items</th>';
-    h += '</tr></thead><tbody>';
-    rows.forEach(function(r) {
-      var sc = r.reconciliation_status === 'Fully Reconciled' ? '#059669' : r.reconciliation_status === 'Partial' ? '#FF9933' : '#dc2626';
-      h += '<tr style="border-bottom:1px solid #f1f5f9;">';
-      h += '<td style="padding:5px 8px;font-weight:600;color:#1843AD;white-space:nowrap;">' + esc(r.date_received || '') + '</td>';
-      h += '<td style="padding:5px 6px;font-size:10px;color:#64748b;">' + esc(r.payment_number || '') + '</td>';
-      h += '<td style="padding:5px 8px;font-size:10px;">' + esc((r.study_name || '').substring(0, 35)) + '</td>';
-      h += '<td style="padding:5px 6px;font-size:10px;color:#64748b;">' + esc((r.sponsor || '').substring(0, 20)) + '</td>';
-      h += '<td style="padding:5px 6px;text-align:right;font-weight:700;">' + fmt(r.amount) + '</td>';
-      h += '<td style="padding:5px 6px;text-align:center;font-size:9px;">' + esc(r.payment_method || '') + '</td>';
-      h += '<td style="padding:5px 6px;text-align:right;color:#059669;font-weight:600;">' + fmt(r.reconciled_amount) + '</td>';
-      h += '<td style="padding:5px 6px;text-align:right;color:' + (parseFloat(r.unreconciled_amount) > 0.01 ? '#dc2626' : '#cbd5e1') + ';font-weight:600;">' + fmt(r.unreconciled_amount) + '</td>';
-      h += '<td style="padding:5px 6px;text-align:center;"><span style="font-size:9px;font-weight:700;padding:1px 4px;border-radius:3px;color:' + sc + ';">' + esc(r.reconciliation_status || '') + '</span></td>';
-      h += '<td style="padding:5px 6px;text-align:center;font-size:10px;color:#64748b;">' + (r.reconciled_items || 0) + '</td>';
-      h += '</tr>';
-    });
-    h += '</tbody></table>';
-    el.innerHTML = h;
-
-  } else if (_ptData.view === 'revenue') {
+  // Single flat table — all revenue items
+  {
     var rows = (_ptData.revenue || []).filter(function(r) {
-      if (!ptFilterRow(r, f, 'service_date')) return false;
-      if (f.status !== 'all' && (r.payment_status || '') !== f.status) return false;
-      if (f.type !== 'all' && !(r.revenue_type || '').includes(f.type)) return false;
+      if (!ptFilterRow(r, f, 'visit_date')) return false;
+      if (f.type !== 'all' && !(r.revenue_payment_type || '').includes(f.type)) return false;
+      if (f.status !== 'all') {
+        if (f.status === 'Outstanding' && r.payment_id !== 'Outstanding') return false;
+        if (f.status === 'Paid' && r.payment_id === 'Outstanding') return false;
+      }
       return true;
     });
-    if (badge) badge.textContent = rows.length + ' items';
-    var h = '<table style="width:100%;border-collapse:collapse;font-size:11px;"><thead><tr style="background:var(--surface2);border-bottom:2px solid var(--border);">';
-    h += '<th style="padding:6px 8px;text-align:left;position:sticky;top:0;z-index:1;background:var(--surface2);font-weight:700;">Service Date</th>';
-    h += '<th style="padding:6px 8px;text-align:left;position:sticky;top:0;z-index:1;background:var(--surface2);font-weight:700;">Study</th>';
-    h += '<th style="padding:6px 6px;text-align:center;position:sticky;top:0;z-index:1;background:var(--surface2);font-weight:700;">Type</th>';
-    h += '<th style="padding:6px 6px;text-align:right;position:sticky;top:0;z-index:1;background:var(--surface2);font-weight:700;">Earned</th>';
-    h += '<th style="padding:6px 6px;text-align:center;position:sticky;top:0;z-index:1;background:var(--surface2);font-weight:700;">Invoice #</th>';
-    h += '<th style="padding:6px 6px;text-align:center;position:sticky;top:0;z-index:1;background:var(--surface2);font-weight:700;">Inv Status</th>';
-    h += '<th style="padding:6px 6px;text-align:right;position:sticky;top:0;z-index:1;background:var(--surface2);font-weight:700;">Paid</th>';
-    h += '<th style="padding:6px 6px;text-align:right;position:sticky;top:0;z-index:1;background:var(--surface2);font-weight:700;">Outstanding</th>';
-    h += '<th style="padding:6px 6px;text-align:center;position:sticky;top:0;z-index:1;background:var(--surface2);font-weight:700;">Pay Status</th>';
-    h += '<th style="padding:6px 6px;text-align:center;position:sticky;top:0;z-index:1;background:var(--surface2);font-weight:700;">Payment #</th>';
+    if (badge) badge.textContent = rows.length + ' revenue items';
+    var th = function(label) { return '<th style="padding:5px 6px;text-align:left;position:sticky;top:0;z-index:1;background:var(--surface2);font-weight:700;font-size:10px;white-space:nowrap;">' + label + '</th>'; };
+    var thR = function(label) { return '<th style="padding:5px 6px;text-align:right;position:sticky;top:0;z-index:1;background:var(--surface2);font-weight:700;font-size:10px;white-space:nowrap;">' + label + '</th>'; };
+    var h = '<table style="width:100%;border-collapse:collapse;font-size:10px;"><thead><tr style="background:var(--surface2);border-bottom:2px solid var(--border);">';
+    h += th('#') + th('Site') + th('Study') + th('Patient ID') + th('Status') + th('Rev Pay Type') + th('Rev Type') + th('Item');
+    h += th('Visit Date') + th('Inv Sent') + th('Invoice #') + th('Type');
+    h += thR('Amount') + thR('VAT') + thR('Total Due');
+    h += th('Payment ID') + th('Payment #') + th('Pay Type') + th('Received');
     h += '</tr></thead><tbody>';
-    rows.forEach(function(r) {
-      var tColor = (r.revenue_type || '').includes('Invoice') ? '#1843AD' : (r.revenue_type || '').includes('Autopay') ? '#059669' : '#FF9933';
-      var psColor = r.payment_status === 'Paid' ? '#059669' : r.payment_status === 'Partial' ? '#FF9933' : '#dc2626';
-      h += '<tr style="border-bottom:1px solid #f1f5f9;">';
-      h += '<td style="padding:5px 8px;font-weight:600;color:#1843AD;white-space:nowrap;">' + esc(r.service_date || '') + '</td>';
-      h += '<td style="padding:5px 8px;font-size:10px;">' + esc((r.study_name || '').substring(0, 35)) + '</td>';
-      h += '<td style="padding:5px 6px;text-align:center;"><span style="font-size:9px;font-weight:700;color:' + tColor + ';">' + esc(r.revenue_type || '') + '</span></td>';
-      h += '<td style="padding:5px 6px;text-align:right;font-weight:700;">' + fmt(r.amount_earned) + '</td>';
-      h += '<td style="padding:5px 6px;text-align:center;font-size:10px;color:#64748b;">' + esc(r.invoice_number || '—') + '</td>';
-      h += '<td style="padding:5px 6px;text-align:center;font-size:9px;color:#64748b;">' + esc(r.invoice_status || '—') + '</td>';
-      h += '<td style="padding:5px 6px;text-align:right;color:#059669;font-weight:600;">' + fmt(r.amount_paid) + '</td>';
-      h += '<td style="padding:5px 6px;text-align:right;color:' + (parseFloat(r.amount_outstanding) > 0.01 ? '#dc2626' : '#cbd5e1') + ';font-weight:600;">' + fmt(r.amount_outstanding) + '</td>';
-      h += '<td style="padding:5px 6px;text-align:center;"><span style="font-size:9px;font-weight:700;color:' + psColor + ';">' + esc(r.payment_status || '') + '</span></td>';
-      h += '<td style="padding:5px 6px;text-align:center;font-size:10px;color:#64748b;">' + esc(r.payment_number || '—') + '</td>';
-      h += '</tr>';
-    });
-    h += '</tbody></table>';
-    el.innerHTML = h;
-
-  } else if (_ptData.view === 'study') {
-    var rows = (_ptData.studies || []).filter(function(r) { return ptFilterRow(r, f, ''); });
-    if (badge) badge.textContent = rows.length + ' studies';
-    var h = '<table style="width:100%;border-collapse:collapse;font-size:11px;"><thead><tr style="background:var(--surface2);border-bottom:2px solid var(--border);">';
-    h += '<th style="padding:6px 8px;text-align:left;position:sticky;top:0;z-index:1;background:var(--surface2);font-weight:700;">Study</th>';
-    h += '<th style="padding:6px 6px;text-align:left;position:sticky;top:0;z-index:1;background:var(--surface2);font-weight:700;">Sponsor</th>';
-    h += '<th style="padding:6px 4px;text-align:center;position:sticky;top:0;z-index:1;background:var(--surface2);font-weight:700;">Status</th>';
-    h += '<th style="padding:6px 6px;text-align:right;position:sticky;top:0;z-index:1;background:var(--surface2);font-weight:700;">Revenue</th>';
-    h += '<th style="padding:6px 6px;text-align:right;position:sticky;top:0;z-index:1;background:var(--surface2);font-weight:700;">Invoice</th>';
-    h += '<th style="padding:6px 6px;text-align:right;position:sticky;top:0;z-index:1;background:var(--surface2);font-weight:700;">Autopay</th>';
-    h += '<th style="padding:6px 6px;text-align:right;position:sticky;top:0;z-index:1;background:var(--surface2);font-weight:700;">Collected</th>';
-    h += '<th style="padding:6px 6px;text-align:right;position:sticky;top:0;z-index:1;background:var(--surface2);font-weight:700;">AR</th>';
-    h += '<th style="padding:6px 4px;text-align:center;position:sticky;top:0;z-index:1;background:var(--surface2);font-weight:700;">Rate</th>';
-    h += '<th style="padding:6px 6px;text-align:right;position:sticky;top:0;z-index:1;background:var(--surface2);font-weight:700;">Uninvoiced</th>';
-    h += '<th style="padding:6px 6px;text-align:right;position:sticky;top:0;z-index:1;background:var(--surface2);font-weight:700;">Stipends</th>';
-    h += '</tr></thead><tbody>';
-    var totals = { rev: 0, inv: 0, auto: 0, coll: 0, ar: 0, uninv: 0, stip: 0 };
-    rows.forEach(function(r) {
-      var rate = parseFloat(r.collection_rate) || 0;
-      var rateColor = rate >= 90 ? '#059669' : rate >= 70 ? '#FF9933' : '#dc2626';
-      var arVal = parseFloat(r.outstanding_ar) || 0;
-      totals.rev += parseFloat(r.total_revenue) || 0;
-      totals.inv += parseFloat(r.invoice_revenue) || 0;
-      totals.auto += parseFloat(r.autopay_revenue) || 0;
-      totals.coll += parseFloat(r.collected) || 0;
-      totals.ar += arVal;
-      totals.uninv += parseFloat(r.uninvoiced_amount) || 0;
-      totals.stip += parseFloat(r.stipend_total) || 0;
-      h += '<tr style="border-bottom:1px solid #f1f5f9;">';
-      h += '<td style="padding:5px 8px;font-weight:600;font-size:10px;">' + esc((r.study_name || '').substring(0, 40)) + '</td>';
-      h += '<td style="padding:5px 6px;font-size:10px;color:#64748b;">' + esc((r.sponsor || '').substring(0, 20)) + '</td>';
-      h += '<td style="padding:5px 4px;text-align:center;"><span style="font-size:8px;font-weight:700;padding:1px 4px;border-radius:3px;background:' + (r.study_status === 'Enrolling' ? '#05966920' : '#94a3b820') + ';color:' + (r.study_status === 'Enrolling' ? '#059669' : '#64748b') + ';">' + esc(r.study_status || '') + '</span></td>';
-      h += '<td style="padding:5px 6px;text-align:right;font-weight:700;">' + fmt(r.total_revenue) + '</td>';
-      h += '<td style="padding:5px 6px;text-align:right;color:#1843AD;">' + fmt(r.invoice_revenue) + '</td>';
-      h += '<td style="padding:5px 6px;text-align:right;color:#059669;">' + fmt(r.autopay_revenue) + '</td>';
-      h += '<td style="padding:5px 6px;text-align:right;color:#059669;font-weight:600;">' + fmt(r.collected) + '</td>';
-      h += '<td style="padding:5px 6px;text-align:right;color:' + (arVal > 0 ? '#dc2626' : arVal < 0 ? '#059669' : '#cbd5e1') + ';font-weight:600;">' + fmt(arVal) + '</td>';
-      h += '<td style="padding:5px 4px;text-align:center;font-weight:700;color:' + rateColor + ';">' + rate.toFixed(0) + '%</td>';
-      h += '<td style="padding:5px 6px;text-align:right;color:' + (parseFloat(r.uninvoiced_amount) > 0 ? '#FF9933' : '#cbd5e1') + ';">' + fmt(r.uninvoiced_amount) + '</td>';
-      h += '<td style="padding:5px 6px;text-align:right;color:#64748b;">' + fmt(r.stipend_total) + '</td>';
+    var totalAmt = 0, totalDue = 0;
+    rows.forEach(function(r, i) {
+      var isOutstanding = r.payment_id === 'Outstanding';
+      var outColor = '#dc2626';
+      var amtVal = parseFloat(r.amount) || 0;
+      totalAmt += amtVal;
+      totalDue += parseFloat(r.total_due) || 0;
+      // Clickable amount cell
+      var amtDetail = 'Study: ' + esc(r.study_name) + '\\nSponsor: ' + esc(r.sponsor) + '\\nDate: ' + esc(r.visit_date) + '\\nType: ' + esc(r.revenue_payment_type) + ' / ' + esc(r.revenue_type) + '\\nAmount: ' + fmt(r.amount);
+      if (!isOutstanding) amtDetail += '\\nPayment: #' + esc(r.payment_number) + ' received ' + esc(r.received_date) + ' via ' + esc(r.payment_type);
+      if (r.all_payment_numbers) amtDetail += '\\nAll payments for study: ' + esc(r.all_payment_numbers);
+      h += '<tr style="border-bottom:1px solid #f1f5f9;' + (isOutstanding ? 'background:#fefce8;' : '') + '">';
+      h += '<td style="padding:4px 6px;color:#94a3b8;font-size:9px;">' + (i+1) + '</td>';
+      h += '<td style="padding:4px 6px;font-size:9px;">' + esc((r.site_name||'').replace('Philadelphia, PA','PHL').replace('Pennington, NJ','PNJ')) + '</td>';
+      h += '<td style="padding:4px 6px;font-size:9px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + esc(r.study_name||'') + '">' + esc((r.study_name||'').substring(0,30)) + '</td>';
+      h += '<td style="padding:4px 6px;font-size:9px;color:#64748b;">' + esc(r.subject_patient_id || '—') + '</td>';
+      h += '<td style="padding:4px 6px;font-size:9px;">' + esc(r.subject_status || '') + '</td>';
+      h += '<td style="padding:4px 6px;font-size:9px;color:' + (r.revenue_payment_type === 'Invoice' ? '#1843AD' : '#059669') + ';font-weight:600;">' + esc(r.revenue_payment_type || '') + '</td>';
+      h += '<td style="padding:4px 6px;font-size:9px;">' + esc(r.revenue_type || '') + '</td>';
+      h += '<td style="padding:4px 6px;font-size:9px;color:#64748b;">' + esc(r.item || '—') + '</td>';
+      h += '<td style="padding:4px 6px;font-size:9px;font-weight:600;color:#1843AD;">' + esc(r.visit_date || '') + '</td>';
+      h += '<td style="padding:4px 6px;font-size:9px;">' + esc(r.invoice_sent_date || '—') + '</td>';
+      h += '<td style="padding:4px 6px;font-size:9px;cursor:pointer;color:#1843AD;text-decoration:underline dotted;" onclick="openModal(\'Invoice ' + jsAttr(r.invoice_number||'') + '\',\'' + jsAttr(r.study_name||'') + '\',\'<div style=padding:16px;font-size:13px>Invoice: ' + jsAttr(r.invoice_number||'N/A') + '<br>Sent: ' + jsAttr(r.invoice_sent_date||'Not sent') + '<br>Type: ' + jsAttr(r.type||'') + '<br>Amount: ' + jsAttr(fmt(r.amount)) + '</div>\')">' + esc(r.invoice_number || '—') + '</td>';
+      h += '<td style="padding:4px 6px;font-size:9px;">' + esc(r.type || '') + '</td>';
+      h += '<td style="padding:4px 6px;text-align:right;font-weight:600;cursor:pointer;color:#072061;" onclick="openModal(\'Revenue Detail\',\'' + jsAttr(r.study_name||'') + '\',\'<div style=padding:16px;font-size:13px;white-space:pre-line>' + jsAttr(amtDetail) + '</div>\')">' + fmt(r.amount) + '</td>';
+      h += '<td style="padding:4px 6px;text-align:right;color:#cbd5e1;">$0</td>';
+      h += '<td style="padding:4px 6px;text-align:right;font-weight:600;">' + fmt(r.total_due) + '</td>';
+      h += '<td style="padding:4px 6px;font-size:9px;color:' + (isOutstanding ? outColor : '#059669') + ';font-weight:' + (isOutstanding ? '700' : '400') + ';">' + esc(r.payment_id) + '</td>';
+      h += '<td style="padding:4px 6px;font-size:9px;color:' + (isOutstanding ? outColor : '#64748b') + ';font-weight:' + (isOutstanding ? '700' : '400') + ';cursor:' + (isOutstanding ? 'default' : 'pointer') + ';"' + (isOutstanding ? '' : ' onclick="openModal(\'Payment ' + jsAttr(r.payment_number) + '\',\'' + jsAttr(r.study_name||'') + '\',\'<div style=padding:16px;font-size:13px>Payment #' + jsAttr(r.payment_number) + '<br>Received: ' + jsAttr(r.received_date) + '<br>Type: ' + jsAttr(r.payment_type) + '<br>Study total paid: ' + jsAttr(fmt(r.study_total_paid)) + '<br>All payments: ' + jsAttr(r.all_payment_numbers||'') + '</div>\')"') + '>' + esc(r.payment_number) + '</td>';
+      h += '<td style="padding:4px 6px;font-size:9px;color:' + (isOutstanding ? outColor : '#64748b') + ';font-weight:' + (isOutstanding ? '700' : '400') + ';">' + esc(r.payment_type) + '</td>';
+      h += '<td style="padding:4px 6px;font-size:9px;color:' + (isOutstanding ? outColor : '#64748b') + ';font-weight:' + (isOutstanding ? '700' : '400') + ';">' + esc(r.received_date) + '</td>';
       h += '</tr>';
     });
     h += '<tr style="background:#f8fafc;border-top:2px solid var(--border);font-weight:700;">';
-    h += '<td style="padding:6px 8px;" colspan="3">TOTAL (' + rows.length + ' studies)</td>';
-    h += '<td style="padding:6px 6px;text-align:right;">' + fmt(totals.rev) + '</td>';
-    h += '<td style="padding:6px 6px;text-align:right;color:#1843AD;">' + fmt(totals.inv) + '</td>';
-    h += '<td style="padding:6px 6px;text-align:right;color:#059669;">' + fmt(totals.auto) + '</td>';
-    h += '<td style="padding:6px 6px;text-align:right;color:#059669;">' + fmt(totals.coll) + '</td>';
-    h += '<td style="padding:6px 6px;text-align:right;color:#dc2626;">' + fmt(totals.ar) + '</td>';
-    h += '<td style="padding:6px 4px;text-align:center;">' + (totals.rev > 0 ? (totals.coll/totals.rev*100).toFixed(0) + '%' : '—') + '</td>';
-    h += '<td style="padding:6px 6px;text-align:right;color:#FF9933;">' + fmt(totals.uninv) + '</td>';
-    h += '<td style="padding:6px 6px;text-align:right;">' + fmt(totals.stip) + '</td>';
-    h += '</tr></tbody></table>';
+    h += '<td colspan="12" style="padding:6px;">TOTAL (' + rows.length + ' items)</td>';
+    h += '<td style="padding:6px;text-align:right;">' + fmt(totalAmt) + '</td>';
+    h += '<td style="padding:6px;text-align:right;">$0</td>';
+    h += '<td style="padding:6px;text-align:right;">' + fmt(totalDue) + '</td>';
+    h += '<td colspan="4"></td></tr>';
+    h += '</tbody></table>';
     el.innerHTML = h;
-
-  } else if (_ptData.view === 'exceptions') {
-    var h = '';
-    // Unreconciled payments
-    var unrecon = (_ptData.payments || []).filter(function(r) { return r.reconciliation_status !== 'Fully Reconciled' && parseFloat(r.unreconciled_amount) > 1; });
-    h += '<div style="margin-bottom:16px;"><div style="font-size:13px;font-weight:700;color:#dc2626;margin-bottom:6px;">Unreconciled Payments (' + unrecon.length + ')</div>';
-    if (unrecon.length) {
-      h += '<table style="width:100%;border-collapse:collapse;font-size:11px;"><thead><tr style="background:#fef2f2;"><th style="padding:5px 8px;text-align:left;">Date</th><th style="padding:5px 6px;text-align:left;">Payment #</th><th style="padding:5px 8px;text-align:left;">Study</th><th style="padding:5px 6px;text-align:right;">Amount</th><th style="padding:5px 6px;text-align:right;">Unreconciled</th><th style="padding:5px 6px;text-align:center;">Status</th></tr></thead><tbody>';
-      unrecon.sort(function(a,b) { return parseFloat(b.unreconciled_amount) - parseFloat(a.unreconciled_amount); }).forEach(function(r) {
-        h += '<tr style="border-bottom:1px solid #fecaca;"><td style="padding:4px 8px;">' + esc(r.date_received) + '</td><td style="padding:4px 6px;font-size:10px;">' + esc(r.payment_number) + '</td><td style="padding:4px 8px;font-size:10px;">' + esc((r.study_name||'').substring(0,30)) + '</td><td style="padding:4px 6px;text-align:right;font-weight:600;">' + fmt(r.amount) + '</td><td style="padding:4px 6px;text-align:right;color:#dc2626;font-weight:700;">' + fmt(r.unreconciled_amount) + '</td><td style="padding:4px 6px;text-align:center;font-size:9px;color:#FF9933;font-weight:600;">' + esc(r.reconciliation_status) + '</td></tr>';
-      });
-      h += '</tbody></table>';
-    } else { h += '<p style="color:#059669;font-size:12px;">All payments fully reconciled.</p>'; }
-    h += '</div>';
-
-    // Uninvoiced revenue
-    var uninv = (_ptData.studies || []).filter(function(r) { return parseFloat(r.uninvoiced_amount) > 100; });
-    h += '<div style="margin-bottom:16px;"><div style="font-size:13px;font-weight:700;color:#FF9933;margin-bottom:6px;">Uninvoiced Revenue (' + uninv.length + ' studies)</div>';
-    if (uninv.length) {
-      h += '<table style="width:100%;border-collapse:collapse;font-size:11px;"><thead><tr style="background:#fffbeb;"><th style="padding:5px 8px;text-align:left;">Study</th><th style="padding:5px 6px;text-align:left;">Sponsor</th><th style="padding:5px 6px;text-align:right;">Uninvoiced</th><th style="padding:5px 6px;text-align:right;">Total Revenue</th></tr></thead><tbody>';
-      uninv.sort(function(a,b) { return parseFloat(b.uninvoiced_amount) - parseFloat(a.uninvoiced_amount); }).forEach(function(r) {
-        h += '<tr style="border-bottom:1px solid #fef3c7;"><td style="padding:4px 8px;font-size:10px;">' + esc((r.study_name||'').substring(0,35)) + '</td><td style="padding:4px 6px;font-size:10px;color:#64748b;">' + esc(r.sponsor||'') + '</td><td style="padding:4px 6px;text-align:right;color:#FF9933;font-weight:700;">' + fmt(r.uninvoiced_amount) + '</td><td style="padding:4px 6px;text-align:right;">' + fmt(r.total_revenue) + '</td></tr>';
-      });
-      h += '</tbody></table>';
-    } else { h += '<p style="color:#059669;font-size:12px;">All revenue invoiced.</p>'; }
-    h += '</div>';
-
-    // Low collection rate studies
-    var lowColl = (_ptData.studies || []).filter(function(r) { return parseFloat(r.total_revenue) > 5000 && parseFloat(r.collection_rate) < 50; });
-    h += '<div><div style="font-size:13px;font-weight:700;color:#1843AD;margin-bottom:6px;">Low Collection Rate (' + lowColl.length + ' studies under 50%)</div>';
-    if (lowColl.length) {
-      h += '<table style="width:100%;border-collapse:collapse;font-size:11px;"><thead><tr style="background:#eff6ff;"><th style="padding:5px 8px;text-align:left;">Study</th><th style="padding:5px 6px;text-align:right;">Revenue</th><th style="padding:5px 6px;text-align:right;">Collected</th><th style="padding:5px 6px;text-align:right;">AR</th><th style="padding:5px 4px;text-align:center;">Rate</th></tr></thead><tbody>';
-      lowColl.sort(function(a,b) { return parseFloat(a.collection_rate) - parseFloat(b.collection_rate); }).forEach(function(r) {
-        h += '<tr style="border-bottom:1px solid #dbeafe;"><td style="padding:4px 8px;font-size:10px;">' + esc((r.study_name||'').substring(0,35)) + '</td><td style="padding:4px 6px;text-align:right;">' + fmt(r.total_revenue) + '</td><td style="padding:4px 6px;text-align:right;color:#059669;">' + fmt(r.collected) + '</td><td style="padding:4px 6px;text-align:right;color:#dc2626;font-weight:600;">' + fmt(r.outstanding_ar) + '</td><td style="padding:4px 4px;text-align:center;font-weight:700;color:#dc2626;">' + parseFloat(r.collection_rate).toFixed(0) + '%</td></tr>';
-      });
-      h += '</tbody></table>';
-    } else { h += '<p style="color:#059669;font-size:12px;">All studies above 50% collection rate.</p>'; }
-    h += '</div>';
-    el.innerHTML = h;
-    if (badge) badge.textContent = unrecon.length + ' unreconciled, ' + uninv.length + ' uninvoiced, ' + lowColl.length + ' low collection';
   }
 }
 
 function ptExportCSV() {
   if (!_ptData.loaded) return;
-  var data, filename, headers;
-  if (_ptData.view === 'cash') {
-    data = _ptData.payments || [];
-    headers = ['date_received','payment_number','study_name','protocol_number','sponsor','amount','payment_method','reconciled_items','reconciled_amount','unreconciled_amount','reconciliation_status','site_name','study_status','comments'];
-    filename = 'payment-ledger';
-  } else if (_ptData.view === 'revenue') {
-    data = _ptData.revenue || [];
-    headers = ['service_date','study_name','protocol_number','sponsor','revenue_type','amount_earned','requires_invoice','is_invoiced','invoice_number','invoice_status','invoice_date','invoice_due_date','amount_paid','amount_outstanding','payment_status','payment_number','payment_date','days_to_collect','site_name','study_status'];
-    filename = 'revenue-ledger';
-  } else {
-    data = _ptData.studies || [];
-    headers = ['study_name','protocol_number','sponsor','study_status','site_name','total_revenue','invoice_revenue','autopay_revenue','holdback_revenue','invoiced_amount','uninvoiced_amount','collected','outstanding_ar','collection_rate','payment_count','total_payments','stipend_count','stipend_total','revenue_items'];
-    filename = 'study-finance-summary';
-  }
+  var data = _ptData.revenue || [];
+  var headers = ['site_name','study_name','subject_patient_id','subject_status','revenue_payment_type','revenue_type','item','visit_date','invoice_sent_date','invoice_number','type','amount','vat_amount','total_due','payment_id','payment_number','payment_type','received_date','sponsor','protocol_number','study_total_paid','all_payment_numbers'];
+  var filename = 'all-revenue-tracker';
   var csv = headers.join(',') + '\n';
   data.forEach(function(r) {
     csv += headers.map(function(h) { var v = String(r[h] == null ? '' : r[h]).replace(/"/g, '""'); return v.includes(',') || v.includes('"') || v.includes('\n') ? '"' + v + '"' : v; }).join(',') + '\n';
@@ -19082,22 +18959,11 @@ function ptExportCSV() {
 }
 
 function ptExportExcel() {
-  // Excel export via CSV with BOM for proper encoding
   if (!_ptData.loaded) return;
-  var data, filename, headers;
-  if (_ptData.view === 'cash') {
-    data = _ptData.payments || []; filename = 'payment-ledger';
-    headers = ['Date Received','Payment #','Study','Protocol','Sponsor','Amount','Method','Reconciled Items','Reconciled Amount','Unreconciled','Status','Site','Study Status','Comments'];
-    var keys = ['date_received','payment_number','study_name','protocol_number','sponsor','amount','payment_method','reconciled_items','reconciled_amount','unreconciled_amount','reconciliation_status','site_name','study_status','comments'];
-  } else if (_ptData.view === 'revenue') {
-    data = _ptData.revenue || []; filename = 'revenue-ledger';
-    headers = ['Service Date','Study','Protocol','Sponsor','Revenue Type','Amount Earned','Requires Invoice','Invoiced','Invoice #','Invoice Status','Invoice Date','Due Date','Amount Paid','Outstanding','Payment Status','Payment #','Payment Date','Days to Collect','Site','Study Status'];
-    var keys = ['service_date','study_name','protocol_number','sponsor','revenue_type','amount_earned','requires_invoice','is_invoiced','invoice_number','invoice_status','invoice_date','invoice_due_date','amount_paid','amount_outstanding','payment_status','payment_number','payment_date','days_to_collect','site_name','study_status'];
-  } else {
-    data = _ptData.studies || []; filename = 'study-finance-summary';
-    headers = ['Study','Protocol','Sponsor','Status','Site','Total Revenue','Invoice Revenue','Autopay Revenue','Holdback','Invoiced','Uninvoiced','Collected','Outstanding AR','Collection Rate %','Payments','Total Payments','Stipend Count','Stipend Total','Revenue Items'];
-    var keys = ['study_name','protocol_number','sponsor','study_status','site_name','total_revenue','invoice_revenue','autopay_revenue','holdback_revenue','invoiced_amount','uninvoiced_amount','collected','outstanding_ar','collection_rate','payment_count','total_payments','stipend_count','stipend_total','revenue_items'];
-  }
+  var data = _ptData.revenue || [];
+  var filename = 'all-revenue-tracker';
+  var headers = ['Site Name','Study Name','Patient ID','Status','Revenue Pay Type','Revenue Type','Item','Visit Date','Invoice Sent Date','Invoice Number','Type','Amount','VAT Amount','Total Due','Payment ID','Payment Number','Payment Type','Received Date','Sponsor','Protocol','Study Total Paid','All Payment Numbers'];
+  var keys = ['site_name','study_name','subject_patient_id','subject_status','revenue_payment_type','revenue_type','item','visit_date','invoice_sent_date','invoice_number','type','amount','vat_amount','total_due','payment_id','payment_number','payment_type','received_date','sponsor','protocol_number','study_total_paid','all_payment_numbers'];
   // TSV with BOM — Excel opens this correctly with proper encoding
   var bom = '\uFEFF';
   var tsv = bom + headers.join('\t') + '\n';

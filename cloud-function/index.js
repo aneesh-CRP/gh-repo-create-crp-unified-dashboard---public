@@ -1287,7 +1287,7 @@ const FEEDS = {
     JOIN ${tbl('gaap_revenue_group')} rg ON rdp.group_id = rg.group_id
     JOIN ${tbl('study')} st ON rg.study_id = st.external_id
     LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
-    LEFT JOIN reconciled rec ON CAST(rdp.revenue_data_point_id AS STRING) = rec.rdp_id
+    LEFT JOIN recon_by_rdp rec ON CAST(rdp.revenue_data_point_id AS STRING) = rec.rdp_id
     WHERE rdp.amount > COALESCE(rec.paid, 0)
     GROUP BY st.study_key, study_name, spon.name, st.protocol_number
     HAVING total_ar > 0
@@ -1978,58 +1978,53 @@ const FEEDS = {
     ORDER BY gp.date_received DESC`
   },
 
-  // ── PT2. Revenue Ledger — every revenue event with invoice & payment status ──
-  // NOTE: gaap_reconciliation.revenue_data_point_id may have type mismatch with
-  // gaap_revenue_data_point.revenue_data_point_id. Use CAST to ensure STRING match.
+  // ── PT2. Revenue Ledger — comprehensive single-spreadsheet tracker ──
+  // 18 columns matching bookkeeper spec. One row per revenue item.
+  // Columns 15-18 show "Outstanding" when payment not received.
   revenueLedger: {
     query: () => `WITH
-    reconciled AS (
-      SELECT CAST(revenue_data_point_id AS STRING) AS rdp_id,
-        ROUND(SUM(CAST(amount AS FLOAT64)), 2) AS paid,
-        MIN(payment_id) AS first_payment_id
-      FROM ${tbl('gaap_reconciliation')}
-      GROUP BY CAST(revenue_data_point_id AS STRING)
-    ),
-    payment_dates AS (
-      SELECT payment_id, FORMAT_DATETIME('%Y-%m-%d', date_received) AS payment_date, payment_number
-      FROM ${tbl('gaap_payment')}
+    -- Payment summary per study (since revenue→reconciliation UUID join is broken in BQ)
+    study_payments AS (
+      SELECT gp.study_id,
+        COUNT(*) AS payment_count,
+        ROUND(SUM(CAST(gp.amount AS FLOAT64)), 2) AS total_paid,
+        MAX(gp.payment_number) AS last_payment_number,
+        MAX(FORMAT_DATETIME('%Y-%m-%d', gp.date_received)) AS last_received_date,
+        MAX(CASE gp.type WHEN 1 THEN 'Check' WHEN 2 THEN 'ACH' WHEN 3 THEN 'Card' WHEN 4 THEN 'Credit Memo' WHEN 5 THEN 'Refund' ELSE 'Other' END) AS last_payment_type,
+        STRING_AGG(DISTINCT CAST(gp.payment_number AS STRING), ', ' ORDER BY CAST(gp.payment_number AS STRING)) AS all_payment_numbers
+      FROM ${tbl('gaap_payment')} gp
+      WHERE gp.date_received >= '2025-01-01'
+      GROUP BY gp.study_id
     )
     SELECT
-      FORMAT_DATETIME('%Y-%m-%d', rdp.service_date) AS service_date,
-      FORMAT_DATETIME('%Y-%m', DATE(rdp.service_date)) AS service_month,
-      CAST(st.study_key AS STRING) AS study_key,
+      COALESCE(si.name, si2.name, '') AS site_name,
       ${STUDY_NAME_SQL} AS study_name,
+      '' AS subject_patient_id,
+      ${STUDY_STATUS_SQL} AS subject_status,
+      CASE WHEN rg.requires_invoice = true THEN 'Invoice' ELSE 'Autopay' END AS revenue_payment_type,
+      CASE rg.amount_type WHEN 1 THEN 'Upfront' WHEN 2 THEN 'Holdback' ELSE 'Revenue' END AS revenue_type,
+      '' AS item,
+      FORMAT_DATETIME('%Y-%m-%d', rdp.service_date) AS visit_date,
+      COALESCE(FORMAT_DATETIME('%Y-%m-%d', gi.date_sent), '') AS invoice_sent_date,
+      COALESCE(CAST(gi.invoice_number AS STRING), '') AS invoice_number,
+      CASE
+        WHEN rg.requires_invoice = false THEN 'Autopay'
+        WHEN gi.invoice_number IS NULL THEN 'Not Invoiced'
+        ELSE CASE gi.status WHEN 0 THEN 'Draft' WHEN 1 THEN 'Unpaid' WHEN 2 THEN 'Paid' WHEN 3 THEN 'Partially Paid' ELSE 'Unknown' END
+      END AS type,
+      ROUND(CAST(rdp.amount AS FLOAT64), 2) AS amount,
+      0 AS vat_amount,
+      ROUND(CAST(rdp.amount AS FLOAT64), 2) AS total_due,
+      CASE WHEN sp.total_paid > 0 THEN CAST(sp.payment_count AS STRING) ELSE 'Outstanding' END AS payment_id,
+      CASE WHEN sp.total_paid > 0 THEN sp.last_payment_number ELSE 'Outstanding' END AS payment_number,
+      CASE WHEN sp.total_paid > 0 THEN sp.last_payment_type ELSE 'Outstanding' END AS payment_type,
+      CASE WHEN sp.total_paid > 0 THEN sp.last_received_date ELSE 'Outstanding' END AS received_date,
+      CAST(st.study_key AS STRING) AS study_key,
       COALESCE(st.protocol_number, '') AS protocol_number,
       COALESCE(spon.name, '') AS sponsor,
-      CASE
-        WHEN rg.requires_invoice = true AND rg.amount_type = 1 THEN 'Invoice - Upfront'
-        WHEN rg.requires_invoice = true AND rg.amount_type = 2 THEN 'Invoice - Holdback'
-        WHEN rg.requires_invoice = true THEN 'Invoice Revenue'
-        WHEN rg.requires_invoice = false AND rg.amount_type = 2 THEN 'Autopay - Holdback'
-        WHEN rg.requires_invoice = false THEN 'Autopay Revenue'
-        ELSE 'Other'
-      END AS revenue_type,
-      ROUND(CAST(rdp.amount AS FLOAT64), 2) AS amount_earned,
-      rg.requires_invoice,
-      CASE WHEN rg.invoice_item_id IS NOT NULL THEN true ELSE false END AS is_invoiced,
-      COALESCE(gi.invoice_number, '') AS invoice_number,
-      CASE gi.status WHEN 0 THEN 'Draft' WHEN 1 THEN 'Unpaid' WHEN 2 THEN 'Paid' WHEN 3 THEN 'Partially Paid' ELSE '' END AS invoice_status,
-      FORMAT_DATETIME('%Y-%m-%d', gi.date_created) AS invoice_date,
-      FORMAT_DATETIME('%Y-%m-%d', gi.date_due) AS invoice_due_date,
-      COALESCE(rec.paid, 0) AS amount_paid,
-      ROUND(CAST(rdp.amount AS FLOAT64) - COALESCE(rec.paid, 0), 2) AS amount_outstanding,
-      CASE
-        WHEN rec.paid IS NULL OR rec.paid = 0 THEN 'Unpaid'
-        WHEN ABS(CAST(rdp.amount AS FLOAT64) - rec.paid) < 0.01 THEN 'Paid'
-        ELSE 'Partial'
-      END AS payment_status,
-      COALESCE(pd.payment_number, '') AS payment_number,
-      COALESCE(pd.payment_date, '') AS payment_date,
-      CASE WHEN pd.payment_date IS NOT NULL AND rdp.service_date IS NOT NULL
-        THEN DATE_DIFF(DATE(pd.payment_date), DATE(rdp.service_date), DAY)
-        ELSE NULL END AS days_to_collect,
-      COALESCE(si.name, '') AS site_name,
-      ${STUDY_STATUS_SQL} AS study_status
+      COALESCE(sp.total_paid, 0) AS study_total_paid,
+      COALESCE(sp.payment_count, 0) AS study_payment_count,
+      COALESCE(sp.all_payment_numbers, '') AS all_payment_numbers
     FROM ${tbl('gaap_revenue_data_point')} rdp
     JOIN ${tbl('gaap_revenue_group')} rg ON rdp.group_id = rg.group_id
     JOIN ${tbl('study')} st ON rg.study_id = st.external_id
@@ -2037,8 +2032,8 @@ const FEEDS = {
     LEFT JOIN ${tbl('gaap_invoice_item')} gii ON rg.invoice_item_id = gii.invoice_item_id AND gii.is_active = true
     LEFT JOIN ${tbl('gaap_invoice')} gi ON gii.invoice_id = gi.invoice_id
     LEFT JOIN ${tbl('site')} si ON CAST(si.site_key AS STRING) = gi.site_id
-    LEFT JOIN reconciled rec ON CAST(rdp.revenue_data_point_id AS STRING) = rec.rdp_id
-    LEFT JOIN payment_dates pd ON rec.first_payment_id = pd.payment_id
+    LEFT JOIN ${tbl('site')} si2 ON st.site_key = si2.site_key
+    LEFT JOIN study_payments sp ON rg.study_id = sp.study_id
     WHERE rg.type NOT IN (6, 7)
       AND rdp.service_date >= '2025-01-01'
     ORDER BY rdp.service_date DESC`
