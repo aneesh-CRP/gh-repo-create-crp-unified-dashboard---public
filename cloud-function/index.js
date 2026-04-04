@@ -1270,9 +1270,9 @@ const FEEDS = {
   gaapAging: {
     query: () => `WITH
       reconciled AS (
-        SELECT revenue_data_point_id, SUM(amount) AS paid
+        SELECT CAST(revenue_data_point_id AS STRING) AS rdp_id, SUM(amount) AS paid
         FROM ${tbl('gaap_reconciliation')}
-        GROUP BY revenue_data_point_id
+        GROUP BY CAST(revenue_data_point_id AS STRING)
       )
     SELECT
       CAST(st.study_key AS STRING) AS study_key,
@@ -1287,7 +1287,7 @@ const FEEDS = {
     JOIN ${tbl('gaap_revenue_group')} rg ON rdp.group_id = rg.group_id
     JOIN ${tbl('study')} st ON rg.study_id = st.external_id
     LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
-    LEFT JOIN reconciled rec ON rdp.revenue_data_point_id = rec.revenue_data_point_id
+    LEFT JOIN reconciled rec ON CAST(rdp.revenue_data_point_id AS STRING) = rec.rdp_id
     WHERE rdp.amount > COALESCE(rec.paid, 0)
     GROUP BY st.study_key, study_name, spon.name, st.protocol_number
     HAVING total_ar > 0
@@ -1925,6 +1925,190 @@ const FEEDS = {
     LEFT JOIN ${tbl('site')} si ON sp.site_key = si.site_key
     WHERE st.is_active = 1 AND sp._fivetran_deleted = false
     ORDER BY sp.payment_date DESC`
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // PAYMENT TRACKER FEEDS — Comprehensive financial audit trail (2025+2026)
+  // ALL studies including closed. No is_active filter. No STUDY_FILTER_SQL.
+  // For bookkeeper/CFO use — locked tab.
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  // ── PT1. Payment Ledger — every payment received with reconciliation detail ──
+  paymentLedger: {
+    query: () => `WITH
+    reconciled AS (
+      SELECT gr.payment_id,
+        COUNT(*) AS recon_items,
+        ROUND(SUM(CAST(gr.amount AS FLOAT64)), 2) AS recon_amount,
+        ARRAY_AGG(STRUCT(
+          gr.revenue_data_point_id,
+          ROUND(CAST(gr.amount AS FLOAT64), 2) AS amount
+        )) AS recon_detail
+      FROM ${tbl('gaap_reconciliation')} gr
+      GROUP BY gr.payment_id
+    )
+    SELECT
+      FORMAT_DATETIME('%Y-%m-%d', gp.date_received) AS date_received,
+      FORMAT_DATETIME('%Y-%m-%d', gp.date_issued) AS date_issued,
+      gp.payment_number,
+      CAST(gp.payment_id AS STRING) AS payment_id,
+      CAST(st.study_key AS STRING) AS study_key,
+      ${STUDY_NAME_SQL} AS study_name,
+      COALESCE(st.protocol_number, '') AS protocol_number,
+      COALESCE(spon.name, '') AS sponsor,
+      ROUND(CAST(gp.amount AS FLOAT64), 2) AS amount,
+      CASE gp.type WHEN 1 THEN 'Check' WHEN 2 THEN 'ACH/Direct Deposit' WHEN 3 THEN 'Credit/Debit Card' WHEN 4 THEN 'Credit Memo' WHEN 5 THEN 'Refund' ELSE 'Other (' || CAST(gp.type AS STRING) || ')' END AS payment_method,
+      COALESCE(rec.recon_items, 0) AS reconciled_items,
+      COALESCE(rec.recon_amount, 0) AS reconciled_amount,
+      ROUND(CAST(gp.amount AS FLOAT64) - COALESCE(rec.recon_amount, 0), 2) AS unreconciled_amount,
+      CASE
+        WHEN rec.recon_amount IS NULL OR rec.recon_amount = 0 THEN 'Unreconciled'
+        WHEN ABS(CAST(gp.amount AS FLOAT64) - rec.recon_amount) < 0.01 THEN 'Fully Reconciled'
+        ELSE 'Partial'
+      END AS reconciliation_status,
+      COALESCE(si.name, '') AS site_name,
+      COALESCE(gp.comments, '') AS comments,
+      ${STUDY_STATUS_SQL} AS study_status
+    FROM ${tbl('gaap_payment')} gp
+    JOIN ${tbl('study')} st ON gp.study_id = st.external_id
+    LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
+    LEFT JOIN ${tbl('site')} si ON CAST(si.site_key AS STRING) = gp.site_id
+    LEFT JOIN reconciled rec ON gp.payment_id = rec.payment_id
+    WHERE gp.date_received >= '2025-01-01'
+    ORDER BY gp.date_received DESC`
+  },
+
+  // ── PT2. Revenue Ledger — every revenue event with invoice & payment status ──
+  // NOTE: gaap_reconciliation.revenue_data_point_id may have type mismatch with
+  // gaap_revenue_data_point.revenue_data_point_id. Use CAST to ensure STRING match.
+  revenueLedger: {
+    query: () => `WITH
+    reconciled AS (
+      SELECT CAST(revenue_data_point_id AS STRING) AS rdp_id,
+        ROUND(SUM(CAST(amount AS FLOAT64)), 2) AS paid,
+        MIN(payment_id) AS first_payment_id
+      FROM ${tbl('gaap_reconciliation')}
+      GROUP BY CAST(revenue_data_point_id AS STRING)
+    ),
+    payment_dates AS (
+      SELECT payment_id, FORMAT_DATETIME('%Y-%m-%d', date_received) AS payment_date, payment_number
+      FROM ${tbl('gaap_payment')}
+    )
+    SELECT
+      FORMAT_DATETIME('%Y-%m-%d', rdp.service_date) AS service_date,
+      FORMAT_DATETIME('%Y-%m', DATE(rdp.service_date)) AS service_month,
+      CAST(st.study_key AS STRING) AS study_key,
+      ${STUDY_NAME_SQL} AS study_name,
+      COALESCE(st.protocol_number, '') AS protocol_number,
+      COALESCE(spon.name, '') AS sponsor,
+      CASE
+        WHEN rg.requires_invoice = true AND rg.amount_type = 1 THEN 'Invoice - Upfront'
+        WHEN rg.requires_invoice = true AND rg.amount_type = 2 THEN 'Invoice - Holdback'
+        WHEN rg.requires_invoice = true THEN 'Invoice Revenue'
+        WHEN rg.requires_invoice = false AND rg.amount_type = 2 THEN 'Autopay - Holdback'
+        WHEN rg.requires_invoice = false THEN 'Autopay Revenue'
+        ELSE 'Other'
+      END AS revenue_type,
+      ROUND(CAST(rdp.amount AS FLOAT64), 2) AS amount_earned,
+      rg.requires_invoice,
+      CASE WHEN rg.invoice_item_id IS NOT NULL THEN true ELSE false END AS is_invoiced,
+      COALESCE(gi.invoice_number, '') AS invoice_number,
+      CASE gi.status WHEN 0 THEN 'Draft' WHEN 1 THEN 'Unpaid' WHEN 2 THEN 'Paid' WHEN 3 THEN 'Partially Paid' ELSE '' END AS invoice_status,
+      FORMAT_DATETIME('%Y-%m-%d', gi.date_created) AS invoice_date,
+      FORMAT_DATETIME('%Y-%m-%d', gi.date_due) AS invoice_due_date,
+      COALESCE(rec.paid, 0) AS amount_paid,
+      ROUND(CAST(rdp.amount AS FLOAT64) - COALESCE(rec.paid, 0), 2) AS amount_outstanding,
+      CASE
+        WHEN rec.paid IS NULL OR rec.paid = 0 THEN 'Unpaid'
+        WHEN ABS(CAST(rdp.amount AS FLOAT64) - rec.paid) < 0.01 THEN 'Paid'
+        ELSE 'Partial'
+      END AS payment_status,
+      COALESCE(pd.payment_number, '') AS payment_number,
+      COALESCE(pd.payment_date, '') AS payment_date,
+      CASE WHEN pd.payment_date IS NOT NULL AND rdp.service_date IS NOT NULL
+        THEN DATE_DIFF(DATE(pd.payment_date), DATE(rdp.service_date), DAY)
+        ELSE NULL END AS days_to_collect,
+      COALESCE(si.name, '') AS site_name,
+      ${STUDY_STATUS_SQL} AS study_status
+    FROM ${tbl('gaap_revenue_data_point')} rdp
+    JOIN ${tbl('gaap_revenue_group')} rg ON rdp.group_id = rg.group_id
+    JOIN ${tbl('study')} st ON rg.study_id = st.external_id
+    LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
+    LEFT JOIN ${tbl('gaap_invoice_item')} gii ON rg.invoice_item_id = gii.invoice_item_id AND gii.is_active = true
+    LEFT JOIN ${tbl('gaap_invoice')} gi ON gii.invoice_id = gi.invoice_id
+    LEFT JOIN ${tbl('site')} si ON CAST(si.site_key AS STRING) = gi.site_id
+    LEFT JOIN reconciled rec ON CAST(rdp.revenue_data_point_id AS STRING) = rec.rdp_id
+    LEFT JOIN payment_dates pd ON rec.first_payment_id = pd.payment_id
+    WHERE rg.type NOT IN (6, 7)
+      AND rdp.service_date >= '2025-01-01'
+    ORDER BY rdp.service_date DESC`
+  },
+
+  // ── PT3. Study Finance Full — per-study summary, ALL studies (active + closed) ──
+  studyFinanceFull: {
+    query: () => `WITH
+    rev AS (
+      SELECT
+        rg.study_id,
+        ROUND(SUM(CASE WHEN rg.type NOT IN (6,7) THEN CAST(rdp.amount AS FLOAT64) ELSE 0 END), 2) AS total_revenue,
+        ROUND(SUM(CASE WHEN rg.requires_invoice = true THEN CAST(rdp.amount AS FLOAT64) ELSE 0 END), 2) AS invoice_revenue,
+        ROUND(SUM(CASE WHEN rg.requires_invoice = false THEN CAST(rdp.amount AS FLOAT64) ELSE 0 END), 2) AS autopay_revenue,
+        ROUND(SUM(CASE WHEN rg.amount_type = 2 AND rg.type NOT IN (6,7) THEN CAST(rdp.amount AS FLOAT64) ELSE 0 END), 2) AS holdback_revenue,
+        ROUND(SUM(CASE WHEN rg.invoice_item_id IS NOT NULL THEN CAST(rdp.amount AS FLOAT64) ELSE 0 END), 2) AS invoiced_amount,
+        ROUND(SUM(CASE WHEN rg.requires_invoice = true AND rg.invoice_item_id IS NULL THEN CAST(rdp.amount AS FLOAT64) ELSE 0 END), 2) AS uninvoiced_amount,
+        COUNT(DISTINCT rdp.revenue_data_point_id) AS line_items
+      FROM ${tbl('gaap_revenue_data_point')} rdp
+      JOIN ${tbl('gaap_revenue_group')} rg ON rdp.group_id = rg.group_id
+      WHERE rdp.service_date >= '2025-01-01'
+      GROUP BY rg.study_id
+    ),
+    pmt AS (
+      SELECT gp.study_id,
+        COUNT(*) AS payment_count,
+        ROUND(SUM(CAST(gp.amount AS FLOAT64)), 2) AS total_payments,
+        ROUND(SUM(COALESCE((SELECT SUM(CAST(gr.amount AS FLOAT64)) FROM ${tbl('gaap_reconciliation')} gr WHERE gr.payment_id = gp.payment_id), 0)), 2) AS total_reconciled
+      FROM ${tbl('gaap_payment')} gp
+      WHERE gp.date_received >= '2025-01-01'
+      GROUP BY gp.study_id
+    ),
+    stip AS (
+      SELECT CAST(sp.study_key AS STRING) AS study_key_str,
+        COUNT(*) AS stipend_count,
+        ROUND(SUM(CAST(sp.amount AS FLOAT64)), 2) AS stipend_total
+      FROM ${tbl('subject_payment')} sp
+      WHERE sp.is_active = 1 AND sp.is_paid = 1 AND sp.payment_date >= '2025-01-01'
+      GROUP BY sp.study_key
+    )
+    SELECT
+      CAST(st.study_key AS STRING) AS study_key,
+      ${STUDY_NAME_SQL} AS study_name,
+      COALESCE(st.protocol_number, '') AS protocol_number,
+      COALESCE(spon.name, '') AS sponsor,
+      ${STUDY_STATUS_SQL} AS study_status,
+      COALESCE(si.name, '') AS site_name,
+      COALESCE(rev.total_revenue, 0) AS total_revenue,
+      COALESCE(rev.invoice_revenue, 0) AS invoice_revenue,
+      COALESCE(rev.autopay_revenue, 0) AS autopay_revenue,
+      COALESCE(rev.holdback_revenue, 0) AS holdback_revenue,
+      COALESCE(rev.invoiced_amount, 0) AS invoiced_amount,
+      COALESCE(rev.uninvoiced_amount, 0) AS uninvoiced_amount,
+      COALESCE(pmt.total_reconciled, 0) AS collected,
+      ROUND(COALESCE(rev.total_revenue, 0) - COALESCE(pmt.total_reconciled, 0), 2) AS outstanding_ar,
+      CASE WHEN COALESCE(rev.total_revenue, 0) > 0 THEN ROUND(COALESCE(pmt.total_reconciled, 0) / rev.total_revenue * 100, 1) ELSE 0 END AS collection_rate,
+      0 AS avg_days_outstanding,
+      COALESCE(rev.line_items, 0) AS revenue_items,
+      COALESCE(pmt.payment_count, 0) AS payment_count,
+      COALESCE(pmt.total_payments, 0) AS total_payments,
+      COALESCE(stip.stipend_count, 0) AS stipend_count,
+      COALESCE(stip.stipend_total, 0) AS stipend_total
+    FROM ${tbl('study')} st
+    LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
+    LEFT JOIN ${tbl('site')} si ON st.site_key = si.site_key
+    LEFT JOIN rev ON st.external_id = rev.study_id
+    LEFT JOIN pmt ON st.external_id = pmt.study_id
+    LEFT JOIN stip ON CAST(st.study_key AS STRING) = stip.study_key_str
+    WHERE (COALESCE(rev.total_revenue, 0) > 0 OR COALESCE(pmt.total_payments, 0) > 0 OR COALESCE(stip.stipend_total, 0) > 0)
+    ORDER BY COALESCE(rev.total_revenue, 0) DESC`
   },
 
   // ── 48. eReg Pending Documents (assigned subject documents awaiting action) ──
