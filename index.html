@@ -11726,8 +11726,10 @@ function processLiveData(allRows, legacyCancels, auditLog) {
     marchTotal,
     aprilTotal,
     allVisitDetail: activeUpcoming.sort((a,b) => {
-      const da = parseDate(a['Scheduled Date']||''), db = parseDate(b['Scheduled Date']||'');
-      return (da||0) - (db||0);
+      const da = a['Scheduled Date']||'', db = b['Scheduled Date']||'';
+      if (da !== db) return da < db ? -1 : 1;
+      const ta = a['Scheduled Time']||a['scheduled_time']||'00:00', tb = b['Scheduled Time']||b['scheduled_time']||'00:00';
+      return ta < tb ? -1 : ta > tb ? 1 : 0;
     }).map(r => {
       const sk = r['Study Key'], subk = r['Subject Key (Back End)'];
       const d = parseDate(r['Scheduled Date']||'');
