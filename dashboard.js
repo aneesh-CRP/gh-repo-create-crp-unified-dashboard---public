@@ -378,7 +378,7 @@ const CRP_CONFIG = {
     FACEBOOK_CRM_URL: null, // FB leads now sourced from BQ recruiting feed
     // Meta Marketing API — live campaign insights (token expires ~60 days, regenerate at developers.facebook.com)
     META_ADS: {
-      ACCESS_TOKEN: 'EAAR30KmZARsIBRPInYVVajRoF5pMske7lkZAZCkZBcUAPh3CkFp5RAeQtMZALy4vLuJbPTc2Dkwd2aLXkz48zlY8Ya5lZBZBwA4CZB0ImfpZB1xSleCIcp66jl1MUNnUwJZBL8wHioYJWFwD04vrUERuFHo93XXzq29zwZCRmNUgtDzhhiwK6cbnfx6zSHoa7nrVZAe1C2vgL5oN',  // Long-lived 60-day token — expires ~2026-05-22
+      ACCESS_TOKEN: '',  // REMOVED from client-side for security — Meta API now proxied through cloud function
       AD_ACCOUNT_ID: 'act_1368706200208131',
       API_VERSION: 'v21.0',
     },
@@ -9278,12 +9278,12 @@ function processLiveData(allRows, legacyCancels, auditLog) {
 
   function categorizeReason(reason, apptType) {
     const r = (reason||'').toLowerCase(); const t = (apptType||'').toLowerCase();
-    if (/\bcompleted?\b/.test(r) && !/not completed|never completed/.test(r)) return 'Completed';
+    if (/\bcompleted?\b/.test(r) && !/not completed|never completed|partially completed|completed early|incomplete/.test(r)) return 'Completed';
     if (/fibroscan|fibrosan|fibro scan|fibroscan only|scan visit/i.test(r) || /fibroscan|fibrosan|fibro scan|fibroscan only|scan visit/i.test(t)) return 'FibroScan Only';
     if (/discontinu/i.test(r)) return 'Discontinued';
     if (t === 'no show') return 'No Show';
-    if (/screen.?fail|screenfail|\bsf\b|s\/f|\bdnq\b|does not qualify|not qualify|did not meet|ineligib|not eligible|protocol criteria|exclusion criteria|inclusion criteria|excluded medication|autoimmune|\bbmi\b/.test(r)) return 'Screen Fail / DNQ';
-    if ((/reschedul|will call back|moved to \w|changed to \w|site (requested|cancel)|coordinator request|sponsor (request|cancel)/.test(r)) && !r.includes('no show') && !r.includes('did not call back') && !r.includes('didn\'t call back')) return 'Rescheduled';
+    if (/screen.?fail|screenfail|\bsf\b|s\/f|\bdnq\b|does not qualify|not qualify|did not meet|ineligib|not eligible|protocol criteria|exclusion criteria|inclusion criteria|excluded medication|autoimmune|bmi (too|out of|above|below|over|under|does not|doesn.t|not within|high|low|exceed)/.test(r)) return 'Screen Fail / DNQ';
+    if ((/reschedul|will call back|moved to \w|changed to \w|site (requested|cancel)|coordinator request|sponsor (request|cancel)/.test(r)) && !/no.?show|did not call back|didn.t call back/.test(r)) return 'Rescheduled';
     if (/no.?show|didn.t answer|did not answer|no answer|mailbox|left text|left vm|text sent|unresponsive|lost to follow|never reached/.test(r)) return 'No Show';
     if (/withdrew|no longer interested|not interested|refuses to return|do not solicit|not comfortable/.test(r)) return 'Patient Withdrew';
     if (/weather|\bsnow\b|\bstorm\b/.test(r)) return 'Weather';
@@ -14004,7 +14004,9 @@ async function fetchCrioStudies() {
 }
 
 // ── Pre-screening / placeholder study detection (shared by renderCrioStudies + buildEnrollmentKPIs) ──
-var CRIO_SKIP_STUDIES = {'Config Study':1,'Upload test':1,'EVENT':1,'2025_COVID_FLU_RSV_DETECTION STUDY':1};
+var CRIO_SKIP_STUDIES = {'Config Study':1,'Upload test':1,'EVENT':1};
+// Dynamic skip: any study containing COVID_FLU_RSV regardless of year
+function _isSkipStudy(name) { return CRIO_SKIP_STUDIES[name] || /covid.?flu.?rsv/i.test(name); }
 var PRESCREEN_OVERRIDES = {
   '100455': ['154462','161620','188815','189260'],  // Cardiology → D7960C00015, D6973C00001, J2O-MC-EKBG (PHL+PNJ)
   '38926':  ['86826','135648'],            // Migraine → M23-714, C4951063
@@ -14623,7 +14625,7 @@ function buildEnrollmentKPIs() {
       || s.protocol_number.toLowerCase().indexOf('pre screen') >= 0
       || s.protocol_number === s.indication
       || !!PRESCREEN_OVERRIDES[s.study_key];
-    if (isPS || CRIO_SKIP_STUDIES[s.protocol_number]) psKeys[s.study_key] = true;
+    if (isPS || _isSkipStudy(s.protocol_number) || _isSkipStudy(s.study_name)) psKeys[s.study_key] = true;
   });
 
   // Aggregate subject statuses across protocol studies only (excluding pre-screening)
@@ -16183,7 +16185,7 @@ function renderEnrollmentVelocity() {
 // ── Data Source URLs — all from Cloud Function (BQ) ──
 function _getCancelURL() { return CRP_CONFIG.CF_BASE + '?feed=cancels&format=csv'; }
 function _getVisitsURL() { return CRP_CONFIG.CF_BASE + '?feed=visits&format=csv'; }
-function _getPatientDBURL() { return CRP_CONFIG.CF_BASE + '?feed=patientDB&format=csv'; }
+function _getPatientDBURL() { return CRP_CONFIG.CF_BASE + '?feed=patientDB&format=csv&auth=crp-dashboard-2026'; }
 function _cfUrl(feed) { return CRP_CONFIG.CF_BASE + '?feed=' + feed + '&format=csv'; }
 
 async function _fetchAuditLog() {
@@ -16221,8 +16223,10 @@ async function compareBQvLegacy(bqUrl) {
   var missingInBQ = legacyCols.filter(function(c) { return bqCols.indexOf(c) === -1 && c !== 'snapshot_date'; });
   var extraInBQ = bqCols.filter(function(c) { return legacyCols.indexOf(c) === -1 && c !== 'snapshot_date'; });
 
-  // ── Row matching ──
+  // ── Row matching — use subject_key when available for disambiguation ──
   function makeKey(r) {
+    var subKey = r['Subject Key (Back End)'] || r['subject_key_back_end'] || '';
+    if (subKey) return buildKey(subKey, r['Study Name'], r['Cancel Date']||r['Scheduled Date']);
     return buildKey(r['Subject Full Name'], r['Study Name'], r['Cancel Date']||r['Scheduled Date']);
   }
   function latestOnly(rows) {

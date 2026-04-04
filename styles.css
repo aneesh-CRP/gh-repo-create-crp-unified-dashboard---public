@@ -446,6 +446,7 @@ body {
 }
 .risk-table td { padding: 8px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
 #merged-study-table th, #vis-table th { position: sticky; top: 0; z-index: 2; background: var(--surface2, #f8fafc); }
+#vis-table tbody tr td { padding: 8px 6px; }
 .risk-table tr:last-child td { border-bottom: none; }
 .risk-table tr:hover td { background: #f8fafc; }
 .risk-tag {

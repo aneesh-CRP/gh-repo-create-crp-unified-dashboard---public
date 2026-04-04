@@ -25,6 +25,13 @@ function tbl(name) { return '`' + PROJECT + '.' + DATASET + '.' + name + '`'; }
 // ── Firestore (shared persistent state) ──
 const firestore = new Firestore({ projectId: PROJECT });
 const STATE_COLLECTION = 'dashboard_state';
+const API_SECRET = process.env.API_SECRET || 'crp-dashboard-2026';  // Shared secret for sensitive endpoints
+const SENSITIVE_FEEDS = new Set(['patientDB']);  // Feeds requiring auth
+function requireAuth(req, res) {
+  const token = req.query.auth || req.headers['x-api-key'] || '';
+  if (token !== API_SECRET) { res.status(403).json({ error: 'Unauthorized. Provide auth= parameter or x-api-key header.' }); return false; }
+  return true;
+}
 const VALID_STATE_DOCS = ['visit_statuses', 'rideshare', 'payouts', 'followups', 'dismissed', 'collection_tracking', 'confirmed_visits', 'risk_cards', 'winback', 'dismissed_actions', 'audit_log'];
 
 // Use user credentials (refresh token) to access Fivetran-managed authorized views
@@ -112,7 +119,7 @@ async function runQuery(sql) {
     const schema = (j.schema?.fields || []).map(f => f.name);
     const parseRows = (rows) => (rows || []).map(r => {
       const obj = {};
-      r.f.forEach((c, i) => { obj[schema[i]] = c.v || ''; });
+      r.f.forEach((c, i) => { obj[schema[i]] = c.v != null ? c.v : ''; });
       return obj;
     });
     let allRows = parseRows(j.rows);
@@ -149,7 +156,7 @@ const STUDY_NAME_SQL = `CASE
 const SUBJECT_NAME_SQL = `REGEXP_REPLACE(TRIM(CONCAT(COALESCE(sub.first_name, ''), ' ', COALESCE(sub.middle_name, ''), ' ', COALESCE(sub.last_name, ''))), r'\\s+', ' ')`;
 
 // Reusable filter: exclude test/config/event studies from all feeds
-const STUDY_FILTER_SQL = `AND LOWER(CONCAT(COALESCE(st.nickname, ''), ' ', COALESCE(st.protocol_number, ''))) NOT LIKE '%test%'
+const STUDY_FILTER_SQL = `AND NOT REGEXP_CONTAINS(LOWER(CONCAT(COALESCE(st.nickname, ''), ' ', COALESCE(st.protocol_number, ''))), r'\\btest\\b')
       AND LOWER(CONCAT(COALESCE(st.nickname, ''), ' ', COALESCE(st.protocol_number, ''))) NOT LIKE '%demo%'
       AND LOWER(CONCAT(COALESCE(st.nickname, ''), ' ', COALESCE(st.protocol_number, ''))) NOT LIKE '%sandbox%'
       AND LOWER(CONCAT(COALESCE(st.nickname, ''), ' ', COALESCE(st.protocol_number, ''))) NOT LIKE '%config study%'
@@ -684,7 +691,7 @@ const FEEDS = {
       FROM ${tbl('fact_subject_visit_procedure_question')} q
       JOIN ${tbl('user')} u ON LOWER(TRIM(CONCAT(COALESCE(q.first_name,''), ' ', COALESCE(q.last_name,'')))) = LOWER(TRIM(CONCAT(u.first_name, ' ', u.last_name)))
       JOIN ${tbl('study_user')} su ON u.user_key = su.user_key AND q.study_key = su.study_key AND su.role = 2 AND su._fivetran_deleted = false
-      WHERE q.date_completed >= '2026-01-01' AND q.answer IS NOT NULL AND q.answer != ''
+      WHERE q.date_completed >= DATETIME_TRUNC(CURRENT_DATETIME(), YEAR) AND q.answer IS NOT NULL AND q.answer != ''
       GROUP BY q.subject_visit_key, q.first_name, q.last_name
       QUALIFY ROW_NUMBER() OVER (PARTITION BY q.subject_visit_key ORDER BY COUNT(*) DESC) = 1
     ),
@@ -696,7 +703,7 @@ const FEEDS = {
       FROM ${tbl('fact_subject_visit_procedure_question')} q
       JOIN ${tbl('user')} u ON LOWER(TRIM(CONCAT(COALESCE(q.first_name,''), ' ', COALESCE(q.last_name,'')))) = LOWER(TRIM(CONCAT(u.first_name, ' ', u.last_name)))
       JOIN ${tbl('study_user')} su ON u.user_key = su.user_key AND q.study_key = su.study_key AND su.role = 1 AND su._fivetran_deleted = false
-      WHERE q.date_completed >= '2026-01-01' AND q.answer IS NOT NULL AND q.answer != ''
+      WHERE q.date_completed >= DATETIME_TRUNC(CURRENT_DATETIME(), YEAR) AND q.answer IS NOT NULL AND q.answer != ''
       GROUP BY q.subject_visit_key, q.first_name, q.last_name
       QUALIFY ROW_NUMBER() OVER (PARTITION BY q.subject_visit_key ORDER BY COUNT(*) DESC) = 1
     ),
@@ -755,7 +762,7 @@ const FEEDS = {
       LEFT JOIN esource_inv ei ON ca.subject_visit_key = ei.subject_visit_key
       LEFT JOIN assigned_coord ac ON ca.calendar_appointment_key = ac.calendar_appointment_key
       LEFT JOIN assigned_inv ai ON ca.calendar_appointment_key = ai.calendar_appointment_key
-      WHERE ca.start >= '2026-01-01'
+      WHERE ca.start >= DATETIME_TRUNC(CURRENT_DATETIME(), YEAR)
         AND ca._fivetran_deleted = false
         AND ca.type IN (0, 1)
         ${STUDY_FILTER_SQL}
@@ -796,7 +803,7 @@ const FEEDS = {
       FROM ${tbl('fact_subject_visit_procedure_question')} q
       JOIN ${tbl('user')} u ON LOWER(TRIM(CONCAT(COALESCE(q.first_name,''), ' ', COALESCE(q.last_name,'')))) = LOWER(TRIM(CONCAT(u.first_name, ' ', u.last_name)))
       JOIN ${tbl('study_user')} su ON u.user_key = su.user_key AND q.study_key = su.study_key AND su.role = 2 AND su._fivetran_deleted = false
-      WHERE q.date_completed >= '2026-01-01' AND q.answer IS NOT NULL AND q.answer != ''
+      WHERE q.date_completed >= DATETIME_TRUNC(CURRENT_DATETIME(), YEAR) AND q.answer IS NOT NULL AND q.answer != ''
       GROUP BY q.subject_visit_key, q.first_name, q.last_name
       QUALIFY ROW_NUMBER() OVER (PARTITION BY q.subject_visit_key ORDER BY COUNT(*) DESC) = 1
     ),
@@ -807,7 +814,7 @@ const FEEDS = {
       FROM ${tbl('fact_subject_visit_procedure_question')} q
       JOIN ${tbl('user')} u ON LOWER(TRIM(CONCAT(COALESCE(q.first_name,''), ' ', COALESCE(q.last_name,'')))) = LOWER(TRIM(CONCAT(u.first_name, ' ', u.last_name)))
       JOIN ${tbl('study_user')} su ON u.user_key = su.user_key AND q.study_key = su.study_key AND su.role = 1 AND su._fivetran_deleted = false
-      WHERE q.date_completed >= '2026-01-01' AND q.answer IS NOT NULL AND q.answer != ''
+      WHERE q.date_completed >= DATETIME_TRUNC(CURRENT_DATETIME(), YEAR) AND q.answer IS NOT NULL AND q.answer != ''
       GROUP BY q.subject_visit_key, q.first_name, q.last_name
       QUALIFY ROW_NUMBER() OVER (PARTITION BY q.subject_visit_key ORDER BY COUNT(*) DESC) = 1
     ),
@@ -862,7 +869,7 @@ const FEEDS = {
     LEFT JOIN esource_inv ei ON ca.subject_visit_key = ei.subject_visit_key
     LEFT JOIN assigned_coord ac ON ca.calendar_appointment_key = ac.calendar_appointment_key
     LEFT JOIN assigned_inv ai ON ca.calendar_appointment_key = ai.calendar_appointment_key
-    WHERE ca.start >= '2026-01-01' AND ca.start < CURRENT_DATETIME()
+    WHERE ca.start >= DATETIME_TRUNC(CURRENT_DATETIME(), YEAR) AND ca.start < CURRENT_DATETIME()
       AND ca.status != 0
       AND ca._fivetran_deleted = false
       AND ca.type IN (0, 1)
@@ -3396,7 +3403,8 @@ function parseCustomFields(fields) {
       obj[f.name] = f.value.map(id => labelMap[id] || id).join(', ');
     } else if (f.type === 'date' && typeof f.value === 'number') {
       // Date: epoch ms → YYYY-MM-DD
-      obj[f.name] = new Date(f.value).toISOString().split('T')[0];
+      // Convert epoch ms to ET date string (cloud function runs in us-east1)
+      obj[f.name] = new Date(parseInt(f.value)).toLocaleDateString('en-CA', {timeZone: 'America/New_York'});
     } else if (f.type === 'date' && typeof f.value === 'string' && /^\d{10,}$/.test(f.value)) {
       obj[f.name] = new Date(parseInt(f.value)).toISOString().split('T')[0];
     } else {
@@ -4122,6 +4130,25 @@ async function fetchQBPayments() {
   })).sort((a, b) => b.date.localeCompare(a.date));
 }
 
+// ═══════════════════════════════════════════════════════════
+// META MARKETING API PROXY — token kept server-side only
+// ═══════════════════════════════════════════════════════════
+const META_TOKEN = process.env.META_TOKEN || '';
+const META_AD_ACCOUNT = 'act_1368706200208131';
+const META_API_VERSION = 'v21.0';
+
+async function fetchMetaInsights(params) {
+  if (!META_TOKEN) throw new Error('META_TOKEN not configured');
+  const days = parseInt(params.days) || 30;
+  const since = new Date(); since.setDate(since.getDate() - days);
+  const sinceStr = since.toISOString().split('T')[0];
+  const untilStr = new Date().toISOString().split('T')[0];
+  const fields = 'campaign_name,impressions,clicks,spend,actions,cost_per_action_type';
+  const url = `https://graph.facebook.com/${META_API_VERSION}/${META_AD_ACCOUNT}/insights?fields=${fields}&time_range={"since":"${sinceStr}","until":"${untilStr}"}&level=campaign&limit=100&access_token=${META_TOKEN}`;
+  const result = await httpGet(url, '');
+  return JSON.parse(result);
+}
+
 const QB_FEEDS = {
   qbEmployees: fetchQBEmployees,
   qbTimeActivity: fetchQBTimeActivity,
@@ -4307,7 +4334,7 @@ functions.http('crpBqApi', async (req, res) => {
       ) u ON ca.calendar_appointment_key = u.calendar_appointment_key
       JOIN ${tbl('study')} st ON ca.study_key = st.study_key
       LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
-      WHERE ca.start >= '2026-01-01' AND ca._fivetran_deleted = false AND ca.type IN (0,1)
+      WHERE ca.start >= DATETIME_TRUNC(CURRENT_DATETIME(), YEAR) AND ca._fivetran_deleted = false AND ca.type IN (0,1)
         ${STUDY_FILTER_SQL}
       GROUP BY coordinator ORDER BY raw_total DESC`;
       const rawRows = await runQuery(rawSql);
@@ -4358,8 +4385,21 @@ functions.http('crpBqApi', async (req, res) => {
     return;
   }
 
+  // ── GET: Meta Ads Proxy ──
+  if (req.query.action === 'meta-ads') {
+    res.set('Cache-Control', 'public, max-age=600');
+    try {
+      const result = await fetchMetaInsights(req.query);
+      res.json({ success: true, ...result });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+    return;
+  }
+
   if (req.query.action === 'send-reminders') {
     res.set('Cache-Control', 'no-store');
+    if (!requireAuth(req, res)) return;
     try {
       const body = req.method === 'POST' ? (typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {})) : {};
       const dryRun = req.query.dry !== 'false';  // default to dry run for safety
@@ -4377,6 +4417,7 @@ functions.http('crpBqApi', async (req, res) => {
   // ── POST: Send single test SMS ──
   if (req.query.action === 'test-sms' && req.method === 'POST') {
     res.set('Cache-Control', 'no-store');
+    if (!requireAuth(req, res)) return;
     try {
       const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {});
       if (!body.to || !body.message) { res.status(400).json({ error: 'Provide to and message in body' }); return; }
@@ -4682,6 +4723,8 @@ functions.http('crpBqApi', async (req, res) => {
   }
 
   // ── BQ feeds ──
+  // Auth required for sensitive feeds (PHI)
+  if (SENSITIVE_FEEDS.has(feed) && !requireAuth(req, res)) return;
   const feedDef = FEEDS[feed];
   if (!feedDef) {
     res.status(404).json({ error: `Unknown feed: ${feed}`, available: [...Object.keys(FEEDS), ...Object.keys(CLICKUP_FEEDS), ...Object.keys(QB_FEEDS)] });
