@@ -1,1 +1,1 @@
-{"note": "Fallback data removed for HIPAA compliance. Dashboard loads live from BQ cloud function.", "removed": "2026-04-04"}
+{"allVisitDetail":[],"allCancels":[],"cancelReasons":[],"noShows":[],"withdrawals":[],"screenFails":[],"discontinued":[],"rescheduledVisits":[],"riskFlags":[],"next14Detail":[],"cancelTrend":[],"cancelWeekly":[],"upcomingWeekly":[],"enrollmentData":[],"enrollSummary":{},"mergedStudies":[],"actionDetails":[],"snapshotDate":"","weeklyTrends":[],"weeklyTrendsAll":[],"note":"Synthetic skeleton — no PHI. Live data loads from BQ cloud function."}
