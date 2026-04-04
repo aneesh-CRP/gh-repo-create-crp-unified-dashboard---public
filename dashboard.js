@@ -17819,12 +17819,25 @@ function exportPayouts() {
 // ═══ AUDIT LOG (Firestore-backed) ═══
 var _auditLog = [];
 (function() {
-  var cached = crpState.get('audit_log');
-  if (cached && cached.entries && cached.entries.length > 0) { _auditLog = cached.entries; return; }
-  try { _auditLog = JSON.parse(localStorage.getItem('crp_audit_log') || '[]'); } catch(e) { _auditLog = []; }
+  try {
+    var cached = crpState.get('audit_log');
+    if (cached && Array.isArray(cached.entries)) { _auditLog = cached.entries; return; }
+    // Firestore may have stored the array directly under various keys — try to recover
+    if (cached && typeof cached === 'object' && !Array.isArray(cached)) {
+      var vals = Object.values(cached).filter(function(v) { return v && typeof v === 'object' && v.timestamp; });
+      if (vals.length > 0) { _auditLog = vals; return; }
+    }
+    if (Array.isArray(cached)) { _auditLog = cached; return; }
+    var raw = localStorage.getItem('crp_audit_log');
+    if (raw) {
+      var parsed = JSON.parse(raw);
+      _auditLog = Array.isArray(parsed) ? parsed : [];
+    }
+  } catch(e) { _auditLog = []; }
 })();
 
 function logAudit(action, details) {
+  if (!Array.isArray(_auditLog)) _auditLog = [];
   _auditLog.push({ timestamp: new Date().toISOString(), action: action, details: details || '', user: crpState._user || '' });
   if (_auditLog.length > 500) _auditLog = _auditLog.slice(-500);
   try { localStorage.setItem('crp_audit_log', JSON.stringify(_auditLog)); } catch(e) {}
