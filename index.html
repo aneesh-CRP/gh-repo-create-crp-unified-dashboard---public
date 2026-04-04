@@ -2139,6 +2139,10 @@ function jsAttr(s) {
   return escapeHTML(String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'"));
 }
 
+// ═══ SAFETY: Override parseInt to always use radix 10 ═══
+var _origParseInt = parseInt;
+parseInt = function(val, radix) { return _origParseInt(val, radix || 10); };
+
 // ═══ DATE PARSING (global — safe for YYYY-MM-DD) ═══
 // Forces local-time parsing: 'YYYY-MM-DD' → 'YYYY-MM-DDT00:00:00' to avoid UTC off-by-one
 function _parseDate(s) {
@@ -10203,8 +10207,52 @@ async function fetchQuickBooksData() {
     _log('CRP QB: Live API — ' + Object.keys(pnlByStudy).length + ' studies matched ($' + Math.round(matchedRev).toLocaleString() + '), ' + pnlUnmatched.length + ' unmatched, income: $' + Math.round(qbTotalIncome).toLocaleString() + ', expense: $' + Math.round(QB_DATA.totalExpense).toLocaleString() + ', net: $' + Math.round(QB_DATA.netIncome).toLocaleString());
     renderCRIOvsQB();
     renderFinancePnL();
+    checkBQvsQBReconciliation();
   } catch(e) {
     console.warn('CRP QB: Live API fetch failed:', e.message);
+  }
+}
+
+// ═══ BQ vs QB AUTOMATED RECONCILIATION ALERT ═══
+function checkBQvsQBReconciliation() {
+  if (!QB_DATA.loaded || !QB_DATA.crioPaidByStudy) return;
+  var alerts = [];
+  var totalBQ = 0, totalQB = 0;
+
+  // Compare per-study: BQ (CRIO) revenue vs QB revenue
+  Object.keys(QB_DATA.pnlByStudy || {}).forEach(function(study) {
+    var qbRev = QB_DATA.pnlByStudy[study].total || 0;
+    // Find matching CRIO study
+    var crioMatch = QB_DATA.crioPaidByStudy[study];
+    var bqRev = crioMatch ? crioMatch.paid : 0;
+    totalBQ += bqRev;
+    totalQB += qbRev;
+    var diff = Math.abs(qbRev - bqRev);
+    var pctDiff = (qbRev + bqRev) > 0 ? (diff / Math.max(qbRev, bqRev) * 100) : 0;
+    if (diff > 500 && pctDiff > 10) {
+      alerts.push({ study: study, bq: bqRev, qb: qbRev, diff: qbRev - bqRev, pct: Math.round(pctDiff) });
+    }
+  });
+
+  // Check unmatched QB studies (in QB but not in CRIO)
+  (QB_DATA.pnlUnmatched || []).forEach(function(r) {
+    if (r.total > 1000) alerts.push({ study: r.name + ' (QB only)', bq: 0, qb: r.total, diff: r.total, pct: 100 });
+  });
+
+  // Show reconciliation health chip
+  var totalDiff = Math.abs(totalQB - totalBQ);
+  var totalPct = (totalQB + totalBQ) > 0 ? (totalDiff / Math.max(totalQB, totalBQ) * 100) : 0;
+  var status = alerts.length === 0 && totalPct < 15 ? 'ok' : alerts.length <= 3 ? 'warn' : 'fail';
+  setHealthChip('dh-finance', status, 'Finance (' + (status === 'ok' ? 'reconciled' : alerts.length + ' discrepancies') + ')');
+
+  // Store for display
+  window._reconAlerts = alerts;
+  window._reconTotals = { bq: totalBQ, qb: totalQB, diff: totalQB - totalBQ, pct: Math.round(totalPct) };
+  _log('BQ vs QB reconciliation: ' + alerts.length + ' alerts, total diff $' + Math.round(totalDiff) + ' (' + Math.round(totalPct) + '%)');
+
+  // Show toast if significant discrepancies
+  if (alerts.length > 0) {
+    showToast('Finance: ' + alerts.length + ' BQ/QB discrepancies detected ($' + Math.round(totalDiff).toLocaleString() + ' diff)', 'warning', 8000);
   }
 }
 
@@ -16043,6 +16091,12 @@ async function fetchCrioStudies() {
         });
         _log('CRIO Studies loaded: ' + CRIO_STUDIES_DATA.length);
         setHealthChip('dh-crio-api', CRIO_STUDIES_DATA.length > 0 ? 'ok' : 'warn', 'CRIO Studies (' + CRIO_STUDIES_DATA.length + ')');
+        // Auto-detect Pennington study keys from CRIO site_key (5545 = Pennington)
+        var _autoPnj = CRIO_STUDIES_DATA.filter(function(s) { return s.site_key === '5545'; }).map(function(s) { return parseInt(s.study_key, 10); }).filter(function(k) { return !isNaN(k); });
+        if (_autoPnj.length > 0) {
+          CRP_CONFIG.PENNINGTON_STUDY_KEYS = _autoPnj;
+          _log('CRIO: Auto-detected ' + _autoPnj.length + ' Pennington studies from site_key=5545');
+        }
         safe(renderCrioStudies, 'renderCrioStudies');
         safe(mergeCrioIntoStudies, 'mergeCrioIntoStudies');
         safe(renderEnrollmentVelocity, 'renderEnrollmentVelocity');
@@ -17576,22 +17630,18 @@ var META_ADS_CAMPAIGNS = [];  // Campaign metadata (status, budget)
 
 async function fetchMetaAds() {
   if (_metaAdsFetchInFlight) return;
-  var cfg = (CRP_CONFIG.CLICKUP || {}).META_ADS;
-  if (!cfg || !cfg.ACCESS_TOKEN) return;
   _metaAdsFetchInFlight = true;
   try {
-    var base = 'https://graph.facebook.com/' + cfg.API_VERSION + '/';
-    var tk = '&access_token=' + cfg.ACCESS_TOKEN;
-    // 3 parallel fetches: 30d summary, weekly breakdown, campaign metadata
-    var [r1, r2, r3] = await Promise.all([
-      fetch(base + cfg.AD_ACCOUNT_ID + '/insights?fields=campaign_name,impressions,clicks,ctr,actions,cost_per_action_type,spend&date_preset=last_30d&level=campaign' + tk),
-      fetch(base + cfg.AD_ACCOUNT_ID + '/insights?fields=campaign_name,actions,spend,impressions,clicks&date_preset=last_30d&level=campaign&time_increment=7' + tk),
-      fetch(base + cfg.AD_ACCOUNT_ID + '/campaigns?fields=name,status,effective_status,daily_budget' + tk),
-    ]);
-    var j1 = await r1.json(), j2 = await r2.json(), j3 = await r3.json();
+    // Fetch via cloud function proxy (token kept server-side — see CLAUDE.md security rules)
+    var proxyResp = await fetch(CRP_CONFIG.CF_BASE + '?action=meta-ads');
+    var proxyData = await proxyResp.json();
+    if (proxyData.error) throw new Error(proxyData.error);
+    var j1 = proxyData.summary || { data: [] };
+    var j2 = proxyData.weekly || { data: [] };
+    var j3 = proxyData.campaigns || { data: [] };
     if (j1.error) throw new Error(j1.error.message);
-    if (j2.error) { console.warn('CRP: Meta weekly insights error:', j2.error.message); j2 = { data: [] }; }
-    if (j3.error) { console.warn('CRP: Meta campaigns error:', j3.error.message); j3 = { data: [] }; }
+    if (j2.error) { _log('CRP: Meta weekly insights error: ' + j2.error.message); j2 = { data: [] }; }
+    if (j3.error) { _log('CRP: Meta campaigns error: ' + j3.error.message); j3 = { data: [] }; }
 
     function parseActions(c) {
       var leads = 0, engagement = 0;
@@ -17632,7 +17682,7 @@ async function fetchMetaAds() {
     updateOverviewMarketingKPI();
     safe(renderEnrollmentVelocity, 'renderEnrollmentVelocity');
     if (typeof renderFinMarketingROI === 'function') try { renderFinMarketingROI(); } catch(e) { _log('renderFinMarketingROI: ' + e.message); }
-    checkMetaTokenExpiry(cfg).catch(function() {});
+    // Token expiry check removed — token is now server-side in cloud function
   } catch(e) {
     console.warn('CRP: Meta Ads fetch failed:', e.message);
     var el = document.getElementById('meta-ads-container');

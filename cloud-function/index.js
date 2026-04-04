@@ -4137,16 +4137,21 @@ const META_TOKEN = process.env.META_TOKEN || '';
 const META_AD_ACCOUNT = 'act_1368706200208131';
 const META_API_VERSION = 'v21.0';
 
-async function fetchMetaInsights(params) {
+async function fetchMetaInsights() {
   if (!META_TOKEN) throw new Error('META_TOKEN not configured');
-  const days = parseInt(params.days) || 30;
-  const since = new Date(); since.setDate(since.getDate() - days);
-  const sinceStr = since.toISOString().split('T')[0];
-  const untilStr = new Date().toISOString().split('T')[0];
-  const fields = 'campaign_name,impressions,clicks,spend,actions,cost_per_action_type';
-  const url = `https://graph.facebook.com/${META_API_VERSION}/${META_AD_ACCOUNT}/insights?fields=${fields}&time_range={"since":"${sinceStr}","until":"${untilStr}"}&level=campaign&limit=100&access_token=${META_TOKEN}`;
-  const result = await httpGet(url, '');
-  return JSON.parse(result);
+  const base = `https://graph.facebook.com/${META_API_VERSION}/${META_AD_ACCOUNT}`;
+  const tk = `&access_token=${META_TOKEN}`;
+  // 3 parallel fetches matching dashboard needs
+  const [r1, r2, r3] = await Promise.all([
+    httpGet(base + '/insights?fields=campaign_name,impressions,clicks,ctr,actions,cost_per_action_type,spend&date_preset=last_30d&level=campaign' + tk, ''),
+    httpGet(base + '/insights?fields=campaign_name,actions,spend,impressions,clicks&date_preset=last_30d&level=campaign&time_increment=7' + tk, ''),
+    httpGet(base + '/campaigns?fields=name,status,effective_status,daily_budget' + tk, ''),
+  ]);
+  return {
+    summary: JSON.parse(r1),
+    weekly: JSON.parse(r2),
+    campaigns: JSON.parse(r3),
+  };
 }
 
 const QB_FEEDS = {
@@ -4385,11 +4390,11 @@ functions.http('crpBqApi', async (req, res) => {
     return;
   }
 
-  // ── GET: Meta Ads Proxy ──
+  // ── GET: Meta Ads Proxy (token kept server-side) ──
   if (req.query.action === 'meta-ads') {
     res.set('Cache-Control', 'public, max-age=600');
     try {
-      const result = await fetchMetaInsights(req.query);
+      const result = await fetchMetaInsights();
       res.json({ success: true, ...result });
     } catch (err) {
       res.status(500).json({ error: err.message });
