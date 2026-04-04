@@ -56,6 +56,13 @@
 - `setHealthChip('dh-xxx', ...)` requires a matching `<span id="dh-xxx">` in the data health strip HTML
 - Call `_updateHealthButton()` after any render cycle that might change chip states
 
+### State Persistence
+- **NEVER** use `localStorage` directly — always go through `crpState` (Firestore-backed, localStorage as offline fallback)
+- All state docs: `visit_statuses`, `rideshare`, `payouts`, `followups`, `dismissed`, `collection_tracking`, `confirmed_visits`, `risk_cards`, `winback`, `dismissed_actions`, `audit_log`
+- Pattern: `crpState.get('docName')` to load, `crpState.set('docName', key, value, 'localStorage_key')` to save
+- Cloud function `VALID_STATE_DOCS` array must match — add new docs there too
+- Coordinator performance data comes from BQ (`coordPerf` feed), NOT localStorage snapshots
+
 ## Performance Attribution — IRON-CLAD RULES (NEVER modify without explicit user approval)
 
 These feeds (`coordPerf`, `completedVisits`) drive performance reviews. **Do NOT change the attribution logic.**
