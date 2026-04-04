@@ -6816,14 +6816,24 @@ function mergeCoordGoalsWithSnapshot(goals) {
     });
   });
 
-  // Layer 2: Merge live data on top (keep higher count)
+  // Layer 2: Merge live data on top
+  // For PAST dates: keep higher count (CRIO drops old visits)
+  // For TODAY and FUTURE: always use live count (cancellations reduce visits)
+  var todayISO = localISO(new Date());
   COORDS.forEach(function(name) {
     if (!snapshot[name]) snapshot[name] = {};
     var liveByDay = (goals.byDay && goals.byDay[name]) ? goals.byDay[name] : {};
     Object.keys(liveByDay).forEach(function(d) {
       var liveCount = liveByDay[d] || 0;
-      var snapCount = snapshot[name][d] || 0;
-      snapshot[name][d] = Math.max(liveCount, snapCount);
+      if (d >= todayISO) {
+        snapshot[name][d] = liveCount; // future/today: trust live data
+      } else {
+        snapshot[name][d] = Math.max(liveCount, snapshot[name][d] || 0); // past: keep higher
+      }
+    });
+    // Clear future snapshot entries that have no live data (visit was fully cancelled)
+    Object.keys(snapshot[name]).forEach(function(d) {
+      if (d >= todayISO && !liveByDay[d]) delete snapshot[name][d];
     });
     // Write merged snapshot back into goals.byDay
     if (!goals.byDay) goals.byDay = {};
