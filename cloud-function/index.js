@@ -1287,7 +1287,7 @@ const FEEDS = {
     JOIN ${tbl('gaap_revenue_group')} rg ON rdp.group_id = rg.group_id
     JOIN ${tbl('study')} st ON rg.study_id = st.external_id
     LEFT JOIN ${tbl('sponsor')} spon ON st.sponsor_key = spon.sponsor_key
-    LEFT JOIN recon_by_rdp rec ON CAST(rdp.revenue_data_point_id AS STRING) = rec.rdp_id
+    LEFT JOIN reconciled rec ON CAST(rdp.revenue_data_point_id AS STRING) = rec.rdp_id
     WHERE rdp.amount > COALESCE(rec.paid, 0)
     GROUP BY st.study_key, study_name, spon.name, st.protocol_number
     HAVING total_ar > 0
