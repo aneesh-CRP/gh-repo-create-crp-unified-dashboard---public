@@ -20,10 +20,20 @@
 - **NEVER** use `new Date('YYYY-MM-DD')` — it parses as UTC, off by 1 day in US timezones
 - **ALWAYS** use `parseDate()` (appends `T00:00:00` for local time)
 - **NEVER** hardcode years (`new Date(2026, ...)`) — use `new Date().getFullYear()`
+- **NEVER** hardcode years in BQ SQL — use `DATETIME_TRUNC(CURRENT_DATETIME(), YEAR)`
 - **NEVER** hardcode month names in KPI labels — compute dynamically
+- For ClickUp epoch dates, convert in ET: `new Date(epoch).toLocaleDateString('en-CA', {timeZone: 'America/New_York'})`
+
+### Security
+- **NEVER** put API tokens in client-side HTML — use cloud function env vars + proxy endpoints
+- **NEVER** commit PHI (patient data) to the repo — `fallback-data.json` was sanitized for this reason
+- Sensitive BQ feeds (patientDB) require `auth=` parameter — add to `SENSITIVE_FEEDS` set
+- SMS/reminder endpoints require auth — use `requireAuth(req, res)` check
+- Cloud function `API_SECRET` env var controls access to sensitive endpoints
 
 ### Keys & Lookups
 - **ALWAYS** use `buildKey()` for Set/Map lookups — it joins with `|` and applies `normalize()`
+- **PREFER** subject_key over patient name in dedup keys when available (prevents same-name collision)
 - **NEVER** concatenate keys manually (e.g., `name + '||' + study`) — it won't match
 
 ### Data Deduplication
